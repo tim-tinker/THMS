@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "TPFS.UI.WinUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "TPFS.UI.WinUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
