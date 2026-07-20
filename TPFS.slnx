@@ -1,12 +1,15 @@
 <Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
   <Project Path="TPFS.Analytics/TPFS.Analytics.csproj" />
   <Project Path="TPFS.Data/TPFS.Data.csproj" />
   <Project Path="TPFS.Domain/TPFS.Domain.csproj" />
   <Project Path="TPFS.Ingestion/TPFS.Ingestion.csproj" />
   <Project Path="TPFS.Reporting.Excel/TPFS.Reporting.Excel.csproj" />
   <Project Path="TPFS.Tests/TPFS.Tests.csproj" />
-  <Project Path="TPFS.UI.WinUI/TPFS.UI.WinUI.csproj" Id="bd5f02b2-a976-4abc-bd90-40f9507cdfa2">
-    <Platform Project="x64" />
-    <Deploy />
-  </Project>
+  <Project Path="TPFS.Logic.ViewModels/TPFS.Logic.ViewModels.csproj" />
+  <Project Path="TPFS.UI.WinForms/TPFS.UI.WinForms.csproj" />
 </Solution>
