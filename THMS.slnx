@@ -1,0 +1,15 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="THMS.Analytics/THMS.Analytics.csproj" />
+  <Project Path="THMS.Data/THMS.Data.csproj" />
+  <Project Path="THMS.Domain/THMS.Domain.csproj" />
+  <Project Path="THMS.Ingestion/THMS.Ingestion.csproj" />
+  <Project Path="THMS.Reporting.Excel/THMS.Reporting.Excel.csproj" />
+  <Project Path="THMS.Tests/THMS.Tests.csproj" />
+  <Project Path="THMS.Logic.ViewModels/THMS.Logic.ViewModels.csproj" />
+  <Project Path="THMS.UI.WinForms/THMS.UI.WinForms.csproj" />
+</Solution>
