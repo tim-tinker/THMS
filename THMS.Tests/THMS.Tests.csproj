@@ -17,7 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\THMS.Analytics\THMS.Analytics.csproj" />
     <ProjectReference Include="..\THMS.Data\THMS.Data.csproj" />
     <ProjectReference Include="..\THMS.Domain\THMS.Domain.csproj" />
     <ProjectReference Include="..\THMS.Ingestion\THMS.Ingestion.csproj" />

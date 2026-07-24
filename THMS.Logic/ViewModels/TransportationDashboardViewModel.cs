@@ -1,5 +1,6 @@
 using THMS.Domain;
 using System.ComponentModel;
+using THMS.Domain.Transportation;
 
 namespace THMS.Logic.ViewModels;
 

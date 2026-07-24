@@ -1,4 +1,4 @@
-using THMS.Domain;
+using THMS.Domain.Transportation;
 using THMS.Logic.ViewModels;
 
 namespace THMS.UI.WinForms

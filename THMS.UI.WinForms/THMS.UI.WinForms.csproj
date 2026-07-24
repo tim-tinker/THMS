@@ -34,7 +34,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\THMS.Domain\THMS.Domain.csproj" />
-    <ProjectReference Include="..\THMS.Logic.ViewModels\THMS.Logic.ViewModels.csproj" />
+    <ProjectReference Include="..\THMS.Logic\THMS.Logic.csproj" />
   </ItemGroup>
 
   <ItemGroup>

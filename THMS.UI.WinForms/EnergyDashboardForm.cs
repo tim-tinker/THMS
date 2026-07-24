@@ -1,6 +1,6 @@
 using System;
 using System.Windows.Forms;
-using THMS.Domain;
+using THMS.Domain.Energy;
 using THMS.Logic.ViewModels;
 
 namespace THMS.UI.WinForms

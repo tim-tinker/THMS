@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using THMS.Domain.Energy;
+using THMS.Domain.Transportation;
 
 namespace THMS.Domain
 {

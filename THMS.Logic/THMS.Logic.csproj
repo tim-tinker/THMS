@@ -8,21 +8,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Energy\**" />
-    <Compile Remove="Finance\**" />
     <Compile Remove="ROI\**" />
     <Compile Remove="Settings\**" />
-    <EmbeddedResource Remove="Energy\**" />
-    <EmbeddedResource Remove="Finance\**" />
     <EmbeddedResource Remove="ROI\**" />
     <EmbeddedResource Remove="Settings\**" />
-    <None Remove="Energy\**" />
-    <None Remove="Finance\**" />
     <None Remove="ROI\**" />
     <None Remove="Settings\**" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="CsvHelper" Version="33.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\THMS.Data\THMS.Data.csproj" />
     <ProjectReference Include="..\THMS.Domain\THMS.Domain.csproj" />
   </ItemGroup>
 

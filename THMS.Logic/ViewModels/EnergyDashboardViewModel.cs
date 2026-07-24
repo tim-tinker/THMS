@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using THMS.Domain;
+using THMS.Domain.Energy;
 
 namespace THMS.Logic.ViewModels
 {
