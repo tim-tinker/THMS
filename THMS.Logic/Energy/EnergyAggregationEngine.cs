@@ -1,4 +1,4 @@
-﻿using THMS.Data.Energy;
+﻿using THMS.Data.Stores;
 using THMS.Domain.Energy;
 
 namespace THMS.Logic.Energy
@@ -8,9 +8,9 @@ namespace THMS.Logic.Energy
     /// </summary>
     public class EnergyAggregationEngine
     {
-        private readonly EnergyIntervalStore _store;
+        private readonly EnergyDataStore _store;
 
-        public EnergyAggregationEngine(EnergyIntervalStore store)
+        public EnergyAggregationEngine(EnergyDataStore store)
         {
             _store = store;
         }
@@ -62,7 +62,7 @@ namespace THMS.Logic.Energy
             }
 
             // Add home energy flows (solar vendor data)
-            foreach (var home in _store.GetHomeIntervals())
+            foreach (var home in _store.GetSolarVendorIntervals())
             {
                 var key = (home.Timestamp.Year, home.Timestamp.Month);
 
@@ -77,12 +77,12 @@ namespace THMS.Logic.Energy
 
                 var summary = summaries[key];
 
-                summary.SolarProducedWh += home.SolarProducedWh;
-                summary.SolarConsumedWh += home.SolarConsumedWh;
-                summary.GridImportedWh += home.GridImportedWh;
-                summary.GridExportedWh += home.GridExportedWh;
-                summary.BatteryStoredWh += home.BatteryStoredWh;
-                summary.BatteryDischargedWh += home.BatteryDischargedWh;
+                summary.SolarProducedWh += home.EnergyProducedWh;
+                summary.SolarConsumedWh += home.EnergyConsumedWh;
+                summary.GridImportedWh += home.ImportedFromGridWh;
+                summary.GridExportedWh += home.ExportedToGridWh;
+                summary.BatteryStoredWh += home.StoredInBatteriesWh;
+                summary.BatteryDischargedWh += home.DischargedFromBatteriesWh;
             }
 
             return summaries.Values.ToList().AsReadOnly();

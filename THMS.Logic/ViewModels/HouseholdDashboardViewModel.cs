@@ -10,7 +10,7 @@ namespace THMS.Logic.ViewModels
 
         public HouseholdDashboardViewModel()
         {
-            Expenses = DemoData.CreateHouseholdExpenses();
+            Expenses = [];
         }
     }
 }

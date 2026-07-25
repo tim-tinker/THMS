@@ -4,105 +4,95 @@ namespace THMS.UI.WinForms
     {
         private System.ComponentModel.IContainer components = null;
 
-        private System.Windows.Forms.TableLayoutPanel mainLayout;
-        private System.Windows.Forms.ListBox energySourceListBox;
-        private System.Windows.Forms.GroupBox energyDetailsGroup;
-        private System.Windows.Forms.Label lblSourceName;
-        private System.Windows.Forms.Label lblMonthlyKwh;
-        private System.Windows.Forms.Label lblCostPerKwh;
-        private System.Windows.Forms.Label lblMonthlyCost;
-        private System.Windows.Forms.DataVisualization.Charting.Chart energyChart;
-
         protected override void Dispose(bool disposing)
         {
             if (disposing && (components != null))
+            {
                 components.Dispose();
+            }
             base.Dispose(disposing);
         }
 
+        #region Windows Form Designer generated code
+
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
+            this.energyGrid = new System.Windows.Forms.DataGridView();
+            this.lblStart = new System.Windows.Forms.Label();
+            this.lblEnd = new System.Windows.Forms.Label();
+            this.dtpStart = new System.Windows.Forms.DateTimePicker();
+            this.dtpEnd = new System.Windows.Forms.DateTimePicker();
+            this.btnRefresh = new System.Windows.Forms.Button();
 
-            this.mainLayout = new System.Windows.Forms.TableLayoutPanel();
-            this.energySourceListBox = new System.Windows.Forms.ListBox();
-            this.energyDetailsGroup = new System.Windows.Forms.GroupBox();
-            this.lblSourceName = new System.Windows.Forms.Label();
-            this.lblMonthlyKwh = new System.Windows.Forms.Label();
-            this.lblCostPerKwh = new System.Windows.Forms.Label();
-            this.lblMonthlyCost = new System.Windows.Forms.Label();
-            this.energyChart = new System.Windows.Forms.DataVisualization.Charting.Chart();
-
-            ((System.ComponentModel.ISupportInitialize)(this.energyChart)).BeginInit();
-            this.mainLayout.SuspendLayout();
-            this.energyDetailsGroup.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.energyGrid)).BeginInit();
             this.SuspendLayout();
 
-            // mainLayout
-            this.mainLayout.ColumnCount = 2;
-            this.mainLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 220F));
-            this.mainLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.mainLayout.RowCount = 2;
-            this.mainLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 160F));
-            this.mainLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.mainLayout.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.mainLayout.Controls.Add(this.energySourceListBox, 0, 0);
-            this.mainLayout.SetRowSpan(this.energySourceListBox, 2);
-            this.mainLayout.Controls.Add(this.energyDetailsGroup, 1, 0);
-            this.mainLayout.Controls.Add(this.energyChart, 1, 1);
+            // energyGrid
+            this.energyGrid.AllowUserToAddRows = false;
+            this.energyGrid.AllowUserToDeleteRows = false;
+            this.energyGrid.AllowUserToResizeRows = false;
+            this.energyGrid.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.energyGrid.Location = new System.Drawing.Point(12, 60);
+            this.energyGrid.MultiSelect = false;
+            this.energyGrid.Name = "energyGrid";
+            this.energyGrid.ReadOnly = true;
+            this.energyGrid.RowHeadersVisible = false;
+            this.energyGrid.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.energyGrid.Size = new System.Drawing.Size(760, 380);
 
-            // energySourceListBox
-            this.energySourceListBox.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.energySourceListBox.SelectedIndexChanged += EnergySourceListBox_SelectedIndexChanged;
+            // lblStart
+            this.lblStart.Location = new System.Drawing.Point(12, 15);
+            this.lblStart.Name = "lblStart";
+            this.lblStart.Size = new System.Drawing.Size(80, 25);
+            this.lblStart.Text = "Start:";
 
-            // energyDetailsGroup
-            this.energyDetailsGroup.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.energyDetailsGroup.Text = "Energy Details";
-            this.energyDetailsGroup.Controls.Add(this.lblSourceName);
-            this.energyDetailsGroup.Controls.Add(this.lblMonthlyKwh);
-            this.energyDetailsGroup.Controls.Add(this.lblCostPerKwh);
-            this.energyDetailsGroup.Controls.Add(this.lblMonthlyCost);
+            // dtpStart
+            this.dtpStart.Location = new System.Drawing.Point(90, 12);
+            this.dtpStart.Name = "dtpStart";
+            this.dtpStart.Size = new System.Drawing.Size(200, 27);
 
-            // lblSourceName
-            this.lblSourceName.AutoSize = true;
-            this.lblSourceName.Location = new System.Drawing.Point(16, 28);
-            this.lblSourceName.Text = "Source:";
+            // lblEnd
+            this.lblEnd.Location = new System.Drawing.Point(310, 15);
+            this.lblEnd.Name = "lblEnd";
+            this.lblEnd.Size = new System.Drawing.Size(80, 25);
+            this.lblEnd.Text = "End:";
 
-            // lblMonthlyKwh
-            this.lblMonthlyKwh.AutoSize = true;
-            this.lblMonthlyKwh.Location = new System.Drawing.Point(16, 52);
-            this.lblMonthlyKwh.Text = "Monthly kWh:";
+            // dtpEnd
+            this.dtpEnd.Location = new System.Drawing.Point(390, 12);
+            this.dtpEnd.Name = "dtpEnd";
+            this.dtpEnd.Size = new System.Drawing.Size(200, 27);
 
-            // lblCostPerKwh
-            this.lblCostPerKwh.AutoSize = true;
-            this.lblCostPerKwh.Location = new System.Drawing.Point(16, 80);
-            this.lblCostPerKwh.Text = "Cost per kWh:";
-
-            // lblMonthlyCost
-            this.lblMonthlyCost.AutoSize = true;
-            this.lblMonthlyCost.Location = new System.Drawing.Point(16, 104);
-            this.lblMonthlyCost.Text = "Monthly Cost:";
-
-            // energyChart
-            this.energyChart.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.energyChart.ChartAreas.Add(new System.Windows.Forms.DataVisualization.Charting.ChartArea("Default"));
-            var series = new System.Windows.Forms.DataVisualization.Charting.Series("MonthlyEnergyCost");
-            series.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Column;
-            series.ChartArea = "Default";
-            this.energyChart.Series.Add(series);
+            // btnRefresh
+            this.btnRefresh.Location = new System.Drawing.Point(610, 10);
+            this.btnRefresh.Name = "btnRefresh";
+            this.btnRefresh.Size = new System.Drawing.Size(120, 35);
+            this.btnRefresh.Text = "Refresh";
+            this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
 
             // EnergyDashboardForm
-            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.Controls.Add(this.mainLayout);
+            this.ClientSize = new System.Drawing.Size(784, 461);
+            this.Controls.Add(this.btnRefresh);
+            this.Controls.Add(this.dtpEnd);
+            this.Controls.Add(this.lblEnd);
+            this.Controls.Add(this.dtpStart);
+            this.Controls.Add(this.lblStart);
+            this.Controls.Add(this.energyGrid);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.Name = "EnergyDashboardForm";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "Energy Dashboard";
 
-            this.mainLayout.ResumeLayout(false);
-            this.energyDetailsGroup.ResumeLayout(false);
-            this.energyDetailsGroup.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.energyChart)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.energyGrid)).EndInit();
             this.ResumeLayout(false);
         }
+
+        #endregion
+
+        private System.Windows.Forms.DataGridView energyGrid;
+        private System.Windows.Forms.Label lblStart;
+        private System.Windows.Forms.Label lblEnd;
+        private System.Windows.Forms.DateTimePicker dtpStart;
+        private System.Windows.Forms.DateTimePicker dtpEnd;
+        private System.Windows.Forms.Button btnRefresh;
     }
 }

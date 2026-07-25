@@ -1,65 +1,69 @@
-using System;
-using System.Windows.Forms;
-using THMS.Domain.Energy;
-using THMS.Logic.ViewModels;
+using THMS.Logic.ViewModels.Energy;
 
 namespace THMS.UI.WinForms
 {
-    public partial class EnergyDashboardForm : BaseDashboardForm
+    public partial class EnergyDashboardForm
+        : BaseDashboardForm<EnergyDashboardViewModel>
     {
-        private EnergyDashboardViewModel _vm;
-
         public EnergyDashboardForm()
         {
             InitializeComponent();
         }
 
-        protected override void OnBindViewModel(BaseDashboardViewModel viewModel)
+        // ---------------------------------------------------------
+        // Bind controls to the ViewModel (called once by MainForm)
+        // ---------------------------------------------------------
+        protected override void BindControlsToViewModel()
         {
-            _vm = viewModel as EnergyDashboardViewModel
-                ?? throw new ArgumentException("Invalid ViewModel type");
+            dtpStart.Value = ViewModel.StartDate;
+            dtpEnd.Value = ViewModel.EndDate;
 
-            energySourceListBox.DataSource = _vm.EnergySources;
-            energySourceListBox.DisplayMember = "Name";
-
-            if (energySourceListBox.Items.Count > 0)
-                energySourceListBox.SelectedIndex = 0;
+            btnRefresh.Click += (s, e) => RefreshDashboard();
         }
 
-        private void EnergySourceListBox_SelectedIndexChanged(object sender, EventArgs e)
+        // ---------------------------------------------------------
+        // Refresh dashboard (called by MainForm + user interactions)
+        // ---------------------------------------------------------
+        public override void RefreshDashboard()
         {
-            if (_vm is null) return;
+            // Update ViewModel date range
+            ViewModel.StartDate = dtpStart.Value;
+            ViewModel.EndDate = dtpEnd.Value;
 
-            _vm.SelectedSource = energySourceListBox.SelectedItem as EnergySource;
-            UpdateEnergyDetails();
-            UpdateChart();
+            // Later: call your energy engines here
+            // For now: ViewModel.EnergyData is already populated externally
+
+            BindEnergyGrid();
         }
 
-        public override void OnActivated()
+        // ---------------------------------------------------------
+        // Helper: bind grid to ViewModel data
+        // ---------------------------------------------------------
+        private void BindEnergyGrid()
         {
-            UpdateEnergyDetails();
-            UpdateChart();
+            var data = ViewModel.EnergyData
+                .Where(e => e.Timestamp >= ViewModel.StartDate &&
+                            e.Timestamp <= ViewModel.EndDate)
+                .Select(e => new
+                {
+                    e.Timestamp,
+                    e.SolarWh,
+                    e.GridWh,
+                    e.BatteryWh,
+                    e.EvChargingWh,
+                    e.IsPartial
+                })
+                .ToList();
+
+            energyGrid.DataSource = data;
         }
 
-        private void UpdateEnergyDetails()
+        // ---------------------------------------------------------
+        // User clicked Refresh button
+        // ---------------------------------------------------------
+        private void btnRefresh_Click(object sender, EventArgs e)
         {
-            if (_vm?.SelectedSource == null) return;
-
-            lblSourceName.Text = _vm.SelectedSource.Name;
-            lblMonthlyKwh.Text = $"Monthly kWh: {_vm.SelectedSource.MonthlyKwh:N0}";
-            lblCostPerKwh.Text = $"Cost per kWh: {_vm.SelectedSource.CostPerKwh:C}";
-            lblMonthlyCost.Text = $"Monthly Cost: {_vm.SelectedSource.MonthlyCost:C}";
-        }
-
-        private void UpdateChart()
-        {
-            if (_vm?.SelectedSource == null) return;
-
-            var series = energyChart.Series["MonthlyEnergyCost"];
-            series.Points.Clear();
-
-            foreach (var mc in _vm.SelectedSource.MonthlyCosts)
-                series.Points.AddXY(mc.Month, mc.Amount);
+            RefreshDashboard();
         }
     }
 }

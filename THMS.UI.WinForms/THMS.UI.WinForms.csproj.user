@@ -1,7 +1,13 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Compile Update="AddVehicleForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="BaseDashboardForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="ChargingCostEntryForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="EnergyDashboardForm.cs">
@@ -10,10 +16,10 @@
     <Compile Update="FinanceDashboardForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="HouseholdDashboardForm.cs">
+    <Compile Update="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="MainForm.cs">
+    <Compile Update="MileageEntryForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="SettingsDashboardForm.cs">
@@ -22,11 +28,11 @@
     <Compile Update="TransportationDashboardForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="Views\Home\HomeView.cs">
-      <SubType>UserControl</SubType>
+    <Compile Update="VehicleDetailForm.cs">
+      <SubType>Form</SubType>
     </Compile>
-    <Compile Update="Views\PlaceholderView.cs">
-      <SubType>UserControl</SubType>
+    <Compile Update="VehicleListForm.cs">
+      <SubType>Form</SubType>
     </Compile>
   </ItemGroup>
   <ItemGroup>

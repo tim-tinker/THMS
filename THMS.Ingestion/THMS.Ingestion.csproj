@@ -7,8 +7,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="CsvHelper" Version="33.1.0" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\THMS.Data\THMS.Data.csproj" />
     <ProjectReference Include="..\THMS.Domain\THMS.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="TransportIngestion\" />
   </ItemGroup>
 
 </Project>

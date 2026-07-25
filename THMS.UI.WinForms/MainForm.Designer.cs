@@ -1,124 +1,86 @@
-#nullable enable
-
-namespace THMS.UI.WinForms;
-
-partial class MainForm
+namespace THMS.UI
 {
-    private System.ComponentModel.IContainer components;
-    private Panel contentPanel = null!;
-    private Panel navPanel = null!;
-    private Button btnTransportation = null!;
-    private Button btnEnergy = null!;
-    private Button btnFinance = null!;
-    private Button btnHousehold = null!;
-    private Button btnSettings = null!;
-    private System.Windows.Forms.ImageList navIcons;
-
-    protected override void Dispose(bool disposing)
+    partial class MainForm
     {
-        if (disposing && components is not null)
+        private System.ComponentModel.IContainer components = null;
+        private System.Windows.Forms.Panel navigationPanel;
+        private System.Windows.Forms.Button btnTransportation;
+        private System.Windows.Forms.Button btnEnergy;
+        private System.Windows.Forms.Panel dashboardHostPanel;
+
+        protected override void Dispose(bool disposing)
         {
-            components.Dispose();
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
         }
 
-        base.Dispose(disposing);
-    }
+        #region Windows Form Designer generated code
 
-    private void InitializeComponent()
-    {
-        components = new System.ComponentModel.Container();
+        private void InitializeComponent()
+        {
+            this.navigationPanel = new System.Windows.Forms.Panel();
+            this.btnTransportation = new System.Windows.Forms.Button();
+            this.btnEnergy = new System.Windows.Forms.Button();
+            this.dashboardHostPanel = new System.Windows.Forms.Panel();
 
-        navPanel = new Panel();
-        contentPanel = new Panel();
-        btnTransportation = new Button();
-        btnEnergy = new Button();
-        btnFinance = new Button();
-        btnHousehold = new Button();
-        btnSettings = new Button();
+            this.navigationPanel.SuspendLayout();
+            this.SuspendLayout();
 
-        navPanel.SuspendLayout();
-        contentPanel.SuspendLayout();
-        SuspendLayout();
+            // 
+            // navigationPanel
+            // 
+            this.navigationPanel.BackColor = System.Drawing.Color.LightGray;
+            this.navigationPanel.Dock = System.Windows.Forms.DockStyle.Left;
+            this.navigationPanel.Width = 180;
+            this.navigationPanel.Controls.Add(this.btnTransportation);
+            this.navigationPanel.Controls.Add(this.btnEnergy);
 
-        // navIcons
-        this.navIcons = new System.Windows.Forms.ImageList(this.components);
-        this.navIcons.ColorDepth = ColorDepth.Depth32Bit;
-        this.navIcons.ImageSize = new Size(24, 24);
-        this.navIcons.TransparentColor = Color.Transparent;
-        this.navIcons.Images.Add("transportation", Properties.Resources.MoveUp);
-        this.navIcons.Images.Add("energy", Properties.Resources.MoveUp);
-        this.navIcons.Images.Add("finance", Properties.Resources.MoveUp);
-        this.navIcons.Images.Add("household", Properties.Resources.MoveUp);
-        this.navIcons.Images.Add("settings", Properties.Resources.MoveUp);
+            // 
+            // btnTransportation
+            // 
+            this.btnTransportation.Location = new System.Drawing.Point(10, 20);
+            this.btnTransportation.Name = "btnTransportation";
+            this.btnTransportation.Size = new System.Drawing.Size(160, 40);
+            this.btnTransportation.Text = "Transportation";
+            this.btnTransportation.UseVisualStyleBackColor = true;
+            this.btnTransportation.Click += new System.EventHandler(this.btnTransportation_Click);
 
-        //
-        // navPanel
-        //
-        navPanel.BackColor = Color.FromArgb(32, 32, 32);
-        navPanel.Controls.Add(btnSettings);
-        navPanel.Controls.Add(btnHousehold);
-        navPanel.Controls.Add(btnFinance);
-        navPanel.Controls.Add(btnEnergy);
-        navPanel.Controls.Add(btnTransportation);
-        navPanel.Dock = DockStyle.Left;
-        navPanel.Name = "navPanel";
-        navPanel.Width = 220;
-        //
-        // Buttons are DockStyle.Top. WinForms docks highest z-order first,
-        // so Controls.Add order is reverse of visual top-to-bottom order:
-        // last added (Transportation) appears at the top.
-        //
-        ConfigureNavButton(btnTransportation, "Transportation", btnTransportation_Click, navIcons.Images["transportation"]);
-        ConfigureNavButton(btnEnergy, "Energy", btnEnergy_Click, navIcons.Images["energy"]);
-        ConfigureNavButton(btnFinance, "Finance", btnFinance_Click, navIcons.Images["finance"]);
-        ConfigureNavButton(btnHousehold, "Household", btnHousehold_Click, navIcons.Images["household"]);
-        ConfigureNavButton(btnSettings, "Settings", btnSettings_Click, navIcons.Images["settings"]);
-        //
-        // contentPanel
-        //
-        contentPanel.BackColor = SystemColors.Window;
-        contentPanel.Dock = DockStyle.Fill;
-        contentPanel.Name = "contentPanel";
-        contentPanel.TabIndex = 0;
+            // 
+            // btnEnergy
+            // 
+            this.btnEnergy.Location = new System.Drawing.Point(10, 70);
+            this.btnEnergy.Name = "btnEnergy";
+            this.btnEnergy.Size = new System.Drawing.Size(160, 40);
+            this.btnEnergy.Text = "Energy";
+            this.btnEnergy.UseVisualStyleBackColor = true;
+            this.btnEnergy.Click += new System.EventHandler(this.btnEnergy_Click);
 
-        //
-        // MainForm
-        //
-        AutoScaleDimensions = new SizeF(7F, 15F);
-        AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(1100, 700);
-        // Fill first, then Left — so the nav panel is laid out correctly.
-        Controls.Add(contentPanel);
-        Controls.Add(navPanel);
-        MinimumSize = new Size(800, 500);
-        Name = "MainForm";
-        StartPosition = FormStartPosition.CenterScreen;
-        Text = "Personal Finance System";
+            // 
+            // dashboardHostPanel
+            // 
+            this.dashboardHostPanel.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.dashboardHostPanel.Location = new System.Drawing.Point(180, 0);
+            this.dashboardHostPanel.Name = "dashboardHostPanel";
+            this.dashboardHostPanel.Size = new System.Drawing.Size(900, 600);
+            this.dashboardHostPanel.BackColor = System.Drawing.Color.White;
 
-        navPanel.ResumeLayout(false);
-        contentPanel.ResumeLayout(false);
-        ResumeLayout(false);
-    }
+            // 
+            // MainForm
+            // 
+            this.ClientSize = new System.Drawing.Size(1080, 600);
+            this.Controls.Add(this.dashboardHostPanel);
+            this.Controls.Add(this.navigationPanel);
+            this.Name = "MainForm";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.Text = "THMS Dashboard";
 
-    private static void ConfigureNavButton(Button button, string text, EventHandler onClick, Image? image)
-    {
-        button.BackColor = Color.FromArgb(45, 45, 45);
-        button.Dock = DockStyle.Top;
-        button.FlatAppearance.BorderSize = 0;
-        button.FlatStyle = FlatStyle.Flat;
-        button.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-        button.ForeColor = Color.White;
-        button.Height = 48;
-        button.Name = "btn" + text.Replace(" ", string.Empty);
-        button.Image = image;
-        button.ImageAlign = ContentAlignment.MiddleLeft;
-        button.TextAlign = ContentAlignment.MiddleLeft;
-        button.Padding = new Padding(50, 0, 0, 0);
-        button.Text = text;
-        button.TextAlign = ContentAlignment.MiddleLeft;
-        button.UseVisualStyleBackColor = false;
-        button.Click += onClick;
-        button.MouseEnter += (_, _) => button.BackColor = Color.FromArgb(60, 60, 60);
-        button.MouseLeave += (_, _) => button.BackColor = Color.FromArgb(45, 45, 45);
+            this.navigationPanel.ResumeLayout(false);
+            this.ResumeLayout(false);
+        }
+
+        #endregion
     }
 }

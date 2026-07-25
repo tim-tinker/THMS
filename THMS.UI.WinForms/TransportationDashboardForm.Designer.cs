@@ -4,16 +4,6 @@ namespace THMS.UI.WinForms
     {
         private System.ComponentModel.IContainer components = null;
 
-        private System.Windows.Forms.TableLayoutPanel mainLayout;
-        private System.Windows.Forms.ListBox vehicleListBox;
-        private System.Windows.Forms.GroupBox vehicleDetailsGroup;
-        private System.Windows.Forms.Label lblVehicleName;
-        private System.Windows.Forms.Label lblAnnualCost;
-        private System.Windows.Forms.Label lblEnergyHome;
-        private System.Windows.Forms.Label lblEnergyPublic;
-        private System.Windows.Forms.Label lblEnergyRegen;
-        private System.Windows.Forms.DataVisualization.Charting.Chart costChart;
-
         protected override void Dispose(bool disposing)
         {
             if (disposing && (components != null))
@@ -23,148 +13,101 @@ namespace THMS.UI.WinForms
             base.Dispose(disposing);
         }
 
+        #region Windows Form Designer generated code
+
         private void InitializeComponent()
         {
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            mainLayout = new TableLayoutPanel();
-            vehicleListBox = new ListBox();
-            vehicleDetailsGroup = new GroupBox();
-            lblVehicleName = new Label();
-            lblAnnualCost = new Label();
-            lblEnergyHome = new Label();
-            lblEnergyPublic = new Label();
-            lblEnergyRegen = new Label();
-            costChart = new System.Windows.Forms.DataVisualization.Charting.Chart();
-            mainLayout.SuspendLayout();
-            vehicleDetailsGroup.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)costChart).BeginInit();
-            SuspendLayout();
-            // 
-            // mainLayout
-            // 
-            mainLayout.ColumnCount = 2;
-            mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 377F));
-            mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            mainLayout.Controls.Add(vehicleListBox, 0, 0);
-            mainLayout.Controls.Add(vehicleDetailsGroup, 1, 0);
-            mainLayout.Controls.Add(costChart, 1, 1);
-            mainLayout.Dock = DockStyle.Fill;
-            mainLayout.Location = new Point(0, 0);
-            mainLayout.Margin = new Padding(5, 6, 5, 6);
-            mainLayout.Name = "mainLayout";
-            mainLayout.RowCount = 2;
-            mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 320F));
-            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            mainLayout.Size = new Size(1661, 983);
-            mainLayout.TabIndex = 0;
-            // 
+            this.vehicleListBox = new System.Windows.Forms.ListBox();
+            this.lblVehicleName = new System.Windows.Forms.Label();
+            this.lblLifetimeCostPerMile = new System.Windows.Forms.Label();
+            this.lblMonthlyMiles = new System.Windows.Forms.Label();
+            this.lblMonthlyCost = new System.Windows.Forms.Label();
+            this.lblMonthlyCostPerMile = new System.Windows.Forms.Label();
+            this.costChart = new System.Windows.Forms.DataVisualization.Charting.Chart();
+
+            ((System.ComponentModel.ISupportInitialize)(this.costChart)).BeginInit();
+            this.SuspendLayout();
+
             // vehicleListBox
-            // 
-            vehicleListBox.Dock = DockStyle.Fill;
-            vehicleListBox.Location = new Point(5, 6);
-            vehicleListBox.Margin = new Padding(5, 6, 5, 6);
-            vehicleListBox.Name = "vehicleListBox";
-            mainLayout.SetRowSpan(vehicleListBox, 2);
-            vehicleListBox.Size = new Size(367, 971);
-            vehicleListBox.TabIndex = 0;
-            vehicleListBox.SelectedIndexChanged += VehicleListBox_SelectedIndexChanged;
-            // 
-            // vehicleDetailsGroup
-            // 
-            vehicleDetailsGroup.Controls.Add(lblVehicleName);
-            vehicleDetailsGroup.Controls.Add(lblAnnualCost);
-            vehicleDetailsGroup.Controls.Add(lblEnergyHome);
-            vehicleDetailsGroup.Controls.Add(lblEnergyPublic);
-            vehicleDetailsGroup.Controls.Add(lblEnergyRegen);
-            vehicleDetailsGroup.Dock = DockStyle.Fill;
-            vehicleDetailsGroup.Location = new Point(382, 6);
-            vehicleDetailsGroup.Margin = new Padding(5, 6, 5, 6);
-            vehicleDetailsGroup.Name = "vehicleDetailsGroup";
-            vehicleDetailsGroup.Padding = new Padding(5, 6, 5, 6);
-            vehicleDetailsGroup.Size = new Size(1274, 308);
-            vehicleDetailsGroup.TabIndex = 1;
-            vehicleDetailsGroup.TabStop = false;
-            vehicleDetailsGroup.Text = "Vehicle Details";
-            // 
+            this.vehicleListBox.FormattingEnabled = true;
+            this.vehicleListBox.ItemHeight = 20;
+            this.vehicleListBox.Location = new System.Drawing.Point(12, 12);
+            this.vehicleListBox.Name = "vehicleListBox";
+            this.vehicleListBox.Size = new System.Drawing.Size(200, 424);
+            this.vehicleListBox.TabIndex = 0;
+            this.vehicleListBox.SelectedIndexChanged +=
+                new System.EventHandler(this.VehicleListBox_SelectedIndexChanged);
+
             // lblVehicleName
-            // 
-            lblVehicleName.AutoSize = true;
-            lblVehicleName.Location = new Point(27, 56);
-            lblVehicleName.Margin = new Padding(5, 0, 5, 0);
-            lblVehicleName.Name = "lblVehicleName";
-            lblVehicleName.Size = new Size(84, 30);
-            lblVehicleName.TabIndex = 0;
-            lblVehicleName.Text = "Vehicle:";
-            // 
-            // lblAnnualCost
-            // 
-            lblAnnualCost.AutoSize = true;
-            lblAnnualCost.Location = new Point(27, 104);
-            lblAnnualCost.Margin = new Padding(5, 0, 5, 0);
-            lblAnnualCost.Name = "lblAnnualCost";
-            lblAnnualCost.Size = new Size(131, 30);
-            lblAnnualCost.TabIndex = 1;
-            lblAnnualCost.Text = "Annual Cost:";
-            // 
-            // lblEnergyHome
-            // 
-            lblEnergyHome.AutoSize = true;
-            lblEnergyHome.Location = new Point(27, 160);
-            lblEnergyHome.Margin = new Padding(5, 0, 5, 0);
-            lblEnergyHome.Name = "lblEnergyHome";
-            lblEnergyHome.Size = new Size(164, 30);
-            lblEnergyHome.TabIndex = 2;
-            lblEnergyHome.Text = "Home Charging:";
-            // 
-            // lblEnergyPublic
-            // 
-            lblEnergyPublic.AutoSize = true;
-            lblEnergyPublic.Location = new Point(27, 208);
-            lblEnergyPublic.Margin = new Padding(5, 0, 5, 0);
-            lblEnergyPublic.Name = "lblEnergyPublic";
-            lblEnergyPublic.Size = new Size(164, 30);
-            lblEnergyPublic.TabIndex = 3;
-            lblEnergyPublic.Text = "Public Charging:";
-            // 
-            // lblEnergyRegen
-            // 
-            lblEnergyRegen.AutoSize = true;
-            lblEnergyRegen.Location = new Point(27, 256);
-            lblEnergyRegen.Margin = new Padding(5, 0, 5, 0);
-            lblEnergyRegen.Name = "lblEnergyRegen";
-            lblEnergyRegen.Size = new Size(76, 30);
-            lblEnergyRegen.TabIndex = 4;
-            lblEnergyRegen.Text = "Regen:";
-            // 
+            this.lblVehicleName.Location = new System.Drawing.Point(230, 20);
+            this.lblVehicleName.Name = "lblVehicleName";
+            this.lblVehicleName.Size = new System.Drawing.Size(300, 25);
+            this.lblVehicleName.Text = "Vehicle:";
+
+            // lblLifetimeCostPerMile
+            this.lblLifetimeCostPerMile.Location = new System.Drawing.Point(230, 55);
+            this.lblLifetimeCostPerMile.Name = "lblLifetimeCostPerMile";
+            this.lblLifetimeCostPerMile.Size = new System.Drawing.Size(300, 25);
+            this.lblLifetimeCostPerMile.Text = "Lifetime Cost/Mile:";
+
+            // lblMonthlyMiles
+            this.lblMonthlyMiles.Location = new System.Drawing.Point(230, 90);
+            this.lblMonthlyMiles.Name = "lblMonthlyMiles";
+            this.lblMonthlyMiles.Size = new System.Drawing.Size(300, 25);
+            this.lblMonthlyMiles.Text = "Miles:";
+
+            // lblMonthlyCost
+            this.lblMonthlyCost.Location = new System.Drawing.Point(230, 125);
+            this.lblMonthlyCost.Name = "lblMonthlyCost";
+            this.lblMonthlyCost.Size = new System.Drawing.Size(300, 25);
+            this.lblMonthlyCost.Text = "Cost:";
+
+            // lblMonthlyCostPerMile
+            this.lblMonthlyCostPerMile.Location = new System.Drawing.Point(230, 160);
+            this.lblMonthlyCostPerMile.Name = "lblMonthlyCostPerMile";
+            this.lblMonthlyCostPerMile.Size = new System.Drawing.Size(300, 25);
+            this.lblMonthlyCostPerMile.Text = "Cost/Mile:";
+
             // costChart
-            // 
-            chartArea1.Name = "Default";
-            costChart.ChartAreas.Add(chartArea1);
-            costChart.Dock = DockStyle.Fill;
-            costChart.Location = new Point(382, 326);
-            costChart.Margin = new Padding(5, 6, 5, 6);
-            costChart.Name = "costChart";
-            series1.ChartArea = "Default";
-            series1.Name = "MonthlyCost";
-            costChart.Series.Add(series1);
-            costChart.Size = new Size(1274, 651);
-            costChart.TabIndex = 2;
-            // 
+            this.costChart.Location = new System.Drawing.Point(230, 200);
+            this.costChart.Name = "costChart";
+            this.costChart.Size = new System.Drawing.Size(540, 236);
+
+            var chartArea = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            chartArea.Name = "ChartArea1";
+            this.costChart.ChartAreas.Add(chartArea);
+
+            var series = new System.Windows.Forms.DataVisualization.Charting.Series();
+            series.Name = "MonthlyCost";
+            series.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Column;
+            this.costChart.Series.Add(series);
+
             // TransportationDashboardForm
-            // 
-            AutoScaleDimensions = new SizeF(12F, 30F);
-            AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1661, 983);
-            Controls.Add(mainLayout);
-            Margin = new Padding(5, 6, 5, 6);
-            Name = "TransportationDashboardForm";
-            Text = "Transportation Dashboard";
-            mainLayout.ResumeLayout(false);
-            vehicleDetailsGroup.ResumeLayout(false);
-            vehicleDetailsGroup.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)costChart).EndInit();
-            ResumeLayout(false);
+            this.ClientSize = new System.Drawing.Size(800, 450);
+            this.Controls.Add(this.costChart);
+            this.Controls.Add(this.lblMonthlyCostPerMile);
+            this.Controls.Add(this.lblMonthlyCost);
+            this.Controls.Add(this.lblMonthlyMiles);
+            this.Controls.Add(this.lblLifetimeCostPerMile);
+            this.Controls.Add(this.lblVehicleName);
+            this.Controls.Add(this.vehicleListBox);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+            this.Name = "TransportationDashboardForm";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            this.Text = "Transportation Dashboard";
+
+            ((System.ComponentModel.ISupportInitialize)(this.costChart)).EndInit();
+            this.ResumeLayout(false);
         }
+
+        #endregion
+
+        private System.Windows.Forms.ListBox vehicleListBox;
+        private System.Windows.Forms.Label lblVehicleName;
+        private System.Windows.Forms.Label lblLifetimeCostPerMile;
+        private System.Windows.Forms.Label lblMonthlyMiles;
+        private System.Windows.Forms.Label lblMonthlyCost;
+        private System.Windows.Forms.Label lblMonthlyCostPerMile;
+        private System.Windows.Forms.DataVisualization.Charting.Chart costChart;
     }
 }

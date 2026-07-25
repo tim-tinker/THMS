@@ -1,104 +1,59 @@
-﻿using THMS.Data.Energy;
+﻿using THMS.Data.Stores;
 using THMS.Domain.Energy;
 
 namespace THMS.Logic.Energy
 {
-    /// <summary>
-    /// Computes attribution of EV charging energy to solar, battery, and grid sources.
-    /// Works with partial ingestion and late-arriving data.
-    /// </summary>
     public class EnergyAttributionEngine
     {
-        private readonly EnergyIntervalStore _store;
+        private readonly EnergyDataStore _store;
 
-        public EnergyAttributionEngine(EnergyIntervalStore store)
+        public EnergyAttributionEngine(EnergyDataStore store)
         {
             _store = store;
         }
 
-        /// <summary>
-        /// Computes attribution for a single timestamp.
-        /// </summary>
-        public EnergyAttributionResult Attribute(DateTime timestamp)
+        public List<EnergyAttributionResult> ComputeAttribution(DateTime start, DateTime end)
         {
-            var evIntervals = _store.GetEvIntervals(timestamp);
-            var home = _store.GetHomeInterval(timestamp);
+            var solar = _store.GetSolarVendorIntervals()
+                              .Where(i => i.Timestamp >= start && i.Timestamp <= end)
+                              .ToList();
 
-            decimal evTotal = evIntervals.Sum(e => e.EvChargingWh);
+            var ev = _store.GetEvChargingIntervals()
+                           .Where(i => i.Timestamp >= start && i.Timestamp <= end)
+                           .ToList();
 
-            // If no EV charging occurred, return empty attribution.
-            if (evTotal == 0)
-            {
-                return new EnergyAttributionResult
-                {
-                    Timestamp = timestamp,
-                    EvChargingWh = 0,
-                    SolarWh = 0,
-                    BatteryWh = 0,
-                    GridWh = 0,
-                    IsPartial = home == null
-                };
-            }
-
-            // If solar vendor data is missing, attribution is partial.
-            if (home == null)
-            {
-                return new EnergyAttributionResult
-                {
-                    Timestamp = timestamp,
-                    EvChargingWh = evTotal,
-                    SolarWh = 0,
-                    BatteryWh = 0,
-                    GridWh = evTotal, // assume grid until solar data arrives
-                    IsPartial = true
-                };
-            }
-
-            // Attribution logic:
-            // Priority order:
-            // 1. SolarConsumedWh
-            // 2. BatteryDischargedWh
-            // 3. GridImportedWh
-
-            decimal remaining = evTotal;
-
-            decimal solar = Math.Min(remaining, home.SolarConsumedWh);
-            remaining -= solar;
-
-            decimal battery = Math.Min(remaining, home.BatteryDischargedWh);
-            remaining -= battery;
-
-            decimal grid = Math.Min(remaining, home.GridImportedWh);
-            remaining -= grid;
-
-            // If remaining > 0, something is off in the vendor data.
-            // Assign remainder to grid.
-            grid += remaining;
-
-            return new EnergyAttributionResult
-            {
-                Timestamp = timestamp,
-                EvChargingWh = evTotal,
-                SolarWh = solar,
-                BatteryWh = battery,
-                GridWh = grid,
-                IsPartial = false
-            };
-        }
-
-        /// <summary>
-        /// Computes attribution for all timestamps that have any energy data.
-        /// </summary>
-        public IReadOnlyCollection<EnergyAttributionResult> AttributeAll()
-        {
             var results = new List<EnergyAttributionResult>();
 
-            foreach (var ts in _store.GetAllTimestamps())
+            foreach (var s in solar)
             {
-                results.Add(Attribute(ts));
+                var timestamp = s.Timestamp;
+
+                var evAt = ev.FirstOrDefault(e => e.Timestamp == timestamp);
+
+                var result = new EnergyAttributionResult
+                {
+                    Timestamp = timestamp,
+
+                    // EV charging attribution
+                    EvChargingWh = evAt?.CircuitUseWh ?? 0m,
+
+                    // Solar production
+                    SolarWh = s.EnergyProducedWh,
+
+                    // Battery discharge from vendor data
+                    BatteryWh = s.DischargedFromBatteriesWh,
+
+                    // Grid import from vendor data
+                    GridWh = s.ImportedFromGridWh,
+
+                    // Partial if solar vendor data missing
+                    IsPartial = s == null
+                };
+
+                results.Add(result);
             }
 
-            return results.AsReadOnly();
+            return results;
         }
     }
 }

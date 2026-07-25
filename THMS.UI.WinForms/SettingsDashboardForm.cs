@@ -4,7 +4,7 @@ using THMS.Logic.ViewModels;
 
 namespace THMS.UI.WinForms
 {
-    public partial class SettingsDashboardForm : BaseDashboardForm
+    public partial class SettingsDashboardForm : BaseDashboardForm<SettingsDashboardViewModel>
     {
         private SettingsDashboardViewModel _vm;
 
@@ -13,11 +13,8 @@ namespace THMS.UI.WinForms
             InitializeComponent();
         }
 
-        protected override void OnBindViewModel(BaseDashboardViewModel viewModel)
+        protected override void BindControlsToViewModel()
         {
-            _vm = viewModel as SettingsDashboardViewModel
-                ?? throw new ArgumentException("Invalid ViewModel type");
-
             chkDarkMode.Checked = _vm.DarkModeEnabled;
             chkAutoSave.Checked = _vm.AutoSaveEnabled;
             chkShowTooltips.Checked = _vm.ShowTooltips;
@@ -39,7 +36,7 @@ namespace THMS.UI.WinForms
             _vm.ShowTooltips = chkShowTooltips.Checked;
         }
 
-        public override void OnActivated()
+        public override void RefreshDashboard()
         {
             // Refresh UI if settings changed elsewhere
             chkDarkMode.Checked = _vm.DarkModeEnabled;

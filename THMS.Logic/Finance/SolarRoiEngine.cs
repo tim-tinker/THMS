@@ -12,12 +12,12 @@ namespace THMS.Logic.Finance
     {
         private readonly IReadOnlyCollection<MonthlyEnergySummary> _monthlySummaries;
         private readonly IReadOnlyCollection<LoanCashFlow> _loanSchedule;
-        private readonly IReadOnlyCollection<ElectricUtilityBillCostInterval> _billing;
+        private readonly IReadOnlyCollection<ElectricUtilityBill> _billing;
 
         public SolarRoiEngine(
             IReadOnlyCollection<MonthlyEnergySummary> monthlySummaries,
             IReadOnlyCollection<LoanCashFlow> loanSchedule,
-            IReadOnlyCollection<ElectricUtilityBillCostInterval> billingIntervals)
+            IReadOnlyCollection<ElectricUtilityBill> billingIntervals)
         {
             _monthlySummaries = monthlySummaries;
             _loanSchedule = loanSchedule;

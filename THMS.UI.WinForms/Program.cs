@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using THMS.UI.WinForms.Navigation;
 using THMS.Logic.ViewModels.Home;
-using THMS.UI.WinForms.Views.Home;
 
 namespace THMS.UI.WinForms;
 
@@ -24,7 +23,6 @@ internal static class Program
 
         services.AddSingleton<NavigationService>();
         services.AddTransient<HomeViewModel>();
-        services.AddTransient<HomeView>();
         services.AddSingleton<MainForm>();
 
         // Later:

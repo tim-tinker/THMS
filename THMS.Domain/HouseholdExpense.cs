@@ -9,8 +9,5 @@ namespace THMS.Domain
         public decimal MonthlyCost { get; set; }
         public string Category { get; set; }
         public string SharedWith { get; set; }
-        public List<MonthlyValue> MonthlyBreakdownInternal { get; set; }
-
-        public override IReadOnlyList<MonthlyValue> MonthlyBreakdown => MonthlyBreakdownInternal;
     }
 }

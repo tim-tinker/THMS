@@ -29,20 +29,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
     <PackageReference Include="WinForms.DataVisualization" Version="1.10.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\THMS.Domain\THMS.Domain.csproj" />
     <ProjectReference Include="..\THMS.Logic\THMS.Logic.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Views\Energy\" />
-    <Folder Include="Views\Finance\" />
-    <Folder Include="Views\ROI\" />
-    <Folder Include="Views\Settings\" />
-    <Folder Include="Views\Transportation\" />
   </ItemGroup>
 
   <ItemGroup>

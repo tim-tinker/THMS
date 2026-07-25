@@ -1,63 +1,43 @@
 using System;
+using System.Linq;
 using System.Windows.Forms;
-using THMS.Domain;
 using THMS.Logic.ViewModels;
+using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.UI.WinForms
 {
-    public partial class FinanceDashboardForm : BaseDashboardForm
+    public partial class FinanceDashboardForm
+        : BaseDashboardForm<FinanceDashboardViewModel>
     {
-        private FinanceDashboardViewModel _vm;
-
         public FinanceDashboardForm()
         {
             InitializeComponent();
         }
 
-        protected override void OnBindViewModel(BaseDashboardViewModel viewModel)
+        protected override void BindControlsToViewModel()
         {
-            _vm = viewModel as FinanceDashboardViewModel
-                ?? throw new ArgumentException("Invalid ViewModel type");
+            // Grid setup
+            financeGrid.AutoGenerateColumns = true;
 
-            accountListBox.DataSource = _vm.Accounts;
-            accountListBox.DisplayMember = "Name";
-
-            if (accountListBox.Items.Count > 0)
-                accountListBox.SelectedIndex = 0;
+            // Initial paint
+            RefreshDashboard();
         }
 
-        private void AccountListBox_SelectedIndexChanged(object sender, EventArgs e)
+        public override void RefreshDashboard()
         {
-            _vm.SelectedAccount = accountListBox.SelectedItem as FinanceAccount;
-            UpdateAccountDetails();
-            UpdateChart();
-        }
+            ViewModel.Refresh();
 
-        public override void OnActivated()
-        {
-            UpdateAccountDetails();
-            UpdateChart();
-        }
+            financeGrid.DataSource = ViewModel.Transactions
+                .Select(t => new
+                {
+                    t.Date,
+                    t.Description,
+                    Amount = t.Amount.ToString("C")
+                })
+                .ToList();
 
-        private void UpdateAccountDetails()
-        {
-            if (_vm?.SelectedAccount == null) return;
-
-            lblAccountName.Text = _vm.SelectedAccount.Name;
-            lblBalance.Text = $"Balance: {_vm.SelectedAccount.Balance:C}";
-            lblMonthlyIncome.Text = $"Monthly Income: {_vm.SelectedAccount.MonthlyIncome:C}";
-            lblMonthlyExpenses.Text = $"Monthly Expenses: {_vm.SelectedAccount.MonthlyExpenses:C}";
-        }
-
-        private void UpdateChart()
-        {
-            if (_vm?.SelectedAccount == null) return;
-
-            var series = financeChart.Series["MonthlyNet"];
-            series.Points.Clear();
-
-            foreach (var mc in _vm.SelectedAccount.MonthlyNet)
-                series.Points.AddXY(mc.Month, mc.Amount);
+            lblTotalIncome.Text = $"Income: {ViewModel.TotalIncome:C}";
+            lblTotalSpending.Text = $"Spending: {ViewModel.TotalSpending:C}";
         }
     }
 }
