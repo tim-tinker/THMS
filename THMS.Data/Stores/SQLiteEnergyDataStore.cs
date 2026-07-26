@@ -102,7 +102,7 @@ namespace THMS.Data.Stores
         // EV Charging Sessions (ChargePoint)
         // ---------------------------------------------------------
 
-        public void AddEvChargingSession(EvChargingSession session)
+        public void AddEvChargingSession(EvCommercialChargingSession session)
         {
             using var connection = new SqliteConnection(_connectionString);
             connection.Open();
@@ -122,9 +122,9 @@ namespace THMS.Data.Stores
             cmd.ExecuteNonQuery();
         }
 
-        public IReadOnlyCollection<EvChargingSession> GetEvChargingSessions()
+        public IReadOnlyCollection<EvCommercialChargingSession> GetEvChargingSessions()
         {
-            var list = new List<EvChargingSession>();
+            var list = new List<EvCommercialChargingSession>();
 
             using var connection = new SqliteConnection(_connectionString);
             connection.Open();
@@ -136,7 +136,7 @@ namespace THMS.Data.Stores
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                list.Add(new EvChargingSession
+                list.Add(new EvCommercialChargingSession
                 {
                     Timestamp = DateTime.Parse(reader.GetString(0)),
                     EvChargingWh = reader.GetDecimal(1),
@@ -149,7 +149,7 @@ namespace THMS.Data.Stores
             return list;
         }
 
-        public IReadOnlyCollection<EvChargingSession> GetAllEvChargingSessionsRaw()
+        public IReadOnlyCollection<EvCommercialChargingSession> GetAllEvChargingSessionsRaw()
             => GetEvChargingSessions();
 
         // ---------------------------------------------------------

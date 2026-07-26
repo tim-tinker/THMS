@@ -1,58 +1,65 @@
-﻿namespace THMS.Data.Stores
-{
-    using THMS.Domain.Transportation;
+﻿using THMS.Domain.Transportation;
 
-    /// <summary>
-    /// Provides persistence operations for vehicle mileage records,
-    /// supporting both ICE and EV vehicles.
-    /// </summary>
+namespace THMS.Data.Stores
+{
     public interface IVehicleDataStore
     {
-        // ---------------------------------------------------------
-        // ICE MILEAGE RECORDS
-        // ---------------------------------------------------------
+        // -------------------------------
+        // VEHICLES
+        // -------------------------------
 
-        /// <summary>
-        /// Adds a new ICE mileage record (fuel fill-up).
-        /// </summary>
+        VehicleBase? GetVehicle(Guid vehicleId);
+        IEnumerable<VehicleBase> GetAllVehicles();
+        void AddVehicle(VehicleBase vehicle);
+
+        // -------------------------------
+        // ICE MILEAGE RECORDS
+        // -------------------------------
+
+        IEnumerable<IceMileageRecord> GetIceMileageRecords(
+            Guid vehicleId,
+            DateTime start,
+            DateTime end);
+
         void AddIceMileageRecord(IceMileageRecord record);
 
-        /// <summary>
-        /// Retrieves all ICE mileage records for a given vehicle.
-        /// </summary>
-        IEnumerable<IceMileageRecord> GetIceMileageRecords(Guid vehicleId);
+        // -------------------------------
+        // EV CHARGING SESSIONS (Transportation)
+        // -------------------------------
 
         /// <summary>
-        /// Retrieves ICE mileage records for a vehicle within a date range.
+        /// Returns EV charging sessions that have vehicle data assigned.
         /// </summary>
-        IEnumerable<IceMileageRecord> GetIceMileageRecords(Guid vehicleId, DateTime start, DateTime end);
-
-        // ---------------------------------------------------------
-        // EV MILEAGE RECORDS
-        // ---------------------------------------------------------
+        IEnumerable<EvChargingSession> GetEvChargingSessions(
+            Guid vehicleId,
+            DateTime start,
+            DateTime end);
 
         /// <summary>
-        /// Adds a new EV mileage record (charging session).
+        /// Returns all EV charging sessions, including unassigned ones.
         /// </summary>
-        void AddEvMileageRecord(EvMileageRecord record);
+        IEnumerable<EvChargingSession> GetAllEvChargingSessions();
+
+        void AddEvChargingSession(EvChargingSession session);
+
+        // -------------------------------
+        // EV CHARGING SESSION VEHICLE DATA
+        // -------------------------------
+
+        EvChargingSessionVehicleData? GetEvChargingSessionVehicleData(Guid id);
+
+        void AddEvChargingSessionVehicleData(EvChargingSessionVehicleData data);
+
+        // -------------------------------
+        // SESSION ENRICHMENT WORKFLOW
+        // -------------------------------
 
         /// <summary>
-        /// Retrieves all EV mileage records for a given vehicle.
+        /// Assigns vehicle data to a charging session.
+        /// Sets session.VehicleDataId = vehicleDataId.
         /// </summary>
-        IEnumerable<EvMileageRecord> GetEvMileageRecords(Guid vehicleId);
-
-        /// <summary>
-        /// Retrieves EV mileage records for a vehicle within a date range.
-        /// </summary>
-        IEnumerable<EvMileageRecord> GetEvMileageRecords(Guid vehicleId, DateTime start, DateTime end);
-
-        // ---------------------------------------------------------
-        // GENERAL
-        // ---------------------------------------------------------
-
-        /// <summary>
-        /// Deletes a mileage record (EV or ICE) by its ID.
-        /// </summary>
-        void DeleteMileageRecord(Guid recordId);
+        void AttachVehicleDataToChargingSession(
+            Guid sessionId,
+            Guid vehicleDataId);
     }
 }

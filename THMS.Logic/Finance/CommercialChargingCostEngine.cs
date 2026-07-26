@@ -8,10 +8,20 @@ namespace THMS.Logic.Finance
     /// </summary>
     public class CommercialChargingCostEngine
     {
-        private readonly IFinanceDataStore _financeStore;
-        private readonly IEnergyDataStore _energyStore;
+        private IFinanceDataStore? _financeStore;
+        private IEnergyDataStore? _energyStore;
+
+        public CommercialChargingCostEngine() { }
 
         public CommercialChargingCostEngine(
+            IFinanceDataStore financeStore,
+            IEnergyDataStore energyStore)
+        {
+            _financeStore = financeStore;
+            _energyStore = energyStore;
+        }
+
+        public void SetStores(
             IFinanceDataStore financeStore,
             IEnergyDataStore energyStore)
         {

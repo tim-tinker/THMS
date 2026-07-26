@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using THMS.UI.WinForms.Navigation;
-using THMS.Logic.ViewModels.Home;
+using THMS.Logic.ViewModels;
 
 namespace THMS.UI.WinForms;
 

@@ -29,8 +29,8 @@ namespace THMS.Logic.ViewModels.Transportation
         // Vehicle selection
         // ---------------------------------------------------------
 
-        public List<Vehicle> Vehicles { get; }
-        public Vehicle? SelectedVehicle { get; set; }
+        public List<VehicleBase> Vehicles { get; }
+        public VehicleBase? SelectedVehicle { get; set; }
 
         // ---------------------------------------------------------
         // Analytics results

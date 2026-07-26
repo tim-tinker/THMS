@@ -6,11 +6,13 @@
     /// </summary>
     public class CommercialChargingCostRecord
     {
+        public Guid Id { get; set; }
+
         /// <summary>
         /// Timestamp of the charging session start.
         /// This aligns with the EvChargingSession.Timestamp stored in IEnergyDataStore.
         /// </summary>
-        public DateTime Timestamp { get; set; }
+        public DateTime Date { get; set; }
 
         /// <summary>
         /// Total cost charged by the commercial charging provider.
@@ -27,6 +29,6 @@
         /// Optional session identifier from the vendor.
         /// Useful for reconciliation and debugging.
         /// </summary>
-        public string? SessionId { get; set; }
+        public string SessionId { get; set; } = string.Empty;
     }
 }

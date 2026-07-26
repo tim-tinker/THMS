@@ -14,8 +14,8 @@ namespace THMS.Data.Stores
         void AddEvCircuitReading(EvCircuitReading interval);
         IReadOnlyCollection<EvCircuitReading> GetEvCircuitReadings();
 
-        void AddEvChargingSession(EvChargingSession session);
-        IReadOnlyCollection<EvChargingSession> GetEvChargingSessions();
+        void AddEvChargingSession(EvCommercialChargingSession session);
+        IReadOnlyCollection<EvCommercialChargingSession> GetEvChargingSessions();
 
         void AddSolarVendorInterval(SolarVendorInterval interval);
         IReadOnlyCollection<SolarVendorInterval> GetSolarVendorIntervals();

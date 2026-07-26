@@ -7,6 +7,11 @@
     public class ElectricUtilityBill
     {
         /// <summary>
+        /// Unique identifier for this bill.
+        /// </summary>
+        public Guid Id { get; set; }
+
+        /// <summary>
         /// First day of the billing cycle.
         /// </summary>
         public DateTime StartDate { get; set; }
@@ -40,5 +45,21 @@
         /// Taxes and fees applied to the bill.
         /// </summary>
         public decimal TaxesAndFees { get; set; }
+
+        /// <summary>
+        /// Total kWh usage for the billing cycle (as listed on the bill).
+        /// </summary>
+        public decimal TotalKwh { get; set; }
+
+        /// <summary>
+        /// Total cost for the billing cycle:
+        /// GridImportCost + DeliveryCharges + FixedCharges + TaxesAndFees - GridExportCredit.
+        /// </summary>
+        public decimal TotalCost =>
+            GridImportCost
+            + DeliveryCharges
+            + FixedCharges
+            + TaxesAndFees
+            - GridExportCredit;
     }
 }

@@ -1,68 +1,64 @@
 ﻿using THMS.Domain.Finance;
 using THMS.Domain.Finance.Billing;
+using THMS.Domain.Transportation;
 
 namespace THMS.Data.Stores
 {
-    /// <summary>
-    /// Stores all financial-domain objects used by THMS.
-    /// Includes utility bills, commercial EV charging costs,
-    /// and general financial transactions.
-    /// </summary>
-    public interface IFinanceDataStore
+    public interface IFinanceStore
     {
         // ---------------------------------------------------------
-        // ELECTRIC UTILITY BILLS (monthly)
+        // ELECTRIC UTILITY BILLS (HOME ENERGY)
         // ---------------------------------------------------------
 
-        /// <summary>
-        /// Adds a monthly electric utility bill.
-        /// </summary>
         void AddElectricUtilityBill(ElectricUtilityBill bill);
 
-        /// <summary>
-        /// Returns all electric utility bills ordered by start date.
-        /// </summary>
-        IReadOnlyCollection<ElectricUtilityBill> GetElectricUtilityBills();
-
-        /// <summary>
-        /// Raw accessor for logic engines.
-        /// </summary>
-        IReadOnlyCollection<ElectricUtilityBill> GetAllElectricUtilityBillsRaw();
+        IEnumerable<ElectricUtilityBill> GetElectricUtilityBills(
+            DateTime start,
+            DateTime end);
 
 
         // ---------------------------------------------------------
-        // COMMERCIAL EV CHARGING COSTS
+        // COMMERCIAL CHARGING COST RECORDS (RAW ENERGY DOMAIN)
         // ---------------------------------------------------------
 
-        /// <summary>
-        /// Adds a commercial EV charging cost record (e.g., ChargePoint).
-        /// Energy (Wh) is stored separately in IEnergyDataStore.
-        /// </summary>
         void AddCommercialChargingCostRecord(CommercialChargingCostRecord record);
 
-        /// <summary>
-        /// Returns all commercial charging cost records.
-        /// </summary>
-        IReadOnlyCollection<CommercialChargingCostRecord> GetCommercialChargingCostRecords();
+        IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecords(
+            DateTime start,
+            DateTime end);
 
-        /// <summary>
-        /// Raw accessor for logic engines.
-        /// </summary>
-        IReadOnlyCollection<CommercialChargingCostRecord> GetAllCommercialChargingCostRecordsRaw();
+        IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecordsByVendor(
+            string vendor,
+            DateTime start,
+            DateTime end);
+
+        // ---------------------------------------------------------
+        // GAS PURCHASES (ICE VEHICLES)
+        // ---------------------------------------------------------
+
+        void AddGasPurchase(GasPurchase purchase);
+
+        IEnumerable<GasPurchase> GetGasPurchases(
+            Guid vehicleId,
+            DateTime start,
+            DateTime end);
 
 
         // ---------------------------------------------------------
-        // GENERAL FINANCE TRANSACTIONS
+        // INCOMPLETE COST RECORDS (USER CORRECTION WORKFLOW)
         // ---------------------------------------------------------
 
-        /// <summary>
-        /// Adds a general financial transaction (fuel, maintenance, etc.).
-        /// </summary>
-        void AddFinanceTransaction(FinanceTransaction transaction);
+        IEnumerable<EvChargingSession> GetEvChargingSessionsWithMissingCost();
 
-        /// <summary>
-        /// Returns all financial transactions.
-        /// </summary>
-        IReadOnlyCollection<FinanceTransaction> GetAllTransactions();
+        IEnumerable<GasPurchase> GetGasPurchasesWithMissingCost();
+
+
+        // ---------------------------------------------------------
+        // COST UPDATES (ONLY WHERE NECESSARY)
+        // ---------------------------------------------------------
+
+        void UpdateEvChargingSessionCost(Guid sessionId, decimal cost);
+
+        void UpdateGasPurchaseCost(Guid purchaseId, decimal cost);
     }
 }

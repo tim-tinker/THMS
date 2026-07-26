@@ -7,8 +7,10 @@ namespace THMS.Logic.Finance
 {
     public class HomeChargingCostAttributionEngine
     {
-        private readonly IEnergyDataStore _energyStore;
-        private readonly IFinanceDataStore _financeStore;
+        private IFinanceDataStore? _financeStore;
+        private IEnergyDataStore? _energyStore;
+
+        public HomeChargingCostAttributionEngine() { }
 
         public HomeChargingCostAttributionEngine(
             IEnergyDataStore energyStore,
@@ -16,6 +18,14 @@ namespace THMS.Logic.Finance
         {
             _energyStore = energyStore;
             _financeStore = financeStore;
+        }
+
+        public void SetStores(
+            IFinanceDataStore financeStore,
+            IEnergyDataStore energyStore)
+        {
+            _financeStore = financeStore;
+            _energyStore = energyStore;
         }
 
         public HomeChargingCostSummary ComputeMonthlyCost(DateTime monthStart, DateTime monthEnd)

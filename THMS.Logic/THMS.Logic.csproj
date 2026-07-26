@@ -26,4 +26,8 @@
     <ProjectReference Include="..\THMS.Domain\THMS.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Home\" />
+  </ItemGroup>
+
 </Project>

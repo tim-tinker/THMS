@@ -45,7 +45,7 @@ namespace THMS.UI.WinForms
         // ---------------------------------------------------------
         private void VehicleListBox_SelectedIndexChanged(object sender, EventArgs e)
         {
-            ViewModel.SelectedVehicle = vehicleListBox.SelectedItem as Vehicle;
+            ViewModel.SelectedVehicle = vehicleListBox.SelectedItem as VehicleBase;
             RefreshDashboard();
         }
 

@@ -20,6 +20,6 @@ namespace THMS.Ingestion.Importers.Energy
             }
         }
 
-        protected abstract IEnumerable<EvChargingSession> ReadChargingSessions(string csvPath);
+        protected abstract IEnumerable<EvCommercialChargingSession> ReadChargingSessions(string csvPath);
    }
 }

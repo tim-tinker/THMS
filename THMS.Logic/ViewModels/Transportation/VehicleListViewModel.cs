@@ -14,15 +14,15 @@ namespace THMS.Logic.ViewModels.Transportation
             Refresh();
         }
 
-        public List<Vehicle> Vehicles { get; private set; } = new();
-        public Vehicle? SelectedVehicle { get; set; }
+        public List<VehicleBase> Vehicles { get; private set; } = new();
+        public VehicleBase? SelectedVehicle { get; set; }
 
         public void Refresh()
         {
             Vehicles = _store.GetAllVehicles().ToList();
         }
 
-        public void AddVehicle(Vehicle vehicle)
+        public void AddVehicle(VehicleBase vehicle)
         {
             _store.AddVehicle(vehicle);
             Refresh();

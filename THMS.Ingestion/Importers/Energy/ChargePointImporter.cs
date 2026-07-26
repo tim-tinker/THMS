@@ -49,7 +49,7 @@ namespace THMS.Importers
                 // -----------------------------------------
                 // ENERGY PORTION (Wh)
                 // -----------------------------------------
-                var energyRecord = new EvChargingSession
+                var energyRecord = new EvCommercialChargingSession
                 {
                     Timestamp = startTime,
                     Duration = duration,

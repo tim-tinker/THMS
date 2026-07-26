@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace THMS.Logic.ViewModels.Transportation
+namespace THMS.Logic.Transportation
 {
     internal class CostPerMileCalculator
     {

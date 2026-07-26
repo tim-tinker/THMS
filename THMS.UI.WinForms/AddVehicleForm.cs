@@ -25,7 +25,7 @@ namespace THMS.UI.WinForms
                 return;
             }
 
-            var vehicle = new Vehicle
+            var vehicle = new VehicleBase
             {
                 Id = Guid.NewGuid(),
                 Name = txtName.Text.Trim(),

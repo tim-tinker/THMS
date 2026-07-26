@@ -1,4 +1,4 @@
-namespace THMS.Logic.ViewModels.Home;
+namespace THMS.Logic.ViewModels;
 
 public class HomeViewModel
 {
