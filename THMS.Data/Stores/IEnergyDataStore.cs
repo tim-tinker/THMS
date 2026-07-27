@@ -1,27 +1,55 @@
 ﻿using THMS.Domain.Energy;
+using THMS.Domain.Finance;
 
 namespace THMS.Data.Stores
 {
-    /// <summary>
-    /// Stores all raw energy-related domain objects produced by the
-    /// EnergyIngestionPipeline. This is the single source of truth for
-    /// energy data in THMS.
-    ///
-    /// Normalization is performed on-demand by logic engines.
-    /// </summary>
     public interface IEnergyDataStore
     {
-        void AddEvCircuitReading(EvCircuitReading interval);
-        IReadOnlyCollection<EvCircuitReading> GetEvCircuitReadings();
+        // ---------------------------------------------------------
+        // HOME CHARGING CIRCUIT READINGS
+        // ---------------------------------------------------------
 
-        void AddEvChargingSession(EvCommercialChargingSession session);
-        IReadOnlyCollection<EvCommercialChargingSession> GetEvChargingSessions();
+        void AddEvCircuitReading(EvCircuitReading reading);
+
+        IEnumerable<EvCircuitReading> GetEvCircuitReadings(
+            DateTime start,
+            DateTime end);
+
+        // ---------------------------------------------------------
+        // HOME SOLAR VENDOR INTERVALS
+        // ---------------------------------------------------------
 
         void AddSolarVendorInterval(SolarVendorInterval interval);
-        IReadOnlyCollection<SolarVendorInterval> GetSolarVendorIntervals();
 
-        IReadOnlyCollection<EvCircuitReading> GetAllEvCircuitReadingsRaw();
+        IEnumerable<SolarVendorInterval> GetSolarVendorIntervals(
+            DateTime start,
+            DateTime end);
 
-        IReadOnlyCollection<SolarVendorInterval> GetAllSolarVendorIntervalsRaw();
+
+        // ---------------------------------------------------------
+        // COMMERCIAL CHARGING SESSIONS
+        // ---------------------------------------------------------
+
+        void AddEvCommercialChargingSession(EvCommercialChargingSession session);
+
+        IEnumerable<EvCommercialChargingSession> GetEvCommercialChargingSessions(
+            DateTime start,
+            DateTime end);
+
+
+        // ---------------------------------------------------------
+        // COMMERCIAL CHARGING COST RECORDS
+        // ---------------------------------------------------------
+
+        void AddCommercialChargingCostRecord(CommercialChargingCostRecord record);
+
+        IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecords(
+            DateTime start,
+            DateTime end);
+
+        IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecordsByVendor(
+            string vendor,
+            DateTime start,
+            DateTime end);
     }
 }

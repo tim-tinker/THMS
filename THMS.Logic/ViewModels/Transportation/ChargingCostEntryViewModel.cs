@@ -5,9 +5,9 @@ namespace THMS.UI.ViewModels.Transportation
 {
     public class ChargingCostEntryViewModel
     {
-        private readonly TransportationDataStore _store;
+        private readonly IVehicleDataStore _store;
 
-        public ChargingCostEntryViewModel(TransportationDataStore store, Guid vehicleId)
+        public ChargingCostEntryViewModel(IVehicleDataStore store, Guid vehicleId)
         {
             _store = store;
             VehicleId = vehicleId;

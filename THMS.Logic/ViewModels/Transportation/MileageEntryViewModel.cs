@@ -5,9 +5,9 @@ namespace THMS.UI.ViewModels.Transportation
 {
     public class MileageEntryViewModel
     {
-        private readonly TransportationDataStore _store;
+        private readonly IVehicleDataStore _store;
 
-        public MileageEntryViewModel(TransportationDataStore store, Guid vehicleId)
+        public MileageEntryViewModel(IVehicleDataStore store, Guid vehicleId)
         {
             _store = store;
             VehicleId = vehicleId;
@@ -20,14 +20,14 @@ namespace THMS.UI.ViewModels.Transportation
 
         public void Save()
         {
-            var record = new MileageRecordBase
+            var record = new IceMileageRecord
             {
                 VehicleId = VehicleId,
                 Date = Date,
                 OdometerMiles = OdometerMiles
             };
 
-            _store.AddMileageRecord(record);
+            _store.AddIceMileageRecord(record);
         }
     }
 }

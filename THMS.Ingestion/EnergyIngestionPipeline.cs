@@ -1,38 +1,49 @@
 ﻿using THMS.Data.Stores;
 using THMS.Ingestion.Importers.Energy;
-using THMS.Ingestion.Importers.Finance;
 
 namespace THMS.Ingestion
 {
-    /// <summary>
-    /// Coordinates ingestion of all raw energy data sources.
-    /// Populates the unified EnergyDataStore with domain objects.
-    /// </summary>
     public class EnergyIngestionPipeline
     {
-        private readonly IEnergyDataStore _store;
+        private readonly IEnergyDataStore _energyStore;
+        private readonly IFinanceDataStore _financeStore;
 
-        public EnergyIngestionPipeline(IEnergyDataStore store)
+        public EnergyIngestionPipeline(
+            IEnergyDataStore energyStore,
+            IFinanceDataStore financeStore)
         {
-            _store = store;
+            _energyStore = energyStore;
+            _financeStore = financeStore;
         }
 
-        public void IngestSpanData(string spanCsvPath)
+        // ---------------------------------------------------------
+        // COMMERCIAL CHARGING (ChargePoint)
+        // ---------------------------------------------------------
+
+        public void IngestChargePointData(string filePath)
         {
-            var importer = new HomeEvCircuitImporter(_store);
-            importer.Import(spanCsvPath);
+            var importer = new ChargePointImporter(_energyStore, _financeStore);
+            importer.Import(filePath);
         }
 
-        public void IngestEvChargingData(string chargingCsvPath)
+        // ---------------------------------------------------------
+        // HOME EV CIRCUIT (SPAN)
+        // ---------------------------------------------------------
+
+        public void IngestHomeEvCircuitData(string filePath)
         {
-            var importer = new ChargePointImporter(_store);
-            importer.Import(chargingCsvPath);
+            var importer = new HomeEvCircuitImporter(_energyStore);
+            importer.Import(filePath);
         }
 
-        public void IngestSolarVendorData(string solarCsvPath)
+        // ---------------------------------------------------------
+        // SOLAR VENDOR (Enphase)
+        // ---------------------------------------------------------
+
+        public void IngestEnphaseSolarData(string filePath)
         {
-            var importer = new SolarReportImporter(_store);
-            importer.Import(solarCsvPath);
+            var importer = new EnphaseSolarImporter(_energyStore);
+            importer.Import(filePath);
         }
     }
 }

@@ -1,15 +1,27 @@
 ﻿namespace THMS.Domain.Transportation
 {
-    public class EvChargingSessionVehicleData
+    public class EvChargingSessionVehicleData : MileageRecordBase
     {
-        public Guid Id { get; set; }
+        // ---------------------------------------------------------
+        // START DATA (captured when charging begins)
+        // ---------------------------------------------------------
+        public DateTime? StartTimestamp { get; set; }
+        public int? StartSocPercent { get; set; }
 
-        // Vehicle identity
-        public Guid VehicleId { get; set; }
+        // The odometer does not change during charging.
+        // This is the ONLY odometer value for the session.
+        public decimal? OdometerMiles { get; set; }
 
-        // Vehicle-specific charging details
-        public decimal StartSocPercent { get; set; }
-        public decimal EndSocPercent { get; set; }
-        public decimal OdometerMiles { get; set; }
+        // ---------------------------------------------------------
+        // END DATA (captured when charging ends)
+        // ---------------------------------------------------------
+        // the end timestamp uses the MileageRecordBase.Date property, which is the only date/time at which the session ends.
+        public int? EndSocPercent { get; set; }
+
+        // ---------------------------------------------------------
+        // OPTIONAL FUTURE FIELDS
+        // ---------------------------------------------------------
+        // public decimal? StartBatteryTempC { get; set; }
+        // public decimal? EndBatteryTempC { get; set; }
     }
 }

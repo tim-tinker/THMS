@@ -8,11 +8,11 @@ namespace THMS.Logic.ViewModels.Transportation
     public class TransportationDashboardViewModel : BaseDashboardViewModel
     {
         // Lazy-initialized dependencies
-        private TransportationDataStore? _store;
+        private IVehicleDataStore? _store;
         private TransportationAnalyticsEngine? _engine;
 
-        protected TransportationDataStore Store =>
-            _store ??= new TransportationDataStore();
+        protected IVehicleDataStore Store =>
+            _store ??= new InMemoryVehicleDataStore();
 
         protected TransportationAnalyticsEngine Engine =>
             _engine ??= new TransportationAnalyticsEngine(Store);
@@ -60,7 +60,7 @@ namespace THMS.Logic.ViewModels.Transportation
         // Test injection support
         // ---------------------------------------------------------
 
-        public void SetStoreForTesting(TransportationDataStore store)
+        public void SetStoreForTesting(IVehicleDataStore store)
         {
             _store = store;
         }

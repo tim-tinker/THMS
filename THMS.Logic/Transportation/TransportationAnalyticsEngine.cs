@@ -9,9 +9,9 @@ namespace THMS.Logic.Transportation
     /// </summary>
     public class TransportationAnalyticsEngine
     {
-        private readonly TransportationDataStore _store;
+        private readonly IVehicleDataStore _store;
 
-        public TransportationAnalyticsEngine(TransportationDataStore store)
+        public TransportationAnalyticsEngine(IVehicleDataStore store)
         {
             _store = store;
         }

@@ -1,65 +1,68 @@
 ﻿using THMS.Domain.Transportation;
+using THMS.Domain.Energy;
+using THMS.Domain.Finance;
 
 namespace THMS.Data.Stores
 {
     public interface IVehicleDataStore
     {
-        // -------------------------------
+        // ---------------------------------------------------------
         // VEHICLES
-        // -------------------------------
-
-        VehicleBase? GetVehicle(Guid vehicleId);
-        IEnumerable<VehicleBase> GetAllVehicles();
+        // ---------------------------------------------------------
         void AddVehicle(VehicleBase vehicle);
+        VehicleBase? GetVehicle(Guid id);
+        IEnumerable<VehicleBase> GetAllVehicles();
 
-        // -------------------------------
-        // ICE MILEAGE RECORDS
-        // -------------------------------
-
-        IEnumerable<IceMileageRecord> GetIceMileageRecords(
-            Guid vehicleId,
-            DateTime start,
-            DateTime end);
-
+        // ---------------------------------------------------------
+        // ICE MILEAGE
+        // ---------------------------------------------------------
         void AddIceMileageRecord(IceMileageRecord record);
+        IEnumerable<IceMileageRecord> GetIceMileageRecords(Guid vehicleId, DateTime start, DateTime end);
 
-        // -------------------------------
-        // EV CHARGING SESSIONS (Transportation)
-        // -------------------------------
+        // Aggregated mileage (used by TransportationAnalyticsEngine)
+        decimal GetMilesDrivenInPeriod(DateTime start, DateTime end);
 
-        /// <summary>
-        /// Returns EV charging sessions that have vehicle data assigned.
-        /// </summary>
-        IEnumerable<EvChargingSession> GetEvChargingSessions(
-            Guid vehicleId,
-            DateTime start,
-            DateTime end);
-
-        /// <summary>
-        /// Returns all EV charging sessions, including unassigned ones.
-        /// </summary>
-        IEnumerable<EvChargingSession> GetAllEvChargingSessions();
-
+        // ---------------------------------------------------------
+        // EV CHARGING SESSIONS (vehicle‑assigned)
+        // ---------------------------------------------------------
         void AddEvChargingSession(EvChargingSession session);
+        IEnumerable<EvChargingSession> GetEvChargingSessions(Guid vehicleId, DateTime start, DateTime end);
 
-        // -------------------------------
-        // EV CHARGING SESSION VEHICLE DATA
-        // -------------------------------
+        // Unassigned sessions (for reconciliation UI)
+        IEnumerable<EvChargingSession> GetUnassignedEvChargingSessions();
 
+        // ---------------------------------------------------------
+        // EV CHARGING SESSION VEHICLE DATA (partial + update)
+        // ---------------------------------------------------------
+        void AddEvChargingSessionVehicleData(EvChargingSessionVehicleData data);
+        void UpdateEvChargingSessionVehicleData(EvChargingSessionVehicleData data);
         EvChargingSessionVehicleData? GetEvChargingSessionVehicleData(Guid id);
 
-        void AddEvChargingSessionVehicleData(EvChargingSessionVehicleData data);
+        // Link session ↔ vehicle data
+        void AttachVehicleDataToChargingSession(Guid sessionId, Guid vehicleDataId);
 
-        // -------------------------------
-        // SESSION ENRICHMENT WORKFLOW
-        // -------------------------------
+        // ---------------------------------------------------------
+        // EV CHARGING COST RECORDS (vehicle attribution)
+        // ---------------------------------------------------------
+        void AddChargingCostRecord(ChargingCostRecord record);
+        IEnumerable<ChargingCostRecord> GetChargingCosts(DateTime start, DateTime end);
 
-        /// <summary>
-        /// Assigns vehicle data to a charging session.
-        /// Sets session.VehicleDataId = vehicleDataId.
-        /// </summary>
-        void AttachVehicleDataToChargingSession(
-            Guid sessionId,
-            Guid vehicleDataId);
+        decimal GetChargingCostInPeriod(DateTime start, DateTime end);
+
+        // ---------------------------------------------------------
+        // FUEL RECEIPTS (ICE)
+        // ---------------------------------------------------------
+        void AddFuelReceipt(GasPurchase purchase);
+        IEnumerable<GasPurchase> GetFuelReceipts(DateTime start, DateTime end);
+
+        decimal GetFuelCostInPeriod(DateTime start, DateTime end);
+
+        // ---------------------------------------------------------
+        // MAINTENANCE
+        // ---------------------------------------------------------
+        void AddMaintenanceInvoice(MaintenanceInvoiceRecord invoice);
+        IEnumerable<MaintenanceInvoiceRecord> GetMaintenanceInvoices(DateTime start, DateTime end);
+
+        decimal GetMaintenanceCostInPeriod(DateTime start, DateTime end);
     }
 }

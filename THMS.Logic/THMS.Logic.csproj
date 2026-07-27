@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>THMS.Logic.ViewModels</RootNamespace>
+    <RootNamespace>THMS.Logic</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\THMS.Data\THMS.Data.csproj" />
     <ProjectReference Include="..\THMS.Domain\THMS.Domain.csproj" />
+    <ProjectReference Include="..\THMS.Ingestion\THMS.Ingestion.csproj" />
   </ItemGroup>
 
   <ItemGroup>

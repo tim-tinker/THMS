@@ -31,7 +31,7 @@ namespace THMS.Ingestion.Importers.Energy
                 var reading = new EvCircuitReading
                 {
                     Timestamp = firstTimeStamp,
-                    CircuitUseWh = circuitEnergyWh,
+                    WattHours = circuitEnergyWh,
                 };
                 _store.AddEvCircuitReading(reading);
             }

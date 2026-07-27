@@ -7,9 +7,9 @@ namespace THMS.Ingestion.Importers.Finance
 {
     public class ElectricUtilityBillImporter
     {
-        private readonly SQLLiteFinanceDataStore _store;
+        private readonly IFinanceDataStore _store;
 
-        public ElectricUtilityBillImporter(SQLLiteFinanceDataStore store)
+        public ElectricUtilityBillImporter(IFinanceDataStore store)
         {
             _store = store;
         }
@@ -26,8 +26,8 @@ namespace THMS.Ingestion.Importers.Finance
             {
                 var interval = new ElectricUtilityBill
                 {
-                    Start = csv.GetField<DateTime>("Start"),
-                    End = csv.GetField<DateTime>("End"),
+                    StartDate = csv.GetField<DateTime>("Start"),
+                    EndDate = csv.GetField<DateTime>("End"),
                     GridImportCost = csv.GetField<decimal>("Grid Import Cost"),
                     GridExportCredit = csv.GetField<decimal>("Grid Export Credit"),
                     FixedCharges = csv.GetField<decimal>("Fixed Charges"),
@@ -35,7 +35,7 @@ namespace THMS.Ingestion.Importers.Finance
                     TaxesAndFees = csv.GetField<decimal>("Taxes and Fees")
                 };
 
-                _store.AddElectricUtilityBillCostInterval(interval);
+                _store.AddElectricUtilityBill(interval);
             }
         }
     }

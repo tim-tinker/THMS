@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using THMS.Data.Stores;
+using THMS.Data.Stores.InMemory;
 using THMS.Domain.Finance;
 using THMS.Logic.ViewModels;
 
@@ -10,10 +11,10 @@ namespace THMS.Logic.ViewModels.Finance
     public class FinanceDashboardViewModel : BaseDashboardViewModel
     {
         // Lazy dependencies (replace with your real store/engine later)
-        private SQLLiteFinanceDataStore? _store;
+        private IFinanceDataStore? _store;
 
-        protected SQLLiteFinanceDataStore Store =>
-            _store ??= new SQLLiteFinanceDataStore();
+        protected IFinanceDataStore Store =>
+            _store ??= new InMemoryFinanceDataStore();
 
         public List<FinanceTransaction> Transactions { get; private set; } = new();
         public decimal TotalSpending { get; private set; }
@@ -39,7 +40,7 @@ namespace THMS.Logic.ViewModels.Finance
         }
 
         // Testing support
-        public void SetStoreForTesting(SQLLiteFinanceDataStore store)
+        public void SetStoreForTesting(IFinanceDataStore store)
         {
             _store = store;
         }

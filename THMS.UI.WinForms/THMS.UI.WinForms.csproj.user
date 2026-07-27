@@ -16,6 +16,9 @@
     <Compile Update="FinanceDashboardForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="ImporterForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>

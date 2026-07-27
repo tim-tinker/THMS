@@ -4,7 +4,7 @@ using THMS.Domain.Transportation;
 
 namespace THMS.Data.Stores
 {
-    public interface IFinanceStore
+    public interface IFinanceDataStore
     {
         // ---------------------------------------------------------
         // ELECTRIC UTILITY BILLS (HOME ENERGY)

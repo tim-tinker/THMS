@@ -5,11 +5,11 @@ using THMS.Domain.Energy;
 
 namespace THMS.Ingestion.Importers.Energy
 {
-    public class SolarReportImporter
+    public class EnphaseSolarImporter
     {
         private readonly IEnergyDataStore _store;
 
-        public SolarReportImporter(IEnergyDataStore store)
+        public EnphaseSolarImporter(IEnergyDataStore store)
         {
             _store = store;
         }

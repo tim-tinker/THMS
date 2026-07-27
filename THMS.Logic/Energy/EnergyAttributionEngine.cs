@@ -5,9 +5,9 @@ namespace THMS.Logic.Energy
 {
     public class EnergyAttributionEngine
     {
-        private readonly EnergyDataStore _store;
+        private readonly IEnergyDataStore _store;
 
-        public EnergyAttributionEngine(EnergyDataStore store)
+        public EnergyAttributionEngine(IEnergyDataStore store)
         {
             _store = store;
         }

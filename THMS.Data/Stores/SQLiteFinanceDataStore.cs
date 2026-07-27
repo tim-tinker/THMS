@@ -8,11 +8,11 @@ using THMS.Domain.Transportation;
 
 namespace THMS.Data.Stores.SQLite
 {
-    public class SQLiteFinanceStore : IFinanceStore
+    public class SQLiteFinanceDataStore : IFinanceDataStore
     {
         private readonly string _connectionString;
 
-        public SQLiteFinanceStore(string databasePath)
+        public SQLiteFinanceDataStore(string databasePath)
         {
             _connectionString = $"Data Source={databasePath}";
         }

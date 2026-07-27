@@ -8,9 +8,9 @@ namespace THMS.Logic.Energy
     /// </summary>
     public class EnergyAggregationEngine
     {
-        private readonly EnergyDataStore _store;
+        private readonly IEnergyDataStore _store;
 
-        public EnergyAggregationEngine(EnergyDataStore store)
+        public EnergyAggregationEngine(IEnergyDataStore store)
         {
             _store = store;
         }

@@ -5,9 +5,9 @@ namespace THMS.Ingestion
 {
     public class FinanceIngestionPipeline
     {
-        private readonly SQLLiteFinanceDataStore _store;
+        private readonly IFinanceDataStore _store;
 
-        public FinanceIngestionPipeline(SQLLiteFinanceDataStore store)
+        public FinanceIngestionPipeline(IFinanceDataStore store)
         {
             _store = store;
         }

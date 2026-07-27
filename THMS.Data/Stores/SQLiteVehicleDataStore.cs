@@ -1,4 +1,9 @@
-﻿using Microsoft.Data.Sqlite;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.Data.Sqlite;
+using THMS.Data.Stores;
+using THMS.Data.Stores.SqlTables;
 using THMS.Domain.Transportation;
 
 namespace THMS.Data.Stores.SQLite
@@ -7,9 +12,22 @@ namespace THMS.Data.Stores.SQLite
     {
         private readonly string _connectionString;
 
-        public SQLiteVehicleDataStore(string databasePath)
+        private readonly VehicleTable _vehicleTable = new();
+        private readonly VehicleIceTable _vehicleIceTable = new();
+        private readonly VehicleEvTable _vehicleEvTable = new();
+        private readonly IceMileageTable _iceMileageTable = new();
+        private readonly EvChargingSessionVehicleDataTable _evVehicleDataTable = new();
+        private readonly MileageRecordTable _mileageRecordTable = new();
+        private readonly ChargingCostTable _chargingCostTable = new();
+        private readonly GasPurchaseTable _gasPurchaseTable = new();
+        private readonly MaintenanceInvoiceTable _maintenanceInvoiceTable = new();
+        private readonly EvChargingSessionTable _evSessionTable = new();
+
+        public SQLiteVehicleDataStore(string connectionString)
         {
-            _connectionString = $"Data Source={databasePath};Version=3;";
+            _connectionString = connectionString;
+            using var conn = OpenConnection();
+            InitializeSchema(conn);
         }
 
         private SqliteConnection OpenConnection()
@@ -19,374 +37,308 @@ namespace THMS.Data.Stores.SQLite
             return conn;
         }
 
+        private void InitializeSchema(SqliteConnection conn)
+        {
+            _vehicleTable.InitializeSchema(conn);
+            _vehicleIceTable.InitializeSchema(conn);
+            _vehicleEvTable.InitializeSchema(conn);
+            _iceMileageTable.InitializeSchema(conn);
+            _evVehicleDataTable.InitializeSchema(conn);
+            _mileageRecordTable.InitializeSchema(conn);
+            _chargingCostTable.InitializeSchema(conn);
+            _gasPurchaseTable.InitializeSchema(conn);
+            _maintenanceInvoiceTable.InitializeSchema(conn);
+            _evSessionTable.InitializeSchema(conn);
+        }
+
         // ---------------------------------------------------------
         // VEHICLES
         // ---------------------------------------------------------
 
-        public VehicleBase? GetVehicle(Guid vehicleId)
+        public void AddVehicle(VehicleBase vehicle)
         {
             using var conn = OpenConnection();
-            using var cmd = new SqliteCommand(@"
-                SELECT Id, Type, Name, Make, Model, Year, Vin,
-                       BatteryCapacityKwh, ChargingPortType,
-                       FuelTankCapacityGallons, FuelType
-                FROM Vehicles
-                WHERE Id = @Id;", conn);
 
-            cmd.Parameters.AddWithValue("@Id", vehicleId.ToString());
+            _vehicleTable.Insert(conn, vehicle);
 
-            using var reader = cmd.ExecuteReader();
-            if (!reader.Read())
+            if (vehicle is VehicleIce ice)
+                _vehicleIceTable.Insert(conn, ice);
+            else if (vehicle is VehicleEv ev)
+                _vehicleEvTable.Insert(conn, ev);
+        }
+
+        public VehicleBase? GetVehicle(Guid id)
+        {
+            using var conn = OpenConnection();
+
+            var baseInfo = _vehicleTable.GetBase(conn, id);
+            if (baseInfo == null)
                 return null;
 
-            var type = reader.GetString(reader.GetOrdinal("Type"));
+            var (name, make, model, year, vin, type) = baseInfo.Value;
 
-            if (type == "Ev")
+            if (type == nameof(VehicleIce))
             {
-                return new VehicleEv
-                {
-                    Id = Guid.Parse(reader.GetString(0)),
-                    Name = reader.GetString(2),
-                    Make = reader.GetString(3),
-                    Model = reader.GetString(4),
-                    Year = reader.GetInt32(5),
-                    Vin = reader.GetString(6),
-                    BatteryCapacityKwh = reader.GetDecimal(7),
-                    ChargingPortType = reader.GetString(8)
-                };
-            }
-            else
-            {
+                var iceInfo = _vehicleIceTable.Get(conn, id);
+                if (iceInfo == null) return null;
+
+                var (fuelTankCapacityGallons, fuelType) = iceInfo.Value;
+
                 return new VehicleIce
                 {
-                    Id = Guid.Parse(reader.GetString(0)),
-                    Name = reader.GetString(2),
-                    Make = reader.GetString(3),
-                    Model = reader.GetString(4),
-                    Year = reader.GetInt32(5),
-                    Vin = reader.GetString(6),
-                    FuelTankCapacityGallons = reader.GetDecimal(9),
-                    FuelType = reader.GetString(10)
+                    Id = id,
+                    Name = name,
+                    Make = make,
+                    Model = model,
+                    Year = year,
+                    Vin = vin,
+                    FuelTankCapacityGallons = fuelTankCapacityGallons,
+                    FuelType = fuelType
                 };
             }
+
+            if (type == nameof(VehicleEv))
+            {
+                var evInfo = _vehicleEvTable.Get(conn, id);
+                if (evInfo == null) return null;
+
+                var (batteryCapacityKwh, chargingPortType) = evInfo.Value;
+
+                return new VehicleEv
+                {
+                    Id = id,
+                    Name = name,
+                    Make = make,
+                    Model = model,
+                    Year = year,
+                    Vin = vin,
+                    BatteryCapacityKwh = batteryCapacityKwh,
+                    ChargingPortType = chargingPortType
+                };
+            }
+
+            return null;
         }
 
         public IEnumerable<VehicleBase> GetAllVehicles()
         {
             using var conn = OpenConnection();
-            using var cmd = new SqliteCommand(@"
-                SELECT Id, Type, Name, Make, Model, Year, Vin,
-                       BatteryCapacityKwh, ChargingPortType,
-                       FuelTankCapacityGallons, FuelType
-                FROM Vehicles;", conn);
+            var ids = _vehicleTable.GetAllIds(conn);
 
-            using var reader = cmd.ExecuteReader();
-            var list = new List<VehicleBase>();
-
-            while (reader.Read())
-            {
-                var type = reader.GetString(reader.GetOrdinal("Type"));
-
-                if (type == "Ev")
-                {
-                    list.Add(new VehicleEv
-                    {
-                        Id = Guid.Parse(reader.GetString(0)),
-                        Name = reader.GetString(2),
-                        Make = reader.GetString(3),
-                        Model = reader.GetString(4),
-                        Year = reader.GetInt32(5),
-                        Vin = reader.GetString(6),
-                        BatteryCapacityKwh = reader.GetDecimal(7),
-                        ChargingPortType = reader.GetString(8)
-                    });
-                }
-                else
-                {
-                    list.Add(new VehicleIce
-                    {
-                        Id = Guid.Parse(reader.GetString(0)),
-                        Name = reader.GetString(2),
-                        Make = reader.GetString(3),
-                        Model = reader.GetString(4),
-                        Year = reader.GetInt32(5),
-                        Vin = reader.GetString(6),
-                        FuelTankCapacityGallons = reader.GetDecimal(9),
-                        FuelType = reader.GetString(10)
-                    });
-                }
-            }
-
-            return list;
-        }
-
-        public void AddVehicle(VehicleBase vehicle)
-        {
-            using var conn = OpenConnection();
-            using var cmd = new SqliteCommand(@"
-                INSERT INTO Vehicles
-                (Id, Type, Name, Make, Model, Year, Vin,
-                 BatteryCapacityKwh, ChargingPortType,
-                 FuelTankCapacityGallons, FuelType)
-                VALUES
-                (@Id, @Type, @Name, @Make, @Model, @Year, @Vin,
-                 @BatteryCapacityKwh, @ChargingPortType,
-                 @FuelTankCapacityGallons, @FuelType);", conn);
-
-            cmd.Parameters.AddWithValue("@Id", vehicle.Id.ToString());
-            cmd.Parameters.AddWithValue("@Name", vehicle.Name);
-            cmd.Parameters.AddWithValue("@Make", vehicle.Make);
-            cmd.Parameters.AddWithValue("@Model", vehicle.Model);
-            cmd.Parameters.AddWithValue("@Year", vehicle.Year);
-            cmd.Parameters.AddWithValue("@Vin", vehicle.Vin);
-
-            if (vehicle is VehicleEv ev)
-            {
-                cmd.Parameters.AddWithValue("@Type", "Ev");
-                cmd.Parameters.AddWithValue("@BatteryCapacityKwh", ev.BatteryCapacityKwh);
-                cmd.Parameters.AddWithValue("@ChargingPortType", ev.ChargingPortType);
-                cmd.Parameters.AddWithValue("@FuelTankCapacityGallons", DBNull.Value);
-                cmd.Parameters.AddWithValue("@FuelType", DBNull.Value);
-            }
-            else if (vehicle is VehicleIce ice)
-            {
-                cmd.Parameters.AddWithValue("@Type", "Ice");
-                cmd.Parameters.AddWithValue("@BatteryCapacityKwh", DBNull.Value);
-                cmd.Parameters.AddWithValue("@ChargingPortType", DBNull.Value);
-                cmd.Parameters.AddWithValue("@FuelTankCapacityGallons", ice.FuelTankCapacityGallons);
-                cmd.Parameters.AddWithValue("@FuelType", ice.FuelType);
-            }
-
-            cmd.ExecuteNonQuery();
+            return ids
+                .Select(GetVehicle)
+                .Where(v => v != null)!;
         }
 
         // ---------------------------------------------------------
-        // ICE MILEAGE RECORDS
+        // ICE MILEAGE
         // ---------------------------------------------------------
-
-        public IEnumerable<IceMileageRecord> GetIceMileageRecords(
-            Guid vehicleId,
-            DateTime start,
-            DateTime end)
-        {
-            using var conn = OpenConnection();
-            using var cmd = new SqliteCommand(@"
-                SELECT Id, VehicleId, Date, OdometerMiles, GallonsAdded, Cost
-                FROM IceMileageRecords
-                WHERE VehicleId = @VehicleId
-                AND Date >= @Start AND Date <= @End
-                ORDER BY Date;", conn);
-
-            cmd.Parameters.AddWithValue("@VehicleId", vehicleId.ToString());
-            cmd.Parameters.AddWithValue("@Start", start);
-            cmd.Parameters.AddWithValue("@End", end);
-
-            using var reader = cmd.ExecuteReader();
-            var list = new List<IceMileageRecord>();
-
-            while (reader.Read())
-            {
-                list.Add(new IceMileageRecord
-                {
-                    Id = Guid.Parse(reader.GetString(0)),
-                    VehicleId = Guid.Parse(reader.GetString(1)),
-                    Date = reader.GetDateTime(2),
-                    OdometerMiles = reader.GetDecimal(3),
-                    GallonsAdded = reader.GetDecimal(4),
-                    FuelCost = reader.GetDecimal(5)
-                });
-            }
-
-            return list;
-        }
 
         public void AddIceMileageRecord(IceMileageRecord record)
         {
             using var conn = OpenConnection();
-            using var cmd = new SqliteCommand(@"
-                INSERT INTO IceMileageRecords
-                (Id, VehicleId, Date, OdometerMiles, GallonsAdded, Cost)
-                VALUES
-                (@Id, @VehicleId, @Date, @OdometerMiles, @GallonsAdded, @Cost);", conn);
 
-            cmd.Parameters.AddWithValue("@Id", record.Id.ToString());
-            cmd.Parameters.AddWithValue("@VehicleId", record.VehicleId.ToString());
-            cmd.Parameters.AddWithValue("@Date", record.Date);
-            cmd.Parameters.AddWithValue("@OdometerMiles", record.OdometerMiles);
-            cmd.Parameters.AddWithValue("@GallonsAdded", record.GallonsAdded);
-            cmd.Parameters.AddWithValue("@Cost", record.FuelCost);
-
-            cmd.ExecuteNonQuery();
+            // base
+            _mileageRecordTable.Insert(conn, record, "Ice");
+            // derived
+            _iceMileageTable.Insert(conn, record);
         }
 
-        // ---------------------------------------------------------
-        // EV CHARGING SESSIONS
-        // ---------------------------------------------------------
-
-        public IEnumerable<EvChargingSession> GetEvChargingSessions(
-            Guid vehicleId,
-            DateTime start,
-            DateTime end)
+        public IEnumerable<IceMileageRecord> GetIceMileageRecords(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            using var cmd = new SqliteCommand(@"
-                SELECT s.Id, s.StartTime, s.EndTime, s.KwhAdded,
-                       s.IsHomeCharging, s.ChargingCost, s.VehicleDataId
-                FROM EvChargingSessions s
-                JOIN EvChargingSessionVehicleData vd
-                    ON s.VehicleDataId = vd.Id
-                WHERE vd.VehicleId = @VehicleId
-                AND s.StartTime >= @Start AND s.EndTime <= @End
-                ORDER BY s.StartTime;", conn);
 
-            cmd.Parameters.AddWithValue("@VehicleId", vehicleId.ToString());
-            cmd.Parameters.AddWithValue("@Start", start);
-            cmd.Parameters.AddWithValue("@End", end);
+            var baseRows = _mileageRecordTable
+                .GetRange(conn, start, end)
+                .Where(r => r.VehicleId == vehicleId && r.Type == "Ice")
+                .ToList();
 
-            using var reader = cmd.ExecuteReader();
-            var list = new List<EvChargingSession>();
+            var results = new List<IceMileageRecord>();
 
-            while (reader.Read())
+            foreach (var (id, vId, date, odo, notes, _) in baseRows)
             {
-                list.Add(new EvChargingSession
+                var derived = _iceMileageTable.GetById(conn, id);
+                if (derived == null) continue;
+
+                var (gallonsAdded, isFullFillUp, fuelCost) = derived.Value;
+
+                results.Add(new IceMileageRecord
                 {
-                    Id = Guid.Parse(reader.GetString(0)),
-                    StartTime = reader.GetDateTime(1),
-                    EndTime = reader.GetDateTime(2),
-                    KwhAdded = reader.GetDecimal(3),
-                    IsHomeCharging = reader.GetBoolean(4),
-                    ChargingCost = reader.IsDBNull(5) ? null : reader.GetDecimal(5),
-                    VehicleDataId = reader.IsDBNull(6)
-                        ? null
-                        : Guid.Parse(reader.GetString(6))
+                    Id = id,
+                    VehicleId = vId,
+                    Date = date,
+                    OdometerMiles = odo,
+                    Notes = notes,
+                    GallonsAdded = gallonsAdded,
+                    IsFullFillUp = isFullFillUp,
+                    FuelCost = fuelCost
                 });
             }
 
-            return list;
+            return results.OrderBy(r => r.Date);
         }
 
-        public IEnumerable<EvChargingSession> GetAllEvChargingSessions()
+        public decimal GetMilesDrivenInPeriod(DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            using var cmd = new SqliteCommand(@"
-                SELECT Id, StartTime, EndTime, KwhAdded,
-                       IsHomeCharging, ChargingCost, VehicleDataId
-                FROM EvChargingSessions
-                ORDER BY StartTime;", conn);
 
-            using var reader = cmd.ExecuteReader();
-            var list = new List<EvChargingSession>();
+            var records = _mileageRecordTable
+                .GetRange(conn, start, end)
+                .OrderBy(r => r.Date)
+                .ToList();
 
-            while (reader.Read())
-            {
-                list.Add(new EvChargingSession
-                {
-                    Id = Guid.Parse(reader.GetString(0)),
-                    StartTime = reader.GetDateTime(1),
-                    EndTime = reader.GetDateTime(2),
-                    KwhAdded = reader.GetDecimal(3),
-                    IsHomeCharging = reader.GetBoolean(4),
-                    ChargingCost = reader.IsDBNull(5) ? null : reader.GetDecimal(5),
-                    VehicleDataId = reader.IsDBNull(6)
-                        ? null
-                        : Guid.Parse(reader.GetString(6))
-                });
-            }
+            if (records.Count < 2)
+                return 0m;
 
-            return list;
-        }
+            var startMiles = records.First().OdometerMiles;
+            var endMiles = records.Last().OdometerMiles;
 
-        public void AddEvChargingSession(EvChargingSession session)
-        {
-            using var conn = OpenConnection();
-            using var cmd = new SqliteCommand(@"
-                INSERT INTO EvChargingSessions
-                (Id, StartTime, EndTime, KwhAdded,
-                 IsHomeCharging, ChargingCost, VehicleDataId)
-                VALUES
-                (@Id, @StartTime, @EndTime, @KwhAdded,
-                 @IsHomeCharging, @ChargingCost, @VehicleDataId);", conn);
-
-            cmd.Parameters.AddWithValue("@Id", session.Id.ToString());
-            cmd.Parameters.AddWithValue("@StartTime", session.StartTime);
-            cmd.Parameters.AddWithValue("@EndTime", session.EndTime);
-            cmd.Parameters.AddWithValue("@KwhAdded", session.KwhAdded);
-            cmd.Parameters.AddWithValue("@IsHomeCharging", session.IsHomeCharging);
-
-            cmd.Parameters.AddWithValue("@ChargingCost",
-                session.ChargingCost.HasValue ? session.ChargingCost.Value : DBNull.Value);
-
-            cmd.Parameters.AddWithValue("@VehicleDataId",
-                session.VehicleDataId.HasValue ? session.VehicleDataId.Value.ToString() : DBNull.Value);
-
-            cmd.ExecuteNonQuery();
+            return endMiles - startMiles;
         }
 
         // ---------------------------------------------------------
         // EV CHARGING SESSION VEHICLE DATA
         // ---------------------------------------------------------
 
-        public EvChargingSessionVehicleData? GetEvChargingSessionVehicleData(Guid id)
-        {
-            using var conn = OpenConnection();
-            using var cmd = new SqliteCommand(@"
-                SELECT Id, VehicleId, StartSocPercent,
-                       EndSocPercent, OdometerMiles
-                FROM EvChargingSessionVehicleData
-                WHERE Id = @Id;", conn);
-
-            cmd.Parameters.AddWithValue("@Id", id.ToString());
-
-            using var reader = cmd.ExecuteReader();
-            if (!reader.Read())
-                return null;
-
-            return new EvChargingSessionVehicleData
-            {
-                Id = Guid.Parse(reader.GetString(0)),
-                VehicleId = Guid.Parse(reader.GetString(1)),
-                StartSocPercent = reader.GetDecimal(2),
-                EndSocPercent = reader.GetDecimal(3),
-                OdometerMiles = reader.GetDecimal(4)
-            };
-        }
-
         public void AddEvChargingSessionVehicleData(EvChargingSessionVehicleData data)
         {
             using var conn = OpenConnection();
-            using var cmd = new SqliteCommand(@"
-                INSERT INTO EvChargingSessionVehicleData
-                (Id, VehicleId, StartSocPercent,
-                 EndSocPercent, OdometerMiles)
-                VALUES
-                (@Id, @VehicleId, @StartSocPercent,
-                 @EndSocPercent, @OdometerMiles);", conn);
 
-            cmd.Parameters.AddWithValue("@Id", data.Id.ToString());
-            cmd.Parameters.AddWithValue("@VehicleId", data.VehicleId.ToString());
-            cmd.Parameters.AddWithValue("@StartSocPercent", data.StartSocPercent);
-            cmd.Parameters.AddWithValue("@EndSocPercent", data.EndSocPercent);
-            cmd.Parameters.AddWithValue("@OdometerMiles", data.OdometerMiles);
-
-            cmd.ExecuteNonQuery();
+            // base
+            _mileageRecordTable.Insert(conn, data, "Ev");
+            // derived
+            _evVehicleDataTable.Insert(conn, data);
         }
 
-        // ---------------------------------------------------------
-        // SESSION ENRICHMENT WORKFLOW
-        // ---------------------------------------------------------
+        public void UpdateEvChargingSessionVehicleData(EvChargingSessionVehicleData data)
+        {
+            using var conn = OpenConnection();
+
+            // base (Date, OdometerMiles, Notes may change)
+            _mileageRecordTable.Insert(conn, data, "Ev"); // or an UPDATE variant if you prefer
+                                                          // derived
+            _evVehicleDataTable.Update(conn, data);
+        }
+
+        public EvChargingSessionVehicleData? GetEvChargingSessionVehicleData(Guid id)
+        {
+            using var conn = OpenConnection();
+
+            var baseRow = _mileageRecordTable.GetById(conn, id);
+            if (baseRow == null || baseRow.Value.Type != "Ev")
+                return null;
+
+            var (vehicleId, date, odo, notes, _) = baseRow.Value;
+            var derived = _evVehicleDataTable.GetById(conn, id);
+            if (derived == null) return null;
+
+            var (startTimestamp, startSocPercent, endSocPercent) = derived.Value;
+
+            return new EvChargingSessionVehicleData
+            {
+                Id = id,
+                VehicleId = vehicleId,
+                Date = date,
+                OdometerMiles = odo,
+                Notes = notes,
+                StartTimestamp = startTimestamp,
+                StartSocPercent = startSocPercent,
+                EndSocPercent = endSocPercent
+            };
+        }
 
         public void AttachVehicleDataToChargingSession(Guid sessionId, Guid vehicleDataId)
         {
             using var conn = OpenConnection();
-            using var cmd = new SqliteCommand(@"
-                UPDATE EvChargingSessions
-                SET VehicleDataId = @VehicleDataId
-                WHERE Id = @SessionId;", conn);
+            _evSessionTable.AttachVehicleData(conn, sessionId, vehicleDataId);
+        }
 
-            cmd.Parameters.AddWithValue("@SessionId", sessionId.ToString());
-            cmd.Parameters.AddWithValue("@VehicleDataId", vehicleDataId.ToString());
+        // ---------------------------------------------------------
+        // EV CHARGING SESSIONS
+        // ---------------------------------------------------------
 
-            cmd.ExecuteNonQuery();
+        public void AddEvChargingSession(EvChargingSession session)
+        {
+            using var conn = OpenConnection();
+            _evSessionTable.Insert(conn, session);
+        }
+
+        public IEnumerable<EvChargingSession> GetEvChargingSessions(Guid vehicleId, DateTime start, DateTime end)
+        {
+            using var conn = OpenConnection();
+            return _evSessionTable.GetByVehicleAndRange(conn, vehicleId, start, end).ToList();
+        }
+
+        public IEnumerable<EvChargingSession> GetUnassignedEvChargingSessions()
+        {
+            using var conn = OpenConnection();
+            return _evSessionTable.GetUnassigned(conn).ToList();
+        }
+
+        // ---------------------------------------------------------
+        // CHARGING COSTS
+        // ---------------------------------------------------------
+
+        public void AddChargingCostRecord(ChargingCostRecord record)
+        {
+            using var conn = OpenConnection();
+            _chargingCostTable.Insert(conn, record);
+        }
+
+        public IEnumerable<ChargingCostRecord> GetChargingCosts(DateTime start, DateTime end)
+        {
+            using var conn = OpenConnection();
+            return _chargingCostTable.GetRange(conn, start, end).ToList();
+        }
+
+        public decimal GetChargingCostInPeriod(DateTime start, DateTime end)
+        {
+            using var conn = OpenConnection();
+            return _chargingCostTable.GetRange(conn, start, end).Sum(r => r.Cost);
+        }
+
+        // ---------------------------------------------------------
+        // FUEL RECEIPTS (GasPurchase)
+        // ---------------------------------------------------------
+
+        public void AddFuelReceipt(GasPurchase purchase)
+        {
+            using var conn = OpenConnection();
+            _gasPurchaseTable.Insert(conn, purchase);
+        }
+
+        public IEnumerable<GasPurchase> GetFuelReceipts(DateTime start, DateTime end)
+        {
+            using var conn = OpenConnection();
+            return _gasPurchaseTable.GetRange(conn, start, end).ToList();
+        }
+
+        public decimal GetFuelCostInPeriod(DateTime start, DateTime end)
+        {
+            using var conn = OpenConnection();
+            return _gasPurchaseTable.GetTotalFuelCost(conn, start, end);
+        }
+
+        // ---------------------------------------------------------
+        // MAINTENANCE
+        // ---------------------------------------------------------
+
+        public void AddMaintenanceInvoice(MaintenanceInvoiceRecord invoice)
+        {
+            using var conn = OpenConnection();
+            _maintenanceInvoiceTable.Insert(conn, invoice);
+        }
+
+        public IEnumerable<MaintenanceInvoiceRecord> GetMaintenanceInvoices(DateTime start, DateTime end)
+        {
+            using var conn = OpenConnection();
+            return _maintenanceInvoiceTable.GetRange(conn, start, end).ToList();
+        }
+
+        public decimal GetMaintenanceCostInPeriod(DateTime start, DateTime end)
+        {
+            using var conn = OpenConnection();
+            return _maintenanceInvoiceTable.GetTotalCost(conn, start, end);
         }
     }
 }

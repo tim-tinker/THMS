@@ -5,10 +5,10 @@ namespace THMS.Logic.ViewModels.Transportation
 {
     public class VehicleListViewModel
     {
-        private readonly TransportationDataStore _store;
-        public TransportationDataStore Store => _store;
+        private readonly IVehicleDataStore _store;
+        public IVehicleDataStore Store => _store;
 
-        public VehicleListViewModel(TransportationDataStore store)
+        public VehicleListViewModel(IVehicleDataStore store)
         {
             _store = store;
             Refresh();

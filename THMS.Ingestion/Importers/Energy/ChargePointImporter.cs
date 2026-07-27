@@ -5,22 +5,19 @@ using THMS.Data.Stores;
 using THMS.Domain.Energy;
 using THMS.Domain.Finance;
 
-namespace THMS.Importers
+namespace THMS.Ingestion.Importers.Energy
 {
-    public class ChargePointImporter
+    public class ChargePointImporter : CommercialChargerImporter
     {
-        private readonly IEnergyDataStore _energyStore;
-        private readonly IFinanceDataStore _financeStore;
-
         public ChargePointImporter(
             IEnergyDataStore energyStore,
             IFinanceDataStore financeStore)
         {
-            _energyStore = energyStore;
-            _financeStore = financeStore;
+            EnergyStore = energyStore;
+            FinanceStore = financeStore;
         }
 
-        public void ImportFromFile(string csvFilePath)
+        protected override IEnumerable<Tuple<EvCommercialChargingSession, CommercialChargingCostRecord>> ReadChargingSessions(string filePath)
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
@@ -28,7 +25,7 @@ namespace THMS.Importers
                 TrimOptions = TrimOptions.Trim,
             };
 
-            using var reader = new StreamReader(csvFilePath);
+            using var reader = new StreamReader(filePath);
             using var csv = new CsvReader(reader, config);
 
             while (csv.Read())
@@ -46,31 +43,33 @@ namespace THMS.Importers
                 var totalKwh = decimal.Parse(kwhString, CultureInfo.InvariantCulture);
                 var totalCost = decimal.Parse(costString, CultureInfo.InvariantCulture);
 
-                // -----------------------------------------
-                // ENERGY PORTION (Wh)
-                // -----------------------------------------
+                // ---------------------------------------------------------
+                // ENERGY PORTION (EvCommercialChargingSession)
+                // ---------------------------------------------------------
                 var energyRecord = new EvCommercialChargingSession
                 {
-                    Timestamp = startTime,
-                    Duration = duration,
-                    EvChargingWh = (int)(totalKwh * 1000m),
-                    Source = "ChargePoint"
+                    Id = Guid.NewGuid(),
+                    StartTime = startTime,
+                    EndTime = endTime,
+                    KwhAdded = totalKwh,          // kWh, not Wh
+                    ChargingCost = totalCost,     // ChargePoint always provides cost
+                    VendorSessionId = null,       // ChargePoint CSV does not include this
+                    Location = "ChargePoint"
                 };
 
-                _energyStore.AddEvChargingSession(energyRecord);
-
-                // -----------------------------------------
-                // FINANCIAL PORTION ($)
-                // -----------------------------------------
+                // ---------------------------------------------------------
+                // FINANCIAL PORTION (CommercialChargingCostRecord)
+                // ---------------------------------------------------------
                 var costRecord = new CommercialChargingCostRecord
                 {
-                    Timestamp = startTime,
+                    Id = Guid.NewGuid(),
+                    Date = startTime,
                     Cost = totalCost,
                     Vendor = "ChargePoint",
-                    SessionId = null
+                    SessionId = energyRecord.Id.ToString()
                 };
 
-                _financeStore.AddCommercialChargingCostRecord(costRecord);
+                yield return Tuple.Create(energyRecord, costRecord);
             }
         }
 

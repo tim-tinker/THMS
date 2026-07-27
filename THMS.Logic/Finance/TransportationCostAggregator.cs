@@ -10,11 +10,11 @@ namespace THMS.Logic.Transportation
     public class TransportationCostAggregator
     {
         private readonly IVehicleDataStore _vehicleStore;
-        private readonly IFinanceStore _financeStore;
+        private readonly IFinanceDataStore _financeStore;
 
         public TransportationCostAggregator(
             IVehicleDataStore vehicleStore,
-            IFinanceStore financeStore)
+            IFinanceDataStore financeStore)
         {
             _vehicleStore = vehicleStore;
             _financeStore = financeStore;

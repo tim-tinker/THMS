@@ -32,17 +32,15 @@ namespace THMS.Logic.Finance
         public CommercialChargingCostSummary ComputeSummary(DateTime start, DateTime end)
         {
             var costRecords = _financeStore
-                .GetCommercialChargingCostRecords()
-                .Where(r => r.Timestamp >= start && r.Timestamp <= end)
+                .GetCommercialChargingCostRecords(start, end)
                 .ToList();
 
             var energyRecords = _energyStore
-                .GetEvChargingSessions()
-                .Where(r => r.Timestamp >= start && r.Timestamp <= end)
+                .GetEvCommercialChargingSessions(start, end)
                 .ToList();
 
             decimal totalCost = costRecords.Sum(r => r.Cost);
-            decimal totalKwh = energyRecords.Sum(r => r.EvChargingWh) / 1000m;
+            decimal totalKwh = energyRecords.Sum(r => r.KwhAdded) / 1000m;
 
             decimal avgCostPerKwh = totalKwh > 0 ? totalCost / totalKwh : 0;
 
@@ -52,7 +50,6 @@ namespace THMS.Logic.Finance
                 End = end,
                 TotalCost = totalCost,
                 TotalKwh = totalKwh,
-                AverageCostPerKwh = avgCostPerKwh
             };
         }
     }
