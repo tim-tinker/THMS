@@ -2,81 +2,86 @@
 using System.Collections.Generic;
 using System.Linq;
 using THMS.Domain.Transportation;
+using THMS.Domain.Energy;
+using THMS.Data.Stores;
+using THMS.Logic.Energy;
 
 namespace THMS.Logic.Transportation
 {
     public class MpgeEngine
     {
-        /// <summary>
-        /// Computes MPGe and related EV analytics from enriched charging sessions.
-        /// Sessions must contain both power data (EvChargingSession)
-        /// and vehicle data (EvChargingSessionVehicleData).
-        /// </summary>
-        public IEnumerable<MpgeResult> ComputeMpge(
-            IEnumerable<EvChargingSession> sessions,
-            IEnumerable<EvChargingSessionVehicleData> vehicleData,
-            decimal batteryCapacityKwh)
-        {
-            var results = new List<MpgeResult>();
+        private readonly IVehicleDataStore _vehicleStore;
+        private readonly EnergyAttributionEngine _energyAttributionEngine;
 
-            // Join sessions with their vehicle data
-            var enriched = sessions
-                .Where(s => s.VehicleDataId.HasValue)
-                .Join(
-                    vehicleData,
-                    s => s.VehicleDataId!.Value,
-                    vd => vd.Id,
-                    (s, vd) => new { Session = s, Vehicle = vd }
-                )
-                .OrderBy(x => x.Session.StartTime)
+        // EPA conversion constant
+        private const decimal KwhPerGallonEquivalent = 33.7m;
+
+        public MpgeEngine(IVehicleDataStore vehicleStore, IEnergyDataStore energyStore)
+        {
+            _vehicleStore = vehicleStore;
+            _energyAttributionEngine = new EnergyAttributionEngine(energyStore);
+        }
+
+        public MpgeResult Compute(Guid vehicleId, DateTime start, DateTime end)
+        {
+            // ---------------------------------------------------------
+            // 1. Get EV mileage records (only those with odometer)
+            // ---------------------------------------------------------
+            var evMileage = _vehicleStore
+                .GetEvChargingSessionVehicleData(vehicleId, start, end)
+                .Where(r => r.VehicleId == vehicleId && r.OdometerMiles.HasValue)
+                .OrderBy(r => r.Date)
                 .ToList();
 
-            if (enriched.Count < 2)
-                return results;
-
-            decimal batteryCapacityWh = batteryCapacityKwh * 1000m;
-
-            for (int i = 1; i < enriched.Count; i++)
+            if (evMileage.Count < 2)
             {
-                var prev = enriched[i - 1];
-                var curr = enriched[i];
-
-                // Miles driven between charging sessions
-                var milesDriven = curr.Vehicle.OdometerMiles - prev.Vehicle.OdometerMiles;
-                if (milesDriven <= 0)
-                    continue;
-
-                // SOC delta for driving segment
-                var socUsedFraction =
-                    (prev.Vehicle.EndSocPercent - curr.Vehicle.StartSocPercent) / 100m;
-
-                if (socUsedFraction <= 0)
-                    continue;
-
-                // Energy used for driving
-                var whUsed = socUsedFraction * batteryCapacityWh;
-
-                // Effective battery capacity from current charging session
-                var socAddedFraction =
-                    (curr.Vehicle.EndSocPercent - curr.Vehicle.StartSocPercent) / 100m;
-
-                decimal effectiveCapacityWh = 0;
-
-                if (socAddedFraction > 0 && curr.Session.KwhAdded > 0)
+                return new MpgeResult
                 {
-                    effectiveCapacityWh = (curr.Session.KwhAdded * 1000m) / socAddedFraction;
-                }
-
-                results.Add(new MpgeResult
-                {
-                    Date = curr.Session.EndTime,
-                    MilesDriven = milesDriven,
-                    WhUsed = whUsed,
-                    EffectiveCapacityWh = effectiveCapacityWh
-                });
+                    VehicleId = vehicleId,
+                    StartDate = start,
+                    EndDate = end,
+                    MilesDriven = 0m,
+                    WhUsed = 0m,
+                };
             }
 
-            return results;
+            decimal startMiles = evMileage.First().OdometerMiles!.Value;
+            decimal endMiles = evMileage.Last().OdometerMiles!.Value;
+            decimal milesDriven = endMiles - startMiles;
+
+            // ---------------------------------------------------------
+            // 2. Get EV energy attribution in the date range
+            // ---------------------------------------------------------
+            var energyAttr = _energyAttributionEngine
+                .ComputeAttribution(start, end)
+                .ToList();
+
+            decimal totalWh = energyAttr.Sum(a => a.EvChargingWh);
+            decimal totalKwh = totalWh / 1000m;
+
+            // ---------------------------------------------------------
+            // 3. Convert kWh → gallon equivalent
+            // ---------------------------------------------------------
+            decimal gallonEquivalent = totalKwh / KwhPerGallonEquivalent;
+
+            // ---------------------------------------------------------
+            // 4. Compute MPGe
+            // ---------------------------------------------------------
+            decimal mpge = gallonEquivalent > 0m
+                ? milesDriven / gallonEquivalent
+                : 0m;
+
+            // ---------------------------------------------------------
+            // 6. Return result
+            // ---------------------------------------------------------
+            return new MpgeResult
+            {
+                VehicleId = vehicleId,
+                StartDate = start,
+                EndDate = end,
+                MilesDriven = milesDriven,
+                WhUsed = totalWh,
+            };
         }
     }
 }

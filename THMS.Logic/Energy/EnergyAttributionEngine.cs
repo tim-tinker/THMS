@@ -3,6 +3,9 @@ using THMS.Domain.Energy;
 
 namespace THMS.Logic.Energy
 {
+    /// <summary>
+    /// This class breaks down 
+    /// </summary>
     public class EnergyAttributionEngine
     {
         private readonly IEnergyDataStore _store;
@@ -14,12 +17,10 @@ namespace THMS.Logic.Energy
 
         public List<EnergyAttributionResult> ComputeAttribution(DateTime start, DateTime end)
         {
-            var solar = _store.GetSolarVendorIntervals()
-                              .Where(i => i.Timestamp >= start && i.Timestamp <= end)
+            var solar = _store.GetSolarVendorIntervals(start, end)
                               .ToList();
 
-            var ev = _store.GetEvChargingIntervals()
-                           .Where(i => i.Timestamp >= start && i.Timestamp <= end)
+            var ev = _store.GetEvCircuitReadings(start, end)
                            .ToList();
 
             var results = new List<EnergyAttributionResult>();
@@ -35,7 +36,7 @@ namespace THMS.Logic.Energy
                     Timestamp = timestamp,
 
                     // EV charging attribution
-                    EvChargingWh = evAt?.CircuitUseWh ?? 0m,
+                    EvChargingWh = evAt?.WattHours ?? 0m,
 
                     // Solar production
                     SolarWh = s.EnergyProducedWh,

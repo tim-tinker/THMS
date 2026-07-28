@@ -41,11 +41,10 @@ namespace THMS.Logic.Transportation
                 VehicleId = vehicleId,
                 Year = year,
                 Month = month,
-                MilesDriven = milesDriven ?? 0,
+                MilesDriven = milesDriven,
                 FuelCost = fuelCost,
                 ChargingCost = chargingCost,
                 MaintenanceCost = maintenanceCost,
-                IsPartial = milesDriven == null
             };
         }
 
@@ -69,25 +68,29 @@ namespace THMS.Logic.Transportation
         /// </summary>
         public decimal ComputeLifetimeCostPerMile(Guid vehicleId)
         {
-            var mileage = _store.GetMileage(vehicleId);
-            if (mileage.Count < 2)
-                return 0;
+            decimal costPerMile = 0;
 
-            decimal milesDriven =
-                mileage.Last().OdometerMiles - mileage.First().OdometerMiles;
+            var start = DateTime.MinValue;
+            var end = DateTime.Now;
 
-            decimal chargingCost =
-                _store.GetChargingCosts(vehicleId).Sum(c => c.Cost);
+            decimal milesDriven = _store.GetMilesDrivenInPeriod(vehicleId, start, end);
+            if (milesDriven > 0)
+            {
+                decimal chargingCost =
+                    _store.GetChargingCosts(vehicleId, start, end).Sum(c => c.Cost);
 
-            decimal fuelCost =
-                _store.GetFuelReceipts(vehicleId).Sum(r => r.Cost);
+                decimal fuelCost =
+                    _store.GetFuelReceipts(vehicleId, start, end).Sum(r => r.FuelCost);
 
-            decimal maintenanceCost =
-                _store.GetMaintenanceInvoices(vehicleId).Sum(m => m.Cost);
+                decimal maintenanceCost =
+                    _store.GetMaintenanceInvoices(vehicleId, start, end).Sum(m => m.Cost);
 
-            decimal totalCost = chargingCost + fuelCost + maintenanceCost;
+                decimal totalCost = chargingCost + fuelCost + maintenanceCost;
 
-            return milesDriven > 0 ? totalCost / milesDriven : 0;
+                costPerMile = totalCost / milesDriven;
+            }
+            
+            return costPerMile;
         }
     }
 }

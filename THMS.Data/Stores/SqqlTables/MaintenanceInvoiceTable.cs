@@ -39,14 +39,15 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
-        public IEnumerable<MaintenanceInvoiceRecord> GetRange(SqliteConnection conn, DateTime start, DateTime end)
+        public IEnumerable<MaintenanceInvoiceRecord> GetRange(SqliteConnection conn, Guid vehicleId, DateTime start, DateTime end)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 SELECT Id, VehicleId, Date, Cost, Description, Vendor
                 FROM MaintenanceInvoices
-                WHERE Date >= @Start AND Date <= @End
+                WHERE VehicleId = @VehicleId AND Date >= @Start AND Date <= @End
                 ORDER BY Date;";
+            cmd.Parameters.AddWithValue("@VehicleId", vehicleId.ToString());
             cmd.Parameters.AddWithValue("@Start", start);
             cmd.Parameters.AddWithValue("@End", end);
 
@@ -65,13 +66,14 @@ namespace THMS.Data.Stores.SqlTables
             }
         }
 
-        public decimal GetTotalCost(SqliteConnection conn, DateTime start, DateTime end)
+        public decimal GetTotalCost(SqliteConnection conn, Guid vehicleId, DateTime start, DateTime end)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 SELECT SUM(Cost)
                 FROM MaintenanceInvoices
-                WHERE Date >= @Start AND Date <= @End;";
+                WHERE VehicleId = @VehicleId AND Date >= @Start AND Date <= @End;";
+            cmd.Parameters.AddWithValue("@VehicleId", vehicleId.ToString());
             cmd.Parameters.AddWithValue("@Start", start);
             cmd.Parameters.AddWithValue("@End", end);
 

@@ -39,14 +39,15 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
-        public IEnumerable<ChargingCostRecord> GetRange(SqliteConnection conn, DateTime start, DateTime end)
+        public IEnumerable<ChargingCostRecord> GetRange(SqliteConnection conn, Guid vehicleId, DateTime start, DateTime end)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 SELECT Id, VehicleId, Timestamp, EnergyWh, Cost, Location
                 FROM ChargingCostRecords
-                WHERE Timestamp >= @Start AND Timestamp <= @End
+                WHERE VehicleId = @VehicleId AND Timestamp >= @Start AND Timestamp <= @End
                 ORDER BY Timestamp;";
+            cmd.Parameters.AddWithValue("@VehicleId", vehicleId.ToString());
             cmd.Parameters.AddWithValue("@Start", start);
             cmd.Parameters.AddWithValue("@End", end);
 

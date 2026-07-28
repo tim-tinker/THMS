@@ -34,8 +34,8 @@ namespace THMS.Logic.Finance
             // 1. Get the monthly utility bill
             // -----------------------------------------
             var bill = _financeStore
-                .GetElectricUtilityBills()
-                .FirstOrDefault(b => b.StartDate == monthStart && b.EndDate == monthEnd);
+                .GetElectricUtilityBills(monthStart, monthEnd)
+                .FirstOrDefault();
 
             if (bill == null)
                 throw new InvalidOperationException("No utility bill found for the specified month.");
@@ -44,8 +44,7 @@ namespace THMS.Logic.Finance
             // 2. Get EV circuit readings for the month
             // -----------------------------------------
             var evReadings = _energyStore
-                .GetEvCircuitReadings()
-                .Where(r => r.Timestamp >= monthStart && r.Timestamp <= monthEnd)
+                .GetEvCircuitReadings(monthStart, monthEnd)
                 .OrderBy(r => r.Timestamp)
                 .ToList();
 
@@ -53,8 +52,7 @@ namespace THMS.Logic.Finance
             // 3. Get solar vendor intervals for the month
             // -----------------------------------------
             var solarIntervals = _energyStore
-                .GetSolarVendorIntervals()
-                .Where(i => i.Timestamp >= monthStart && i.Timestamp <= monthEnd)
+                .GetSolarVendorIntervals(monthStart, monthEnd)
                 .OrderBy(i => i.Timestamp)
                 .ToList();
 
@@ -72,7 +70,7 @@ namespace THMS.Logic.Finance
                     continue;
 
                 // EV circuit energy for this interval
-                decimal evWh = ev.CircuitUseWh;
+                decimal evWh = ev.WattHours;
 
                 // Grid import for this interval
                 decimal gridWh = interval.ImportedFromGridWh;

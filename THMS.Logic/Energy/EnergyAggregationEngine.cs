@@ -20,17 +20,29 @@ namespace THMS.Logic.Energy
         /// </summary>
         public IReadOnlyCollection<MonthlyEnergySummary> Aggregate(
             IReadOnlyCollection<EnergyAttributionResult> attributionResults,
-            IReadOnlyCollection<EnergyCostResult> costResults)
+            IReadOnlyCollection<EnergyCostResult> costResults,
+            DateTime start,
+            DateTime end)
         {
             var summaries = new Dictionary<(int Year, int Month), MonthlyEnergySummary>();
 
-            foreach (var attr in attributionResults)
+            // ---------------------------------------------------------
+            // 1. EV CHARGING ATTRIBUTION + COSTS
+            // ---------------------------------------------------------
+            var filteredAttr = attributionResults
+                .Where(a => a.Timestamp >= start && a.Timestamp <= end);
+
+            var filteredCost = costResults
+                .Where(c => c.Timestamp >= start && c.Timestamp <= end)
+                .ToDictionary(c => c.Timestamp);
+
+            foreach (var attr in filteredAttr)
             {
-                var cost = costResults.First(c => c.Timestamp == attr.Timestamp);
+                if (!filteredCost.TryGetValue(attr.Timestamp, out var cost))
+                    continue; // or throw — depends on your data guarantees
 
                 int year = attr.Timestamp.Year;
                 int month = attr.Timestamp.Month;
-
                 var key = (year, month);
 
                 if (!summaries.ContainsKey(key))
@@ -61,8 +73,12 @@ namespace THMS.Logic.Energy
                     summary.IsPartial = true;
             }
 
-            // Add home energy flows (solar vendor data)
-            foreach (var home in _store.GetSolarVendorIntervals())
+            // ---------------------------------------------------------
+            // 2. HOME ENERGY FLOWS (SOLAR VENDOR INTERVALS)
+            // ---------------------------------------------------------
+            var homeIntervals = _store.GetSolarVendorIntervals(start, end);
+
+            foreach (var home in homeIntervals)
             {
                 var key = (home.Timestamp.Year, home.Timestamp.Month);
 
@@ -85,7 +101,14 @@ namespace THMS.Logic.Energy
                 summary.BatteryDischargedWh += home.DischargedFromBatteriesWh;
             }
 
-            return summaries.Values.ToList().AsReadOnly();
+            // ---------------------------------------------------------
+            // 3. Return sorted summaries
+            // ---------------------------------------------------------
+            return summaries.Values
+                .OrderBy(s => s.Year)
+                .ThenBy(s => s.Month)
+                .ToList()
+                .AsReadOnly();
         }
     }
 }

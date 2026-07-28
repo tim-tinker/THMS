@@ -38,14 +38,15 @@ public class MileageRecordTable
     }
 
     public IEnumerable<(Guid Id, Guid VehicleId, DateTime Date, decimal OdometerMiles, string? Notes, string Type)>
-        GetRange(SqliteConnection conn, DateTime start, DateTime end)
+        GetRange(SqliteConnection conn, Guid vehicleId, DateTime start, DateTime end)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             SELECT Id, VehicleId, Date, OdometerMiles, Notes, Type
             FROM MileageRecords
-            WHERE Date >= @Start AND Date <= @End
+            WHERE VehicleId = @VehicleId AND Date >= @Start AND Date <= @End
             ORDER BY Date;";
+        cmd.Parameters.AddWithValue("@VehicleId", vehicleId.ToString());
         cmd.Parameters.AddWithValue("@Start", start);
         cmd.Parameters.AddWithValue("@End", end);
 

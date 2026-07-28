@@ -149,7 +149,7 @@ namespace THMS.Data.Stores.SQLite
             using var conn = OpenConnection();
 
             var baseRows = _mileageRecordTable
-                .GetRange(conn, start, end)
+                .GetRange(conn, vehicleId, start, end)
                 .Where(r => r.VehicleId == vehicleId && r.Type == "Ice")
                 .ToList();
 
@@ -178,12 +178,12 @@ namespace THMS.Data.Stores.SQLite
             return results.OrderBy(r => r.Date);
         }
 
-        public decimal GetMilesDrivenInPeriod(DateTime start, DateTime end)
+        public decimal GetMilesDrivenInPeriod(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
 
             var records = _mileageRecordTable
-                .GetRange(conn, start, end)
+                .GetRange(conn, vehicleId, start, end)
                 .OrderBy(r => r.Date)
                 .ToList();
 
@@ -220,31 +220,33 @@ namespace THMS.Data.Stores.SQLite
             _evVehicleDataTable.Update(conn, data);
         }
 
-        public EvChargingSessionVehicleData? GetEvChargingSessionVehicleData(Guid id)
+        public IEnumerable<EvChargingSessionVehicleData> GetEvChargingSessionVehicleData(Guid id, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
 
-            var baseRow = _mileageRecordTable.GetById(conn, id);
-            if (baseRow == null || baseRow.Value.Type != "Ev")
-                return null;
-
-            var (vehicleId, date, odo, notes, _) = baseRow.Value;
-            var derived = _evVehicleDataTable.GetById(conn, id);
-            if (derived == null) return null;
-
-            var (startTimestamp, startSocPercent, endSocPercent) = derived.Value;
-
-            return new EvChargingSessionVehicleData
+            foreach (var baseRow in _mileageRecordTable.GetRange(conn, id, start, end))
             {
-                Id = id,
-                VehicleId = vehicleId,
-                Date = date,
-                OdometerMiles = odo,
-                Notes = notes,
-                StartTimestamp = startTimestamp,
-                StartSocPercent = startSocPercent,
-                EndSocPercent = endSocPercent
-            };
+                if (baseRow.Type == "Ev")
+                {
+                    var derived = _evVehicleDataTable.GetById(conn, id);
+                    if (derived is not null)
+                    {
+                        var (startTimestamp, startSocPercent, endSocPercent) = derived.Value;
+
+                        yield return new EvChargingSessionVehicleData
+                        {
+                            Id = id,
+                            VehicleId = id,
+                            Date = baseRow.Date,
+                            OdometerMiles = baseRow.OdometerMiles,
+                            Notes = baseRow.Notes,
+                            StartTimestamp = startTimestamp,
+                            StartSocPercent = startSocPercent,
+                            EndSocPercent = endSocPercent
+                        };
+                    }
+                }
+            }
         }
 
         public void AttachVehicleDataToChargingSession(Guid sessionId, Guid vehicleDataId)
@@ -285,38 +287,16 @@ namespace THMS.Data.Stores.SQLite
             _chargingCostTable.Insert(conn, record);
         }
 
-        public IEnumerable<ChargingCostRecord> GetChargingCosts(DateTime start, DateTime end)
+        public IEnumerable<ChargingCostRecord> GetChargingCosts(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _chargingCostTable.GetRange(conn, start, end).ToList();
+            return _chargingCostTable.GetRange(conn, vehicleId, start, end).ToList();
         }
 
-        public decimal GetChargingCostInPeriod(DateTime start, DateTime end)
+        public decimal GetChargingCostInPeriod(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _chargingCostTable.GetRange(conn, start, end).Sum(r => r.Cost);
-        }
-
-        // ---------------------------------------------------------
-        // FUEL RECEIPTS (GasPurchase)
-        // ---------------------------------------------------------
-
-        public void AddFuelReceipt(GasPurchase purchase)
-        {
-            using var conn = OpenConnection();
-            _gasPurchaseTable.Insert(conn, purchase);
-        }
-
-        public IEnumerable<GasPurchase> GetFuelReceipts(DateTime start, DateTime end)
-        {
-            using var conn = OpenConnection();
-            return _gasPurchaseTable.GetRange(conn, start, end).ToList();
-        }
-
-        public decimal GetFuelCostInPeriod(DateTime start, DateTime end)
-        {
-            using var conn = OpenConnection();
-            return _gasPurchaseTable.GetTotalFuelCost(conn, start, end);
+            return _chargingCostTable.GetRange(conn, vehicleId, start, end).Sum(r => r.Cost);
         }
 
         // ---------------------------------------------------------
@@ -329,16 +309,16 @@ namespace THMS.Data.Stores.SQLite
             _maintenanceInvoiceTable.Insert(conn, invoice);
         }
 
-        public IEnumerable<MaintenanceInvoiceRecord> GetMaintenanceInvoices(DateTime start, DateTime end)
+        public IEnumerable<MaintenanceInvoiceRecord> GetMaintenanceInvoices(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _maintenanceInvoiceTable.GetRange(conn, start, end).ToList();
+            return _maintenanceInvoiceTable.GetRange(conn, vehicleId, start, end).ToList();
         }
 
-        public decimal GetMaintenanceCostInPeriod(DateTime start, DateTime end)
+        public decimal GetMaintenanceCostInPeriod(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _maintenanceInvoiceTable.GetTotalCost(conn, start, end);
+            return _maintenanceInvoiceTable.GetTotalCost(conn, vehicleId, start, end);
         }
     }
 }

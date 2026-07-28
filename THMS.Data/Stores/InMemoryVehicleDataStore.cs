@@ -53,16 +53,16 @@ namespace THMS.Data.Stores.InMemory
                 .OrderBy(r => r.Date);
         }
 
-        public decimal GetMilesDrivenInPeriod(DateTime start, DateTime end)
+        public decimal GetMilesDrivenInPeriod(Guid vehicleId, DateTime start, DateTime end)
         {
             // ICE mileage records (Date = mileage event time, OdometerMiles = odometer)
             var iceRecords = _iceMileageRecords
-                .Where(r => r.Date >= start && r.Date <= end);
+                .Where(r => vehicleId == r.VehicleId && r.Date >= start && r.Date <= end);
 
             // EV mileage records (Date = end of charging session, OdometerMiles = odometer)
+            // ignore sessions without odometer
             var evRecords = _evChargingSessionVehicleData
-                .Where(r => r.Date >= start && r.Date <= end)
-                .Where(r => r.OdometerMiles.HasValue); // ignore sessions without odometer
+                .Where(r => vehicleId == r.VehicleId && r.Date >= start && r.Date <= end && r.OdometerMiles.HasValue);
 
             // Combine ICE + EV as MileageRecordBase
             var allRecords = iceRecords
@@ -121,9 +121,9 @@ namespace THMS.Data.Stores.InMemory
             _evChargingSessionVehicleData.Add(data);
         }
 
-        public EvChargingSessionVehicleData? GetEvChargingSessionVehicleData(Guid id)
+        public IEnumerable<EvChargingSessionVehicleData> GetEvChargingSessionVehicleData(Guid vehicleId, DateTime start, DateTime end)
         {
-            return _evChargingSessionVehicleData.FirstOrDefault(d => d.Id == id);
+            return (from entry in _evChargingSessionVehicleData where entry.VehicleId == vehicleId && entry.Date >= start && entry.Date <= end select entry);
         }
 
         public void AttachVehicleDataToChargingSession(Guid sessionId, Guid vehicleDataId)
@@ -143,41 +143,18 @@ namespace THMS.Data.Stores.InMemory
             _chargingCostRecords.Add(record);
         }
 
-        public IEnumerable<ChargingCostRecord> GetChargingCosts(DateTime start, DateTime end)
+        public IEnumerable<ChargingCostRecord> GetChargingCosts(Guid vehicleId, DateTime start, DateTime end)
         {
             return _chargingCostRecords
-                .Where(r => r.Timestamp >= start && r.Timestamp <= end)
+                .Where(r => vehicleId == r.VehicleId && r.Timestamp >= start && r.Timestamp <= end)
                 .OrderBy(r => r.Timestamp);
         }
 
-        public decimal GetChargingCostInPeriod(DateTime start, DateTime end)
+        public decimal GetChargingCostInPeriod(Guid vehicleId, DateTime start, DateTime end)
         {
             return _chargingCostRecords
-                .Where(r => r.Timestamp >= start && r.Timestamp <= end)
+                .Where(r => vehicleId == r.VehicleId && r.Timestamp >= start && r.Timestamp <= end)
                 .Sum(r => r.Cost);
-        }
-
-        // ---------------------------------------------------------
-        // FUEL RECEIPTS
-        // ---------------------------------------------------------
-
-        public void AddFuelReceipt(GasPurchase purchase)
-        {
-            _fuelReceipts.Add(purchase);
-        }
-
-        public IEnumerable<GasPurchase> GetFuelReceipts(DateTime start, DateTime end)
-        {
-            return _fuelReceipts
-                .Where(r => r.Date >= start && r.Date <= end)
-                .OrderBy(r => r.Date);
-        }
-
-        public decimal GetFuelCostInPeriod(DateTime start, DateTime end)
-        {
-            return _fuelReceipts
-                .Where(r => r.Date >= start && r.Date <= end)
-                .Sum(r => r.FuelCost);
         }
 
         // ---------------------------------------------------------
@@ -189,17 +166,17 @@ namespace THMS.Data.Stores.InMemory
             _maintenanceInvoices.Add(invoice);
         }
 
-        public IEnumerable<MaintenanceInvoiceRecord> GetMaintenanceInvoices(DateTime start, DateTime end)
+        public IEnumerable<MaintenanceInvoiceRecord> GetMaintenanceInvoices(Guid vehicleId, DateTime start, DateTime end)
         {
             return _maintenanceInvoices
-                .Where(r => r.Date >= start && r.Date <= end)
+                .Where(r => vehicleId == r.VehicleId && r.Date >= start && r.Date <= end)
                 .OrderBy(r => r.Date);
         }
 
-        public decimal GetMaintenanceCostInPeriod(DateTime start, DateTime end)
+        public decimal GetMaintenanceCostInPeriod(Guid vehicleId, DateTime start, DateTime end)
         {
             return _maintenanceInvoices
-                .Where(r => r.Date >= start && r.Date <= end)
+                .Where(r => vehicleId == r.VehicleId && r.Date >= start && r.Date <= end)
                 .Sum(r => r.Cost);
         }
     }

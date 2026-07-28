@@ -2,7 +2,9 @@
 {
     public class MpgeResult
     {
-        public DateTime Date { get; set; }
+        public Guid VehicleId { get; set; }
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
         public decimal MilesDriven { get; set; }
         public decimal WhUsed { get; set; }
 

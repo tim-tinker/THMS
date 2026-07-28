@@ -34,8 +34,8 @@ namespace THMS.Logic.Finance
             foreach (var summary in _monthlySummaries)
             {
                 var billing = _billing.FirstOrDefault(b =>
-                    b.Start.Year == summary.Year &&
-                    b.Start.Month == summary.Month);
+                    b.StartDate.Year == summary.Year &&
+                    b.StartDate.Month == summary.Month);
 
                 var loan = _loanSchedule.FirstOrDefault(l =>
                     l.Date.Year == summary.Year &&
