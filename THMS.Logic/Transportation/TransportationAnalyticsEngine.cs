@@ -28,10 +28,10 @@ namespace THMS.Logic.Transportation
             var milesDriven = _store.GetMilesDrivenInPeriod(vehicleId, start, end);
 
             // Charging cost (commercial)
-            var chargingCost = _store.GetChargingCostInPeriod(vehicleId, start, end);
+            var chargingCost = _store.GetChargingCosts(vehicleId, start, end).Sum(c => c.Cost);
 
             // Fuel cost (ICE)
-            var fuelCost = _store.GetFuelCostInPeriod(vehicleId, start, end);
+            var fuelCost = _store.GetIceMileageRecords(vehicleId, start, end).Sum(r => r.FuelCost);
 
             // Maintenance cost
             var maintenanceCost = _store.GetMaintenanceCostInPeriod(vehicleId, start, end);
@@ -80,7 +80,7 @@ namespace THMS.Logic.Transportation
                     _store.GetChargingCosts(vehicleId, start, end).Sum(c => c.Cost);
 
                 decimal fuelCost =
-                    _store.GetFuelReceipts(vehicleId, start, end).Sum(r => r.FuelCost);
+                    _store.GetIceMileageRecords(vehicleId, start, end).Sum(r => r.FuelCost);
 
                 decimal maintenanceCost =
                     _store.GetMaintenanceInvoices(vehicleId, start, end).Sum(m => m.Cost);

@@ -1,4 +1,5 @@
 using THMS.Data.Stores;
+using THMS.Data.Stores.InMemory;
 using THMS.Domain.Transportation;
 using THMS.Domain.Transportation.Analytics;
 using THMS.Logic.Transportation;

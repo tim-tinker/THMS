@@ -1,4 +1,4 @@
-﻿namespace THMS.UI.ViewModels
+﻿namespace THMS.Logic.ViewModels
 {
     public enum ImporterType
     {

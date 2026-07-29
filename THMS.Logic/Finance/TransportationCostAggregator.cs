@@ -167,7 +167,7 @@ namespace THMS.Logic.Transportation
                 if (session.VehicleDataId == null)
                     continue;
 
-                var vd = _vehicleStore.GetEvChargingSessionVehicleData(session.VehicleDataId.Value, session.StartTime, session.EndTime).FirstOrDefault();
+                var vd = _vehicleStore.GetEvChargingSessionVehicleDataById(session.VehicleDataId.Value);
                 if (vd is not null && vd.OdometerMiles != null)
                     miles += vd.OdometerMiles.Value;
             }

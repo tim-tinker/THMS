@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Windows.Forms;
 using THMS.Logic.ViewModels.Transportation;
-using THMS.UI.ViewModels.Transportation;
 
 namespace THMS.UI.WinForms
 {

@@ -1,7 +1,7 @@
 ﻿using THMS.Data.Stores;
 using THMS.Domain.Transportation;
 
-namespace THMS.UI.ViewModels.Transportation
+namespace THMS.Logic.ViewModels.Transportation
 {
     public class ChargingCostEntryViewModel
     {

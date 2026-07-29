@@ -127,13 +127,13 @@ namespace THMS.Logic.ViewModels
             // Load vehicle data if present
             if (session.VehicleDataId != null)
             {
-                var vd = _vehicleStore.GetEvChargingSessionVehicleData(session.VehicleDataId.Value);
+                var vd = _vehicleStore.GetEvChargingSessionVehicleDataById(session.VehicleDataId.Value);
                 if (vd != null)
                 {
                     VehicleId = vd.VehicleId;
-                    StartSoc = vd.StartSocPercent;
-                    EndSoc = vd.EndSocPercent;
-                    OdometerMiles = vd.OdometerMiles;
+                    StartSoc = vd.StartSocPercent ?? 0;
+                    EndSoc = vd.EndSocPercent ?? 0;
+                    OdometerMiles = vd.OdometerMiles ?? 0;
                 }
             }
         }

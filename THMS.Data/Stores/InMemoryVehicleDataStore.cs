@@ -126,6 +126,12 @@ namespace THMS.Data.Stores.InMemory
             return (from entry in _evChargingSessionVehicleData where entry.VehicleId == vehicleId && entry.Date >= start && entry.Date <= end select entry);
         }
 
+        public EvChargingSessionVehicleData? GetEvChargingSessionVehicleDataById(Guid id)
+        {
+            return _evChargingSessionVehicleData.FirstOrDefault(d => d.Id == id);
+        }
+
+
         public void AttachVehicleDataToChargingSession(Guid sessionId, Guid vehicleDataId)
         {
             var session = _evChargingSessions.FirstOrDefault(s => s.Id == sessionId);
@@ -148,13 +154,6 @@ namespace THMS.Data.Stores.InMemory
             return _chargingCostRecords
                 .Where(r => vehicleId == r.VehicleId && r.Timestamp >= start && r.Timestamp <= end)
                 .OrderBy(r => r.Timestamp);
-        }
-
-        public decimal GetChargingCostInPeriod(Guid vehicleId, DateTime start, DateTime end)
-        {
-            return _chargingCostRecords
-                .Where(r => vehicleId == r.VehicleId && r.Timestamp >= start && r.Timestamp <= end)
-                .Sum(r => r.Cost);
         }
 
         // ---------------------------------------------------------

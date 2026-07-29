@@ -1,149 +1,57 @@
-﻿using System;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using THMS.Data.Stores;
-using THMS.Domain.Finance;
 using THMS.Domain.Transportation;
-using THMS.Logic.Transportation;
-using THMS.Logic.ViewModels;
 
-namespace THMS.Logic.ViewModels
+namespace THMS.Logic.ViewModels.Transportation
 {
-    public class VehicleDetailViewModel : INotifyPropertyChanged
+    public class VehicleDetailViewModel
     {
-        private readonly IVehicleDataStore _vehicleStore;
-        private readonly IFinanceDataStore _financeStore;
-        private readonly IEnergyDataStore _energyStore;
-        private readonly TransportationCostAggregator _aggregator;
-
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        // ---------------------------------------------------------
-        // VEHICLE METADATA
-        // ---------------------------------------------------------
+        private readonly IVehicleDataStore _store;
+        public IVehicleDataStore Store => _store;
+
+        private DateTime _startTime;
+        public DateTime StartTime
+        {
+            get => _startTime;
+            set { _startTime = value; RaiseChanged(nameof(StartTime)); Refresh(); }
+        }
+
+        private DateTime _endTime;
+        public DateTime EndTime
+        {
+            get => _endTime;
+            set { _endTime = value; RaiseChanged(nameof(EndTime)); Refresh(); }
+        }
+
+        public VehicleDetailViewModel(IVehicleDataStore store, Guid vehicleId)
+        {
+            _store = store;
+            VehicleId = vehicleId;
+            Refresh();
+        }
 
         public Guid VehicleId { get; }
-        public string VehicleName { get; }
 
-        private bool _isEv;
-        public bool IsEv
+        public VehicleBase? Vehicle { get; private set; }
+        public decimal Mileage { get; private set; } = 0m;
+        public IReadOnlyCollection<ChargingCostRecord> ChargingCosts { get; private set; } = Array.Empty<ChargingCostRecord>();
+        public IReadOnlyCollection<EvChargingSession> ChargingSessions { get; private set; } = Array.Empty<EvChargingSession>();
+        public IReadOnlyCollection<IceMileageRecord> FuelReceipts { get; private set; } = Array.Empty<IceMileageRecord>();
+        public IReadOnlyCollection<MaintenanceInvoiceRecord> MaintenanceInvoices { get; private set; } = Array.Empty<MaintenanceInvoiceRecord>();
+
+        public void Refresh()
         {
-            get => _isEv;
-            private set { _isEv = value; OnChanged(nameof(IsEv)); }
+            Vehicle = _store.GetVehicle(VehicleId);
+            Mileage = _store.GetMilesDrivenInPeriod(VehicleId, StartTime, EndTime);
+            ChargingCosts = _store.GetChargingCosts(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
+            ChargingSessions = _store.GetEvChargingSessions(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
+            FuelReceipts = _store.GetIceMileageRecords(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
+            MaintenanceInvoices = _store.GetMaintenanceInvoices(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
         }
 
-        // ---------------------------------------------------------
-        // CHILD VIEWMODELS
-        // ---------------------------------------------------------
-
-        public ChargingSessionListViewModel ChargingSessions { get; }
-        public GasPurchaseListViewModel GasPurchases { get; }
-
-        // ---------------------------------------------------------
-        // COST SUMMARY (EV or ICE)
-        // ---------------------------------------------------------
-
-        private EvTransportationCostSummary? _evSummary;
-        public EvTransportationCostSummary? EvSummary
-        {
-            get => _evSummary;
-            private set { _evSummary = value; OnChanged(nameof(EvSummary)); }
-        }
-
-        private IceTransportationCostSummary? _iceSummary;
-        public IceTransportationCostSummary? IceSummary
-        {
-            get => _iceSummary;
-            private set { _iceSummary = value; OnChanged(nameof(IceSummary)); }
-        }
-
-        // ---------------------------------------------------------
-        // PERIOD SELECTION
-        // ---------------------------------------------------------
-
-        private DateTime _periodStart;
-        public DateTime PeriodStart
-        {
-            get => _periodStart;
-            set { _periodStart = value; OnChanged(nameof(PeriodStart)); RefreshSummary(); }
-        }
-
-        private DateTime _periodEnd;
-        public DateTime PeriodEnd
-        {
-            get => _periodEnd;
-            set { _periodEnd = value; OnChanged(nameof(PeriodEnd)); RefreshSummary(); }
-        }
-
-        // ---------------------------------------------------------
-        // CONSTRUCTOR
-        // ---------------------------------------------------------
-
-        public VehicleDetailViewModel(
-            IVehicleDataStore vehicleStore,
-            IFinanceDataStore financeStore,
-            IEnergyDataStore energyStore,
-            TransportationCostAggregator aggregator,
-            Guid vehicleId)
-        {
-            _vehicleStore = vehicleStore;
-            _financeStore = financeStore;
-            _energyStore = energyStore;
-            _aggregator = aggregator;
-
-            VehicleId = vehicleId;
-
-            var vehicle = _vehicleStore.GetVehicle(vehicleId)
-                ?? throw new InvalidOperationException("Vehicle not found.");
-
-            VehicleName = vehicle.Name;
-            IsEv = vehicle is VehicleEv;
-
-            // Default period: last 30 days
-            PeriodStart = DateTime.Today.AddDays(-30);
-            PeriodEnd = DateTime.Today;
-
-            // Child ViewModels
-            ChargingSessions = new ChargingSessionListViewModel(
-                _vehicleStore,
-                _financeStore,
-                _energyStore,
-                vehicleId);
-
-            GasPurchases = new GasPurchaseListViewModel(
-                _financeStore,
-                vehicleId);
-
-            RefreshSummary();
-        }
-
-        // ---------------------------------------------------------
-        // SUMMARY REFRESH
-        // ---------------------------------------------------------
-
-        public void RefreshSummary()
-        {
-            var summary = _aggregator.GetCostSummary(
-                VehicleId,
-                PeriodStart,
-                PeriodEnd);
-
-            if (summary is EvTransportationCostSummary ev)
-            {
-                EvSummary = ev;
-                IceSummary = null;
-            }
-            else if (summary is IceTransportationCostSummary ice)
-            {
-                IceSummary = ice;
-                EvSummary = null;
-            }
-        }
-
-        // ---------------------------------------------------------
-        // PROPERTY CHANGED
-        // ---------------------------------------------------------
-
-        private void OnChanged(string propertyName)
+        private void RaiseChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

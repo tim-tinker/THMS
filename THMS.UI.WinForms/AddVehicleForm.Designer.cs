@@ -17,110 +17,167 @@
 
         private void InitializeComponent()
         {
-            this.lblName = new System.Windows.Forms.Label();
-            this.lblMake = new System.Windows.Forms.Label();
-            this.lblModel = new System.Windows.Forms.Label();
-            this.lblYear = new System.Windows.Forms.Label();
-            this.txtName = new System.Windows.Forms.TextBox();
-            this.txtMake = new System.Windows.Forms.TextBox();
-            this.txtModel = new System.Windows.Forms.TextBox();
-            this.numYear = new System.Windows.Forms.NumericUpDown();
-            this.btnSave = new System.Windows.Forms.Button();
-            this.btnCancel = new System.Windows.Forms.Button();
-            ((System.ComponentModel.ISupportInitialize)(this.numYear)).BeginInit();
-            this.SuspendLayout();
+            lblName = new Label();
+            lblMake = new Label();
+            lblModel = new Label();
+            lblYear = new Label();
+            txtName = new TextBox();
+            txtMake = new TextBox();
+            txtModel = new TextBox();
+            numYear = new NumericUpDown();
+            btnSave = new Button();
+            btnCancel = new Button();
+            _checkEv = new CheckBox();
+            _numericFuelCapacity = new NumericUpDown();
+            _labelCapacity = new Label();
+            _labelFuelType = new Label();
+            ((System.ComponentModel.ISupportInitialize)numYear).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)_numericFuelCapacity).BeginInit();
+            SuspendLayout();
             // 
             // lblName
             // 
-            this.lblName.Location = new System.Drawing.Point(12, 15);
-            this.lblName.Name = "lblName";
-            this.lblName.Size = new System.Drawing.Size(120, 25);
-            this.lblName.Text = "Name:";
-            // 
-            // txtName
-            // 
-            this.txtName.Location = new System.Drawing.Point(140, 12);
-            this.txtName.Name = "txtName";
-            this.txtName.Size = new System.Drawing.Size(220, 27);
+            lblName.Location = new Point(12, 15);
+            lblName.Name = "lblName";
+            lblName.Size = new Size(120, 25);
+            lblName.TabIndex = 9;
+            lblName.Text = "Name:";
             // 
             // lblMake
             // 
-            this.lblMake.Location = new System.Drawing.Point(12, 55);
-            this.lblMake.Name = "lblMake";
-            this.lblMake.Size = new System.Drawing.Size(120, 25);
-            this.lblMake.Text = "Make:";
-            // 
-            // txtMake
-            // 
-            this.txtMake.Location = new System.Drawing.Point(140, 52);
-            this.txtMake.Name = "txtMake";
-            this.txtMake.Size = new System.Drawing.Size(220, 27);
+            lblMake.Location = new Point(12, 55);
+            lblMake.Name = "lblMake";
+            lblMake.Size = new Size(120, 25);
+            lblMake.TabIndex = 7;
+            lblMake.Text = "Make:";
             // 
             // lblModel
             // 
-            this.lblModel.Location = new System.Drawing.Point(12, 95);
-            this.lblModel.Name = "lblModel";
-            this.lblModel.Size = new System.Drawing.Size(120, 25);
-            this.lblModel.Text = "Model:";
-            // 
-            // txtModel
-            // 
-            this.txtModel.Location = new System.Drawing.Point(140, 92);
-            this.txtModel.Name = "txtModel";
-            this.txtModel.Size = new System.Drawing.Size(220, 27);
+            lblModel.Location = new Point(12, 95);
+            lblModel.Name = "lblModel";
+            lblModel.Size = new Size(120, 25);
+            lblModel.TabIndex = 5;
+            lblModel.Text = "Model:";
             // 
             // lblYear
             // 
-            this.lblYear.Location = new System.Drawing.Point(12, 135);
-            this.lblYear.Name = "lblYear";
-            this.lblYear.Size = new System.Drawing.Size(120, 25);
-            this.lblYear.Text = "Year:";
+            lblYear.Location = new Point(12, 135);
+            lblYear.Name = "lblYear";
+            lblYear.Size = new Size(120, 25);
+            lblYear.TabIndex = 3;
+            lblYear.Text = "Year:";
+            // 
+            // txtName
+            // 
+            txtName.Location = new Point(154, 12);
+            txtName.Name = "txtName";
+            txtName.Size = new Size(220, 35);
+            txtName.TabIndex = 8;
+            // 
+            // txtMake
+            // 
+            txtMake.Location = new Point(154, 52);
+            txtMake.Name = "txtMake";
+            txtMake.Size = new Size(220, 35);
+            txtMake.TabIndex = 6;
+            // 
+            // txtModel
+            // 
+            txtModel.Location = new Point(154, 92);
+            txtModel.Name = "txtModel";
+            txtModel.Size = new Size(220, 35);
+            txtModel.TabIndex = 4;
             // 
             // numYear
             // 
-            this.numYear.Location = new System.Drawing.Point(140, 132);
-            this.numYear.Maximum = new decimal(new int[] { 2050, 0, 0, 0 });
-            this.numYear.Minimum = new decimal(new int[] { 1950, 0, 0, 0 });
-            this.numYear.Name = "numYear";
-            this.numYear.Size = new System.Drawing.Size(120, 27);
-            this.numYear.Value = new decimal(new int[] { 2024, 0, 0, 0 });
+            numYear.Location = new Point(154, 132);
+            numYear.Maximum = new decimal(new int[] { 2050, 0, 0, 0 });
+            numYear.Minimum = new decimal(new int[] { 1950, 0, 0, 0 });
+            numYear.Name = "numYear";
+            numYear.Size = new Size(120, 35);
+            numYear.TabIndex = 2;
+            numYear.Value = new decimal(new int[] { 2024, 0, 0, 0 });
             // 
             // btnSave
             // 
-            this.btnSave.Location = new System.Drawing.Point(140, 185);
-            this.btnSave.Name = "btnSave";
-            this.btnSave.Size = new System.Drawing.Size(100, 35);
-            this.btnSave.Text = "Save";
-            this.btnSave.Click += new System.EventHandler(this.btnSave_Click);
+            btnSave.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            btnSave.Location = new Point(182, 269);
+            btnSave.Name = "btnSave";
+            btnSave.Size = new Size(100, 35);
+            btnSave.TabIndex = 1;
+            btnSave.Text = "Save";
+            btnSave.Click += btnSave_Click;
             // 
             // btnCancel
             // 
-            this.btnCancel.Location = new System.Drawing.Point(260, 185);
-            this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(100, 35);
-            this.btnCancel.Text = "Cancel";
-            this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
+            btnCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            btnCancel.Location = new Point(302, 269);
+            btnCancel.Name = "btnCancel";
+            btnCancel.Size = new Size(100, 35);
+            btnCancel.TabIndex = 0;
+            btnCancel.Text = "Cancel";
+            btnCancel.Click += btnCancel_Click;
+            // 
+            // _checkEv
+            // 
+            _checkEv.AutoSize = true;
+            _checkEv.Location = new Point(154, 173);
+            _checkEv.Name = "_checkEv";
+            _checkEv.Size = new Size(219, 34);
+            _checkEv.TabIndex = 13;
+            _checkEv.Text = "Electric Vehicle (EV)";
+            _checkEv.UseVisualStyleBackColor = true;
+            // 
+            // _numericFuelCapacity
+            // 
+            _numericFuelCapacity.Location = new Point(154, 213);
+            _numericFuelCapacity.Name = "_numericFuelCapacity";
+            _numericFuelCapacity.Size = new Size(120, 35);
+            _numericFuelCapacity.TabIndex = 14;
+            // 
+            // _labelCapacity
+            // 
+            _labelCapacity.AutoSize = true;
+            _labelCapacity.Location = new Point(12, 215);
+            _labelCapacity.Name = "_labelCapacity";
+            _labelCapacity.Size = new Size(136, 30);
+            _labelCapacity.TabIndex = 15;
+            _labelCapacity.Text = "Fuel Capacity";
+            // 
+            // _labelFuelType
+            // 
+            _labelFuelType.AutoSize = true;
+            _labelFuelType.Location = new Point(280, 215);
+            _labelFuelType.Name = "_labelFuelType";
+            _labelFuelType.Size = new Size(79, 30);
+            _labelFuelType.TabIndex = 16;
+            _labelFuelType.Text = "gallons";
             // 
             // AddVehicleForm
             // 
-            this.ClientSize = new System.Drawing.Size(380, 240);
-            this.Controls.Add(this.btnCancel);
-            this.Controls.Add(this.btnSave);
-            this.Controls.Add(this.numYear);
-            this.Controls.Add(this.lblYear);
-            this.Controls.Add(this.txtModel);
-            this.Controls.Add(this.lblModel);
-            this.Controls.Add(this.txtMake);
-            this.Controls.Add(this.lblMake);
-            this.Controls.Add(this.txtName);
-            this.Controls.Add(this.lblName);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
-            this.Name = "AddVehicleForm";
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Add Vehicle";
-            ((System.ComponentModel.ISupportInitialize)(this.numYear)).EndInit();
-            this.ResumeLayout(false);
-            this.PerformLayout();
+            ClientSize = new Size(422, 324);
+            Controls.Add(_labelFuelType);
+            Controls.Add(_labelCapacity);
+            Controls.Add(_numericFuelCapacity);
+            Controls.Add(_checkEv);
+            Controls.Add(btnCancel);
+            Controls.Add(btnSave);
+            Controls.Add(numYear);
+            Controls.Add(lblYear);
+            Controls.Add(txtModel);
+            Controls.Add(lblModel);
+            Controls.Add(txtMake);
+            Controls.Add(lblMake);
+            Controls.Add(txtName);
+            Controls.Add(lblName);
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            Name = "AddVehicleForm";
+            StartPosition = FormStartPosition.CenterParent;
+            Text = "Add Vehicle";
+            ((System.ComponentModel.ISupportInitialize)numYear).EndInit();
+            ((System.ComponentModel.ISupportInitialize)_numericFuelCapacity).EndInit();
+            ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion
@@ -135,5 +192,9 @@
         private System.Windows.Forms.NumericUpDown numYear;
         private System.Windows.Forms.Button btnSave;
         private System.Windows.Forms.Button btnCancel;
+        private CheckBox _checkEv;
+        private NumericUpDown _numericFuelCapacity;
+        private Label _labelCapacity;
+        private Label _labelFuelType;
     }
 }

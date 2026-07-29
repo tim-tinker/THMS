@@ -35,6 +35,7 @@ namespace THMS.Data.Stores
         void AddEvChargingSessionVehicleData(EvChargingSessionVehicleData data);
         void UpdateEvChargingSessionVehicleData(EvChargingSessionVehicleData data);
         IEnumerable<EvChargingSessionVehicleData> GetEvChargingSessionVehicleData(Guid vehicleId, DateTime start, DateTime end);
+        EvChargingSessionVehicleData? GetEvChargingSessionVehicleDataById(Guid id);
 
         // Link session ↔ vehicle data
         void AttachVehicleDataToChargingSession(Guid sessionId, Guid vehicleDataId);
@@ -44,8 +45,6 @@ namespace THMS.Data.Stores
         // ---------------------------------------------------------
         void AddChargingCostRecord(ChargingCostRecord record);
         IEnumerable<ChargingCostRecord> GetChargingCosts(Guid vehicleId, DateTime start, DateTime end);
-
-        decimal GetChargingCostInPeriod(Guid vehicleId, DateTime start, DateTime end);
 
         // ---------------------------------------------------------
         // MAINTENANCE

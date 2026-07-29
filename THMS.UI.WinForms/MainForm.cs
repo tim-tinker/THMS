@@ -22,6 +22,7 @@ namespace THMS.UI
             _dashboards["Transportation"] = new TransportationDashboardForm();
             _dashboards["Energy"] = new EnergyDashboardForm();
             _dashboards["Finance"] = new FinanceDashboardForm();
+            _dashboards["Vehicles"] = new VehicleListDashboardForm();
 
             foreach (var form in _dashboards.Values)
             {
@@ -59,6 +60,11 @@ namespace THMS.UI
         private void btnFinance_Click(object sender, EventArgs e)
         {
             ShowModule("Finance");
+        }
+
+        private void OnClickVehicles(object sender, EventArgs e)
+        {
+            ShowModule("Vehicles");
         }
     }
 }

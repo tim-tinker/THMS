@@ -1,6 +1,6 @@
 ﻿namespace THMS.UI.WinForms
 {
-    partial class VehicleListForm
+    partial class VehicleListDashboardForm
     {
         /// <summary>
         /// Required designer variable.

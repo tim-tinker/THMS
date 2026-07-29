@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Windows.Forms;
-using THMS.UI.ViewModels;
+using THMS.Logic.ViewModels;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace THMS.UI.WinForms

@@ -1,19 +1,16 @@
-﻿using System;
-using System.Collections.ObjectModel;
-using System.Linq;
+﻿using System.Collections.ObjectModel;
 using THMS.Data.Stores;
 using THMS.Domain.Transportation;
 using THMS.Logic.Transportation;
-using THMS.Logic.ViewModels;
 
-namespace THMS.UI.ViewModels
+namespace THMS.Logic.ViewModels
 {
-    public class VehicleListViewModel
+    public class VehicleListViewModel : BaseDashboardViewModel
     {
-        private readonly IVehicleDataStore _vehicleStore;
-        private readonly IFinanceDataStore _financeStore;
-        private readonly IEnergyDataStore _energyStore;
-        private readonly TransportationCostAggregator _aggregator;
+        private IVehicleDataStore _vehicleStore = null!;
+        private IFinanceDataStore _financeStore = null!;
+        private IEnergyDataStore _energyStore = null!;
+        private TransportationCostAggregator _aggregator = null!;
 
         public ObservableCollection<VehicleListItemViewModel> Vehicles { get; }
             = new ObservableCollection<VehicleListItemViewModel>();
@@ -21,7 +18,7 @@ namespace THMS.UI.ViewModels
         public DateTime PeriodStart { get; set; }
         public DateTime PeriodEnd { get; set; }
 
-        public VehicleListViewModel(
+        public void SetStores(
             IVehicleDataStore vehicleStore,
             IFinanceDataStore financeStore,
             IEnergyDataStore energyStore,
@@ -31,14 +28,21 @@ namespace THMS.UI.ViewModels
             _financeStore = financeStore;
             _energyStore = energyStore;
             _aggregator = aggregator;
+        }
 
+        public override void Initialize()
+        {
             PeriodStart = DateTime.Today.AddDays(-30);
             PeriodEnd = DateTime.Today;
-
             Load();
         }
 
-        public void Load()
+        public override void Activate()
+        {
+            Load();
+        }
+
+        private void Load()
         {
             Vehicles.Clear();
 
@@ -62,9 +66,9 @@ namespace THMS.UI.ViewModels
             }
         }
 
-        public void Refresh()
+        public void AddVehicle(VehicleBase vehicle)
         {
-            Load();
+            _vehicleStore.AddVehicle(vehicle);
         }
     }
 }

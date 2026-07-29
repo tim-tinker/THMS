@@ -2,7 +2,7 @@
 using System.ComponentModel;
 using THMS.Ingestion;
 
-namespace THMS.UI.ViewModels
+namespace THMS.Logic.ViewModels
 {
     public class ImporterViewModel : INotifyPropertyChanged
     {

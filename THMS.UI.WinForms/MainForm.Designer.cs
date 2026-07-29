@@ -4,8 +4,8 @@ namespace THMS.UI
     {
         private System.ComponentModel.IContainer components = null;
         private System.Windows.Forms.Panel navigationPanel;
-        private System.Windows.Forms.Button btnTransportation;
-        private System.Windows.Forms.Button btnEnergy;
+        private System.Windows.Forms.Button _btnFinance;
+        private System.Windows.Forms.Button _btnVehicles;
         private System.Windows.Forms.Panel dashboardHostPanel;
 
         protected override void Dispose(bool disposing)
@@ -21,66 +21,92 @@ namespace THMS.UI
 
         private void InitializeComponent()
         {
-            this.navigationPanel = new System.Windows.Forms.Panel();
-            this.btnTransportation = new System.Windows.Forms.Button();
-            this.btnEnergy = new System.Windows.Forms.Button();
-            this.dashboardHostPanel = new System.Windows.Forms.Panel();
-
-            this.navigationPanel.SuspendLayout();
-            this.SuspendLayout();
-
+            navigationPanel = new Panel();
+            _btnFinance = new Button();
+            _btnTransportation = new Button();
+            _btnEnergy = new Button();
+            _btnVehicles = new Button();
+            dashboardHostPanel = new Panel();
+            navigationPanel.SuspendLayout();
+            SuspendLayout();
             // 
             // navigationPanel
             // 
-            this.navigationPanel.BackColor = System.Drawing.Color.LightGray;
-            this.navigationPanel.Dock = System.Windows.Forms.DockStyle.Left;
-            this.navigationPanel.Width = 180;
-            this.navigationPanel.Controls.Add(this.btnTransportation);
-            this.navigationPanel.Controls.Add(this.btnEnergy);
-
+            navigationPanel.BackColor = Color.LightGray;
+            navigationPanel.Controls.Add(_btnFinance);
+            navigationPanel.Controls.Add(_btnTransportation);
+            navigationPanel.Controls.Add(_btnEnergy);
+            navigationPanel.Controls.Add(_btnVehicles);
+            navigationPanel.Dock = DockStyle.Left;
+            navigationPanel.Location = new Point(0, 0);
+            navigationPanel.Name = "navigationPanel";
+            navigationPanel.Size = new Size(180, 600);
+            navigationPanel.TabIndex = 1;
             // 
-            // btnTransportation
+            // _btnFinance
             // 
-            this.btnTransportation.Location = new System.Drawing.Point(10, 20);
-            this.btnTransportation.Name = "btnTransportation";
-            this.btnTransportation.Size = new System.Drawing.Size(160, 40);
-            this.btnTransportation.Text = "Transportation";
-            this.btnTransportation.UseVisualStyleBackColor = true;
-            this.btnTransportation.Click += new System.EventHandler(this.btnTransportation_Click);
-
+            _btnFinance.Location = new Point(10, 20);
+            _btnFinance.Name = "_btnFinance";
+            _btnFinance.Size = new Size(160, 40);
+            _btnFinance.TabIndex = 0;
+            _btnFinance.Text = "Finance";
+            _btnFinance.UseVisualStyleBackColor = true;
+            _btnFinance.Click += btnFinance_Click;
             // 
-            // btnEnergy
+            // _btnTransportation
             // 
-            this.btnEnergy.Location = new System.Drawing.Point(10, 70);
-            this.btnEnergy.Name = "btnEnergy";
-            this.btnEnergy.Size = new System.Drawing.Size(160, 40);
-            this.btnEnergy.Text = "Energy";
-            this.btnEnergy.UseVisualStyleBackColor = true;
-            this.btnEnergy.Click += new System.EventHandler(this.btnEnergy_Click);
-
+            _btnTransportation.Location = new Point(10, 162);
+            _btnTransportation.Name = "_btnTransportation";
+            _btnTransportation.Size = new Size(160, 40);
+            _btnTransportation.TabIndex = 1;
+            _btnTransportation.Text = "Transportation";
+            _btnTransportation.UseVisualStyleBackColor = true;
+            _btnTransportation.Click += btnTransportation_Click;
+            // 
+            // _btnEnergy
+            // 
+            _btnEnergy.Location = new Point(10, 116);
+            _btnEnergy.Name = "_btnEnergy";
+            _btnEnergy.Size = new Size(160, 40);
+            _btnEnergy.TabIndex = 1;
+            _btnEnergy.Text = "Energy";
+            _btnEnergy.UseVisualStyleBackColor = true;
+            _btnEnergy.Click += btnEnergy_Click;
+            // 
+            // _btnVehicles
+            // 
+            _btnVehicles.Location = new Point(10, 70);
+            _btnVehicles.Name = "_btnVehicles";
+            _btnVehicles.Size = new Size(160, 40);
+            _btnVehicles.TabIndex = 1;
+            _btnVehicles.Text = "Vehicles";
+            _btnVehicles.UseVisualStyleBackColor = true;
+            _btnVehicles.Click += OnClickVehicles;
             // 
             // dashboardHostPanel
             // 
-            this.dashboardHostPanel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.dashboardHostPanel.Location = new System.Drawing.Point(180, 0);
-            this.dashboardHostPanel.Name = "dashboardHostPanel";
-            this.dashboardHostPanel.Size = new System.Drawing.Size(900, 600);
-            this.dashboardHostPanel.BackColor = System.Drawing.Color.White;
-
+            dashboardHostPanel.BackColor = Color.White;
+            dashboardHostPanel.Dock = DockStyle.Fill;
+            dashboardHostPanel.Location = new Point(180, 0);
+            dashboardHostPanel.Name = "dashboardHostPanel";
+            dashboardHostPanel.Size = new Size(900, 600);
+            dashboardHostPanel.TabIndex = 0;
             // 
             // MainForm
             // 
-            this.ClientSize = new System.Drawing.Size(1080, 600);
-            this.Controls.Add(this.dashboardHostPanel);
-            this.Controls.Add(this.navigationPanel);
-            this.Name = "MainForm";
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "THMS Dashboard";
-
-            this.navigationPanel.ResumeLayout(false);
-            this.ResumeLayout(false);
+            ClientSize = new Size(1080, 600);
+            Controls.Add(dashboardHostPanel);
+            Controls.Add(navigationPanel);
+            Name = "MainForm";
+            StartPosition = FormStartPosition.CenterScreen;
+            Text = "THMS Dashboard";
+            navigationPanel.ResumeLayout(false);
+            ResumeLayout(false);
         }
 
         #endregion
+
+        private Button _btnTransportation;
+        private Button _btnEnergy;
     }
 }

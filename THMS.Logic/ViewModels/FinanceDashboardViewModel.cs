@@ -23,14 +23,14 @@ namespace THMS.Logic.ViewModels.Finance
         public override void Initialize()
         {
             // Load initial data
-            Transactions = Store.GetAllTransactions().ToList();
-            ComputeTotals();
+            //Transactions = Store.GetAllTransactions().ToList().AsReadOnly();
+            //ComputeTotals();
         }
 
         public void Refresh()
         {
-            Transactions = Store.GetAllTransactions().ToList();
-            ComputeTotals();
+            //Transactions = Store.GetAllTransactions().ToList().AsReadOnly();
+            //ComputeTotals();
         }
 
         private void ComputeTotals()

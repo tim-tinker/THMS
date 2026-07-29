@@ -2,6 +2,8 @@
 using System.Linq;
 using System.Windows.Forms;
 using THMS.Data.Stores;
+using THMS.Data.Stores.InMemory;
+using THMS.Domain.Transportation;
 using THMS.Logic.ViewModels.Transportation;
 
 namespace THMS.UI.WinForms
@@ -9,40 +11,52 @@ namespace THMS.UI.WinForms
     public partial class VehicleDetailForm : Form
     {
         private readonly VehicleDetailViewModel _vm;
-
-        public VehicleDetailForm(TransportationDataStore store, Guid vehicleId)
+        public VehicleDetailForm()
         {
             InitializeComponent();
-            _vm = new VehicleDetailViewModel(store, vehicleId);
+        }
+
+        public VehicleDetailForm(IVehicleDataStore store, Guid vehicleId)
+            : this()
+        {
+            _vm = new VehicleDetailViewModel(store, vehicleId) ?? throw new ArgumentOutOfRangeException(nameof(vehicleId));
+
+        }
+
+        private void OnLoad(object sender, EventArgs e)
+        {
             LoadVehicle();
             LoadGrids();
         }
 
         private void LoadVehicle()
         {
-            if (_vm.Vehicle == null)
-            {
-                MessageBox.Show("Vehicle not found.");
-                Close();
-                return;
-            }
+            var vehicle = _vm.Vehicle;
+            lblNameValue.Text = vehicle.Name;
+            lblMakeValue.Text = vehicle.Make;
+            lblModelValue.Text = vehicle.Model;
+            lblYearValue.Text = vehicle.Year.ToString();
 
-            lblNameValue.Text = _vm.Vehicle.Name;
-            lblMakeValue.Text = _vm.Vehicle.Make;
-            lblModelValue.Text = _vm.Vehicle.Model;
-            lblYearValue.Text = _vm.Vehicle.Year.ToString();
+            if (vehicle is VehicleEv evVehicle)
+            {
+                _splitFuelCharge.Panel1Collapsed = true;
+            }
+            else
+            {
+                _splitFuelCharge.Panel2Collapsed = true;
+            }
+                //    lblBatteryCapacityValue.Text = evVehicle.BatteryCapacity.ToString();
+                //    lblChargingTimeValue.Text = evVehicle.ChargingTime.ToString();
+
+                //}
+                //else
+                //{
+                //    lblBatteryCapacityValue.Text = "N/A";
+                //    lblChargingTimeValue.Text = "N/A";
         }
 
         private void LoadGrids()
         {
-            mileageGrid.DataSource = _vm.Mileage
-                .Select(m => new
-                {
-                    m.Date,
-                    m.OdometerMiles
-                })
-                .ToList();
-
             chargingGrid.DataSource = _vm.ChargingCosts
                 .Select(c => new
                 {
@@ -55,8 +69,8 @@ namespace THMS.UI.WinForms
                 .Select(f => new
                 {
                     f.Date,
-                    f.Gallons,
-                    f.Cost
+                    f.GallonsAdded,
+                    f.FuelCost
                 })
                 .ToList();
 

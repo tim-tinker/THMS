@@ -34,7 +34,7 @@
     <Compile Update="VehicleDetailForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="VehicleListForm.cs">
+    <Compile Update="VehicleListDashboardForm.cs">
       <SubType>Form</SubType>
     </Compile>
   </ItemGroup>

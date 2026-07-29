@@ -19,7 +19,6 @@ namespace THMS.Data.Stores.SQLite
         private readonly EvChargingSessionVehicleDataTable _evVehicleDataTable = new();
         private readonly MileageRecordTable _mileageRecordTable = new();
         private readonly ChargingCostTable _chargingCostTable = new();
-        private readonly GasPurchaseTable _gasPurchaseTable = new();
         private readonly MaintenanceInvoiceTable _maintenanceInvoiceTable = new();
         private readonly EvChargingSessionTable _evSessionTable = new();
 
@@ -46,7 +45,6 @@ namespace THMS.Data.Stores.SQLite
             _evVehicleDataTable.InitializeSchema(conn);
             _mileageRecordTable.InitializeSchema(conn);
             _chargingCostTable.InitializeSchema(conn);
-            _gasPurchaseTable.InitializeSchema(conn);
             _maintenanceInvoiceTable.InitializeSchema(conn);
             _evSessionTable.InitializeSchema(conn);
         }
@@ -249,6 +247,25 @@ namespace THMS.Data.Stores.SQLite
             }
         }
 
+        public EvChargingSessionVehicleData? GetEvChargingSessionVehicleDataById(Guid id)
+        {
+            using var conn = OpenConnection();
+            return _evVehicleDataTable.GetById(conn, id) is { } derived
+                ? new EvChargingSessionVehicleData
+                {
+                    Id = id,
+                    VehicleId = id,
+                    Date = _mileageRecordTable.GetById(conn, id)?.Date ?? default,
+                    OdometerMiles = _mileageRecordTable.GetById(conn, id)?.OdometerMiles ?? default,
+                    Notes = _mileageRecordTable.GetById(conn, id)?.Notes ?? string.Empty,
+                    StartTimestamp = derived.StartTimestamp,
+                    StartSocPercent = derived.StartSocPercent,
+                    EndSocPercent = derived.EndSocPercent
+                }
+                : null;
+        }
+
+
         public void AttachVehicleDataToChargingSession(Guid sessionId, Guid vehicleDataId)
         {
             using var conn = OpenConnection();
@@ -291,12 +308,6 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             return _chargingCostTable.GetRange(conn, vehicleId, start, end).ToList();
-        }
-
-        public decimal GetChargingCostInPeriod(Guid vehicleId, DateTime start, DateTime end)
-        {
-            using var conn = OpenConnection();
-            return _chargingCostTable.GetRange(conn, vehicleId, start, end).Sum(r => r.Cost);
         }
 
         // ---------------------------------------------------------
