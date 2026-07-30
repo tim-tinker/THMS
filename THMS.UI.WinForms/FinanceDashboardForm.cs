@@ -1,25 +1,32 @@
-using System;
-using System.Linq;
-using System.Windows.Forms;
-using THMS.Logic.ViewModels;
+using THMS.Data.Stores;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.UI.WinForms
 {
-    public partial class FinanceDashboardForm
-        : BaseDashboardForm<FinanceDashboardViewModel>
+    public partial class FinanceDashboardForm : BaseDashboardForm
     {
+        private readonly IFinanceDataStore? _financeDataStore;
+        private FinanceDashboardViewModel ViewModel { get; set; } = null!;
+
+        /// <summary>Designer only.</summary>
         public FinanceDashboardForm()
         {
             InitializeComponent();
         }
 
-        protected override void BindControlsToViewModel()
+        public FinanceDashboardForm(IFinanceDataStore financeDataStore) : this()
         {
-            // Grid setup
-            financeGrid.AutoGenerateColumns = true;
+            _financeDataStore = financeDataStore;
+        }
 
-            // Initial paint
+        public override void InitializeDashboard()
+        {
+            ViewModel = _financeDataStore is null
+                ? new FinanceDashboardViewModel()
+                : new FinanceDashboardViewModel(_financeDataStore);
+
+            financeGrid.AutoGenerateColumns = true;
+            ViewModel.Initialize();
             RefreshDashboard();
         }
 

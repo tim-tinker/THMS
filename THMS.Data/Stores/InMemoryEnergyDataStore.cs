@@ -4,7 +4,7 @@ using System.Linq;
 using THMS.Domain.Energy;
 using THMS.Domain.Finance;
 
-namespace THMS.Data.Stores.InMemory
+namespace THMS.Data.Stores
 {
     public class InMemoryEnergyDataStore : IEnergyDataStore
     {

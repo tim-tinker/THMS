@@ -4,9 +4,6 @@
     <Compile Update="AddVehicleForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="BaseDashboardForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Update="ChargingCostEntryForm.cs">
       <SubType>Form</SubType>
     </Compile>

@@ -6,7 +6,7 @@ using THMS.Domain.Finance;
 using THMS.Domain.Finance.Billing;
 using THMS.Domain.Transportation;
 
-namespace THMS.Data.Stores.InMemory
+namespace THMS.Data.Stores
 {
     public class InMemoryFinanceDataStore : IFinanceDataStore
     {

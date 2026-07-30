@@ -1,47 +1,51 @@
-using System;
-using System.Windows.Forms;
 using THMS.Logic.ViewModels;
 
 namespace THMS.UI.WinForms
 {
-    public partial class SettingsDashboardForm : BaseDashboardForm<SettingsDashboardViewModel>
+    public partial class SettingsDashboardForm : BaseDashboardForm
     {
-        private SettingsDashboardViewModel _vm;
+        private SettingsDashboardViewModel ViewModel { get; set; } = null!;
 
         public SettingsDashboardForm()
         {
             InitializeComponent();
         }
 
-        protected override void BindControlsToViewModel()
+        public override void InitializeDashboard()
         {
-            chkDarkMode.Checked = _vm.DarkModeEnabled;
-            chkAutoSave.Checked = _vm.AutoSaveEnabled;
-            chkShowTooltips.Checked = _vm.ShowTooltips;
+            ViewModel = new SettingsDashboardViewModel();
+            BindControlsToViewModel();
+            ViewModel.Initialize();
+            RefreshDashboard();
+        }
 
+        private void BindControlsToViewModel()
+        {
+            chkDarkMode.Checked = ViewModel.DarkModeEnabled;
+            chkAutoSave.Checked = ViewModel.AutoSaveEnabled;
+            chkShowTooltips.Checked = ViewModel.ShowTooltips;
         }
 
         private void OnDarkModeCheckChanged(object sender, EventArgs e)
         {
-            _vm.DarkModeEnabled = chkDarkMode.Checked;
+            ViewModel.DarkModeEnabled = chkDarkMode.Checked;
         }
 
         private void OnAutoSaveCheckChanged(object sender, EventArgs e)
         {
-            _vm.AutoSaveEnabled = chkAutoSave.Checked;
+            ViewModel.AutoSaveEnabled = chkAutoSave.Checked;
         }
 
         private void OnShowTooltipsCheckChanged(object sender, EventArgs e)
         {
-            _vm.ShowTooltips = chkShowTooltips.Checked;
+            ViewModel.ShowTooltips = chkShowTooltips.Checked;
         }
 
         public override void RefreshDashboard()
         {
-            // Refresh UI if settings changed elsewhere
-            chkDarkMode.Checked = _vm.DarkModeEnabled;
-            chkAutoSave.Checked = _vm.AutoSaveEnabled;
-            chkShowTooltips.Checked = _vm.ShowTooltips;
+            chkDarkMode.Checked = ViewModel.DarkModeEnabled;
+            chkAutoSave.Checked = ViewModel.AutoSaveEnabled;
+            chkShowTooltips.Checked = ViewModel.ShowTooltips;
         }
     }
 }

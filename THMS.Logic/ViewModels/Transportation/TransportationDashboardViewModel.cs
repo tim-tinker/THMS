@@ -1,5 +1,4 @@
 using THMS.Data.Stores;
-using THMS.Data.Stores.InMemory;
 using THMS.Domain.Transportation;
 using THMS.Domain.Transportation.Analytics;
 using THMS.Logic.Transportation;
@@ -8,41 +7,25 @@ namespace THMS.Logic.ViewModels.Transportation
 {
     public class TransportationDashboardViewModel : BaseDashboardViewModel
     {
-        // Lazy-initialized dependencies
-        private IVehicleDataStore? _store;
-        private TransportationAnalyticsEngine? _engine;
+        private readonly IVehicleDataStore _store;
+        private readonly TransportationAnalyticsEngine _engine;
 
-        protected IVehicleDataStore Store =>
-            _store ??= new InMemoryVehicleDataStore();
-
-        protected TransportationAnalyticsEngine Engine =>
-            _engine ??= new TransportationAnalyticsEngine(Store);
-
-        public TransportationDashboardViewModel()
+        public TransportationDashboardViewModel(IVehicleDataStore store)
         {
-            Vehicles = Store.GetAllVehicles().ToList();
+            _store = store;
+            _engine = new TransportationAnalyticsEngine(_store);
+
+            Vehicles = _store.GetAllVehicles().ToList();
 
             if (Vehicles.Any())
                 SelectedVehicle = Vehicles.First();
         }
 
-        // ---------------------------------------------------------
-        // Vehicle selection
-        // ---------------------------------------------------------
-
         public List<VehicleBase> Vehicles { get; }
         public VehicleBase? SelectedVehicle { get; set; }
 
-        // ---------------------------------------------------------
-        // Analytics results
-        // ---------------------------------------------------------
-
         public MonthlyTransportationSummary? MonthlySummary { get; private set; }
         public decimal LifetimeCostPerMile { get; private set; }
-
-        // ---------------------------------------------------------
-        // Dashboard refresh logic
-        // ---------------------------------------------------------
 
         public void Refresh(int year, int month)
         {
@@ -53,22 +36,8 @@ namespace THMS.Logic.ViewModels.Transportation
                 return;
             }
 
-            MonthlySummary = Engine.ComputeMonthlySummary(SelectedVehicle.Id, year, month);
-            LifetimeCostPerMile = Engine.ComputeLifetimeCostPerMile(SelectedVehicle.Id);
-        }
-
-        // ---------------------------------------------------------
-        // Test injection support
-        // ---------------------------------------------------------
-
-        public void SetStoreForTesting(IVehicleDataStore store)
-        {
-            _store = store;
-        }
-
-        public void SetEngineForTesting(TransportationAnalyticsEngine engine)
-        {
-            _engine = engine;
+            MonthlySummary = _engine.ComputeMonthlySummary(SelectedVehicle.Id, year, month);
+            LifetimeCostPerMile = _engine.ComputeLifetimeCostPerMile(SelectedVehicle.Id);
         }
     }
 }

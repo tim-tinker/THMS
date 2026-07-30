@@ -10,5 +10,6 @@
   <Project Path="THMS.Logic/THMS.Logic.csproj" />
   <Project Path="THMS.Reporting.Excel/THMS.Reporting.Excel.csproj" />
   <Project Path="THMS.Tests/THMS.Tests.csproj" />
+  <Project Path="THMS.UI.Common/THMS.UI.Common.csproj" />
   <Project Path="THMS.UI.WinForms/THMS.UI.WinForms.csproj" />
 </Solution>

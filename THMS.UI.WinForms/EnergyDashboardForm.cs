@@ -1,44 +1,47 @@
+using THMS.Data.Stores;
 using THMS.Logic.ViewModels.Energy;
 
 namespace THMS.UI.WinForms
 {
-    public partial class EnergyDashboardForm
-        : BaseDashboardForm<EnergyDashboardViewModel>
+    public partial class EnergyDashboardForm : BaseDashboardForm
     {
+        private readonly IEnergyDataStore? _energyDataStore;
+        private EnergyDashboardViewModel ViewModel { get; set; } = null!;
+
+        /// <summary>Designer only.</summary>
         public EnergyDashboardForm()
         {
             InitializeComponent();
         }
 
-        // ---------------------------------------------------------
-        // Bind controls to the ViewModel (called once by MainForm)
-        // ---------------------------------------------------------
-        protected override void BindControlsToViewModel()
+        public EnergyDashboardForm(IEnergyDataStore energyDataStore) : this()
+        {
+            _energyDataStore = energyDataStore;
+        }
+
+        public override void InitializeDashboard()
+        {
+            // Store is available for engines/importers you'll wire later.
+            ViewModel = new EnergyDashboardViewModel();
+            BindControlsToViewModel();
+            ViewModel.Initialize();
+            RefreshDashboard();
+        }
+
+        private void BindControlsToViewModel()
         {
             dtpStart.Value = ViewModel.StartDate;
             dtpEnd.Value = ViewModel.EndDate;
-
-            btnRefresh.Click += (s, e) => RefreshDashboard();
+            btnRefresh.Click += (_, _) => RefreshDashboard();
         }
 
-        // ---------------------------------------------------------
-        // Refresh dashboard (called by MainForm + user interactions)
-        // ---------------------------------------------------------
         public override void RefreshDashboard()
         {
-            // Update ViewModel date range
             ViewModel.StartDate = dtpStart.Value;
             ViewModel.EndDate = dtpEnd.Value;
-
-            // Later: call your energy engines here
-            // For now: ViewModel.EnergyData is already populated externally
-
             BindEnergyGrid();
         }
 
-        // ---------------------------------------------------------
-        // Helper: bind grid to ViewModel data
-        // ---------------------------------------------------------
         private void BindEnergyGrid()
         {
             var data = ViewModel.EnergyData
@@ -58,9 +61,6 @@ namespace THMS.UI.WinForms
             energyGrid.DataSource = data;
         }
 
-        // ---------------------------------------------------------
-        // User clicked Refresh button
-        // ---------------------------------------------------------
         private void btnRefresh_Click(object sender, EventArgs e)
         {
             RefreshDashboard();

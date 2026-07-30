@@ -21,13 +21,12 @@ namespace THMS.Logic.ViewModels
         public void SetStores(
             IVehicleDataStore vehicleStore,
             IFinanceDataStore financeStore,
-            IEnergyDataStore energyStore,
-            TransportationCostAggregator aggregator)
+            IEnergyDataStore energyStore)
         {
             _vehicleStore = vehicleStore;
             _financeStore = financeStore;
             _energyStore = energyStore;
-            _aggregator = aggregator;
+            _aggregator = new TransportationCostAggregator(vehicleStore, financeStore);
         }
 
         public override void Initialize()
@@ -44,6 +43,11 @@ namespace THMS.Logic.ViewModels
 
         private void Load()
         {
+            if (_vehicleStore == null || _financeStore == null || _energyStore == null || _aggregator == null)
+            {
+                throw new InvalidOperationException("Stores and aggregator must be set before loading data.");
+            }
+
             Vehicles.Clear();
 
             var allVehicles = _vehicleStore.GetAllVehicles();

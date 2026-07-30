@@ -4,36 +4,34 @@ namespace THMS.UI
 {
     public partial class MainForm : Form
     {
-        private readonly Dictionary<string, BaseDashboardForm> _dashboards;
+        private readonly Dictionary<string, BaseDashboardForm> _dashboards = new();
 
+        /// <summary>Designer only.</summary>
         public MainForm()
         {
             InitializeComponent();
-            _dashboards = new Dictionary<string, BaseDashboardForm>();
-
-            InitializeModules();
         }
 
-        // ---------------------------------------------------------
-        // Create dashboard forms + view models
-        // ---------------------------------------------------------
-        private void InitializeModules()
+        public MainForm(
+            TransportationDashboardForm transportationDashboard,
+            EnergyDashboardForm energyDashboard,
+            FinanceDashboardForm financeDashboard,
+            VehicleListDashboardForm vehicleListDashboard) : this()
         {
-            _dashboards["Transportation"] = new TransportationDashboardForm();
-            _dashboards["Energy"] = new EnergyDashboardForm();
-            _dashboards["Finance"] = new FinanceDashboardForm();
-            _dashboards["Vehicles"] = new VehicleListDashboardForm();
+            _dashboards["Transportation"] = transportationDashboard;
+            _dashboards["Energy"] = energyDashboard;
+            _dashboards["Finance"] = financeDashboard;
+            _dashboards["Vehicles"] = vehicleListDashboard;
 
             foreach (var form in _dashboards.Values)
             {
+                form.ConfigureAsEmbeddedDashboard();
                 form.Visible = false;
                 dashboardHostPanel.Controls.Add(form);
+                form.InitializeDashboard();
             }
         }
 
-        // ---------------------------------------------------------
-        // Show a dashboard when user clicks a navigation button
-        // ---------------------------------------------------------
         private void ShowModule(string moduleName)
         {
             foreach (var form in _dashboards.Values)
@@ -44,9 +42,6 @@ namespace THMS.UI
             dashboard.RefreshDashboard();
         }
 
-        // ---------------------------------------------------------
-        // Navigation button handlers
-        // ---------------------------------------------------------
         private void btnTransportation_Click(object sender, EventArgs e)
         {
             ShowModule("Transportation");

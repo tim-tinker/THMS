@@ -6,7 +6,7 @@ using THMS.Domain.Transportation;
 using THMS.Domain.Energy;
 using THMS.Domain.Finance;
 
-namespace THMS.Data.Stores.InMemory
+namespace THMS.Data.Stores
 {
     public class InMemoryVehicleDataStore : IVehicleDataStore
     {
@@ -15,8 +15,21 @@ namespace THMS.Data.Stores.InMemory
         private readonly List<EvChargingSession> _evChargingSessions = new();
         private readonly List<EvChargingSessionVehicleData> _evChargingSessionVehicleData = new();
         private readonly List<ChargingCostRecord> _chargingCostRecords = new();
-        private readonly List<GasPurchase> _fuelReceipts = new();
         private readonly List<MaintenanceInvoiceRecord> _maintenanceInvoices = new();
+
+        public InMemoryVehicleDataStore()
+        {
+            _vehicles.Add(new VehicleEv
+            {
+                Id = Guid.NewGuid(),
+                Make = "Ford",
+                Model = "Mustang Mach-E",
+                Year = 2021,
+                Vin = "1FADP5C1XMF123456",
+                BatteryCapacityKwh = 92,
+                Name = "Bluey",
+            });
+        }
 
         // ---------------------------------------------------------
         // VEHICLES

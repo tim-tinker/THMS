@@ -1,20 +1,37 @@
-using System;
-using System.Linq;
-using System.Windows.Forms;
+using THMS.Data.Stores;
 using THMS.Domain.Transportation;
 using THMS.Logic.ViewModels.Transportation;
 
 namespace THMS.UI.WinForms
 {
-    public partial class TransportationDashboardForm
-        : BaseDashboardForm<TransportationDashboardViewModel>
+    public partial class TransportationDashboardForm : BaseDashboardForm
     {
+        private readonly IVehicleDataStore? _vehicleDataStore;
+        private TransportationDashboardViewModel ViewModel { get; set; } = null!;
+
+        /// <summary>Designer only.</summary>
         public TransportationDashboardForm()
         {
             InitializeComponent();
         }
 
-        protected override void BindControlsToViewModel()
+        public TransportationDashboardForm(IVehicleDataStore vehicleDataStore) : this()
+        {
+            _vehicleDataStore = vehicleDataStore;
+        }
+
+        public override void InitializeDashboard()
+        {
+            if (_vehicleDataStore is null)
+                throw new InvalidOperationException("IVehicleDataStore was not provided. Resolve this form from DI at runtime.");
+
+            ViewModel = new TransportationDashboardViewModel(_vehicleDataStore);
+            BindControlsToViewModel();
+            ViewModel.Initialize();
+            RefreshDashboard();
+        }
+
+        private void BindControlsToViewModel()
         {
             vehicleListBox.DataSource = ViewModel.Vehicles;
             vehicleListBox.DisplayMember = "Name";
@@ -25,9 +42,6 @@ namespace THMS.UI.WinForms
             vehicleListBox.SelectedIndexChanged += VehicleListBox_SelectedIndexChanged;
         }
 
-        // ---------------------------------------------------------
-        // Refresh dashboard (called by MainForm + user interactions)
-        // ---------------------------------------------------------
         public override void RefreshDashboard()
         {
             if (ViewModel.SelectedVehicle == null)
@@ -40,18 +54,12 @@ namespace THMS.UI.WinForms
             UpdateChart();
         }
 
-        // ---------------------------------------------------------
-        // User selects a vehicle
-        // ---------------------------------------------------------
-        private void VehicleListBox_SelectedIndexChanged(object sender, EventArgs e)
+        private void VehicleListBox_SelectedIndexChanged(object? sender, EventArgs e)
         {
             ViewModel.SelectedVehicle = vehicleListBox.SelectedItem as VehicleBase;
             RefreshDashboard();
         }
 
-        // ---------------------------------------------------------
-        // Helper: update labels
-        // ---------------------------------------------------------
         private void UpdateVehicleDetails()
         {
             var vehicle = ViewModel.SelectedVehicle;
@@ -65,14 +73,10 @@ namespace THMS.UI.WinForms
             if (summary != null)
             {
                 lblMonthlyMiles.Text = $"Miles: {summary.MilesDriven}";
-                //lblMonthlyCost.Text = $"Cost: {summary.Cost:C}";
                 lblMonthlyCostPerMile.Text = $"Cost/Mile: {summary.CostPerMile:C}";
             }
         }
 
-        // ---------------------------------------------------------
-        // Helper: update chart
-        // ---------------------------------------------------------
         private void UpdateChart()
         {
             var summary = ViewModel.MonthlySummary;
@@ -81,9 +85,6 @@ namespace THMS.UI.WinForms
 
             var series = costChart.Series["MonthlyCost"];
             series.Points.Clear();
-
-            //foreach (var entry in summary.Entries)
-            //    series.Points.AddXY(entry.MonthName, entry.Cost);
         }
     }
 }

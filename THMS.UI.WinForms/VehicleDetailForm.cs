@@ -2,7 +2,6 @@
 using System.Linq;
 using System.Windows.Forms;
 using THMS.Data.Stores;
-using THMS.Data.Stores.InMemory;
 using THMS.Domain.Transportation;
 using THMS.Logic.ViewModels.Transportation;
 

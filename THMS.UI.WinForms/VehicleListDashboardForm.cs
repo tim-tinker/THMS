@@ -1,25 +1,42 @@
-﻿using THMS.Logic.ViewModels;
+﻿using THMS.Data.Stores;
+using THMS.Logic.ViewModels;
 
 namespace THMS.UI.WinForms
 {
-    public partial class VehicleListDashboardForm : BaseDashboardForm<VehicleListViewModel>
+    public partial class VehicleListDashboardForm : BaseDashboardForm
     {
+        private readonly IVehicleDataStore? _vehicleDataStore;
+        private readonly IFinanceDataStore? _financeDataStore;
+        private readonly IEnergyDataStore? _energyDataStore;
+        private VehicleListViewModel ViewModel { get; set; } = null!;
+
+        /// <summary>Designer only.</summary>
         public VehicleListDashboardForm()
         {
             InitializeComponent();
         }
 
-        // ---------------------------------------------------------
-        // Bind controls to the ViewModel (called once by MainForm)
-        // ---------------------------------------------------------
-        protected override void BindControlsToViewModel()
+        public VehicleListDashboardForm(
+            IVehicleDataStore vehicleDataStore,
+            IFinanceDataStore financeDataStore,
+            IEnergyDataStore energyDataStore) : this()
         {
-            LoadVehicles();
+            _vehicleDataStore = vehicleDataStore;
+            _financeDataStore = financeDataStore;
+            _energyDataStore = energyDataStore;
         }
 
-        // ---------------------------------------------------------
-        // Refresh dashboard (called by MainForm + user interactions)
-        // ---------------------------------------------------------
+        public override void InitializeDashboard()
+        {
+            if (_vehicleDataStore is null || _financeDataStore is null || _energyDataStore is null)
+                throw new InvalidOperationException("Data stores were not provided. Resolve this form from DI at runtime.");
+
+            ViewModel = new VehicleListViewModel();
+            ViewModel.SetStores(_vehicleDataStore, _financeDataStore, _energyDataStore);
+            ViewModel.Initialize();
+            RefreshDashboard();
+        }
+
         public override void RefreshDashboard()
         {
             ViewModel.Activate();
