@@ -15,20 +15,43 @@ namespace THMS.Logic.ViewModels.Transportation
         public DateTime StartTime
         {
             get => _startTime;
-            set { _startTime = value; RaiseChanged(nameof(StartTime)); Refresh(); }
+            set
+            {
+                if (_startTime == value)
+                    return;
+
+                _startTime = value;
+                RaiseChanged(nameof(StartTime));
+                Refresh();
+            }
         }
 
         private DateTime _endTime;
         public DateTime EndTime
         {
             get => _endTime;
-            set { _endTime = value; RaiseChanged(nameof(EndTime)); Refresh(); }
+            set
+            {
+                if (_endTime == value)
+                    return;
+
+                _endTime = value;
+                RaiseChanged(nameof(EndTime));
+                Refresh();
+            }
         }
 
         public VehicleDetailViewModel(IVehicleDataStore store, Guid vehicleId)
         {
             _store = store;
             VehicleId = vehicleId;
+
+            // Assign the backing fields so the range is complete before the first
+            // Refresh; the setters would each trigger a redundant load.
+            _startTime = _store.GetEarliestIceMileageRecord(VehicleId)?.Date
+                ?? DateTime.MinValue;
+            _endTime = DateTime.MaxValue;
+
             Refresh();
         }
 

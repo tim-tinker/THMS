@@ -15,7 +15,7 @@ namespace THMS.UI.WinForms
             _parentVm = parentVm;
             _vm = new MileageEntryViewModel(parentVm.Store, vehicleId);
 
-            dtpDate.Value = DateTime.Now;
+            dtpDate.Value = DateTime.Now.Date;
         }
 
         private void btnSave_Click(object sender, EventArgs e)
@@ -28,6 +28,9 @@ namespace THMS.UI.WinForms
 
             _vm.Date = dtpDate.Value;
             _vm.OdometerMiles = numOdometer.Value;
+            _vm.GallonsAdded = _numGallons.Value;
+            _vm.FuelCost = _numCost.Value;
+            _vm.IsFullFillUp = _checkFull.Checked;
 
             _vm.Save();
             _parentVm.Refresh();

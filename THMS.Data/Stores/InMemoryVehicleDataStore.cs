@@ -24,10 +24,20 @@ namespace THMS.Data.Stores
                 Id = Guid.NewGuid(),
                 Make = "Ford",
                 Model = "Mustang Mach-E",
-                Year = 2021,
-                Vin = "1FADP5C1XMF123456",
+                Year = 2023,
+                Vin = "3FMTK3R74PMA89745",
                 BatteryCapacityKwh = 92,
-                Name = "Bluey",
+                Name = "Tim's",
+            });
+
+            _vehicles.Add(new VehicleIce
+            {
+                Id = Guid.NewGuid(),
+                Make = "Ford",
+                Model = "Escape SEL",
+                Year = 2018,
+                Vin = "1FMCU9HD5JUA71357",
+                Name = "Julie's",
             });
         }
 
@@ -57,6 +67,14 @@ namespace THMS.Data.Stores
         public void AddIceMileageRecord(IceMileageRecord record)
         {
             _iceMileageRecords.Add(record);
+        }
+
+        public IceMileageRecord? GetEarliestIceMileageRecord(Guid vehicleId)
+        {
+            return _iceMileageRecords
+                .Where(r => r.VehicleId == vehicleId)
+                .OrderBy(r => r.Date)
+                .FirstOrDefault();
         }
 
         public IEnumerable<IceMileageRecord> GetIceMileageRecords(Guid vehicleId, DateTime start, DateTime end)

@@ -10,6 +10,11 @@ namespace THMS.UI.WinForms
         private readonly IEnergyDataStore? _energyDataStore;
         private VehicleListViewModel ViewModel { get; set; } = null!;
 
+        protected VehicleListItemViewModel? SelectedVehicle =>
+            vehicleGrid.SelectedRows.Count > 0
+                ? vehicleGrid.SelectedRows[0].DataBoundItem as VehicleListItemViewModel
+                : null;
+
         /// <summary>Designer only.</summary>
         public VehicleListDashboardForm()
         {
@@ -45,21 +50,8 @@ namespace THMS.UI.WinForms
 
         private void LoadVehicles()
         {
-            vehicleGrid.DataSource = ViewModel.Vehicles
-                .Select(v => new
-                {
-                    v.VehicleId,
-                    v.Name,
-                    v.IsEv,
-                    v.CostPerMile,
-                    v.TotalMiles,
-                    v.TotalCost
-                })
-                .ToList();
-        }
-
-        private void vehicleGrid_SelectionChanged(object sender, EventArgs e)
-        {
+            vehicleGrid.DataSource = null;
+            vehicleGrid.DataSource = ViewModel.Vehicles;
         }
 
         private void btnAddVehicle_Click(object sender, EventArgs e)
@@ -73,6 +65,22 @@ namespace THMS.UI.WinForms
 
         private void btnDetails_Click(object sender, EventArgs e)
         {
+            if (SelectedVehicle != null)
+            {
+                var form = new VehicleDetailForm(
+                    _vehicleDataStore,
+                    SelectedVehicle.VehicleId);
+
+                form.ShowDialog(this);
+
+                // The detail form can add mileage and charging records, so the
+                // summaries have to be recomputed even when it is just closed.
+                RefreshDashboard();
+            }
+            else
+            {
+                MessageBox.Show("Please select a vehicle.");
+            }
         }
     }
 }

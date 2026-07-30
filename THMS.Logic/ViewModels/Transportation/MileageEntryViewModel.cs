@@ -17,6 +17,9 @@ namespace THMS.Logic.ViewModels.Transportation
 
         public DateTime Date { get; set; } = DateTime.Now;
         public decimal OdometerMiles { get; set; }
+        public decimal GallonsAdded { get; set; }
+        public decimal FuelCost { get; set; }
+        public bool IsFullFillUp { get; set; }
 
         public void Save()
         {
@@ -24,7 +27,10 @@ namespace THMS.Logic.ViewModels.Transportation
             {
                 VehicleId = VehicleId,
                 Date = Date,
-                OdometerMiles = OdometerMiles
+                OdometerMiles = OdometerMiles,
+                GallonsAdded = GallonsAdded,
+                FuelCost = FuelCost,
+                IsFullFillUp = IsFullFillUp
             };
 
             _store.AddIceMileageRecord(record);

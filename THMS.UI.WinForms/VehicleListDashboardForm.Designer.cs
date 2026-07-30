@@ -43,7 +43,6 @@
             this.vehicleGrid.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             this.vehicleGrid.Size = new System.Drawing.Size(560, 300);
             this.vehicleGrid.TabIndex = 0;
-            this.vehicleGrid.SelectionChanged += new System.EventHandler(this.vehicleGrid_SelectionChanged);
             // 
             // btnAddVehicle
             // 

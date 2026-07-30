@@ -142,6 +142,12 @@ namespace THMS.Data.Stores.SQLite
             _iceMileageTable.Insert(conn, record);
         }
 
+        public IceMileageRecord? GetEarliestIceMileageRecord(Guid vehicleId)
+        {
+            return GetIceMileageRecords(vehicleId, DateTime.MinValue, DateTime.MaxValue)
+                .FirstOrDefault();
+        }
+
         public IEnumerable<IceMileageRecord> GetIceMileageRecords(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();

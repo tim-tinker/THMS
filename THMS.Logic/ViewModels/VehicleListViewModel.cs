@@ -32,7 +32,10 @@ namespace THMS.Logic.ViewModels
         public override void Initialize()
         {
             PeriodStart = DateTime.Today.AddDays(-30);
-            PeriodEnd = DateTime.Today;
+
+            // Store queries filter on Date <= PeriodEnd, so this has to be the end
+            // of today rather than midnight or entries made today are excluded.
+            PeriodEnd = DateTime.Today.AddDays(1).AddTicks(-1);
             Load();
         }
 

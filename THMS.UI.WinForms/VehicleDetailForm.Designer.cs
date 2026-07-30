@@ -18,13 +18,7 @@
         private void InitializeComponent()
         {
             lblName = new Label();
-            lblMake = new Label();
-            lblModel = new Label();
-            lblYear = new Label();
-            lblNameValue = new Label();
-            lblMakeValue = new Label();
-            lblModelValue = new Label();
-            lblYearValue = new Label();
+            lblMakeModelYear = new Label();
             chargingGrid = new DataGridView();
             fuelGrid = new DataGridView();
             maintenanceGrid = new DataGridView();
@@ -36,6 +30,11 @@
             label4 = new Label();
             _btnAddInvoice = new Button();
             label2 = new Label();
+            _dateStart = new DateTimePicker();
+            groupBox1 = new GroupBox();
+            label5 = new Label();
+            _dateEnd = new DateTimePicker();
+            label1 = new Label();
             ((System.ComponentModel.ISupportInitialize)chargingGrid).BeginInit();
             ((System.ComponentModel.ISupportInitialize)fuelGrid).BeginInit();
             ((System.ComponentModel.ISupportInitialize)maintenanceGrid).BeginInit();
@@ -47,6 +46,7 @@
             _splitFuelCharge.Panel1.SuspendLayout();
             _splitFuelCharge.Panel2.SuspendLayout();
             _splitFuelCharge.SuspendLayout();
+            groupBox1.SuspendLayout();
             SuspendLayout();
             // 
             // lblName
@@ -55,59 +55,16 @@
             lblName.Name = "lblName";
             lblName.Size = new Size(100, 35);
             lblName.TabIndex = 0;
-            lblName.Text = "Name:";
+            lblName.Text = "Name";
             // 
-            // lblMake
+            // lblMakeModelYear
             // 
-            lblMake.Location = new Point(12, 58);
-            lblMake.Name = "lblMake";
-            lblMake.Size = new Size(100, 33);
-            lblMake.TabIndex = 1;
-            lblMake.Text = "Make:";
-            // 
-            // lblModel
-            // 
-            lblModel.Location = new Point(12, 99);
-            lblModel.Name = "lblModel";
-            lblModel.Size = new Size(100, 34);
-            lblModel.TabIndex = 2;
-            lblModel.Text = "Model:";
-            // 
-            // lblYear
-            // 
-            lblYear.Location = new Point(12, 141);
-            lblYear.Name = "lblYear";
-            lblYear.Size = new Size(100, 32);
-            lblYear.TabIndex = 3;
-            lblYear.Text = "Year:";
-            // 
-            // lblNameValue
-            // 
-            lblNameValue.Location = new Point(140, 15);
-            lblNameValue.Name = "lblNameValue";
-            lblNameValue.Size = new Size(100, 23);
-            lblNameValue.TabIndex = 4;
-            // 
-            // lblMakeValue
-            // 
-            lblMakeValue.Location = new Point(140, 45);
-            lblMakeValue.Name = "lblMakeValue";
-            lblMakeValue.Size = new Size(100, 23);
-            lblMakeValue.TabIndex = 5;
-            // 
-            // lblModelValue
-            // 
-            lblModelValue.Location = new Point(140, 75);
-            lblModelValue.Name = "lblModelValue";
-            lblModelValue.Size = new Size(100, 23);
-            lblModelValue.TabIndex = 6;
-            // 
-            // lblYearValue
-            // 
-            lblYearValue.Location = new Point(140, 105);
-            lblYearValue.Name = "lblYearValue";
-            lblYearValue.Size = new Size(100, 23);
-            lblYearValue.TabIndex = 7;
+            lblMakeModelYear.AutoSize = true;
+            lblMakeModelYear.Location = new Point(12, 58);
+            lblMakeModelYear.Name = "lblMakeModelYear";
+            lblMakeModelYear.Size = new Size(184, 30);
+            lblMakeModelYear.TabIndex = 1;
+            lblMakeModelYear.Text = "Year, Make, Model";
             // 
             // chargingGrid
             // 
@@ -118,7 +75,7 @@
             chargingGrid.ReadOnly = true;
             chargingGrid.RowHeadersWidth = 72;
             chargingGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            chargingGrid.Size = new Size(996, 47);
+            chargingGrid.Size = new Size(996, 50);
             chargingGrid.TabIndex = 9;
             // 
             // fuelGrid
@@ -142,7 +99,7 @@
             maintenanceGrid.ReadOnly = true;
             maintenanceGrid.RowHeadersWidth = 72;
             maintenanceGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            maintenanceGrid.Size = new Size(996, 226);
+            maintenanceGrid.Size = new Size(996, 233);
             maintenanceGrid.TabIndex = 11;
             // 
             // btnAddMileage
@@ -158,7 +115,7 @@
             // btnAddCharging
             // 
             btnAddCharging.Dock = DockStyle.Bottom;
-            btnAddCharging.Location = new Point(0, 77);
+            btnAddCharging.Location = new Point(0, 80);
             btnAddCharging.Name = "btnAddCharging";
             btnAddCharging.Size = new Size(996, 35);
             btnAddCharging.TabIndex = 13;
@@ -167,7 +124,7 @@
             // 
             // _splitFuelMaintenance
             // 
-            _splitFuelMaintenance.Location = new Point(12, 196);
+            _splitFuelMaintenance.Location = new Point(12, 186);
             _splitFuelMaintenance.Name = "_splitFuelMaintenance";
             _splitFuelMaintenance.Orientation = Orientation.Horizontal;
             // 
@@ -180,8 +137,8 @@
             _splitFuelMaintenance.Panel2.Controls.Add(maintenanceGrid);
             _splitFuelMaintenance.Panel2.Controls.Add(_btnAddInvoice);
             _splitFuelMaintenance.Panel2.Controls.Add(label2);
-            _splitFuelMaintenance.Size = new Size(996, 595);
-            _splitFuelMaintenance.SplitterDistance = 295;
+            _splitFuelMaintenance.Size = new Size(996, 605);
+            _splitFuelMaintenance.SplitterDistance = 298;
             _splitFuelMaintenance.TabIndex = 19;
             // 
             // _splitFuelCharge
@@ -202,7 +159,7 @@
             _splitFuelCharge.Panel2.Controls.Add(chargingGrid);
             _splitFuelCharge.Panel2.Controls.Add(label4);
             _splitFuelCharge.Panel2.Controls.Add(btnAddCharging);
-            _splitFuelCharge.Size = new Size(996, 295);
+            _splitFuelCharge.Size = new Size(996, 298);
             _splitFuelCharge.SplitterDistance = 179;
             _splitFuelCharge.TabIndex = 0;
             // 
@@ -229,7 +186,7 @@
             // _btnAddInvoice
             // 
             _btnAddInvoice.Dock = DockStyle.Bottom;
-            _btnAddInvoice.Location = new Point(0, 256);
+            _btnAddInvoice.Location = new Point(0, 263);
             _btnAddInvoice.Name = "_btnAddInvoice";
             _btnAddInvoice.Size = new Size(996, 40);
             _btnAddInvoice.TabIndex = 13;
@@ -246,18 +203,62 @@
             label2.TabIndex = 12;
             label2.Text = "Maintenance";
             // 
+            // _dateStart
+            // 
+            _dateStart.Format = DateTimePickerFormat.Short;
+            _dateStart.Location = new Point(77, 34);
+            _dateStart.Name = "_dateStart";
+            _dateStart.Size = new Size(183, 35);
+            _dateStart.TabIndex = 20;
+            _dateStart.ValueChanged += OnValueChangedStart;
+            // 
+            // groupBox1
+            // 
+            groupBox1.Controls.Add(label5);
+            groupBox1.Controls.Add(_dateEnd);
+            groupBox1.Controls.Add(label1);
+            groupBox1.Controls.Add(_dateStart);
+            groupBox1.Location = new Point(12, 91);
+            groupBox1.Name = "groupBox1";
+            groupBox1.Size = new Size(516, 89);
+            groupBox1.TabIndex = 21;
+            groupBox1.TabStop = false;
+            groupBox1.Text = "Date Range";
+            // 
+            // label5
+            // 
+            label5.AutoSize = true;
+            label5.Location = new Point(266, 39);
+            label5.Name = "label5";
+            label5.Size = new Size(39, 30);
+            label5.TabIndex = 22;
+            label5.Text = "To:";
+            // 
+            // _dateEnd
+            // 
+            _dateEnd.Format = DateTimePickerFormat.Short;
+            _dateEnd.Location = new Point(311, 35);
+            _dateEnd.Name = "_dateEnd";
+            _dateEnd.Size = new Size(183, 35);
+            _dateEnd.TabIndex = 21;
+            _dateEnd.ValueChanged += OnValueChangedEnd;
+            // 
+            // label1
+            // 
+            label1.AutoSize = true;
+            label1.Location = new Point(6, 38);
+            label1.Name = "label1";
+            label1.Size = new Size(65, 30);
+            label1.TabIndex = 0;
+            label1.Text = "From:";
+            // 
             // VehicleDetailForm
             // 
             ClientSize = new Size(1020, 803);
+            Controls.Add(groupBox1);
             Controls.Add(_splitFuelMaintenance);
             Controls.Add(lblName);
-            Controls.Add(lblMake);
-            Controls.Add(lblModel);
-            Controls.Add(lblYear);
-            Controls.Add(lblNameValue);
-            Controls.Add(lblMakeValue);
-            Controls.Add(lblModelValue);
-            Controls.Add(lblYearValue);
+            Controls.Add(lblMakeModelYear);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             Name = "VehicleDetailForm";
             StartPosition = FormStartPosition.CenterParent;
@@ -277,20 +278,16 @@
             _splitFuelCharge.Panel2.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)_splitFuelCharge).EndInit();
             _splitFuelCharge.ResumeLayout(false);
+            groupBox1.ResumeLayout(false);
+            groupBox1.PerformLayout();
             ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion
 
         private System.Windows.Forms.Label lblName;
-        private System.Windows.Forms.Label lblMake;
-        private System.Windows.Forms.Label lblModel;
-        private System.Windows.Forms.Label lblYear;
-
-        private System.Windows.Forms.Label lblNameValue;
-        private System.Windows.Forms.Label lblMakeValue;
-        private System.Windows.Forms.Label lblModelValue;
-        private System.Windows.Forms.Label lblYearValue;
+        private System.Windows.Forms.Label lblMakeModelYear;
         private System.Windows.Forms.DataGridView chargingGrid;
         private System.Windows.Forms.DataGridView fuelGrid;
         private System.Windows.Forms.DataGridView maintenanceGrid;
@@ -303,5 +300,10 @@
         private SplitContainer _splitFuelCharge;
         private Label label3;
         private Label label4;
+        private DateTimePicker _dateStart;
+        private GroupBox groupBox1;
+        private Label label5;
+        private DateTimePicker _dateEnd;
+        private Label label1;
     }
 }

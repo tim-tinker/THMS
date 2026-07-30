@@ -15,6 +15,7 @@ namespace THMS.Data.Stores
         // ICE MILEAGE
         // ---------------------------------------------------------
         void AddIceMileageRecord(IceMileageRecord record);
+        IceMileageRecord? GetEarliestIceMileageRecord(Guid vehicleId);
         IEnumerable<IceMileageRecord> GetIceMileageRecords(Guid vehicleId, DateTime start, DateTime end);
 
         // Aggregated mileage (used by TransportationAnalyticsEngine)

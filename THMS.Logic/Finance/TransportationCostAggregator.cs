@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using THMS.Data.Stores;
-using THMS.Domain.Transportation;
 using THMS.Domain.Finance;
+using THMS.Domain.Transportation;
+using static System.Collections.Specialized.BitVector32;
 
 namespace THMS.Logic.Transportation
 {
@@ -67,7 +68,7 @@ namespace THMS.Logic.Transportation
                 .Sum(s => s.ChargingCost!.Value);
 
             // 5. Total EV miles
-            var miles = ComputeEvMiles(homeSessions.Concat(commercialSessions));
+            var miles = ComputeEvMiles(sessions);
 
             // 6. Cost per mile
             var totalCost = homeCost + commercialCost;
@@ -103,15 +104,13 @@ namespace THMS.Logic.Transportation
             // 2. Compute miles driven
             var miles = ComputeIceMiles(mileageRecords);
 
-            // 3. Get gas purchases
-            var gasPurchases = _financeStore.GetGasPurchases(vehicle.Id, start, end)
-                .Where(g => g.FuelCost > 0)
-                .ToList();
+            // 3. Total fuel cost, taken from the fill-up captured on each mileage
+            // record. The mileage record is the single source of truth for fuel
+            // cost; finance GasPurchase rows are not summed here to avoid counting
+            // the same fill-up twice.
+            var fuelCost = mileageRecords.Sum(r => r.FuelCost);
 
-            // 4. Total fuel cost
-            var fuelCost = gasPurchases.Sum(g => g.FuelCost);
-
-            // 5. Cost per mile
+            // 4. Cost per mile
             var costPerMile = miles > 0 ? fuelCost / miles : 0;
 
             return new IceTransportationCostSummary
@@ -162,17 +161,34 @@ namespace THMS.Logic.Transportation
         {
             decimal miles = 0;
 
-            foreach (var session in sessions)
-            {
-                if (session.VehicleDataId == null)
-                    continue;
+            var validSessions = (from session in sessions
+                                 where session.VehicleDataId != null
+                                 let vehicleData = _vehicleStore.GetEvChargingSessionVehicleDataById(session.VehicleDataId.Value)
+                                 where vehicleData != null && vehicleData.OdometerMiles != null
+                                 orderby session.EndTime
+                                 select session).ToArray();
 
-                var vd = _vehicleStore.GetEvChargingSessionVehicleDataById(session.VehicleDataId.Value);
-                if (vd is not null && vd.OdometerMiles != null)
-                    miles += vd.OdometerMiles.Value;
+            var startSession = validSessions.FirstOrDefault();
+            var endSession = validSessions.LastOrDefault();
+            if (startSession != null && endSession != null)
+            {
+                miles = GetOdometer(endSession) - GetOdometer(startSession);
             }
 
             return miles;
+        }
+
+        private decimal GetOdometer(EvChargingSession session)
+        {
+            decimal odometer = 0;
+            if (session.VehicleDataId != null)
+            {
+                var vd = _vehicleStore.GetEvChargingSessionVehicleDataById(session.VehicleDataId.Value);
+                if (vd is not null && vd.OdometerMiles != null)
+                    odometer = vd.OdometerMiles.Value;
+            }
+
+            return odometer;
         }
 
         // ---------------------------------------------------------
