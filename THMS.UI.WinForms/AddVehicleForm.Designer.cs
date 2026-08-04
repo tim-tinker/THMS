@@ -72,21 +72,21 @@
             txtName.Location = new Point(154, 12);
             txtName.Name = "txtName";
             txtName.Size = new Size(220, 35);
-            txtName.TabIndex = 8;
+            txtName.TabIndex = 0;
             // 
             // txtMake
             // 
             txtMake.Location = new Point(154, 52);
             txtMake.Name = "txtMake";
             txtMake.Size = new Size(220, 35);
-            txtMake.TabIndex = 6;
+            txtMake.TabIndex = 1;
             // 
             // txtModel
             // 
             txtModel.Location = new Point(154, 92);
             txtModel.Name = "txtModel";
             txtModel.Size = new Size(220, 35);
-            txtModel.TabIndex = 4;
+            txtModel.TabIndex = 2;
             // 
             // numYear
             // 
@@ -95,26 +95,26 @@
             numYear.Minimum = new decimal(new int[] { 1950, 0, 0, 0 });
             numYear.Name = "numYear";
             numYear.Size = new Size(120, 35);
-            numYear.TabIndex = 2;
+            numYear.TabIndex = 3;
             numYear.Value = new decimal(new int[] { 2024, 0, 0, 0 });
             // 
             // btnSave
             // 
             btnSave.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            btnSave.Location = new Point(182, 269);
+            btnSave.Location = new Point(277, 269);
             btnSave.Name = "btnSave";
             btnSave.Size = new Size(100, 35);
-            btnSave.TabIndex = 1;
+            btnSave.TabIndex = 6;
             btnSave.Text = "Save";
             btnSave.Click += btnSave_Click;
             // 
             // btnCancel
             // 
             btnCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            btnCancel.Location = new Point(302, 269);
+            btnCancel.Location = new Point(397, 269);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(100, 35);
-            btnCancel.TabIndex = 0;
+            btnCancel.TabIndex = 7;
             btnCancel.Text = "Cancel";
             btnCancel.Click += btnCancel_Click;
             // 
@@ -124,16 +124,17 @@
             _checkEv.Location = new Point(154, 173);
             _checkEv.Name = "_checkEv";
             _checkEv.Size = new Size(219, 34);
-            _checkEv.TabIndex = 13;
+            _checkEv.TabIndex = 4;
             _checkEv.Text = "Electric Vehicle (EV)";
             _checkEv.UseVisualStyleBackColor = true;
+            _checkEv.CheckedChanged += OnCheckedChangedEv;
             // 
             // _numericFuelCapacity
             // 
             _numericFuelCapacity.Location = new Point(154, 213);
             _numericFuelCapacity.Name = "_numericFuelCapacity";
             _numericFuelCapacity.Size = new Size(120, 35);
-            _numericFuelCapacity.TabIndex = 14;
+            _numericFuelCapacity.TabIndex = 5;
             // 
             // _labelCapacity
             // 
@@ -155,7 +156,9 @@
             // 
             // AddVehicleForm
             // 
-            ClientSize = new Size(422, 324);
+            AcceptButton = btnSave;
+            CancelButton = btnCancel;
+            ClientSize = new Size(517, 324);
             Controls.Add(_labelFuelType);
             Controls.Add(_labelCapacity);
             Controls.Add(_numericFuelCapacity);

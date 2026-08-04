@@ -24,28 +24,23 @@ namespace THMS.Data.Stores
         // ---------------------------------------------------------
         // EV CHARGING SESSIONS (vehicle‑assigned)
         // ---------------------------------------------------------
+        // Create
         void AddEvChargingSession(EvChargingSession session);
+
+        // Read (single)
+        EvChargingSession? GetEvChargingSession(Guid sessionId);
+
+        // Read (all for vehicle)
+        IEnumerable<EvChargingSession> GetEvChargingSessions(Guid vehicleId);
+
+        // Read (filtered by period)
         IEnumerable<EvChargingSession> GetEvChargingSessions(Guid vehicleId, DateTime start, DateTime end);
 
-        // Unassigned sessions (for reconciliation UI)
-        IEnumerable<EvChargingSession> GetUnassignedEvChargingSessions();
+        // Update
+        void UpdateEvChargingSession(EvChargingSession session);
 
-        // ---------------------------------------------------------
-        // EV CHARGING SESSION VEHICLE DATA (partial + update)
-        // ---------------------------------------------------------
-        void AddEvChargingSessionVehicleData(EvChargingSessionVehicleData data);
-        void UpdateEvChargingSessionVehicleData(EvChargingSessionVehicleData data);
-        IEnumerable<EvChargingSessionVehicleData> GetEvChargingSessionVehicleData(Guid vehicleId, DateTime start, DateTime end);
-        EvChargingSessionVehicleData? GetEvChargingSessionVehicleDataById(Guid id);
-
-        // Link session ↔ vehicle data
-        void AttachVehicleDataToChargingSession(Guid sessionId, Guid vehicleDataId);
-
-        // ---------------------------------------------------------
-        // EV CHARGING COST RECORDS (vehicle attribution)
-        // ---------------------------------------------------------
-        void AddChargingCostRecord(ChargingCostRecord record);
-        IEnumerable<ChargingCostRecord> GetChargingCosts(Guid vehicleId, DateTime start, DateTime end);
+        // Delete (optional)
+        void DeleteEvChargingSession(Guid sessionId);
 
         // ---------------------------------------------------------
         // MAINTENANCE

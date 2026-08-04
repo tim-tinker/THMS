@@ -26,6 +26,7 @@ namespace THMS.UI
             foreach (var form in _dashboards.Values)
             {
                 form.ConfigureAsEmbeddedDashboard();
+                form.Dock = DockStyle.Fill;
                 form.Visible = false;
                 dashboardHostPanel.Controls.Add(form);
                 form.InitializeDashboard();

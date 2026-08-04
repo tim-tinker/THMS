@@ -39,28 +39,21 @@ namespace THMS.UI.WinForms
             ViewModel = new VehicleListViewModel();
             ViewModel.SetStores(_vehicleDataStore, _financeDataStore, _energyDataStore);
             ViewModel.Initialize();
+            vehicleGrid.DataSource = ViewModel.Vehicles;
             RefreshDashboard();
         }
 
         public override void RefreshDashboard()
         {
+            // BindingList notifies the grid on Clear/Add; no DataSource reset needed.
             ViewModel.Activate();
-            LoadVehicles();
-        }
-
-        private void LoadVehicles()
-        {
-            vehicleGrid.DataSource = null;
-            vehicleGrid.DataSource = ViewModel.Vehicles;
         }
 
         private void btnAddVehicle_Click(object sender, EventArgs e)
         {
-            var form = new AddVehicleForm(ViewModel);
-            if (form.ShowDialog(this) == DialogResult.OK)
-            {
-                LoadVehicles();
-            }
+            using var form = new AddVehicleForm(ViewModel);
+            form.ShowDialog(this);
+            // AddVehicle appends to Vehicles; the grid updates via BindingList.
         }
 
         private void btnDetails_Click(object sender, EventArgs e)

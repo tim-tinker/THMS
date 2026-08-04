@@ -201,84 +201,6 @@ namespace THMS.Data.Stores.SQLite
         }
 
         // ---------------------------------------------------------
-        // EV CHARGING SESSION VEHICLE DATA
-        // ---------------------------------------------------------
-
-        public void AddEvChargingSessionVehicleData(EvChargingSessionVehicleData data)
-        {
-            using var conn = OpenConnection();
-
-            // base
-            _mileageRecordTable.Insert(conn, data, "Ev");
-            // derived
-            _evVehicleDataTable.Insert(conn, data);
-        }
-
-        public void UpdateEvChargingSessionVehicleData(EvChargingSessionVehicleData data)
-        {
-            using var conn = OpenConnection();
-
-            // base (Date, OdometerMiles, Notes may change)
-            _mileageRecordTable.Insert(conn, data, "Ev"); // or an UPDATE variant if you prefer
-                                                          // derived
-            _evVehicleDataTable.Update(conn, data);
-        }
-
-        public IEnumerable<EvChargingSessionVehicleData> GetEvChargingSessionVehicleData(Guid id, DateTime start, DateTime end)
-        {
-            using var conn = OpenConnection();
-
-            foreach (var baseRow in _mileageRecordTable.GetRange(conn, id, start, end))
-            {
-                if (baseRow.Type == "Ev")
-                {
-                    var derived = _evVehicleDataTable.GetById(conn, id);
-                    if (derived is not null)
-                    {
-                        var (startTimestamp, startSocPercent, endSocPercent) = derived.Value;
-
-                        yield return new EvChargingSessionVehicleData
-                        {
-                            Id = id,
-                            VehicleId = id,
-                            Date = baseRow.Date,
-                            OdometerMiles = baseRow.OdometerMiles,
-                            Notes = baseRow.Notes,
-                            StartTimestamp = startTimestamp,
-                            StartSocPercent = startSocPercent,
-                            EndSocPercent = endSocPercent
-                        };
-                    }
-                }
-            }
-        }
-
-        public EvChargingSessionVehicleData? GetEvChargingSessionVehicleDataById(Guid id)
-        {
-            using var conn = OpenConnection();
-            return _evVehicleDataTable.GetById(conn, id) is { } derived
-                ? new EvChargingSessionVehicleData
-                {
-                    Id = id,
-                    VehicleId = id,
-                    Date = _mileageRecordTable.GetById(conn, id)?.Date ?? default,
-                    OdometerMiles = _mileageRecordTable.GetById(conn, id)?.OdometerMiles ?? default,
-                    Notes = _mileageRecordTable.GetById(conn, id)?.Notes ?? string.Empty,
-                    StartTimestamp = derived.StartTimestamp,
-                    StartSocPercent = derived.StartSocPercent,
-                    EndSocPercent = derived.EndSocPercent
-                }
-                : null;
-        }
-
-
-        public void AttachVehicleDataToChargingSession(Guid sessionId, Guid vehicleDataId)
-        {
-            using var conn = OpenConnection();
-            _evSessionTable.AttachVehicleData(conn, sessionId, vehicleDataId);
-        }
-
-        // ---------------------------------------------------------
         // EV CHARGING SESSIONS
         // ---------------------------------------------------------
 
@@ -294,26 +216,16 @@ namespace THMS.Data.Stores.SQLite
             return _evSessionTable.GetByVehicleAndRange(conn, vehicleId, start, end).ToList();
         }
 
-        public IEnumerable<EvChargingSession> GetUnassignedEvChargingSessions()
+        public EvChargingSession? GetEvChargingSession(Guid sessionId)
         {
             using var conn = OpenConnection();
-            return _evSessionTable.GetUnassigned(conn).ToList();
+            return _evSessionTable.GetById(conn, sessionId);
         }
 
-        // ---------------------------------------------------------
-        // CHARGING COSTS
-        // ---------------------------------------------------------
-
-        public void AddChargingCostRecord(ChargingCostRecord record)
+        public void UpdateEvChargingSession(EvChargingSession session)
         {
             using var conn = OpenConnection();
-            _chargingCostTable.Insert(conn, record);
-        }
-
-        public IEnumerable<ChargingCostRecord> GetChargingCosts(Guid vehicleId, DateTime start, DateTime end)
-        {
-            using var conn = OpenConnection();
-            return _chargingCostTable.GetRange(conn, vehicleId, start, end).ToList();
+            _evSessionTable.Update(conn, session);
         }
 
         // ---------------------------------------------------------

@@ -15,6 +15,8 @@ namespace THMS.UI.WinForms
         public VehicleDetailForm()
         {
             InitializeComponent();
+
+            _splitFuelMaintenance.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         }
 
         public VehicleDetailForm(IVehicleDataStore store, Guid vehicleId)
@@ -107,7 +109,7 @@ namespace THMS.UI.WinForms
 
         private void btnAddCharging_Click(object sender, EventArgs e)
         {
-            var form = new ChargingCostEntryForm(_vm.VehicleId, _vm);
+            var form = new EvChargeSessionForm(_vm.VehicleId, _vm);
             if (form.ShowDialog(this) == DialogResult.OK)
             {
                 _vm.Refresh();

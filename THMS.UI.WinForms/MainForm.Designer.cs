@@ -40,7 +40,7 @@ namespace THMS.UI
             navigationPanel.Dock = DockStyle.Left;
             navigationPanel.Location = new Point(0, 0);
             navigationPanel.Name = "navigationPanel";
-            navigationPanel.Size = new Size(180, 600);
+            navigationPanel.Size = new Size(180, 999);
             navigationPanel.TabIndex = 1;
             // 
             // _btnFinance
@@ -89,12 +89,12 @@ namespace THMS.UI
             dashboardHostPanel.Dock = DockStyle.Fill;
             dashboardHostPanel.Location = new Point(180, 0);
             dashboardHostPanel.Name = "dashboardHostPanel";
-            dashboardHostPanel.Size = new Size(900, 600);
+            dashboardHostPanel.Size = new Size(1433, 999);
             dashboardHostPanel.TabIndex = 0;
             // 
             // MainForm
             // 
-            ClientSize = new Size(1080, 600);
+            ClientSize = new Size(1613, 999);
             Controls.Add(dashboardHostPanel);
             Controls.Add(navigationPanel);
             Name = "MainForm";

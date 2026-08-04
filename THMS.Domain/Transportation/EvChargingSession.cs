@@ -3,17 +3,23 @@
     public class EvChargingSession
     {
         public Guid Id { get; set; }
+        public Guid VehicleId { get; set; }
 
-        // power data
+        // Basic session data
+        public decimal OdometerMiles { get; set; }
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
-        public decimal KwhAdded { get; set; }
+        public decimal StartSoc { get; set; }
+        public decimal EndSoc { get; set; }
         public bool IsHomeCharging { get; set; }
 
-        // Cost data
-        public decimal? ChargingCost { get; set; }
+        // Source-dependent data (manual for commercial, computed for home)
+        public decimal KwhAdded { get; set; }
+        public decimal ChargingCost { get; set; }
 
-        // FK to vehicle-specific enrichment (nullable until user provides it)
-        public Guid? VehicleDataId { get; set; }
+        // home energy source data (if applicable)
+        public decimal GridKwh { get; set; }
+        public decimal SolarKwh { get; set; }
+        public decimal BatteryKwh { get; set; }
     }
 }

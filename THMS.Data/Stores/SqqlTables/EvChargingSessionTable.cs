@@ -9,12 +9,25 @@ namespace THMS.Data.Stores.SqlTables
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                CREATE TABLE IF NOT EXISTS EvChargingSessions (
-                    Id TEXT PRIMARY KEY,
-                    VehicleDataId TEXT,
-                    StartTime TEXT NOT NULL,
-                    EndTime TEXT NOT NULL
-                );";
+        CREATE TABLE IF NOT EXISTS EvChargingSessions (
+            Id TEXT PRIMARY KEY,
+            VehicleId TEXT NOT NULL,
+
+            OdometerMiles REAL NOT NULL,
+            StartTime TEXT NOT NULL,
+            EndTime TEXT NOT NULL,
+            StartSoc REAL NOT NULL,
+            EndSoc REAL NOT NULL,
+            IsHomeCharging INTEGER NOT NULL,
+
+            KwhAdded REAL NOT NULL,
+            ChargingCost REAL NOT NULL,
+
+            GridKwh REAL NOT NULL,
+            SolarKwh REAL NOT NULL,
+            BatteryKwh REAL NOT NULL
+        );
+    ";
             cmd.ExecuteNonQuery();
         }
 
@@ -22,81 +35,141 @@ namespace THMS.Data.Stores.SqlTables
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO EvChargingSessions
-                (Id, VehicleDataId, StartTime, EndTime)
-                VALUES
-                (@Id, @VehicleDataId, @StartTime, @EndTime);";
+        INSERT INTO EvChargingSessions (
+            Id, VehicleId,
+            OdometerMiles, StartTime, EndTime,
+            StartSoc, EndSoc, IsHomeCharging,
+            KwhAdded, ChargingCost,
+            GridKwh, SolarKwh, BatteryKwh
+        )
+        VALUES (
+            @Id, @VehicleId,
+            @OdometerMiles, @StartTime, @EndTime,
+            @StartSoc, @EndSoc, @IsHomeCharging,
+            @KwhAdded, @ChargingCost,
+            @GridKwh, @SolarKwh, @BatteryKwh
+        );
+    ";
 
             cmd.Parameters.AddWithValue("@Id", session.Id.ToString());
-            cmd.Parameters.AddWithValue("@VehicleDataId",
-                session.VehicleDataId == null || session.VehicleDataId == Guid.Empty
-                    ? (object?)DBNull.Value
-                    : session.VehicleDataId.ToString());
+            cmd.Parameters.AddWithValue("@VehicleId", session.VehicleId.ToString());
+            cmd.Parameters.AddWithValue("@OdometerMiles", session.OdometerMiles);
             cmd.Parameters.AddWithValue("@StartTime", session.StartTime);
             cmd.Parameters.AddWithValue("@EndTime", session.EndTime);
+            cmd.Parameters.AddWithValue("@StartSoc", session.StartSoc);
+            cmd.Parameters.AddWithValue("@EndSoc", session.EndSoc);
+            cmd.Parameters.AddWithValue("@IsHomeCharging", session.IsHomeCharging ? 1 : 0);
+            cmd.Parameters.AddWithValue("@KwhAdded", session.KwhAdded);
+            cmd.Parameters.AddWithValue("@ChargingCost", session.ChargingCost);
+            cmd.Parameters.AddWithValue("@GridKwh", session.GridKwh);
+            cmd.Parameters.AddWithValue("@SolarKwh", session.SolarKwh);
+            cmd.Parameters.AddWithValue("@BatteryKwh", session.BatteryKwh);
 
             cmd.ExecuteNonQuery();
         }
 
-        public IEnumerable<EvChargingSession> GetByVehicleAndRange(SqliteConnection conn, Guid vehicleId, DateTime start, DateTime end)
+        public IEnumerable<EvChargingSession> GetByVehicleAndRange(
+            SqliteConnection conn,
+            Guid vehicleId,
+            DateTime start,
+            DateTime end)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT Id, VehicleDataId, StartTime, EndTime
-                FROM EvChargingSessions
-                WHERE VehicleDataId = @VehicleDataId
-                  AND StartTime >= @Start AND EndTime <= @End
-                ORDER BY StartTime;";
-            cmd.Parameters.AddWithValue("@VehicleDataId", vehicleId.ToString());
+        SELECT *
+        FROM EvChargingSessions
+        WHERE VehicleId = @VehicleId
+          AND StartTime >= @Start
+          AND StartTime <= @End
+        ORDER BY StartTime;
+    ";
+
+            cmd.Parameters.AddWithValue("@VehicleId", vehicleId.ToString());
             cmd.Parameters.AddWithValue("@Start", start);
             cmd.Parameters.AddWithValue("@End", end);
 
             using var reader = cmd.ExecuteReader();
+
+            var list = new List<EvChargingSession>();
             while (reader.Read())
-            {
-                yield return new EvChargingSession
-                {
-                    Id = Guid.Parse(reader.GetString(0)),
-                    VehicleDataId = reader.IsDBNull(1) ? Guid.Empty : Guid.Parse(reader.GetString(1)),
-                    StartTime = reader.GetDateTime(2),
-                    EndTime = reader.GetDateTime(3)
-                };
-            }
+                list.Add(Read(reader));
+
+            return list;
         }
 
-        public IEnumerable<EvChargingSession> GetUnassigned(SqliteConnection conn)
+        public EvChargingSession? GetById(SqliteConnection conn, Guid sessionId)
         {
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                SELECT Id, VehicleDataId, StartTime, EndTime
-                FROM EvChargingSessions
-                WHERE VehicleDataId IS NULL OR VehicleDataId = ''
-                ORDER BY StartTime;";
+            cmd.CommandText = "SELECT * FROM EvChargingSessions WHERE Id = @Id;";
+            cmd.Parameters.AddWithValue("@Id", sessionId.ToString());
 
             using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                yield return new EvChargingSession
-                {
-                    Id = Guid.Parse(reader.GetString(0)),
-                    VehicleDataId = Guid.Empty,
-                    StartTime = reader.GetDateTime(2),
-                    EndTime = reader.GetDateTime(3)
-                };
-            }
+            if (!reader.Read())
+                return null;
+
+            return Read(reader);
         }
 
-        public void AttachVehicleData(SqliteConnection conn, Guid sessionId, Guid vehicleDataId)
+        public void Update(SqliteConnection conn, EvChargingSession session)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                UPDATE EvChargingSessions
-                SET VehicleDataId = @VehicleDataId
-                WHERE Id = @Id;";
-            cmd.Parameters.AddWithValue("@Id", sessionId.ToString());
-            cmd.Parameters.AddWithValue("@VehicleDataId", vehicleDataId.ToString());
+        UPDATE EvChargingSessions SET
+            VehicleId = @VehicleId,
+            OdometerMiles = @OdometerMiles,
+            StartTime = @StartTime,
+            EndTime = @EndTime,
+            StartSoc = @StartSoc,
+            EndSoc = @EndSoc,
+            IsHomeCharging = @IsHomeCharging,
+            KwhAdded = @KwhAdded,
+            ChargingCost = @ChargingCost,
+            GridKwh = @GridKwh,
+            SolarKwh = @SolarKwh,
+            BatteryKwh = @BatteryKwh
+        WHERE Id = @Id;
+    ";
+
+            cmd.Parameters.AddWithValue("@Id", session.Id.ToString());
+            cmd.Parameters.AddWithValue("@VehicleId", session.VehicleId.ToString());
+            cmd.Parameters.AddWithValue("@OdometerMiles", session.OdometerMiles);
+            cmd.Parameters.AddWithValue("@StartTime", session.StartTime);
+            cmd.Parameters.AddWithValue("@EndTime", session.EndTime);
+            cmd.Parameters.AddWithValue("@StartSoc", session.StartSoc);
+            cmd.Parameters.AddWithValue("@EndSoc", session.EndSoc);
+            cmd.Parameters.AddWithValue("@IsHomeCharging", session.IsHomeCharging ? 1 : 0);
+            cmd.Parameters.AddWithValue("@KwhAdded", session.KwhAdded);
+            cmd.Parameters.AddWithValue("@ChargingCost", session.ChargingCost);
+            cmd.Parameters.AddWithValue("@GridKwh", session.GridKwh);
+            cmd.Parameters.AddWithValue("@SolarKwh", session.SolarKwh);
+            cmd.Parameters.AddWithValue("@BatteryKwh", session.BatteryKwh);
 
             cmd.ExecuteNonQuery();
         }
+
+        private EvChargingSession Read(SqliteDataReader reader)
+        {
+            return new EvChargingSession
+            {
+                Id = Guid.Parse(reader["Id"].ToString()!),
+                VehicleId = Guid.Parse(reader["VehicleId"].ToString()!),
+
+                OdometerMiles = Convert.ToDecimal(reader["OdometerMiles"]),
+                StartTime = DateTime.Parse(reader["StartTime"].ToString()!),
+                EndTime = DateTime.Parse(reader["EndTime"].ToString()!),
+
+                StartSoc = Convert.ToDecimal(reader["StartSoc"]),
+                EndSoc = Convert.ToDecimal(reader["EndSoc"]),
+                IsHomeCharging = Convert.ToInt32(reader["IsHomeCharging"]) == 1,
+
+                KwhAdded = Convert.ToDecimal(reader["KwhAdded"]),
+                ChargingCost = Convert.ToDecimal(reader["ChargingCost"]),
+
+                GridKwh = Convert.ToDecimal(reader["GridKwh"]),
+                SolarKwh = Convert.ToDecimal(reader["SolarKwh"]),
+                BatteryKwh = Convert.ToDecimal(reader["BatteryKwh"])
+            };
+        }
+
     }
 }

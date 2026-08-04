@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+﻿using System.ComponentModel;
 using THMS.Data.Stores;
 using THMS.Domain.Transportation;
 using THMS.Logic.Transportation;
@@ -9,11 +9,9 @@ namespace THMS.Logic.ViewModels
     {
         private IVehicleDataStore _vehicleStore = null!;
         private IFinanceDataStore _financeStore = null!;
-        private IEnergyDataStore _energyStore = null!;
         private TransportationCostAggregator _aggregator = null!;
 
-        public ObservableCollection<VehicleListItemViewModel> Vehicles { get; }
-            = new ObservableCollection<VehicleListItemViewModel>();
+        public BindingList<VehicleListItemViewModel> Vehicles { get; } = new();
 
         public DateTime PeriodStart { get; set; }
         public DateTime PeriodEnd { get; set; }
@@ -25,7 +23,6 @@ namespace THMS.Logic.ViewModels
         {
             _vehicleStore = vehicleStore;
             _financeStore = financeStore;
-            _energyStore = energyStore;
             _aggregator = new TransportationCostAggregator(vehicleStore, financeStore);
         }
 
@@ -46,7 +43,7 @@ namespace THMS.Logic.ViewModels
 
         private void Load()
         {
-            if (_vehicleStore == null || _financeStore == null || _energyStore == null || _aggregator == null)
+            if (_vehicleStore == null || _financeStore == null || _aggregator == null)
             {
                 throw new InvalidOperationException("Stores and aggregator must be set before loading data.");
             }
@@ -57,25 +54,30 @@ namespace THMS.Logic.ViewModels
 
             foreach (var v in allVehicles)
             {
-                var item = new VehicleListItemViewModel(
-                    v.Id,
-                    v.Name,
-                    v is VehicleEv);
-
-                var summary = _aggregator.GetCostSummary(
-                    v.Id,
-                    PeriodStart,
-                    PeriodEnd);
-
-                item.ApplySummary(summary);
-
-                Vehicles.Add(item);
+                Vehicles.Add(CreateListItem(v));
             }
         }
 
         public void AddVehicle(VehicleBase vehicle)
         {
             _vehicleStore.AddVehicle(vehicle);
+            Vehicles.Add(CreateListItem(vehicle));
+        }
+
+        private VehicleListItemViewModel CreateListItem(VehicleBase vehicle)
+        {
+            var item = new VehicleListItemViewModel(
+                vehicle.Id,
+                vehicle.Name,
+                vehicle is VehicleEv);
+
+            var summary = _aggregator.GetCostSummary(
+                vehicle.Id,
+                PeriodStart,
+                PeriodEnd);
+
+            item.ApplySummary(summary);
+            return item;
         }
     }
 }

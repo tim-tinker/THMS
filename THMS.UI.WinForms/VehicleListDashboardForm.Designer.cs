@@ -23,61 +23,69 @@
 
         private void InitializeComponent()
         {
-            this.vehicleGrid = new System.Windows.Forms.DataGridView();
-            this.btnAddVehicle = new System.Windows.Forms.Button();
-            this.btnDetails = new System.Windows.Forms.Button();
-            ((System.ComponentModel.ISupportInitialize)(this.vehicleGrid)).BeginInit();
-            this.SuspendLayout();
+            vehicleGrid = new DataGridView();
+            btnAddVehicle = new Button();
+            btnDetails = new Button();
+            ((System.ComponentModel.ISupportInitialize)vehicleGrid).BeginInit();
+            SuspendLayout();
             // 
             // vehicleGrid
             // 
-            this.vehicleGrid.AllowUserToAddRows = false;
-            this.vehicleGrid.AllowUserToDeleteRows = false;
-            this.vehicleGrid.AllowUserToResizeRows = false;
-            this.vehicleGrid.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.vehicleGrid.Location = new System.Drawing.Point(12, 12);
-            this.vehicleGrid.MultiSelect = false;
-            this.vehicleGrid.Name = "vehicleGrid";
-            this.vehicleGrid.ReadOnly = true;
-            this.vehicleGrid.RowHeadersVisible = false;
-            this.vehicleGrid.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.vehicleGrid.Size = new System.Drawing.Size(560, 300);
-            this.vehicleGrid.TabIndex = 0;
+            vehicleGrid.AllowUserToAddRows = false;
+            vehicleGrid.AllowUserToDeleteRows = false;
+            vehicleGrid.AllowUserToResizeRows = false;
+            vehicleGrid.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            vehicleGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            vehicleGrid.Location = new Point(18, 18);
+            vehicleGrid.Margin = new Padding(4, 4, 4, 4);
+            vehicleGrid.MultiSelect = false;
+            vehicleGrid.Name = "vehicleGrid";
+            vehicleGrid.ReadOnly = true;
+            vehicleGrid.RowHeadersVisible = false;
+            vehicleGrid.RowHeadersWidth = 72;
+            vehicleGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            vehicleGrid.Size = new Size(944, 544);
+            vehicleGrid.TabIndex = 0;
             // 
             // btnAddVehicle
             // 
-            this.btnAddVehicle.Location = new System.Drawing.Point(12, 325);
-            this.btnAddVehicle.Name = "btnAddVehicle";
-            this.btnAddVehicle.Size = new System.Drawing.Size(120, 35);
-            this.btnAddVehicle.TabIndex = 1;
-            this.btnAddVehicle.Text = "Add Vehicle";
-            this.btnAddVehicle.UseVisualStyleBackColor = true;
-            this.btnAddVehicle.Click += new System.EventHandler(this.btnAddVehicle_Click);
+            btnAddVehicle.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+            btnAddVehicle.Location = new Point(18, 582);
+            btnAddVehicle.Margin = new Padding(4, 4, 4, 4);
+            btnAddVehicle.Name = "btnAddVehicle";
+            btnAddVehicle.Size = new Size(180, 52);
+            btnAddVehicle.TabIndex = 1;
+            btnAddVehicle.Text = "Add Vehicle";
+            btnAddVehicle.UseVisualStyleBackColor = true;
+            btnAddVehicle.Click += btnAddVehicle_Click;
             // 
             // btnDetails
             // 
-            this.btnDetails.Location = new System.Drawing.Point(452, 325);
-            this.btnDetails.Name = "btnDetails";
-            this.btnDetails.Size = new System.Drawing.Size(120, 35);
-            this.btnDetails.TabIndex = 2;
-            this.btnDetails.Text = "Details";
-            this.btnDetails.UseVisualStyleBackColor = true;
-            this.btnDetails.Click += new System.EventHandler(this.btnDetails_Click);
+            btnDetails.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            btnDetails.Location = new Point(782, 582);
+            btnDetails.Margin = new Padding(4, 4, 4, 4);
+            btnDetails.Name = "btnDetails";
+            btnDetails.Size = new Size(180, 52);
+            btnDetails.TabIndex = 2;
+            btnDetails.Text = "Details";
+            btnDetails.UseVisualStyleBackColor = true;
+            btnDetails.Click += btnDetails_Click;
             // 
-            // VehicleListForm
+            // VehicleListDashboardForm
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(584, 372);
-            this.Controls.Add(this.btnDetails);
-            this.Controls.Add(this.btnAddVehicle);
-            this.Controls.Add(this.vehicleGrid);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
-            this.Name = "VehicleListForm";
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Vehicles";
-            ((System.ComponentModel.ISupportInitialize)(this.vehicleGrid)).EndInit();
-            this.ResumeLayout(false);
+            AutoScaleDimensions = new SizeF(12F, 30F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(980, 652);
+            Controls.Add(btnDetails);
+            Controls.Add(btnAddVehicle);
+            Controls.Add(vehicleGrid);
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            Margin = new Padding(4, 4, 4, 4);
+            Name = "VehicleListDashboardForm";
+            StartPosition = FormStartPosition.CenterParent;
+            Text = "Vehicles";
+            ((System.ComponentModel.ISupportInitialize)vehicleGrid).EndInit();
+            ResumeLayout(false);
 
         }
 

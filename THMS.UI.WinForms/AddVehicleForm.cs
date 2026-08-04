@@ -25,25 +25,25 @@ namespace THMS.UI.WinForms
                 return;
             }
 
-            var vehicle = _checkEv.Checked 
-                ? (VehicleBase) new VehicleEv
-            {
-                Id = Guid.NewGuid(),
-                Name = txtName.Text.Trim(),
-                Make = txtMake.Text.Trim(),
-                Model = txtModel.Text.Trim(),
-                Year = (int)numYear.Value,
-                BatteryCapacityKwh = _numericFuelCapacity.Value
-            }
+            var vehicle = _checkEv.Checked
+                ? (VehicleBase)new VehicleEv
+                {
+                    Id = Guid.NewGuid(),
+                    Name = txtName.Text.Trim(),
+                    Make = txtMake.Text.Trim(),
+                    Model = txtModel.Text.Trim(),
+                    Year = (int)numYear.Value,
+                    BatteryCapacityKwh = _numericFuelCapacity.Value
+                }
                 : new VehicleIce
-            {
-                Id = Guid.NewGuid(),
-                Name = txtName.Text.Trim(),
-                Make = txtMake.Text.Trim(),
-                Model = txtModel.Text.Trim(),
-                Year = (int)numYear.Value,
-                FuelTankCapacityGallons = _numericFuelCapacity.Value
-            };
+                {
+                    Id = Guid.NewGuid(),
+                    Name = txtName.Text.Trim(),
+                    Make = txtMake.Text.Trim(),
+                    Model = txtModel.Text.Trim(),
+                    Year = (int)numYear.Value,
+                    FuelTankCapacityGallons = _numericFuelCapacity.Value
+                };
 
             _vm.AddVehicle(vehicle);
 
@@ -55,6 +55,11 @@ namespace THMS.UI.WinForms
         {
             DialogResult = DialogResult.Cancel;
             Close();
+        }
+
+        private void OnCheckedChangedEv(object sender, EventArgs e)
+        {
+            _labelFuelType.Text = _checkEv.Checked ? "kiloWatt-hours" : "gallons";
         }
     }
 }

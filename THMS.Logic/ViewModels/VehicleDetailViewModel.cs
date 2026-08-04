@@ -68,7 +68,6 @@ namespace THMS.Logic.ViewModels.Transportation
         {
             Vehicle = _store.GetVehicle(VehicleId);
             Mileage = _store.GetMilesDrivenInPeriod(VehicleId, StartTime, EndTime);
-            ChargingCosts = _store.GetChargingCosts(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
             ChargingSessions = _store.GetEvChargingSessions(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
             FuelReceipts = _store.GetIceMileageRecords(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
             MaintenanceInvoices = _store.GetMaintenanceInvoices(VehicleId, StartTime, EndTime).ToList().AsReadOnly();

@@ -115,78 +115,58 @@ namespace THMS.Data.Stores
         // EV CHARGING SESSIONS
         // ---------------------------------------------------------
 
-        public void AddEvChargingSession(EvChargingSession session)
+
+        public EvChargingSession? GetEvChargingSession(Guid sessionId)
         {
-            _evChargingSessions.Add(session);
+            return _evChargingSessions.FirstOrDefault(s => s.Id == sessionId);
         }
 
-        public IEnumerable<EvChargingSession> GetEvChargingSessions(Guid vehicleId, DateTime start, DateTime end)
+        public IEnumerable<EvChargingSession> GetEvChargingSessions(Guid vehicleId)
         {
             return _evChargingSessions
-                .Where(s => s.VehicleDataId == vehicleId && s.StartTime >= start && s.EndTime <= end)
+                .Where(s => s.VehicleId == vehicleId)
                 .OrderBy(s => s.StartTime);
         }
 
-        public IEnumerable<EvChargingSession> GetUnassignedEvChargingSessions()
+        public IEnumerable<EvChargingSession> GetEvChargingSessions(
+            Guid vehicleId,
+            DateTime start,
+            DateTime end)
         {
             return _evChargingSessions
-                .Where(s => s.VehicleDataId == null || s.VehicleDataId == Guid.Empty)
+                .Where(s => s.VehicleId == vehicleId &&
+                            s.StartTime >= start &&
+                            s.StartTime <= end)
                 .OrderBy(s => s.StartTime);
         }
 
-        // ---------------------------------------------------------
-        // EV CHARGING SESSION VEHICLE DATA
-        // ---------------------------------------------------------
-
-        public void AddEvChargingSessionVehicleData(EvChargingSessionVehicleData data)
+        public void UpdateEvChargingSession(EvChargingSession session)
         {
-            _evChargingSessionVehicleData.Add(data);
+            var existing = _evChargingSessions.FirstOrDefault(s => s.Id == session.Id);
+            if (existing == null)
+                return;
+
+            existing.StartTime = session.StartTime;
+            existing.EndTime = session.EndTime;
+            existing.StartSoc = session.StartSoc;
+            existing.EndSoc = session.EndSoc;
+            existing.OdometerMiles = session.OdometerMiles;
+            existing.KwhAdded = session.KwhAdded;
+            existing.IsHomeCharging = session.IsHomeCharging;
+            existing.ChargingCost = session.ChargingCost;
+
+            // Energy attribution
+            existing.GridKwh = session.GridKwh;
+            existing.SolarKwh = session.SolarKwh;
+            existing.BatteryKwh = session.BatteryKwh;
         }
 
-        public void UpdateEvChargingSessionVehicleData(EvChargingSessionVehicleData data)
+        public void DeleteEvChargingSession(Guid sessionId)
         {
-            var existing = _evChargingSessionVehicleData.FirstOrDefault(d => d.Id == data.Id);
-            if (existing is null) return;
-
-            _evChargingSessionVehicleData.Remove(existing);
-            _evChargingSessionVehicleData.Add(data);
+            var existing = _evChargingSessions.FirstOrDefault(s => s.Id == sessionId);
+            if (existing != null)
+                _evChargingSessions.Remove(existing);
         }
-
-        public IEnumerable<EvChargingSessionVehicleData> GetEvChargingSessionVehicleData(Guid vehicleId, DateTime start, DateTime end)
-        {
-            return (from entry in _evChargingSessionVehicleData where entry.VehicleId == vehicleId && entry.Date >= start && entry.Date <= end select entry);
-        }
-
-        public EvChargingSessionVehicleData? GetEvChargingSessionVehicleDataById(Guid id)
-        {
-            return _evChargingSessionVehicleData.FirstOrDefault(d => d.Id == id);
-        }
-
-
-        public void AttachVehicleDataToChargingSession(Guid sessionId, Guid vehicleDataId)
-        {
-            var session = _evChargingSessions.FirstOrDefault(s => s.Id == sessionId);
-            if (session is null) return;
-
-            session.VehicleDataId = vehicleDataId;
-        }
-
-        // ---------------------------------------------------------
-        // EV CHARGING COST RECORDS
-        // ---------------------------------------------------------
-
-        public void AddChargingCostRecord(ChargingCostRecord record)
-        {
-            _chargingCostRecords.Add(record);
-        }
-
-        public IEnumerable<ChargingCostRecord> GetChargingCosts(Guid vehicleId, DateTime start, DateTime end)
-        {
-            return _chargingCostRecords
-                .Where(r => vehicleId == r.VehicleId && r.Timestamp >= start && r.Timestamp <= end)
-                .OrderBy(r => r.Timestamp);
-        }
-
         // ---------------------------------------------------------
         // MAINTENANCE
         // ---------------------------------------------------------

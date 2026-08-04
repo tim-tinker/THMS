@@ -52,7 +52,6 @@ namespace THMS.Logic.Transportation
         {
             // 1. Get enriched EV charging sessions
             var sessions = _vehicleStore.GetEvChargingSessions(vehicle.Id, start, end)
-                .Where(s => s.VehicleDataId != null)
                 .ToList();
 
             // 2. Split home vs commercial
@@ -162,9 +161,6 @@ namespace THMS.Logic.Transportation
             decimal miles = 0;
 
             var validSessions = (from session in sessions
-                                 where session.VehicleDataId != null
-                                 let vehicleData = _vehicleStore.GetEvChargingSessionVehicleDataById(session.VehicleDataId.Value)
-                                 where vehicleData != null && vehicleData.OdometerMiles != null
                                  orderby session.EndTime
                                  select session).ToArray();
 
@@ -180,14 +176,7 @@ namespace THMS.Logic.Transportation
 
         private decimal GetOdometer(EvChargingSession session)
         {
-            decimal odometer = 0;
-            if (session.VehicleDataId != null)
-            {
-                var vd = _vehicleStore.GetEvChargingSessionVehicleDataById(session.VehicleDataId.Value);
-                if (vd is not null && vd.OdometerMiles != null)
-                    odometer = vd.OdometerMiles.Value;
-            }
-
+            decimal odometer = session.OdometerMiles;
             return odometer;
         }
 
