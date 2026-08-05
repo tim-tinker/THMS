@@ -16,9 +16,7 @@ namespace THMS.Data.Stores.SQLite
         private readonly VehicleIceTable _vehicleIceTable = new();
         private readonly VehicleEvTable _vehicleEvTable = new();
         private readonly IceMileageTable _iceMileageTable = new();
-        private readonly EvChargingSessionVehicleDataTable _evVehicleDataTable = new();
         private readonly MileageRecordTable _mileageRecordTable = new();
-        private readonly ChargingCostTable _chargingCostTable = new();
         private readonly MaintenanceInvoiceTable _maintenanceInvoiceTable = new();
         private readonly EvChargingSessionTable _evSessionTable = new();
 
@@ -42,9 +40,7 @@ namespace THMS.Data.Stores.SQLite
             _vehicleIceTable.InitializeSchema(conn);
             _vehicleEvTable.InitializeSchema(conn);
             _iceMileageTable.InitializeSchema(conn);
-            _evVehicleDataTable.InitializeSchema(conn);
             _mileageRecordTable.InitializeSchema(conn);
-            _chargingCostTable.InitializeSchema(conn);
             _maintenanceInvoiceTable.InitializeSchema(conn);
             _evSessionTable.InitializeSchema(conn);
         }
@@ -226,6 +222,12 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _evSessionTable.Update(conn, session);
+        }
+
+        public void DeleteEvChargingSession(Guid sessionId)
+        {
+            using var conn = OpenConnection();
+            _evSessionTable.Delete(conn, sessionId);
         }
 
         // ---------------------------------------------------------

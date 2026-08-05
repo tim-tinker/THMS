@@ -68,15 +68,19 @@
             // 
             // chargingGrid
             // 
+            chargingGrid.AllowUserToAddRows = false;
+            chargingGrid.AllowUserToDeleteRows = false;
             chargingGrid.ColumnHeadersHeight = 40;
             chargingGrid.Dock = DockStyle.Fill;
             chargingGrid.Location = new Point(0, 30);
             chargingGrid.Name = "chargingGrid";
             chargingGrid.ReadOnly = true;
+            chargingGrid.RowHeadersVisible = false;
             chargingGrid.RowHeadersWidth = 72;
             chargingGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            chargingGrid.Size = new Size(996, 50);
+            chargingGrid.Size = new Size(1330, 191);
             chargingGrid.TabIndex = 9;
+            chargingGrid.CellContentDoubleClick += OnCellContentDoubleClickChargingSession;
             // 
             // fuelGrid
             // 
@@ -87,7 +91,7 @@
             fuelGrid.ReadOnly = true;
             fuelGrid.RowHeadersWidth = 72;
             fuelGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            fuelGrid.Size = new Size(996, 114);
+            fuelGrid.Size = new Size(1330, 177);
             fuelGrid.TabIndex = 10;
             // 
             // maintenanceGrid
@@ -99,15 +103,15 @@
             maintenanceGrid.ReadOnly = true;
             maintenanceGrid.RowHeadersWidth = 72;
             maintenanceGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            maintenanceGrid.Size = new Size(996, 233);
+            maintenanceGrid.Size = new Size(1330, 182);
             maintenanceGrid.TabIndex = 11;
             // 
             // btnAddMileage
             // 
             btnAddMileage.Dock = DockStyle.Bottom;
-            btnAddMileage.Location = new Point(0, 144);
+            btnAddMileage.Location = new Point(0, 207);
             btnAddMileage.Name = "btnAddMileage";
-            btnAddMileage.Size = new Size(996, 35);
+            btnAddMileage.Size = new Size(1330, 35);
             btnAddMileage.TabIndex = 12;
             btnAddMileage.Text = "Add Gas";
             btnAddMileage.Click += btnAddMileage_Click;
@@ -115,15 +119,16 @@
             // btnAddCharging
             // 
             btnAddCharging.Dock = DockStyle.Bottom;
-            btnAddCharging.Location = new Point(0, 80);
+            btnAddCharging.Location = new Point(0, 221);
             btnAddCharging.Name = "btnAddCharging";
-            btnAddCharging.Size = new Size(996, 35);
+            btnAddCharging.Size = new Size(1330, 35);
             btnAddCharging.TabIndex = 13;
-            btnAddCharging.Text = "Add Charging Cost";
+            btnAddCharging.Text = "Add Charging Session";
             btnAddCharging.Click += btnAddCharging_Click;
             // 
             // _splitFuelMaintenance
             // 
+            _splitFuelMaintenance.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             _splitFuelMaintenance.Location = new Point(12, 186);
             _splitFuelMaintenance.Name = "_splitFuelMaintenance";
             _splitFuelMaintenance.Orientation = Orientation.Horizontal;
@@ -137,8 +142,8 @@
             _splitFuelMaintenance.Panel2.Controls.Add(maintenanceGrid);
             _splitFuelMaintenance.Panel2.Controls.Add(_btnAddInvoice);
             _splitFuelMaintenance.Panel2.Controls.Add(label2);
-            _splitFuelMaintenance.Size = new Size(996, 605);
-            _splitFuelMaintenance.SplitterDistance = 298;
+            _splitFuelMaintenance.Size = new Size(1330, 758);
+            _splitFuelMaintenance.SplitterDistance = 502;
             _splitFuelMaintenance.TabIndex = 19;
             // 
             // _splitFuelCharge
@@ -159,8 +164,8 @@
             _splitFuelCharge.Panel2.Controls.Add(chargingGrid);
             _splitFuelCharge.Panel2.Controls.Add(label4);
             _splitFuelCharge.Panel2.Controls.Add(btnAddCharging);
-            _splitFuelCharge.Size = new Size(996, 298);
-            _splitFuelCharge.SplitterDistance = 179;
+            _splitFuelCharge.Size = new Size(1330, 502);
+            _splitFuelCharge.SplitterDistance = 242;
             _splitFuelCharge.TabIndex = 0;
             // 
             // label3
@@ -186,9 +191,9 @@
             // _btnAddInvoice
             // 
             _btnAddInvoice.Dock = DockStyle.Bottom;
-            _btnAddInvoice.Location = new Point(0, 263);
+            _btnAddInvoice.Location = new Point(0, 212);
             _btnAddInvoice.Name = "_btnAddInvoice";
-            _btnAddInvoice.Size = new Size(996, 40);
+            _btnAddInvoice.Size = new Size(1330, 40);
             _btnAddInvoice.TabIndex = 13;
             _btnAddInvoice.Text = "Add Invoice";
             _btnAddInvoice.UseVisualStyleBackColor = true;
@@ -254,12 +259,11 @@
             // 
             // VehicleDetailForm
             // 
-            ClientSize = new Size(1020, 803);
+            ClientSize = new Size(1354, 956);
             Controls.Add(groupBox1);
             Controls.Add(_splitFuelMaintenance);
             Controls.Add(lblName);
             Controls.Add(lblMakeModelYear);
-            FormBorderStyle = FormBorderStyle.FixedDialog;
             Name = "VehicleDetailForm";
             StartPosition = FormStartPosition.CenterParent;
             Text = "Vehicle Details";

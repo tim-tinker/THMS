@@ -30,9 +30,6 @@ namespace THMS.Data.Stores
         // Read (single)
         EvChargingSession? GetEvChargingSession(Guid sessionId);
 
-        // Read (all for vehicle)
-        IEnumerable<EvChargingSession> GetEvChargingSessions(Guid vehicleId);
-
         // Read (filtered by period)
         IEnumerable<EvChargingSession> GetEvChargingSessions(Guid vehicleId, DateTime start, DateTime end);
 

@@ -1,24 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Text;
-using THMS.Data.Stores;
+﻿using THMS.Data.Stores;
 using THMS.Domain.Energy;
 using THMS.Domain.Transportation;
 
 namespace THMS.Logic.ViewModels
 {
-    public class EvChargeSessionViewModel : INotifyPropertyChanged
+    public class EvChargeSessionViewModel
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
+        private const decimal WhPerGasGallon = 33700m;
 
         private readonly IVehicleDataStore _vehicleStore;
         private readonly Guid _vehicleId;
         private readonly VehicleEv _vehicle;
 
+        public decimal BatteryCapacityKwh => _vehicle.BatteryCapacityKwh;
+
         // For “previous session” context
-        public decimal? LastOdometer { get; }
-        public decimal? LastSoc { get; }
+        public decimal LastOdometer { get; private set; }
+        public decimal LastSoc { get; private set; }
 
         // Session identity
         public Guid? SessionId { get; private set; }
@@ -32,75 +30,78 @@ namespace THMS.Logic.ViewModels
         public decimal EndSoc { get; set; }
         public bool IsHomeCharging { get; set; }
         public decimal KwhAdded { get; set; }          // manual or from circuit file
-        public decimal? SessionCost { get; set; }      // manual (commercial) or computed (home)
+        public decimal SessionCost { get; set; }       // manual (commercial) or computed (home)
 
         // Derived metrics
-        public decimal MilesUsed => LastOdometer.HasValue && Odometer > LastOdometer.Value
-            ? Odometer - LastOdometer.Value
+        public decimal MilesUsed => 0 > LastOdometer && Odometer > LastOdometer
+            ? Odometer - LastOdometer
             : 0;
 
-        public decimal SocUsed => LastSoc.HasValue && StartSoc > LastSoc.Value
-            ? StartSoc - LastSoc.Value
+        public decimal SocUsed => 0 < LastSoc && StartSoc < LastSoc
+            ? LastSoc - StartSoc
             : 0;
-
-        public decimal SocAdded => EndSoc > StartSoc
-            ? EndSoc - StartSoc
-            : 0;
-
-        public decimal BatteryCapacityKwh => _vehicle.BatteryCapacityKwh;
 
         public decimal KwhUsed => SocUsed * BatteryCapacityKwh / 100m;
 
         public decimal WhPerMile => MilesUsed > 0 ? KwhUsed * 1000m / MilesUsed : 0;
 
-        private const decimal WhPerGasGallon = 33700m;
         public decimal Mpge => WhPerMile > 0 ? WhPerGasGallon / WhPerMile : 0;
+
+        public decimal SocAdded => EndSoc > StartSoc
+            ? EndSoc - StartSoc
+            : 0;
+
+        public decimal CostPerMile => 0 < SessionCost && 0 < KwhAdded && 0 < WhPerMile
+            ? SessionCost / KwhAdded * WhPerMile / 1000
+            : 0;
 
         // EV-specific energy attribution
         public decimal GridKwh { get; set; }
         public decimal SolarKwh { get; set; }
         public decimal BatteryKwh { get; set; }
 
-        public decimal CostPerMile => MilesUsed > 0 && SessionCost.HasValue
-            ? SessionCost.Value / MilesUsed
-            : 0;
-
         public EvChargeSessionViewModel(
             IVehicleDataStore vehicleStore,
             Guid vehicleId,
             VehicleEv vehicle,
-            decimal? lastOdometer,
-            decimal? lastSoc,
+            decimal lastOdometer,
+            decimal lastSoc,
             EvChargingSession? existingSession = null)
         {
             _vehicleStore = vehicleStore;
             _vehicleId = vehicleId;
             _vehicle = vehicle;
-            LastOdometer = lastOdometer;
-            LastSoc = lastSoc;
 
-            if (existingSession != null)
-                LoadFromDomain(existingSession);
+            if (existingSession is null)
+            {
+                InitializeDefaults(lastOdometer, lastSoc);
+            }
             else
-                InitializeDefaults();
+            {
+                LoadFromDomain(existingSession);
+            }
         }
 
-        private void InitializeDefaults()
+        private void InitializeDefaults(decimal lastOdometer, decimal lastSoc)
         {
             var now = DateTime.Now;
+            LastOdometer = lastOdometer;
+            LastSoc = lastSoc;
+            Odometer = LastOdometer;
             StartTime = now;
             EndTime = now;
-            Odometer = LastOdometer ?? 0;
-            StartSoc = LastSoc ?? 0;
+            StartSoc = LastSoc;
             EndSoc = StartSoc;
-            IsHomeCharging = true;
+            IsHomeCharging = false;
             KwhAdded = 0;
-            SessionCost = null;
+            SessionCost = 0;
         }
 
         private void LoadFromDomain(EvChargingSession s)
         {
             SessionId = s.Id;
+            LastOdometer = s.LastOdometer;
+            LastSoc = s.LastSoc;
             Odometer = s.OdometerMiles;
             StartTime = s.StartTime;
             EndTime = s.EndTime;
@@ -124,14 +125,17 @@ namespace THMS.Logic.ViewModels
             KwhAdded = summary.TotalKwh;
         }
 
-        public void Save()
+        public EvChargingSession Save()
         {
+            EvChargingSession session;
             if (IsNew)
             {
-                var session = new EvChargingSession
+                session = new EvChargingSession
                 {
                     Id = Guid.NewGuid(),
                     VehicleId = _vehicleId,
+                    LastOdometer = LastOdometer,
+                    LastSoc = LastSoc,
                     OdometerMiles = Odometer,
                     StartTime = StartTime,
                     EndTime = EndTime,
@@ -150,26 +154,26 @@ namespace THMS.Logic.ViewModels
             }
             else
             {
-                var session = _vehicleStore.GetEvChargingSession(SessionId!.Value);
-                if (session == null) return;
+                var existing = _vehicleStore.GetEvChargingSession(SessionId!.Value)
+                    ?? throw new InvalidOperationException("Charging session was not found.");
 
-                session.OdometerMiles = Odometer;
-                session.StartTime = StartTime;
-                session.EndTime = EndTime;
-                session.StartSoc = StartSoc;
-                session.EndSoc = EndSoc;
-                session.IsHomeCharging = IsHomeCharging;
-                session.KwhAdded = KwhAdded;
-                session.ChargingCost = SessionCost;
-                session.GridKwh = GridKwh;
-                session.SolarKwh = SolarKwh;
-                session.BatteryKwh = BatteryKwh;
+                // user cannot edit last odometer or last soc, so we don't update those
+                existing.OdometerMiles = Odometer;
+                existing.StartTime = StartTime;
+                existing.EndTime = EndTime;
+                existing.StartSoc = StartSoc;
+                existing.EndSoc = EndSoc;
+                existing.IsHomeCharging = IsHomeCharging;
+                existing.KwhAdded = KwhAdded;
+                existing.ChargingCost = SessionCost;
+                existing.GridKwh = GridKwh;
+                existing.SolarKwh = SolarKwh;
+                existing.BatteryKwh = BatteryKwh;
 
-                _vehicleStore.UpdateEvChargingSession(session);
+                _vehicleStore.UpdateEvChargingSession(existing);
+                session = existing;
             }
+            return session;
         }
-
-        private void OnChanged(string name)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 }

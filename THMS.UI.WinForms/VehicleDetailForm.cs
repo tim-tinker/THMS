@@ -11,6 +11,7 @@ namespace THMS.UI.WinForms
     {
         private readonly VehicleDetailViewModel _vm;
         private bool _syncingDates;
+        private bool _chargingGridBound;
 
         public VehicleDetailForm()
         {
@@ -47,6 +48,7 @@ namespace THMS.UI.WinForms
             _vm.EndTime = EndOfDay(end);
 
             LoadVehicle();
+            BindChargingGrid();
             LoadGrids();
         }
 
@@ -66,16 +68,26 @@ namespace THMS.UI.WinForms
             }
         }
 
+        private void BindChargingGrid()
+        {
+            if (_chargingGridBound)
+                return;
+
+            chargingGrid.AutoGenerateColumns = true;
+            chargingGrid.DataSource = _vm.ChargingSessions;
+            HideChargingGridColumn("Id");
+            HideChargingGridColumn("VehicleId");
+            _chargingGridBound = true;
+        }
+
+        private void HideChargingGridColumn(string dataPropertyName)
+        {
+            if (chargingGrid.Columns[dataPropertyName] is DataGridViewColumn column)
+                column.Visible = false;
+        }
+
         private void LoadGrids()
         {
-            chargingGrid.DataSource = _vm.ChargingCosts
-                .Select(c => new
-                {
-                    c.Timestamp,
-                    c.Cost
-                })
-                .ToList();
-
             fuelGrid.DataSource = _vm.FuelReceipts
                 .Select(f => new
                 {
@@ -109,11 +121,40 @@ namespace THMS.UI.WinForms
 
         private void btnAddCharging_Click(object sender, EventArgs e)
         {
-            var form = new EvChargeSessionForm(_vm.VehicleId, _vm);
-            if (form.ShowDialog(this) == DialogResult.OK)
+            var last = _vm.GetLatestChargingSession();
+
+            using var form = new EvChargeSessionForm(
+                _vm.VehicleId,
+                _vm,
+                last?.OdometerMiles ?? 0,
+                last?.EndSoc ?? 0,
+                existingSession: null);
+
+            if (form.ShowDialog(this) == DialogResult.OK && form.SavedSession != null)
             {
-                _vm.Refresh();
-                LoadGrids();
+                _vm.UpsertChargingSession(form.SavedSession);
+            }
+        }
+
+        private void OnCellContentDoubleClickChargingSession(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0)
+                return;
+
+            var row = chargingGrid.Rows[e.RowIndex];
+            var session = row.DataBoundItem as EvChargingSession;
+            if (session is null)
+                return;
+
+            using var form = new EvChargeSessionForm(
+                _vm.VehicleId,
+                _vm,
+                session.LastOdometer, session.LastSoc,
+                existingSession: session);
+
+            if (form.ShowDialog(this) == DialogResult.OK && form.SavedSession != null)
+            {
+                _vm.UpsertChargingSession(form.SavedSession);
             }
         }
 

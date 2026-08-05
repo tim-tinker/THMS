@@ -5,6 +5,10 @@
         public Guid Id { get; set; }
         public Guid VehicleId { get; set; }
 
+        // Previous session context (must be persisted)
+        public decimal LastOdometer { get; set; }
+        public decimal LastSoc { get; set; }
+
         // Basic session data
         public decimal OdometerMiles { get; set; }
         public DateTime StartTime { get; set; }

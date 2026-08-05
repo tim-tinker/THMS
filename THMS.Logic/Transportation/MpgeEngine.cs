@@ -24,18 +24,19 @@ namespace THMS.Logic.Transportation
 
         public MpgeResult Compute(Guid vehicleId, DateTime start, DateTime end)
         {
+            var result = new MpgeResult();
+
             // ---------------------------------------------------------
             // 1. Get EV mileage records (only those with odometer)
             // ---------------------------------------------------------
             var evMileage = _vehicleStore
-                .GetEvChargingSessionVehicleData(vehicleId, start, end)
-                .Where(r => r.VehicleId == vehicleId && r.OdometerMiles.HasValue)
-                .OrderBy(r => r.Date)
+                .GetEvChargingSessions(vehicleId, start, end)
+                .OrderBy(r => r.StartTime)
                 .ToList();
 
             if (evMileage.Count < 2)
             {
-                return new MpgeResult
+                result = new MpgeResult
                 {
                     VehicleId = vehicleId,
                     StartDate = start,
@@ -44,44 +45,48 @@ namespace THMS.Logic.Transportation
                     WhUsed = 0m,
                 };
             }
-
-            decimal startMiles = evMileage.First().OdometerMiles!.Value;
-            decimal endMiles = evMileage.Last().OdometerMiles!.Value;
-            decimal milesDriven = endMiles - startMiles;
-
-            // ---------------------------------------------------------
-            // 2. Get EV energy attribution in the date range
-            // ---------------------------------------------------------
-            var energyAttr = _energyAttributionEngine
-                .ComputeAttribution(start, end)
-                .ToList();
-
-            decimal totalWh = energyAttr.Sum(a => a.EvChargingWh);
-            decimal totalKwh = totalWh / 1000m;
-
-            // ---------------------------------------------------------
-            // 3. Convert kWh → gallon equivalent
-            // ---------------------------------------------------------
-            decimal gallonEquivalent = totalKwh / KwhPerGallonEquivalent;
-
-            // ---------------------------------------------------------
-            // 4. Compute MPGe
-            // ---------------------------------------------------------
-            decimal mpge = gallonEquivalent > 0m
-                ? milesDriven / gallonEquivalent
-                : 0m;
-
-            // ---------------------------------------------------------
-            // 6. Return result
-            // ---------------------------------------------------------
-            return new MpgeResult
+            else
             {
-                VehicleId = vehicleId,
-                StartDate = start,
-                EndDate = end,
-                MilesDriven = milesDriven,
-                WhUsed = totalWh,
-            };
+                decimal startMiles = evMileage.First().OdometerMiles;
+                decimal endMiles = evMileage.Last().OdometerMiles;
+                decimal milesDriven = endMiles - startMiles;
+
+                // ---------------------------------------------------------
+                // 2. Get EV energy attribution in the date range
+                // ---------------------------------------------------------
+                var energyAttr = _energyAttributionEngine
+                    .ComputeAttribution(start, end)
+                    .ToList();
+
+                decimal totalWh = energyAttr.Sum(a => a.EvChargingWh);
+                decimal totalKwh = totalWh / 1000m;
+
+                // ---------------------------------------------------------
+                // 3. Convert kWh → gallon equivalent
+                // ---------------------------------------------------------
+                decimal gallonEquivalent = totalKwh / KwhPerGallonEquivalent;
+
+                // ---------------------------------------------------------
+                // 4. Compute MPGe
+                // ---------------------------------------------------------
+                decimal mpge = gallonEquivalent > 0m
+                    ? milesDriven / gallonEquivalent
+                    : 0m;
+
+                // ---------------------------------------------------------
+                // 6. Return result
+                // ---------------------------------------------------------
+                result = new MpgeResult
+                {
+                    VehicleId = vehicleId,
+                    StartDate = start,
+                    EndDate = end,
+                    MilesDriven = milesDriven,
+                    WhUsed = totalWh,
+                };
+            }
+
+            return result;
         }
     }
 }

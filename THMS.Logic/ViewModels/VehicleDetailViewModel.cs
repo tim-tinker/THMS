@@ -59,8 +59,7 @@ namespace THMS.Logic.ViewModels.Transportation
 
         public VehicleBase? Vehicle { get; private set; }
         public decimal Mileage { get; private set; } = 0m;
-        public IReadOnlyCollection<ChargingCostRecord> ChargingCosts { get; private set; } = Array.Empty<ChargingCostRecord>();
-        public IReadOnlyCollection<EvChargingSession> ChargingSessions { get; private set; } = Array.Empty<EvChargingSession>();
+        public BindingList<EvChargingSession> ChargingSessions { get; } = new();
         public IReadOnlyCollection<IceMileageRecord> FuelReceipts { get; private set; } = Array.Empty<IceMileageRecord>();
         public IReadOnlyCollection<MaintenanceInvoiceRecord> MaintenanceInvoices { get; private set; } = Array.Empty<MaintenanceInvoiceRecord>();
 
@@ -68,9 +67,54 @@ namespace THMS.Logic.ViewModels.Transportation
         {
             Vehicle = _store.GetVehicle(VehicleId);
             Mileage = _store.GetMilesDrivenInPeriod(VehicleId, StartTime, EndTime);
-            ChargingSessions = _store.GetEvChargingSessions(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
+
+            ChargingSessions.Clear();
+            foreach (var session in _store.GetEvChargingSessions(VehicleId, StartTime, EndTime))
+                ChargingSessions.Add(session);
+
             FuelReceipts = _store.GetIceMileageRecords(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
             MaintenanceInvoices = _store.GetMaintenanceInvoices(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
+        }
+
+        public EvChargingSession? GetLatestChargingSession()
+        {
+            return _store
+                .GetEvChargingSessions(VehicleId, DateTime.MinValue, DateTime.MaxValue)
+                .OrderBy(s => s.StartTime)
+                .LastOrDefault();
+        }
+
+        /// <summary>
+        /// Inserts or replaces a session in the bound list when it falls inside the
+        /// current date filter. Outside the filter, an existing row is removed.
+        /// </summary>
+        public void UpsertChargingSession(EvChargingSession session)
+        {
+            var index = IndexOfSession(session.Id);
+            var inRange = session.StartTime >= StartTime && session.StartTime <= EndTime;
+
+            if (index >= 0)
+            {
+                if (inRange)
+                    ChargingSessions[index] = session;
+                else
+                    ChargingSessions.RemoveAt(index);
+            }
+            else if (inRange)
+            {
+                ChargingSessions.Add(session);
+            }
+        }
+
+        private int IndexOfSession(Guid sessionId)
+        {
+            for (var i = 0; i < ChargingSessions.Count; i++)
+            {
+                if (ChargingSessions[i].Id == sessionId)
+                    return i;
+            }
+
+            return -1;
         }
 
         private void RaiseChanged(string propertyName)

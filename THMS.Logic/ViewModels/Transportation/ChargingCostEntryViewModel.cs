@@ -27,7 +27,7 @@ namespace THMS.Logic.ViewModels.Transportation
                 Cost = Cost
             };
 
-            _store.AddChargingCostRecord(record);
+            //_store.AddChargingCostRecord(record);
         }
     }
 }

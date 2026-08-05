@@ -115,17 +115,14 @@ namespace THMS.Data.Stores
         // EV CHARGING SESSIONS
         // ---------------------------------------------------------
 
+        public void AddEvChargingSession(EvChargingSession session)
+        {
+            _evChargingSessions.Add(session);
+        }
 
         public EvChargingSession? GetEvChargingSession(Guid sessionId)
         {
             return _evChargingSessions.FirstOrDefault(s => s.Id == sessionId);
-        }
-
-        public IEnumerable<EvChargingSession> GetEvChargingSessions(Guid vehicleId)
-        {
-            return _evChargingSessions
-                .Where(s => s.VehicleId == vehicleId)
-                .OrderBy(s => s.StartTime);
         }
 
         public IEnumerable<EvChargingSession> GetEvChargingSessions(
