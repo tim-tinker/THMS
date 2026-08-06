@@ -63,7 +63,7 @@ namespace THMS.Logic.Transportation
 
             // 4. Commercial charging cost (direct)
             var commercialCost = commercialSessions
-                .Sum(s => s.ChargingCost);
+                .Sum(s => s.SessionCost);
 
             // 5. Total EV miles
             var miles = ComputeEvMiles(sessions);

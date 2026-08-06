@@ -75,7 +75,7 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@IsHomeCharging", session.IsHomeCharging ? 1 : 0);
 
             cmd.Parameters.AddWithValue("@KwhAdded", session.KwhAdded);
-            cmd.Parameters.AddWithValue("@ChargingCost", session.ChargingCost);
+            cmd.Parameters.AddWithValue("@ChargingCost", session.SessionCost);
 
             cmd.Parameters.AddWithValue("@GridKwh", session.GridKwh);
             cmd.Parameters.AddWithValue("@SolarKwh", session.SolarKwh);
@@ -175,7 +175,7 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@IsHomeCharging", session.IsHomeCharging ? 1 : 0);
 
             cmd.Parameters.AddWithValue("@KwhAdded", session.KwhAdded);
-            cmd.Parameters.AddWithValue("@ChargingCost", session.ChargingCost);
+            cmd.Parameters.AddWithValue("@ChargingCost", session.SessionCost);
 
             cmd.Parameters.AddWithValue("@GridKwh", session.GridKwh);
             cmd.Parameters.AddWithValue("@SolarKwh", session.SolarKwh);
@@ -216,7 +216,7 @@ namespace THMS.Data.Stores.SqlTables
                 IsHomeCharging = Convert.ToInt32(reader["IsHomeCharging"]) == 1,
 
                 KwhAdded = Convert.ToDecimal(reader["KwhAdded"]),
-                ChargingCost = Convert.ToDecimal(reader["ChargingCost"]),
+                SessionCost = Convert.ToDecimal(reader["ChargingCost"]),
 
                 GridKwh = Convert.ToDecimal(reader["GridKwh"]),
                 SolarKwh = Convert.ToDecimal(reader["SolarKwh"]),

@@ -19,7 +19,7 @@
 
         // Source-dependent data (manual for commercial, computed for home)
         public decimal KwhAdded { get; set; }
-        public decimal ChargingCost { get; set; }
+        public decimal SessionCost { get; set; }
 
         // home energy source data (if applicable)
         public decimal GridKwh { get; set; }

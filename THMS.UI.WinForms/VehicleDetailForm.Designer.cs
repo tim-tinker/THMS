@@ -80,7 +80,7 @@
             chargingGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             chargingGrid.Size = new Size(1330, 191);
             chargingGrid.TabIndex = 9;
-            chargingGrid.CellContentDoubleClick += OnCellContentDoubleClickChargingSession;
+            chargingGrid.CellDoubleClick += OnCellDoubleClickChargingSession;
             // 
             // fuelGrid
             // 

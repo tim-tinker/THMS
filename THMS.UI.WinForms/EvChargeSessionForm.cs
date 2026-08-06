@@ -1,19 +1,11 @@
 ﻿using System.Globalization;
-using System.Linq.Expressions;
-using System.Windows.Forms.DataVisualization.Charting;
 using THMS.Domain.Transportation;
-using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Transportation;
 
 namespace THMS.UI.WinForms
 {
     public partial class EvChargeSessionForm : Form
     {
-        private const decimal _whPerGasGallon = 33700;
-
-        private Guid _vehicleId;
-        private VehicleDetailViewModel _vm = null!;
-
         private VehicleEv _vehicle = null!;
         protected VehicleEv Vehicle
         {
@@ -21,187 +13,12 @@ namespace THMS.UI.WinForms
         }
 
         private readonly EvChargeSessionViewModel _sessionVM = null!;
+        private bool _loadingControls;
 
         /// <summary>Session written on Save; null if the dialog was cancelled.</summary>
         public EvChargingSession? SavedSession { get; private set; }
 
         protected decimal BatteryCapacityKwh => _vehicle?.BatteryCapacityKwh ?? 0;
-
-        private decimal _lastOdometer;
-        protected decimal LastOdometer
-        {
-            get => _lastOdometer;
-            set
-            {
-                _lastOdometer = value;
-                _textLastOdometer.Text = $"{_lastOdometer}";
-            }
-        }
-
-        private decimal _lastSoc;
-        protected decimal LastSoc
-        {
-            get => _lastSoc;
-            set
-            {
-                _lastSoc = value;
-                _textLastSoc.Text = $"{_lastSoc}";
-            }
-        }
-
-        private decimal _odometer;
-        protected decimal Odometer
-        {
-            get => _odometer;
-            set
-            {
-                _odometer = value;
-                _numOdometer.Value = value;
-            }
-        }
-
-        private decimal _milesUsed;
-        protected decimal MilesUsed
-        {
-            get => _milesUsed;
-            set
-            {
-                _milesUsed = value;
-                _textMilesUsed.Text = $"{_milesUsed:0}";
-                UpdateConsumption();
-            }
-        }
-
-        private decimal _startSoc;
-        protected decimal StartSoc
-        {
-            get => _startSoc;
-            set
-            {
-                _startSoc = value;
-                _numStartSoc.Value = value;
-            }
-        }
-
-        private decimal _socUsed;
-        protected decimal SocUsed
-        {
-            get => _socUsed;
-            set
-            {
-                _socUsed = value;
-                _textSocUsed.Text = $"{_socUsed:0}";
-                UpdateConsumption();
-            }
-        }
-
-        private decimal _endSoc;
-        protected decimal EndSoc
-        {
-            get => _endSoc;
-            set
-            {
-                _endSoc = value;
-                _numEndSoc.Value = value;
-            }
-        }
-
-        private decimal _socAdded;
-        protected decimal SocAdded
-        {
-            get => _socAdded;
-            set
-            {
-                _socAdded = value;
-                _textSocAdded.Text = $"{_socAdded:0}";
-                UpdateConsumption();
-            }
-        }
-
-        private decimal _gridKwh;
-        protected decimal GridKwh
-        {
-            get => _gridKwh;
-            set
-            {
-                _gridKwh = value;
-                _textGridKwh.Text = $"{_gridKwh:0.000}";
-                UpdateConsumption();
-            }
-        }
-
-        private decimal _solarKwh;
-        protected decimal SolarKwh
-        {
-            get => _solarKwh;
-            set
-            {
-                _solarKwh = value;
-                _textSolarKwh.Text = $"{_solarKwh:0.000}";
-                UpdateConsumption();
-            }
-        }
-
-        private decimal _batteryKwh;
-        protected decimal BatteryKwh
-        {
-            get => _batteryKwh;
-            set
-            {
-                _batteryKwh = value;
-                _textBatteryKwh.Text = $"{_batteryKwh:0.000}";
-                UpdateConsumption();
-            }
-        }
-
-        private decimal _sessionCost;
-        protected decimal SessionCost
-        {
-            get => _sessionCost;
-            set
-            {
-                _sessionCost = value;
-                _numSessionCost.Value = _sessionCost;
-            }
-        }
-
-        private decimal _kwhAdded;
-        protected decimal KwhAdded
-        {
-            get => _kwhAdded;
-            set
-            {
-                _kwhAdded = value;
-                _numKwhAdded.Value = ClampToNumeric(_numKwhAdded, _kwhAdded);
-                UpdateConsumption();
-            }
-        }
-
-        private decimal _costPerMile;
-        protected decimal CostPerMile
-        {
-            get => _costPerMile;
-            set
-            {
-                _costPerMile = value;
-                _textCostPerMile.Text = $"{_costPerMile:0.00}";
-            }
-        }
-
-        protected decimal KwhUsed
-        {
-            get => SocUsed * BatteryCapacityKwh / 100;
-        }
-
-        protected decimal WhPerMile
-        {
-            get => 0 < _milesUsed ? KwhUsed * 1000 / _milesUsed : 0;
-        }
-
-        protected decimal MilesPerGallonEquivalent
-        {
-            get => 0 < WhPerMile ? _whPerGasGallon / WhPerMile : 0;
-        }
 
         public EvChargeSessionForm()
         {
@@ -211,10 +28,8 @@ namespace THMS.UI.WinForms
         public EvChargeSessionForm(Guid vehicleId, VehicleDetailViewModel vm, decimal lastOdometer, decimal lastSoc, EvChargingSession? existingSession = null)
             : this()
         {
-            _vehicleId = vehicleId;
-            _vm = vm;
             Vehicle = vm.Vehicle as VehicleEv ?? throw new ArgumentException("Vehicle is not an EV.", nameof(vm));
-            _sessionVM = new EvChargeSessionViewModel(vm.Store, vehicleId, Vehicle, lastOdometer, lastSoc, existingSession);
+            _sessionVM = new EvChargeSessionViewModel(vm.VehicleStore, vm.EnergyStore, vehicleId, Vehicle, lastOdometer, lastSoc, existingSession);
         }
 
         private void OnLoadForm(object sender, EventArgs e)
@@ -225,23 +40,35 @@ namespace THMS.UI.WinForms
 
         private void LoadControlsFromViewModel()
         {
-            LastOdometer = _sessionVM.LastOdometer;
-            LastSoc = _sessionVM.LastSoc;
-            _numOdometer.Value = ClampToNumeric(_numOdometer, _sessionVM.Odometer);
-            _dateStart.Value = ClampToPicker(_sessionVM.StartTime);
-            _timeStart.Value = ClampToPicker(_sessionVM.StartTime);
-            _dateEnd.Value = ClampToPicker(_sessionVM.EndTime);
-            _timeEnd.Value = ClampToPicker(_sessionVM.EndTime);
-            _numStartSoc.Value = ClampToNumeric(_numStartSoc, _sessionVM.StartSoc);
-            _numEndSoc.Value = ClampToNumeric(_numEndSoc, _sessionVM.EndSoc);
-            _checkHomeCharger.Checked = _sessionVM.IsHomeCharging;
-            _numKwhAdded.Value = ClampToNumeric(_numKwhAdded, _sessionVM.KwhAdded);
-            _numSessionCost.Value = ClampToNumeric(_numSessionCost, _sessionVM.SessionCost);
-            GridKwh = _sessionVM.GridKwh;
-            SolarKwh = _sessionVM.SolarKwh;
-            BatteryKwh = _sessionVM.BatteryKwh;
+            _loadingControls = true;
+            try
+            {
+                _numLastOdometer.Value = _sessionVM.LastOdometer;
+                _numLastSoc.Value = _sessionVM.LastSoc;
+                _numOdometer.Value = ClampToNumeric(_numOdometer, _sessionVM.Odometer);
+                _dateStart.Value = ClampToPicker(_sessionVM.StartTime);
+                _timeStart.Value = ClampToPicker(_sessionVM.StartTime);
+                _dateEnd.Value = ClampToPicker(_sessionVM.EndTime);
+                _timeEnd.Value = ClampToPicker(_sessionVM.EndTime);
 
-            EnableHomeControls(false);
+                _numStartSoc.Value = ClampToNumeric(_numStartSoc, _sessionVM.StartSoc);
+                _numEndSoc.Value = ClampToNumeric(_numEndSoc, _sessionVM.EndSoc);
+
+                _checkHomeCharger.Checked = _sessionVM.IsHomeCharging;
+                _numKwhAdded.Value = ClampToNumeric(_numKwhAdded, _sessionVM.KwhAdded);
+                _numSessionCost.Value = ClampToNumeric(_numSessionCost, _sessionVM.SessionCost);
+
+                _textGridKwh.Text = $"{_sessionVM.GridKwh:0.000}";
+                _textSolarKwh.Text = $"{_sessionVM.SolarKwh:0.000}";
+                _textBatteryKwh.Text = $"{_sessionVM.BatteryKwh:0.000}";
+
+                EnableHomeControls(_sessionVM.IsHomeCharging);
+            }
+            finally
+            {
+                _loadingControls = false;
+            }
+
             UpdateConsumption();
         }
 
@@ -257,72 +84,26 @@ namespace THMS.UI.WinForms
             _numSessionCost.Enabled = !enable;
         }
 
-        private void OnValueChangedOdometer(object sender, EventArgs e)
+        private void OnValueChanged(object sender, EventArgs e)
         {
-            _odometer = _numOdometer.Value;
-            if (0 < LastOdometer && LastOdometer < Odometer)
-            {
-                MilesUsed = Odometer - LastOdometer;
-            }
-
-            UpdateConsumption();
-        }
-
-        private void OnValueChangedStartSoc(object sender, EventArgs e)
-        {
-            _startSoc = _numStartSoc.Value;
-            if (0 < LastSoc && LastSoc > StartSoc)
-            {
-                SocUsed = LastSoc - StartSoc;
-            }
-
-            UpdateConsumption();
-        }
-
-        private void OnValueChangedEndSoc(object sender, EventArgs e)
-        {
-            _endSoc = _numEndSoc.Value;
-            if (EndSoc > StartSoc)
-            {
-                SocAdded = EndSoc - StartSoc;
-            }
-
-            UpdateConsumption();
-        }
-
-        private void OnValueChangedKwhAdded(object sender, EventArgs e)
-        {
-            _kwhAdded = _numKwhAdded.Value;
-            UpdateConsumption();
-        }
-
-        private void OnValueChangedSessionCost(object sender, EventArgs e)
-        {
-            _sessionCost = _numSessionCost.Value;
             UpdateConsumption();
         }
 
         private void UpdateConsumption()
         {
-            if (MilesUsed <= 0 || SocUsed <= 0)
+            if (_loadingControls)
                 return;
 
-            _textKwhUsed.Text = $"{KwhUsed:N1}";
-            _textWhPerMile.Text = $"{WhPerMile:N1}";
-            _textMpge.Text = $"{MilesPerGallonEquivalent:N1}";
+            ApplyControlsToViewModel();
 
-            if (SocAdded <= 0)
-                return;
+            _textMilesUsed.Text = $"{_sessionVM.MilesUsed:0}";
+            _textSocUsed.Text = $"{_sessionVM.SocUsed:0}";
+            _textSocAdded.Text = $"{_sessionVM.SocAdded:0}";
 
-            if (_checkHomeCharger.Checked)
-            {
-                KwhAdded = GridKwh + SolarKwh + BatteryKwh;
-            }
-
-            if (0 < SessionCost && 0 < KwhAdded)
-            {
-                CostPerMile = SessionCost / KwhAdded * WhPerMile / 1000;
-            }
+            _textKwhUsed.Text = $"{_sessionVM.KwhUsed:N1}";
+            _textWhPerMile.Text = $"{_sessionVM.WhPerMile:N1}";
+            _textMpge.Text = $"{_sessionVM.Mpge:N1}";
+            _textCostPerMile.Text = $"{_sessionVM.CostPerMile:N2}";
         }
 
         private void OnClickSave(object sender, EventArgs e)
@@ -342,6 +123,8 @@ namespace THMS.UI.WinForms
 
         private void ApplyControlsToViewModel()
         {
+            _sessionVM.LastOdometer = _numLastOdometer.Value;
+            _sessionVM.LastSoc = _numLastSoc.Value;
             _sessionVM.Odometer = _numOdometer.Value;
             _sessionVM.StartTime = Combine(_dateStart.Value, _timeStart.Value);
             _sessionVM.EndTime = Combine(_dateEnd.Value, _timeEnd.Value);
@@ -384,6 +167,18 @@ namespace THMS.UI.WinForms
             if (value > DateTimePicker.MaximumDateTime)
                 return DateTimePicker.MaximumDateTime;
             return value;
+        }
+
+        private void OnClickLoadCircuitData(object sender, EventArgs e)
+        {
+            using var form = new EvCircuitDataForm(_sessionVM);
+
+            form.ShowDialog();
+
+            // Circuit import updates the shared session VM; push those values
+            // into the controls. Do not call UpdateConsumption alone — it applies
+            // stale control values back onto the VM first.
+            LoadControlsFromViewModel();
         }
     }
 }

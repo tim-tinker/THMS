@@ -8,8 +8,8 @@ namespace THMS.Logic.ViewModels.Transportation
     {
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        private readonly IVehicleDataStore _store;
-        public IVehicleDataStore Store => _store;
+        public IVehicleDataStore VehicleStore { get; }
+        public IEnergyDataStore EnergyStore { get; }
 
         private DateTime _startTime;
         public DateTime StartTime
@@ -41,14 +41,15 @@ namespace THMS.Logic.ViewModels.Transportation
             }
         }
 
-        public VehicleDetailViewModel(IVehicleDataStore store, Guid vehicleId)
+        public VehicleDetailViewModel(IVehicleDataStore store, IEnergyDataStore energyStore, Guid vehicleId)
         {
-            _store = store;
+            VehicleStore = store;
+            EnergyStore = energyStore;
             VehicleId = vehicleId;
 
             // Assign the backing fields so the range is complete before the first
             // Refresh; the setters would each trigger a redundant load.
-            _startTime = _store.GetEarliestIceMileageRecord(VehicleId)?.Date
+            _startTime = VehicleStore.GetEarliestIceMileageRecord(VehicleId)?.Date
                 ?? DateTime.MinValue;
             _endTime = DateTime.MaxValue;
 
@@ -65,20 +66,20 @@ namespace THMS.Logic.ViewModels.Transportation
 
         public void Refresh()
         {
-            Vehicle = _store.GetVehicle(VehicleId);
-            Mileage = _store.GetMilesDrivenInPeriod(VehicleId, StartTime, EndTime);
+            Vehicle = VehicleStore.GetVehicle(VehicleId);
+            Mileage = VehicleStore.GetMilesDrivenInPeriod(VehicleId, StartTime, EndTime);
 
             ChargingSessions.Clear();
-            foreach (var session in _store.GetEvChargingSessions(VehicleId, StartTime, EndTime))
+            foreach (var session in VehicleStore.GetEvChargingSessions(VehicleId, StartTime, EndTime))
                 ChargingSessions.Add(session);
 
-            FuelReceipts = _store.GetIceMileageRecords(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
-            MaintenanceInvoices = _store.GetMaintenanceInvoices(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
+            FuelReceipts = VehicleStore.GetIceMileageRecords(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
+            MaintenanceInvoices = VehicleStore.GetMaintenanceInvoices(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
         }
 
         public EvChargingSession? GetLatestChargingSession()
         {
-            return _store
+            return VehicleStore
                 .GetEvChargingSessions(VehicleId, DateTime.MinValue, DateTime.MaxValue)
                 .OrderBy(s => s.StartTime)
                 .LastOrDefault();

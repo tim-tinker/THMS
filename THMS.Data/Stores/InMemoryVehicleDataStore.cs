@@ -147,10 +147,12 @@ namespace THMS.Data.Stores
             existing.EndTime = session.EndTime;
             existing.StartSoc = session.StartSoc;
             existing.EndSoc = session.EndSoc;
+            existing.LastOdometer = session.LastOdometer;
+            existing.LastSoc = session.LastSoc;
             existing.OdometerMiles = session.OdometerMiles;
             existing.KwhAdded = session.KwhAdded;
             existing.IsHomeCharging = session.IsHomeCharging;
-            existing.ChargingCost = session.ChargingCost;
+            existing.SessionCost = session.SessionCost;
 
             // Energy attribution
             existing.GridKwh = session.GridKwh;

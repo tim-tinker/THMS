@@ -62,6 +62,7 @@ namespace THMS.UI.WinForms
             {
                 var form = new VehicleDetailForm(
                     _vehicleDataStore,
+                    _energyDataStore,
                     SelectedVehicle.VehicleId);
 
                 form.ShowDialog(this);

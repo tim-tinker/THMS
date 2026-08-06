@@ -70,7 +70,7 @@ namespace THMS.Logic.Finance
                     continue;
 
                 // EV circuit energy for this interval
-                decimal evWh = ev.WattHours;
+                decimal evWh = ev.KiloWattHours;
 
                 // Grid import for this interval
                 decimal gridWh = interval.ImportedFromGridWh;

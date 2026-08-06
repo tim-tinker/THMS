@@ -36,7 +36,7 @@ namespace THMS.Logic.Energy
                     Timestamp = timestamp,
 
                     // EV charging attribution
-                    EvChargingWh = evAt?.WattHours ?? 0m,
+                    EvChargingWh = evAt?.KiloWattHours ?? 0m,
 
                     // Solar production
                     SolarWh = s.EnergyProducedWh,

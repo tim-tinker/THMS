@@ -13,7 +13,7 @@ namespace THMS.UI.WinForms
         {
             InitializeComponent();
             _parentVm = parentVm;
-            _vm = new ChargingCostEntryViewModel(parentVm.Store, vehicleId);
+            _vm = new ChargingCostEntryViewModel(parentVm.VehicleStore, vehicleId);
 
             dtpTimestamp.Value = DateTime.Now;
         }

@@ -13,7 +13,7 @@ namespace THMS.UI.WinForms
         {
             InitializeComponent();
             _parentVm = parentVm;
-            _vm = new MileageEntryViewModel(parentVm.Store, vehicleId);
+            _vm = new MileageEntryViewModel(parentVm.VehicleStore, vehicleId);
 
             dtpDate.Value = DateTime.Now.Date;
         }

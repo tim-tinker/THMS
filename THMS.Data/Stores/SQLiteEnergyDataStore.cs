@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using THMS.Data.Stores.Sqlite;
+using THMS.Data.Stores.SqlTables;
 using THMS.Domain.Energy;
 using THMS.Domain.Finance;
 
@@ -11,9 +13,13 @@ namespace THMS.Data.Stores.SQLite
     {
         private readonly string _connectionString;
 
+        private readonly EvCircuitSegmentsTable _evCircuitSegmentsTable = new();
+
         public SQLiteEnergyDataStore(string databasePath)
         {
             _connectionString = $"Data Source={databasePath}";
+            using var conn = OpenConnection();
+            InitializeSchema(conn);
         }
 
         private SqliteConnection OpenConnection()
@@ -22,6 +28,10 @@ namespace THMS.Data.Stores.SQLite
             conn.Open();
             return conn;
         }
+
+        private void InitializeSchema(SqliteConnection conn)
+        {
+            _evCircuitSegmentsTable.InitializeSchema(conn);        }
 
         // ---------------------------------------------------------
         // HOME CHARGING CIRCUIT READINGS
@@ -38,7 +48,7 @@ namespace THMS.Data.Stores.SQLite
 
             cmd.Parameters.AddWithValue("@Id", reading.Id.ToString());
             cmd.Parameters.AddWithValue("@Timestamp", reading.Timestamp);
-            cmd.Parameters.AddWithValue("@WattHours", reading.WattHours);
+            cmd.Parameters.AddWithValue("@WattHours", reading.KiloWattHours);
             cmd.Parameters.AddWithValue("@CircuitId", reading.CircuitId ?? (object)DBNull.Value);
 
             cmd.ExecuteNonQuery();
@@ -65,7 +75,7 @@ namespace THMS.Data.Stores.SQLite
                 {
                     Id = Guid.Parse(reader.GetString(0)),
                     Timestamp = reader.GetDateTime(1),
-                    WattHours = reader.GetDecimal(2),
+                    KiloWattHours = reader.GetDecimal(2),
                     CircuitId = reader.IsDBNull(3) ? null : reader.GetString(3)
                 });
             }
@@ -282,6 +292,38 @@ namespace THMS.Data.Stores.SQLite
             }
 
             return list;
+        }
+
+        // ----------------------------------------------------------
+        // HOME EV CIRCUIT SEGMENTS
+        // ----------------------------------------------------------
+
+        // Store segments for a session (overwrite existing)
+        public void SaveEvCircuitSegments(Guid sessionId, IEnumerable<EvCircuitSegment> segments)
+        {
+            using var conn = OpenConnection();
+            _evCircuitSegmentsTable.SaveEvCircuitSegments(conn, sessionId, segments);
+        }
+
+        // Retrieve segments for a session
+        public IEnumerable<EvCircuitSegment> GetEvCircuitSegments(Guid sessionId)
+        {
+            using var conn = OpenConnection();
+            return _evCircuitSegmentsTable.GetEvCircuitSegments(conn, sessionId);
+        }
+
+        // Delete all segments for a session
+        public void DeleteEvCircuitSegments(Guid sessionId)
+        {
+            using var conn = OpenConnection();
+            _evCircuitSegmentsTable.DeleteEvCircuitSegments(conn, sessionId);
+        }
+
+        // Optional convenience: roll-up summary
+        public EvCircuitSegmentSummary GetEvCircuitSummary(Guid sessionId)
+        {
+            using var conn = OpenConnection();
+            return _evCircuitSegmentsTable.GetEvCircuitSummary(conn, sessionId);
         }
     }
 }

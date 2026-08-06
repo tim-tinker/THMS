@@ -146,7 +146,7 @@ namespace THMS.Data.Stores
         public IEnumerable<EvChargingSession> GetEvChargingSessionsWithMissingCost()
         {
             return _evChargingSessions
-                .Where(s => s.ChargingCost == null)
+                .Where(s => s.SessionCost == null)
                 .OrderBy(s => s.StartTime);
         }
 
@@ -165,7 +165,7 @@ namespace THMS.Data.Stores
         {
             var session = _evChargingSessions.FirstOrDefault(s => s.Id == sessionId);
             if (session != null)
-                session.ChargingCost = cost;
+                session.SessionCost = cost;
         }
 
         public void UpdateGasPurchaseCost(Guid purchaseId, decimal cost)

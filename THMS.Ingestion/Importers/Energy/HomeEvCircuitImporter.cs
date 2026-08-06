@@ -14,7 +14,7 @@ namespace THMS.Ingestion.Importers.Energy
             _store = store;
         }
 
-        public void Import(string csvPath)
+        public IEnumerable<EvCircuitReading> Import(string csvPath)
         {
             using var reader = new StreamReader(csvPath);
             using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
@@ -24,16 +24,16 @@ namespace THMS.Ingestion.Importers.Energy
 
             while (csv.Read())
             {
-                var firstTimeStamp = csv.GetField<DateTime>("Local SPAN Panel time (America/Chicago)");
+                var timeStamp = csv.GetField<DateTime>(0);
 
-                var circuitEnergyWh = csv.GetField<decimal>("Energy Data (Wh)");
+                var circuitEnergyKwh = csv.GetField<decimal>(1);
 
                 var reading = new EvCircuitReading
                 {
-                    Timestamp = firstTimeStamp,
-                    WattHours = circuitEnergyWh,
+                    Timestamp = timeStamp,
+                    KiloWattHours = circuitEnergyKwh,
                 };
-                _store.AddEvCircuitReading(reading);
+                yield return reading;
             }
         }
     }

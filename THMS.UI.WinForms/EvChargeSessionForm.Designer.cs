@@ -66,19 +66,21 @@
             _textMpge = new TextBox();
             _textGridKwh = new TextBox();
             _textSolarKwh = new TextBox();
-            _textLastOdometer = new TextBox();
             label20 = new Label();
-            _textLastSoc = new TextBox();
             label21 = new Label();
             _textBatteryKwh = new TextBox();
             label22 = new Label();
             _btnSave = new Button();
             _btnCancel = new Button();
+            _numLastOdometer = new NumericUpDown();
+            _numLastSoc = new NumericUpDown();
             ((System.ComponentModel.ISupportInitialize)_numOdometer).BeginInit();
             ((System.ComponentModel.ISupportInitialize)_numStartSoc).BeginInit();
             ((System.ComponentModel.ISupportInitialize)_numEndSoc).BeginInit();
             ((System.ComponentModel.ISupportInitialize)_numKwhAdded).BeginInit();
             ((System.ComponentModel.ISupportInitialize)_numSessionCost).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)_numLastOdometer).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)_numLastSoc).BeginInit();
             SuspendLayout();
             // 
             // _numOdometer
@@ -88,7 +90,7 @@
             _numOdometer.Name = "_numOdometer";
             _numOdometer.Size = new Size(183, 35);
             _numOdometer.TabIndex = 0;
-            _numOdometer.ValueChanged += OnValueChangedOdometer;
+            _numOdometer.ValueChanged += OnValueChanged;
             // 
             // label2
             // 
@@ -122,7 +124,7 @@
             _numStartSoc.Name = "_numStartSoc";
             _numStartSoc.Size = new Size(183, 35);
             _numStartSoc.TabIndex = 3;
-            _numStartSoc.ValueChanged += OnValueChangedStartSoc;
+            _numStartSoc.ValueChanged += OnValueChanged;
             // 
             // _timeStart
             // 
@@ -174,7 +176,7 @@
             _numEndSoc.Name = "_numEndSoc";
             _numEndSoc.Size = new Size(183, 35);
             _numEndSoc.TabIndex = 6;
-            _numEndSoc.ValueChanged += OnValueChangedEndSoc;
+            _numEndSoc.ValueChanged += OnValueChanged;
             // 
             // _timeEnd
             // 
@@ -210,7 +212,7 @@
             _numKwhAdded.Name = "_numKwhAdded";
             _numKwhAdded.Size = new Size(183, 35);
             _numKwhAdded.TabIndex = 9;
-            _numKwhAdded.ValueChanged += OnValueChangedKwhAdded;
+            _numKwhAdded.ValueChanged += OnValueChanged;
             // 
             // label9
             // 
@@ -240,7 +242,7 @@
             _numSessionCost.Name = "_numSessionCost";
             _numSessionCost.Size = new Size(183, 35);
             _numSessionCost.TabIndex = 10;
-            _numSessionCost.ValueChanged += OnValueChangedSessionCost;
+            _numSessionCost.ValueChanged += OnValueChanged;
             // 
             // label10
             // 
@@ -257,8 +259,9 @@
             _btnLoadCircuitData.Name = "_btnLoadCircuitData";
             _btnLoadCircuitData.Size = new Size(183, 40);
             _btnLoadCircuitData.TabIndex = 8;
-            _btnLoadCircuitData.Text = "Load Circuit Data";
+            _btnLoadCircuitData.Text = "View Circuit Data";
             _btnLoadCircuitData.UseVisualStyleBackColor = true;
+            _btnLoadCircuitData.Click += OnClickLoadCircuitData;
             // 
             // label11
             // 
@@ -429,15 +432,6 @@
             _textSolarKwh.Size = new Size(183, 35);
             _textSolarKwh.TabIndex = 34;
             // 
-            // _textLastOdometer
-            // 
-            _textLastOdometer.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textLastOdometer.Location = new Point(664, 10);
-            _textLastOdometer.Name = "_textLastOdometer";
-            _textLastOdometer.ReadOnly = true;
-            _textLastOdometer.Size = new Size(183, 35);
-            _textLastOdometer.TabIndex = 35;
-            // 
             // label20
             // 
             label20.Anchor = AnchorStyles.Top | AnchorStyles.Right;
@@ -447,15 +441,6 @@
             label20.Size = new Size(150, 30);
             label20.TabIndex = 36;
             label20.Text = "Last Odometer";
-            // 
-            // _textLastSoc
-            // 
-            _textLastSoc.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textLastSoc.Location = new Point(664, 51);
-            _textLastSoc.Name = "_textLastSoc";
-            _textLastSoc.ReadOnly = true;
-            _textLastSoc.Size = new Size(183, 35);
-            _textLastSoc.TabIndex = 37;
             // 
             // label21
             // 
@@ -508,20 +493,37 @@
             _btnCancel.UseVisualStyleBackColor = true;
             _btnCancel.Click += OnClickCancel;
             // 
+            // _numLastOdometer
+            // 
+            _numLastOdometer.Location = new Point(664, 11);
+            _numLastOdometer.Maximum = new decimal(new int[] { 1000000, 0, 0, 0 });
+            _numLastOdometer.Name = "_numLastOdometer";
+            _numLastOdometer.Size = new Size(183, 35);
+            _numLastOdometer.TabIndex = 11;
+            _numLastOdometer.ValueChanged += OnValueChanged;
+            // 
+            // _numLastSoc
+            // 
+            _numLastSoc.Location = new Point(664, 51);
+            _numLastSoc.Name = "_numLastSoc";
+            _numLastSoc.Size = new Size(183, 35);
+            _numLastSoc.TabIndex = 12;
+            _numLastSoc.ValueChanged += OnValueChanged;
+            // 
             // EvChargeSessionForm
             // 
             AutoScaleDimensions = new SizeF(12F, 30F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = _btnCancel;
             ClientSize = new Size(859, 543);
+            Controls.Add(_numLastSoc);
+            Controls.Add(_numLastOdometer);
             Controls.Add(_btnCancel);
             Controls.Add(_btnSave);
             Controls.Add(label22);
             Controls.Add(_textBatteryKwh);
             Controls.Add(label21);
-            Controls.Add(_textLastSoc);
             Controls.Add(label20);
-            Controls.Add(_textLastOdometer);
             Controls.Add(_textSolarKwh);
             Controls.Add(_textGridKwh);
             Controls.Add(_textMpge);
@@ -568,6 +570,8 @@
             ((System.ComponentModel.ISupportInitialize)_numEndSoc).EndInit();
             ((System.ComponentModel.ISupportInitialize)_numKwhAdded).EndInit();
             ((System.ComponentModel.ISupportInitialize)_numSessionCost).EndInit();
+            ((System.ComponentModel.ISupportInitialize)_numLastOdometer).EndInit();
+            ((System.ComponentModel.ISupportInitialize)_numLastSoc).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -611,13 +615,13 @@
         private TextBox _textMpge;
         private TextBox _textGridKwh;
         private TextBox _textSolarKwh;
-        private TextBox _textLastOdometer;
         private Label label20;
-        private TextBox _textLastSoc;
         private Label label21;
         private TextBox _textBatteryKwh;
         private Label label22;
         private Button _btnSave;
         private Button _btnCancel;
+        private NumericUpDown _numLastOdometer;
+        private NumericUpDown _numLastSoc;
     }
 }

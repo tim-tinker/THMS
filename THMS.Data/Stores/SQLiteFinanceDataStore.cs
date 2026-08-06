@@ -265,7 +265,7 @@ namespace THMS.Data.Stores.SQLite
                     EndTime = reader.GetDateTime(2),
                     KwhAdded = reader.GetDecimal(3),
                     IsHomeCharging = reader.GetBoolean(4),
-                    ChargingCost = 0,
+                    SessionCost = 0,
                 });
             }
 

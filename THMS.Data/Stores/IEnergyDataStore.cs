@@ -51,5 +51,21 @@ namespace THMS.Data.Stores
             string vendor,
             DateTime start,
             DateTime end);
+
+        // ----------------------------------------------------------
+        // HOME EV CIRCUIT SEGMENTS
+        // ----------------------------------------------------------
+
+        // Store segments for a session (overwrite existing)
+        void SaveEvCircuitSegments(Guid sessionId, IEnumerable<EvCircuitSegment> segments);
+
+        // Retrieve segments for a session
+        IEnumerable<EvCircuitSegment> GetEvCircuitSegments(Guid sessionId);
+
+        // Delete all segments for a session
+        void DeleteEvCircuitSegments(Guid sessionId);
+
+        // Optional convenience: roll-up summary
+        EvCircuitSegmentSummary GetEvCircuitSummary(Guid sessionId);
     }
 }

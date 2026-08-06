@@ -22,7 +22,7 @@ namespace THMS.Data.Stores
             {
                 Id = Guid.NewGuid(),
                 Timestamp = DateTime.Today.AddDays(-3).AddHours(20),
-                WattHours = 18500,
+                KiloWattHours = 18500,
                 CircuitId = "Garage-240V"
             });
 
@@ -30,7 +30,7 @@ namespace THMS.Data.Stores
             {
                 Id = Guid.NewGuid(),
                 Timestamp = DateTime.Today.AddDays(-3).AddHours(21),
-                WattHours = 18200,
+                KiloWattHours = 18200,
                 CircuitId = "Garage-240V"
             });
 
@@ -165,6 +165,61 @@ namespace THMS.Data.Stores
                 .Where(c => c.Vendor.Equals(vendor, StringComparison.OrdinalIgnoreCase))
                 .Where(c => c.Date >= start && c.Date <= end)
                 .OrderBy(c => c.Date);
+        }
+
+        // ----------------------------------------------------------
+        // HOME EV CIRCUIT SEGMENTS
+        // ----------------------------------------------------------
+
+
+        private readonly Dictionary<Guid, List<EvCircuitSegment>> _segments
+            = new Dictionary<Guid, List<EvCircuitSegment>>();
+
+        public void SaveEvCircuitSegments(Guid sessionId, IEnumerable<EvCircuitSegment> segments)
+        {
+            _segments[sessionId] = segments.ToList();
+        }
+
+        public IEnumerable<EvCircuitSegment> GetEvCircuitSegments(Guid sessionId)
+        {
+            return _segments.TryGetValue(sessionId, out var list)
+                ? list
+                : Enumerable.Empty<EvCircuitSegment>();
+        }
+
+        public void DeleteEvCircuitSegments(Guid sessionId)
+        {
+            _segments.Remove(sessionId);
+        }
+
+        public EvCircuitSegmentSummary GetEvCircuitSummary(Guid sessionId)
+        {
+            var segs = GetEvCircuitSegments(sessionId).ToList();
+
+            if (!segs.Any())
+            {
+                return new EvCircuitSegmentSummary  
+                {
+                    SessionId = sessionId,
+                    TotalKwh = 0,
+                    GridKwh = 0,
+                    SolarKwh = 0,
+                    BatteryKwh = 0,
+                    SegmentCount = 0
+                };
+            }
+
+            return new EvCircuitSegmentSummary
+            {
+                SessionId = sessionId,
+                TotalKwh = segs.Sum(s => s.Kwh),
+                GridKwh = segs.Sum(s => s.GridKwh),
+                SolarKwh = segs.Sum(s => s.SolarKwh),
+                BatteryKwh = segs.Sum(s => s.BatteryKwh),
+                SegmentCount = segs.Count,
+                StartTime = segs.Min(s => s.Timestamp),
+                EndTime = segs.Max(s => s.Timestamp)
+            };
         }
     }
 }

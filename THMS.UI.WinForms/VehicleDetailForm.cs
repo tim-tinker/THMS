@@ -20,10 +20,10 @@ namespace THMS.UI.WinForms
             _splitFuelMaintenance.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         }
 
-        public VehicleDetailForm(IVehicleDataStore store, Guid vehicleId)
+        public VehicleDetailForm(IVehicleDataStore vehicleStore, IEnergyDataStore energyStore, Guid vehicleId)
             : this()
         {
-            _vm = new VehicleDetailViewModel(store, vehicleId) ?? throw new ArgumentOutOfRangeException(nameof(vehicleId));
+            _vm = new VehicleDetailViewModel(vehicleStore, energyStore, vehicleId) ?? throw new ArgumentOutOfRangeException(nameof(vehicleId));
         }
 
         private void OnLoad(object sender, EventArgs e)
@@ -136,7 +136,7 @@ namespace THMS.UI.WinForms
             }
         }
 
-        private void OnCellContentDoubleClickChargingSession(object sender, DataGridViewCellEventArgs e)
+        private void OnCellDoubleClickChargingSession(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0)
                 return;
