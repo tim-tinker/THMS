@@ -30,7 +30,7 @@ namespace THMS.Logic.Transportation
             // 1. Get EV mileage records (only those with odometer)
             // ---------------------------------------------------------
             var evMileage = _vehicleStore
-                .GetEvChargingSessions(vehicleId, start, end)
+                .GetEvChargeSessions(vehicleId, start, end)
                 .OrderBy(r => r.StartTime)
                 .ToList();
 
@@ -58,7 +58,7 @@ namespace THMS.Logic.Transportation
                     .ComputeAttribution(start, end)
                     .ToList();
 
-                decimal totalWh = energyAttr.Sum(a => a.EvChargingWh);
+                decimal totalWh = energyAttr.Sum(a => a.EvChargeWh);
                 decimal totalKwh = totalWh / 1000m;
 
                 // ---------------------------------------------------------

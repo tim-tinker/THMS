@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using THMS.Data.Stores.InMemoryStores;
 using THMS.Domain.Energy;
 using THMS.Domain.Finance;
 
@@ -9,83 +10,14 @@ namespace THMS.Data.Stores
     public class InMemoryEnergyDataStore : IEnergyDataStore
     {
         private readonly List<EvCircuitReading> _circuitReadings = new();
-        private readonly List<SolarVendorInterval> _solarVendorIntervals = new();
-        private readonly List<EvCommercialChargingSession> _commercialSessions = new();
-        private readonly List<CommercialChargingCostRecord> _commercialCosts = new();
+        private readonly List<EvCommercialChargeSession> _commercialSessions = new();
+        private readonly List<CommercialChargeCostRecord> _commercialCosts = new();
+        private readonly InMemorySolarVendorIntervalStore _solarStore = new();
+        private readonly InMemoryEvAttributionStore _evAttrStore = new();
+        private readonly InMemoryBatterySocStore _batterySocStore = new();
 
         public InMemoryEnergyDataStore()
         {
-            // ---------------------------------------------------------
-            // HOME CIRCUIT READINGS
-            // ---------------------------------------------------------
-            AddEvCircuitReading(new EvCircuitReading
-            {
-                Id = Guid.NewGuid(),
-                Timestamp = DateTime.Today.AddDays(-3).AddHours(20),
-                KiloWattHours = 18500,
-                CircuitId = "Garage-240V"
-            });
-
-            AddEvCircuitReading(new EvCircuitReading
-            {
-                Id = Guid.NewGuid(),
-                Timestamp = DateTime.Today.AddDays(-3).AddHours(21),
-                KiloWattHours = 18200,
-                CircuitId = "Garage-240V"
-            });
-
-            // ---------------------------------------------------------
-            // HOME SOLAR VENDOR INTERVALS
-            // ---------------------------------------------------------
-
-            AddSolarVendorInterval(new SolarVendorInterval
-            {
-                Id = Guid.NewGuid(),
-                Timestamp = DateTime.Today.AddHours(9),
-                EnergyProducedWh = 1200,
-                EnergyConsumedWh = 900,
-                ExportedToGridWh = 200,
-                ImportedFromGridWh = 0,
-                StoredInBatteriesWh = 100,
-                DischargedFromBatteriesWh = 0
-            });
-
-            AddSolarVendorInterval(new SolarVendorInterval
-            {
-                Id = Guid.NewGuid(),
-                Timestamp = DateTime.Today.AddHours(20),
-                EnergyProducedWh = 0,
-                EnergyConsumedWh = 1100,
-                ExportedToGridWh = 0,
-                ImportedFromGridWh = 600,
-                StoredInBatteriesWh = 0,
-                DischargedFromBatteriesWh = 500
-            });
-
-            // ---------------------------------------------------------
-            // COMMERCIAL CHARGING SESSIONS
-            // ---------------------------------------------------------
-            AddEvCommercialChargingSession(new EvCommercialChargingSession
-            {
-                Id = Guid.NewGuid(),
-                StartTime = DateTime.Today.AddDays(-2).AddHours(14),
-                EndTime = DateTime.Today.AddDays(-2).AddHours(15),
-                KwhAdded = 22.0m,
-                ChargingCost = 11.99m,
-                VendorSessionId = "EA-2026-07-22-ABC123",
-                Location = "Electrify America - Katy"
-            });
-
-            AddEvCommercialChargingSession(new EvCommercialChargingSession
-            {
-                Id = Guid.NewGuid(),
-                StartTime = DateTime.Today.AddDays(-5).AddHours(10),
-                EndTime = DateTime.Today.AddDays(-5).AddHours(11),
-                KwhAdded = 18.0m,
-                ChargingCost = 9.50m,
-                VendorSessionId = "CP-2026-07-20-XYZ789",
-                Location = "ChargePoint - Richmond"
-            });
         }
 
         // ---------------------------------------------------------
@@ -110,26 +42,39 @@ namespace THMS.Data.Stores
 
         public void AddSolarVendorInterval(SolarVendorInterval interval)
         {
-            _solarVendorIntervals.Add(interval);
+            _solarStore.Add(interval);
         }
 
         public IEnumerable<SolarVendorInterval> GetSolarVendorIntervals(DateTime start, DateTime end)
         {
-            return _solarVendorIntervals
-                .Where(r => r.Timestamp >= start && r.Timestamp <= end)
-                .OrderBy(r => r.Timestamp);
+            return _solarStore.GetRange(start, end);
         }
 
+        // ---------------------------------------------------------
+        // EV ATTRIBUTION
+        // ---------------------------------------------------------
+        public IReadOnlyCollection<EnergyAttributionResult> GetEvAttribution(DateTime start, DateTime end)
+        {
+            return _evAttrStore.GetRange(start, end);
+        }
+
+        // ---------------------------------------------------------
+        // BATTERY SOC TIMELINE
+        // ---------------------------------------------------------
+        public IReadOnlyCollection<BatterySocRecord> GetBatterySocTimeline(DateTime start, DateTime end)
+        {
+            return _batterySocStore.GetRange(start, end);
+        }
         // ---------------------------------------------------------
         // COMMERCIAL CHARGING SESSIONS
         // ---------------------------------------------------------
 
-        public void AddEvCommercialChargingSession(EvCommercialChargingSession session)
+        public void AddEvCommercialChargeSession(EvCommercialChargeSession session)
         {
             _commercialSessions.Add(session);
         }
 
-        public IEnumerable<EvCommercialChargingSession> GetEvCommercialChargingSessions(
+        public IEnumerable<EvCommercialChargeSession> GetEvCommercialChargeSessions(
             DateTime start,
             DateTime end)
         {
@@ -142,12 +87,12 @@ namespace THMS.Data.Stores
         // COMMERCIAL CHARGING COST RECORDS
         // ---------------------------------------------------------
 
-        public void AddCommercialChargingCostRecord(CommercialChargingCostRecord record)
+        public void AddCommercialChargeCostRecord(CommercialChargeCostRecord record)
         {
             _commercialCosts.Add(record);
         }
 
-        public IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecords(
+        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecords(
             DateTime start,
             DateTime end)
         {
@@ -156,7 +101,7 @@ namespace THMS.Data.Stores
                 .OrderBy(c => c.Date);
         }
 
-        public IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecordsByVendor(
+        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecordsByVendor(
             string vendor,
             DateTime start,
             DateTime end)

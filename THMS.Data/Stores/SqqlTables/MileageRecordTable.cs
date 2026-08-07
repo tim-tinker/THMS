@@ -10,9 +10,8 @@ public class MileageRecordTable
             CREATE TABLE IF NOT EXISTS MileageRecords (
                 Id TEXT PRIMARY KEY,
                 VehicleId TEXT NOT NULL,
-                Date TEXT NOT NULL,
+                EndTime TEXT NOT NULL,
                 OdometerMiles REAL NOT NULL,
-                Notes TEXT,
                 Type TEXT NOT NULL
             );";
         cmd.ExecuteNonQuery();
@@ -23,29 +22,28 @@ public class MileageRecordTable
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             INSERT INTO MileageRecords
-            (Id, VehicleId, Date, OdometerMiles, Notes, Type)
+            (Id, VehicleId, EndTime, OdometerMiles, Type)
             VALUES
-            (@Id, @VehicleId, @Date, @OdometerMiles, @Notes, @Type);";
+            (@Id, @VehicleId, @EndTime, @OdometerMiles, @Type);";
 
         cmd.Parameters.AddWithValue("@Id", record.Id.ToString());
         cmd.Parameters.AddWithValue("@VehicleId", record.VehicleId.ToString());
-        cmd.Parameters.AddWithValue("@Date", record.Date);
+        cmd.Parameters.AddWithValue("@EndTime", record.EndTime);
         cmd.Parameters.AddWithValue("@OdometerMiles", record.OdometerMiles);
-        cmd.Parameters.AddWithValue("@Notes", (object?)record.Notes ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@Type", type);
 
         cmd.ExecuteNonQuery();
     }
 
-    public IEnumerable<(Guid Id, Guid VehicleId, DateTime Date, decimal OdometerMiles, string? Notes, string Type)>
+    public IEnumerable<(Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string Type)>
         GetRange(SqliteConnection conn, Guid vehicleId, DateTime start, DateTime end)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
-            SELECT Id, VehicleId, Date, OdometerMiles, Notes, Type
+            SELECT Id, VehicleId, EndTime, OdometerMiles, Type
             FROM MileageRecords
-            WHERE VehicleId = @VehicleId AND Date >= @Start AND Date <= @End
-            ORDER BY Date;";
+            WHERE VehicleId = @VehicleId AND EndTime >= @Start AND EndTime <= @End
+            ORDER BY EndTime;";
         cmd.Parameters.AddWithValue("@VehicleId", vehicleId.ToString());
         cmd.Parameters.AddWithValue("@Start", start);
         cmd.Parameters.AddWithValue("@End", end);
@@ -58,18 +56,17 @@ public class MileageRecordTable
                 Guid.Parse(reader.GetString(1)),
                 reader.GetDateTime(2),
                 (decimal)(double)reader.GetDouble(3),
-                reader.IsDBNull(4) ? null : reader.GetString(4),
-                reader.GetString(5)
+                reader.GetString(4)
             );
         }
     }
 
-    public (Guid VehicleId, DateTime Date, decimal OdometerMiles, string? Notes, string Type)?
+    public (Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string Type)?
         GetById(SqliteConnection conn, Guid id)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
-            SELECT VehicleId, Date, OdometerMiles, Notes, Type
+            SELECT VehicleId, EndTime, OdometerMiles, Type
             FROM MileageRecords
             WHERE Id = @Id;";
         cmd.Parameters.AddWithValue("@Id", id.ToString());
@@ -82,8 +79,40 @@ public class MileageRecordTable
             Guid.Parse(reader.GetString(0)),
             reader.GetDateTime(1),
             (decimal)(double)reader.GetDouble(2),
-            reader.IsDBNull(3) ? null : reader.GetString(3),
-            reader.GetString(4)
+            reader.GetString(3)
         );
+    }
+
+    public void Update(SqliteConnection conn, MileageRecordBase record)
+    {
+        using var cmd = conn.CreateCommand();
+
+        cmd.CommandText =
+        @"
+        UPDATE MileageRecords
+        SET
+            VehicleId = @VehicleId,
+            OdometerMiles = @OdometerMiles,
+            EndTime = @EndTime
+        WHERE Id = @Id;
+    ";
+
+        cmd.Parameters.AddWithValue("@Id", record.Id.ToString());
+        cmd.Parameters.AddWithValue("@VehicleId", record.VehicleId.ToString());
+        cmd.Parameters.AddWithValue("@OdometerMiles", record.OdometerMiles);
+        cmd.Parameters.AddWithValue("@EndTime", record.EndTime);
+
+        cmd.ExecuteNonQuery();
+    }
+
+    // ---------------------------------------------------------
+    // DELETE
+    // ---------------------------------------------------------
+    public void Delete(SqliteConnection conn, Guid id)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM MileageRecords WHERE Id = @Id;";
+        cmd.Parameters.AddWithValue("@Id", id.ToString());
+        cmd.ExecuteNonQuery();
     }
 }

@@ -13,7 +13,7 @@ namespace THMS.Logic.ViewModels.Transportation
 
         private readonly VehicleEv _vehicle;
 
-        private EvChargingSession _session;
+        private EvChargeSession _session;
 
         public IEnergyDataStore EnergyStore => _energyStore;
 
@@ -24,7 +24,7 @@ namespace THMS.Logic.ViewModels.Transportation
             VehicleEv vehicle,
             decimal lastOdometer,
             decimal lastSoc,
-            EvChargingSession? existingSession = null)
+            EvChargeSession? existingSession = null)
         {
             _vehicleStore = vehicleStore;
             _energyStore = energyStore;
@@ -36,7 +36,7 @@ namespace THMS.Logic.ViewModels.Transportation
             }
             else
             {
-                _session = new EvChargingSession
+                _session = new EvChargeSession
                 {
                     Id = Guid.NewGuid(),
                     VehicleId = vehicleId,
@@ -47,7 +47,8 @@ namespace THMS.Logic.ViewModels.Transportation
                     EndTime = DateTime.Now,
                     StartSoc = lastSoc,
                     EndSoc = lastSoc,
-                    IsHomeCharging = false
+                    BatteryKwhAdded = 0,
+                    IsHomeCharge = false
                 };
             }
 
@@ -71,9 +72,10 @@ namespace THMS.Logic.ViewModels.Transportation
         public decimal StartSoc { get => _session.StartSoc; set => _session.StartSoc = value; }
         public decimal EndSoc { get => _session.EndSoc; set => _session.EndSoc = value; }
 
-        public bool IsHomeCharging { get => _session.IsHomeCharging; set => _session.IsHomeCharging = value; }
+        public bool IsHomeCharge { get => _session.IsHomeCharge; set => _session.IsHomeCharge = value; }
 
         public decimal KwhAdded { get => _session.KwhAdded; set => _session.KwhAdded = value; }
+        public decimal BatteryKwhAdded { get => _session.BatteryKwhAdded; set => _session.BatteryKwhAdded = value; }
         public decimal SessionCost { get => _session.SessionCost; set => _session.SessionCost = value; }
 
         public decimal GridKwh { get => _session.GridKwh; set => _session.GridKwh = value; }
@@ -86,6 +88,14 @@ namespace THMS.Logic.ViewModels.Transportation
         public decimal MilesUsed => (Odometer > LastOdometer) ? (Odometer - LastOdometer) : 0;
         public decimal SocUsed => (LastSoc > StartSoc) ? (LastSoc - StartSoc) : 0;
         public decimal SocAdded => (EndSoc > StartSoc) ? (EndSoc - StartSoc) : 0;
+        public decimal ChargeLossKwh =>
+            (BatteryKwhAdded > 0 && KwhAdded > 0)
+                ? KwhAdded - BatteryKwhAdded
+                : 0;
+        public decimal ChargeEfficiency =>
+            (BatteryKwhAdded > 0 && KwhAdded > 0)
+                ? BatteryKwhAdded / KwhAdded
+                : 0;
 
         public decimal KwhUsed => SocUsed * _vehicle.BatteryCapacityKwh / 100;
         public decimal WhPerMile => MilesUsed > 0 ? (KwhUsed * 1000 / MilesUsed) : 0;
@@ -201,15 +211,15 @@ namespace THMS.Logic.ViewModels.Transportation
         // ---------------------------------------------------------
         // Save session
         // ---------------------------------------------------------
-        public EvChargingSession Save()
+        public EvChargeSession Save()
         {
-            if (_vehicleStore.GetEvChargingSession(_session.Id) == null)
+            if (_vehicleStore.GetEvChargeSession(_session.Id) == null)
             {
-                _vehicleStore.AddEvChargingSession(_session);
+                _vehicleStore.AddEvChargeSession(_session);
             }
             else
             {
-                _vehicleStore.UpdateEvChargingSession(_session);
+                _vehicleStore.UpdateEvChargeSession(_session);
             }
 
             return _session;

@@ -51,15 +51,15 @@ namespace THMS.Logic.Transportation
             DateTime end)
         {
             // 1. Get enriched EV charging sessions
-            var sessions = _vehicleStore.GetEvChargingSessions(vehicle.Id, start, end)
+            var sessions = _vehicleStore.GetEvChargeSessions(vehicle.Id, start, end)
                 .ToList();
 
             // 2. Split home vs commercial
-            var homeSessions = sessions.Where(s => s.IsHomeCharging).ToList();
-            var commercialSessions = sessions.Where(s => !s.IsHomeCharging).ToList();
+            var homeSessions = sessions.Where(s => s.IsHomeCharge).ToList();
+            var commercialSessions = sessions.Where(s => !s.IsHomeCharge).ToList();
 
             // 3. Home charging cost attribution
-            var homeCost = ComputeHomeChargingCost(homeSessions, start, end);
+            var homeCost = ComputeHomeChargeCost(homeSessions, start, end);
 
             // 4. Commercial charging cost (direct)
             var commercialCost = commercialSessions
@@ -80,8 +80,8 @@ namespace THMS.Logic.Transportation
                 TotalMiles = miles,
                 TotalCost = totalCost,
                 CostPerMile = costPerMile,
-                HomeChargingCost = homeCost,
-                CommercialChargingCost = commercialCost
+                HomeChargeCost = homeCost,
+                CommercialChargeCost = commercialCost
             };
         }
 
@@ -96,7 +96,7 @@ namespace THMS.Logic.Transportation
         {
             // 1. Get mileage records
             var mileageRecords = _vehicleStore.GetIceMileageRecords(vehicle.Id, start, end)
-                .OrderBy(r => r.Date)
+                .OrderBy(r => r.EndTime)
                 .ToList();
 
             // 2. Compute miles driven
@@ -127,8 +127,8 @@ namespace THMS.Logic.Transportation
         // HOME CHARGING COST ATTRIBUTION
         // ---------------------------------------------------------
 
-        private decimal ComputeHomeChargingCost(
-            IEnumerable<EvChargingSession> homeSessions,
+        private decimal ComputeHomeChargeCost(
+            IEnumerable<EvChargeSession> homeSessions,
             DateTime start,
             DateTime end)
         {
@@ -155,7 +155,7 @@ namespace THMS.Logic.Transportation
         // EV MILES
         // ---------------------------------------------------------
 
-        private decimal ComputeEvMiles(IEnumerable<EvChargingSession> sessions)
+        private decimal ComputeEvMiles(IEnumerable<EvChargeSession> sessions)
         {
             decimal miles = 0;
 
@@ -173,7 +173,7 @@ namespace THMS.Logic.Transportation
             return miles;
         }
 
-        private decimal GetOdometer(EvChargingSession session)
+        private decimal GetOdometer(EvChargeSession session)
         {
             decimal odometer = session.OdometerMiles;
             return odometer;

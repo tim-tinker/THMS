@@ -26,7 +26,7 @@ namespace THMS.Logic.ViewModels.Transportation
             var record = new IceMileageRecord
             {
                 VehicleId = VehicleId,
-                Date = Date,
+                EndTime = Date,
                 OdometerMiles = OdometerMiles,
                 GallonsAdded = GallonsAdded,
                 FuelCost = FuelCost,

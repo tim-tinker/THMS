@@ -25,19 +25,19 @@ namespace THMS.Data.Stores
         // EV CHARGING SESSIONS (vehicle‑assigned)
         // ---------------------------------------------------------
         // Create
-        void AddEvChargingSession(EvChargingSession session);
+        void AddEvChargeSession(EvChargeSession session);
 
         // Read (single)
-        EvChargingSession? GetEvChargingSession(Guid sessionId);
+        EvChargeSession? GetEvChargeSession(Guid sessionId);
 
         // Read (filtered by period)
-        IEnumerable<EvChargingSession> GetEvChargingSessions(Guid vehicleId, DateTime start, DateTime end);
+        IEnumerable<EvChargeSession> GetEvChargeSessions(Guid vehicleId, DateTime start, DateTime end);
 
         // Update
-        void UpdateEvChargingSession(EvChargingSession session);
+        void UpdateEvChargeSession(EvChargeSession session);
 
         // Delete (optional)
-        void DeleteEvChargingSession(Guid sessionId);
+        void DeleteEvChargeSession(Guid sessionId);
 
         // ---------------------------------------------------------
         // MAINTENANCE

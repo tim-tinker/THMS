@@ -4,8 +4,14 @@
     <Compile Update="AddVehicleForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="ChargingCostEntryForm.cs">
+    <Compile Update="ChargeCostEntryForm.cs">
       <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\EnergyBreakdownControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\VcrControl.cs">
+      <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="EnergyDashboardForm.cs">
       <SubType>Form</SubType>

@@ -11,9 +11,9 @@ namespace THMS.Data.Stores
     public class InMemoryFinanceDataStore : IFinanceDataStore
     {
         private readonly List<ElectricUtilityBill> _utilityBills = new();
-        private readonly List<CommercialChargingCostRecord> _commercialCosts = new();
+        private readonly List<CommercialChargeCostRecord> _commercialCosts = new();
         private readonly List<GasPurchase> _gasPurchases = new();
-        private readonly List<EvChargingSession> _evChargingSessions = new();
+        private readonly List<EvChargeSession> _evChargeSessions = new();
 
         public InMemoryFinanceDataStore()
         {
@@ -59,7 +59,7 @@ namespace THMS.Data.Stores
             // ---------------------------------------------------------
             // COMMERCIAL CHARGING COST RECORDS
             // ---------------------------------------------------------
-            AddCommercialChargingCostRecord(new CommercialChargingCostRecord
+            AddCommercialChargeCostRecord(new CommercialChargeCostRecord
             {
                 Id = Guid.NewGuid(),
                 SessionId = "EA-2026-07-22-ABC123",
@@ -68,7 +68,7 @@ namespace THMS.Data.Stores
                 Vendor = "Electrify America"
             });
 
-            AddCommercialChargingCostRecord(new CommercialChargingCostRecord
+            AddCommercialChargeCostRecord(new CommercialChargeCostRecord
             {
                 Id = Guid.NewGuid(),
                 SessionId = "CP-2026-07-20-XYZ789",
@@ -98,19 +98,19 @@ namespace THMS.Data.Stores
         // COMMERCIAL CHARGING COST RECORDS
         // ---------------------------------------------------------
 
-        public void AddCommercialChargingCostRecord(CommercialChargingCostRecord record)
+        public void AddCommercialChargeCostRecord(CommercialChargeCostRecord record)
         {
             _commercialCosts.Add(record);
         }
 
-        public IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecords(DateTime start, DateTime end)
+        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecords(DateTime start, DateTime end)
         {
             return _commercialCosts
                 .Where(c => c.Date >= start && c.Date <= end)
                 .OrderBy(c => c.Date);
         }
 
-        public IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecordsByVendor(
+        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecordsByVendor(
             string vendor,
             DateTime start,
             DateTime end)
@@ -143,9 +143,9 @@ namespace THMS.Data.Stores
         // INCOMPLETE COST RECORDS
         // ---------------------------------------------------------
 
-        public IEnumerable<EvChargingSession> GetEvChargingSessionsWithMissingCost()
+        public IEnumerable<EvChargeSession> GetEvChargeSessionsWithMissingCost()
         {
-            return _evChargingSessions
+            return _evChargeSessions
                 .Where(s => s.SessionCost == null)
                 .OrderBy(s => s.StartTime);
         }
@@ -161,9 +161,9 @@ namespace THMS.Data.Stores
         // COST UPDATES
         // ---------------------------------------------------------
 
-        public void UpdateEvChargingSessionCost(Guid sessionId, decimal cost)
+        public void UpdateEvChargeSessionCost(Guid sessionId, decimal cost)
         {
-            var session = _evChargingSessions.FirstOrDefault(s => s.Id == sessionId);
+            var session = _evChargeSessions.FirstOrDefault(s => s.Id == sessionId);
             if (session != null)
                 session.SessionCost = cost;
         }
@@ -179,9 +179,9 @@ namespace THMS.Data.Stores
         // EV SESSION STORAGE (FinanceStore needs cost access)
         // ---------------------------------------------------------
 
-        public void AddEvChargingSession(EvChargingSession session)
+        public void AddEvChargeSession(EvChargeSession session)
         {
-            _evChargingSessions.Add(session);
+            _evChargeSessions.Add(session);
         }
     }
 }

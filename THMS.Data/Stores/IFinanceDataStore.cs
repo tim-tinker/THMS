@@ -21,13 +21,13 @@ namespace THMS.Data.Stores
         // COMMERCIAL CHARGING COST RECORDS (RAW ENERGY DOMAIN)
         // ---------------------------------------------------------
 
-        void AddCommercialChargingCostRecord(CommercialChargingCostRecord record);
+        void AddCommercialChargeCostRecord(CommercialChargeCostRecord record);
 
-        IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecords(
+        IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecords(
             DateTime start,
             DateTime end);
 
-        IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecordsByVendor(
+        IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecordsByVendor(
             string vendor,
             DateTime start,
             DateTime end);
@@ -48,7 +48,7 @@ namespace THMS.Data.Stores
         // INCOMPLETE COST RECORDS (USER CORRECTION WORKFLOW)
         // ---------------------------------------------------------
 
-        IEnumerable<EvChargingSession> GetEvChargingSessionsWithMissingCost();
+        IEnumerable<EvChargeSession> GetEvChargeSessionsWithMissingCost();
 
         IEnumerable<GasPurchase> GetGasPurchasesWithMissingCost();
 
@@ -57,7 +57,7 @@ namespace THMS.Data.Stores
         // COST UPDATES (ONLY WHERE NECESSARY)
         // ---------------------------------------------------------
 
-        void UpdateEvChargingSessionCost(Guid sessionId, decimal cost);
+        void UpdateEvChargeSessionCost(Guid sessionId, decimal cost);
 
         void UpdateGasPurchaseCost(Guid purchaseId, decimal cost);
     }

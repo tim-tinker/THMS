@@ -17,7 +17,7 @@ namespace THMS.Ingestion.Importers.Energy
             FinanceStore = financeStore;
         }
 
-        protected override IEnumerable<Tuple<EvCommercialChargingSession, CommercialChargingCostRecord>> ReadChargingSessions(string filePath)
+        protected override IEnumerable<Tuple<EvCommercialChargeSession, CommercialChargeCostRecord>> ReadChargeSessions(string filePath)
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
@@ -44,23 +44,23 @@ namespace THMS.Ingestion.Importers.Energy
                 var totalCost = decimal.Parse(costString, CultureInfo.InvariantCulture);
 
                 // ---------------------------------------------------------
-                // ENERGY PORTION (EvCommercialChargingSession)
+                // ENERGY PORTION (EvCommercialChargeSession)
                 // ---------------------------------------------------------
-                var energyRecord = new EvCommercialChargingSession
+                var energyRecord = new EvCommercialChargeSession
                 {
                     Id = Guid.NewGuid(),
                     StartTime = startTime,
                     EndTime = endTime,
                     KwhAdded = totalKwh,          // kWh, not Wh
-                    ChargingCost = totalCost,     // ChargePoint always provides cost
+                    ChargeCost = totalCost,     // ChargePoint always provides cost
                     VendorSessionId = null,       // ChargePoint CSV does not include this
                     Location = "ChargePoint"
                 };
 
                 // ---------------------------------------------------------
-                // FINANCIAL PORTION (CommercialChargingCostRecord)
+                // FINANCIAL PORTION (CommercialChargeCostRecord)
                 // ---------------------------------------------------------
-                var costRecord = new CommercialChargingCostRecord
+                var costRecord = new CommercialChargeCostRecord
                 {
                     Id = Guid.NewGuid(),
                     Date = startTime,

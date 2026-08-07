@@ -1,6 +1,6 @@
 ﻿namespace THMS.UI.WinForms
 {
-    partial class ChargingCostEntryForm
+    partial class ChargeCostEntryForm
     {
         private System.ComponentModel.IContainer components = null;
 
@@ -65,7 +65,7 @@
             this.btnCancel.Text = "Cancel";
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
 
-            // ChargingCostEntryForm
+            // ChargeCostEntryForm
             this.ClientSize = new System.Drawing.Size(380, 155);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnSave);
@@ -74,9 +74,9 @@
             this.Controls.Add(this.dtpTimestamp);
             this.Controls.Add(this.lblTimestamp);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
-            this.Name = "ChargingCostEntryForm";
+            this.Name = "ChargeCostEntryForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Add Charging Cost";
+            this.Text = "Add Charge Cost";
 
             ((System.ComponentModel.ISupportInitialize)(this.numCost)).EndInit();
             this.ResumeLayout(false);

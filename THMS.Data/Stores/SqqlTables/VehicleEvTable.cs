@@ -12,7 +12,7 @@ namespace THMS.Data.Stores.SqlTables
                 CREATE TABLE IF NOT EXISTS VehicleEv (
                     VehicleId TEXT PRIMARY KEY,
                     BatteryCapacityKwh REAL NOT NULL,
-                    ChargingPortType TEXT NOT NULL
+                    ChargePortType TEXT NOT NULL
                 );";
             cmd.ExecuteNonQuery();
         }
@@ -21,21 +21,21 @@ namespace THMS.Data.Stores.SqlTables
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO VehicleEv (VehicleId, BatteryCapacityKwh, ChargingPortType)
-                VALUES (@VehicleId, @BatteryCapacityKwh, @ChargingPortType);";
+                INSERT INTO VehicleEv (VehicleId, BatteryCapacityKwh, ChargePortType)
+                VALUES (@VehicleId, @BatteryCapacityKwh, @ChargePortType);";
 
             cmd.Parameters.AddWithValue("@VehicleId", ev.Id.ToString());
             cmd.Parameters.AddWithValue("@BatteryCapacityKwh", ev.BatteryCapacityKwh);
-            cmd.Parameters.AddWithValue("@ChargingPortType", ev.ChargingPortType);
+            cmd.Parameters.AddWithValue("@ChargePortType", ev.ChargePortType);
 
             cmd.ExecuteNonQuery();
         }
 
-        public (decimal BatteryCapacityKwh, string ChargingPortType)? Get(SqliteConnection conn, Guid id)
+        public (decimal BatteryCapacityKwh, string ChargePortType)? Get(SqliteConnection conn, Guid id)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT BatteryCapacityKwh, ChargingPortType
+                SELECT BatteryCapacityKwh, ChargePortType
                 FROM VehicleEv
                 WHERE VehicleId = @VehicleId;";
             cmd.Parameters.AddWithValue("@VehicleId", id.ToString());

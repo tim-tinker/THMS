@@ -3,6 +3,6 @@
     public class VehicleEv : VehicleBase
     {
         public decimal BatteryCapacityKwh { get; set; }
-        public string ChargingPortType { get; set; } = "J1772";
+        public string ChargePortType { get; set; } = "J1772";
     }
 }

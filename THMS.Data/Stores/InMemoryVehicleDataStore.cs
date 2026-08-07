@@ -12,9 +12,8 @@ namespace THMS.Data.Stores
     {
         private readonly List<VehicleBase> _vehicles = new();
         private readonly List<IceMileageRecord> _iceMileageRecords = new();
-        private readonly List<EvChargingSession> _evChargingSessions = new();
-        private readonly List<EvChargingSessionVehicleData> _evChargingSessionVehicleData = new();
-        private readonly List<ChargingCostRecord> _chargingCostRecords = new();
+        private readonly List<EvChargeSession> _evChargeSessions = new();
+        private readonly List<ChargeCostRecord> _chargingCostRecords = new();
         private readonly List<MaintenanceInvoiceRecord> _maintenanceInvoices = new();
 
         public InMemoryVehicleDataStore()
@@ -73,33 +72,33 @@ namespace THMS.Data.Stores
         {
             return _iceMileageRecords
                 .Where(r => r.VehicleId == vehicleId)
-                .OrderBy(r => r.Date)
+                .OrderBy(r => r.EndTime)
                 .FirstOrDefault();
         }
 
         public IEnumerable<IceMileageRecord> GetIceMileageRecords(Guid vehicleId, DateTime start, DateTime end)
         {
             return _iceMileageRecords
-                .Where(r => r.VehicleId == vehicleId && r.Date >= start && r.Date <= end)
-                .OrderBy(r => r.Date);
+                .Where(r => r.VehicleId == vehicleId && r.EndTime >= start && r.EndTime <= end)
+                .OrderBy(r => r.EndTime);
         }
 
         public decimal GetMilesDrivenInPeriod(Guid vehicleId, DateTime start, DateTime end)
         {
             // ICE mileage records (Date = mileage event time, OdometerMiles = odometer)
             var iceRecords = _iceMileageRecords
-                .Where(r => vehicleId == r.VehicleId && r.Date >= start && r.Date <= end);
+                .Where(r => vehicleId == r.VehicleId && r.EndTime >= start && r.EndTime <= end);
 
             // EV mileage records (Date = end of charging session, OdometerMiles = odometer)
             // ignore sessions without odometer
-            var evRecords = _evChargingSessionVehicleData
-                .Where(r => vehicleId == r.VehicleId && r.Date >= start && r.Date <= end && r.OdometerMiles.HasValue);
+            var evRecords = _evChargeSessions
+                .Where(r => vehicleId == r.VehicleId && r.StartTime >= start && r.EndTime <= end && 0 < r.OdometerMiles);
 
             // Combine ICE + EV as MileageRecordBase
             var allRecords = iceRecords
                 .Cast<MileageRecordBase>()
                 .Concat(evRecords)
-                .OrderBy(r => r.Date)
+                .OrderBy(r => r.EndTime)
                 .ToList();
 
             if (allRecords.Count < 2)
@@ -115,31 +114,31 @@ namespace THMS.Data.Stores
         // EV CHARGING SESSIONS
         // ---------------------------------------------------------
 
-        public void AddEvChargingSession(EvChargingSession session)
+        public void AddEvChargeSession(EvChargeSession session)
         {
-            _evChargingSessions.Add(session);
+            _evChargeSessions.Add(session);
         }
 
-        public EvChargingSession? GetEvChargingSession(Guid sessionId)
+        public EvChargeSession? GetEvChargeSession(Guid sessionId)
         {
-            return _evChargingSessions.FirstOrDefault(s => s.Id == sessionId);
+            return _evChargeSessions.FirstOrDefault(s => s.Id == sessionId);
         }
 
-        public IEnumerable<EvChargingSession> GetEvChargingSessions(
+        public IEnumerable<EvChargeSession> GetEvChargeSessions(
             Guid vehicleId,
             DateTime start,
             DateTime end)
         {
-            return _evChargingSessions
+            return _evChargeSessions
                 .Where(s => s.VehicleId == vehicleId &&
                             s.StartTime >= start &&
                             s.StartTime <= end)
                 .OrderBy(s => s.StartTime);
         }
 
-        public void UpdateEvChargingSession(EvChargingSession session)
+        public void UpdateEvChargeSession(EvChargeSession session)
         {
-            var existing = _evChargingSessions.FirstOrDefault(s => s.Id == session.Id);
+            var existing = _evChargeSessions.FirstOrDefault(s => s.Id == session.Id);
             if (existing == null)
                 return;
 
@@ -151,7 +150,8 @@ namespace THMS.Data.Stores
             existing.LastSoc = session.LastSoc;
             existing.OdometerMiles = session.OdometerMiles;
             existing.KwhAdded = session.KwhAdded;
-            existing.IsHomeCharging = session.IsHomeCharging;
+            existing.BatteryKwhAdded = session.BatteryKwhAdded;
+            existing.IsHomeCharge = session.IsHomeCharge;
             existing.SessionCost = session.SessionCost;
 
             // Energy attribution
@@ -160,11 +160,11 @@ namespace THMS.Data.Stores
             existing.BatteryKwh = session.BatteryKwh;
         }
 
-        public void DeleteEvChargingSession(Guid sessionId)
+        public void DeleteEvChargeSession(Guid sessionId)
         {
-            var existing = _evChargingSessions.FirstOrDefault(s => s.Id == sessionId);
+            var existing = _evChargeSessions.FirstOrDefault(s => s.Id == sessionId);
             if (existing != null)
-                _evChargingSessions.Remove(existing);
+                _evChargeSessions.Remove(existing);
         }
         // ---------------------------------------------------------
         // MAINTENANCE

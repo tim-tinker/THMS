@@ -3,29 +3,27 @@ using THMS.Domain.Transportation;
 
 namespace THMS.Data.Stores.SqlTables
 {
-    public class EvChargingSessionTable
+    public class EvChargeSessionTable
     {
         public void InitializeSchema(SqliteConnection conn)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText =
             @"
-            CREATE TABLE IF NOT EXISTS EvChargingSessions (
+            CREATE TABLE IF NOT EXISTS EvChargeSessions (
                 Id TEXT PRIMARY KEY,
-                VehicleId TEXT NOT NULL,
 
                 LastOdometer REAL NOT NULL,
                 LastSoc REAL NOT NULL,
 
-                OdometerMiles REAL NOT NULL,
                 StartTime TEXT NOT NULL,
-                EndTime TEXT NOT NULL,
                 StartSoc REAL NOT NULL,
                 EndSoc REAL NOT NULL,
-                IsHomeCharging INTEGER NOT NULL,
+                IsHomeCharge INTEGER NOT NULL,
 
                 KwhAdded REAL NOT NULL,
-                ChargingCost REAL NOT NULL,
+                BatteryKwhAdded REAL NOT NULL,
+                SessionCost REAL NOT NULL,
 
                 GridKwh REAL NOT NULL,
                 SolarKwh REAL NOT NULL,
@@ -38,44 +36,40 @@ namespace THMS.Data.Stores.SqlTables
         // ---------------------------------------------------------
         // INSERT
         // ---------------------------------------------------------
-        public void Insert(SqliteConnection conn, EvChargingSession session)
+        public void Insert(SqliteConnection conn, EvChargeSession session)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText =
             @"
-            INSERT INTO EvChargingSessions (
-                Id, VehicleId,
+            INSERT INTO EvChargeSessions (
+                Id,
                 LastOdometer, LastSoc,
-                OdometerMiles, StartTime, EndTime,
-                StartSoc, EndSoc, IsHomeCharging,
-                KwhAdded, ChargingCost,
+                StartTime, StartSoc, EndSoc, IsHomeCharge,
+                KwhAdded, BatteryKwhAdded, SessionCost,
                 GridKwh, SolarKwh, BatteryKwh
             )
             VALUES (
-                @Id, @VehicleId,
+                @Id,
                 @LastOdometer, @LastSoc,
-                @OdometerMiles, @StartTime, @EndTime,
-                @StartSoc, @EndSoc, @IsHomeCharging,
-                @KwhAdded, @ChargingCost,
+                @StartTime, @StartSoc, @EndSoc, @IsHomeCharge,
+                @KwhAdded, @BatteryKwhAdded, @SessionCost,
                 @GridKwh, @SolarKwh, @BatteryKwh
             );
             ";
 
             cmd.Parameters.AddWithValue("@Id", session.Id.ToString());
-            cmd.Parameters.AddWithValue("@VehicleId", session.VehicleId.ToString());
 
             cmd.Parameters.AddWithValue("@LastOdometer", session.LastOdometer);
             cmd.Parameters.AddWithValue("@LastSoc", session.LastSoc);
 
-            cmd.Parameters.AddWithValue("@OdometerMiles", session.OdometerMiles);
             cmd.Parameters.AddWithValue("@StartTime", session.StartTime);
-            cmd.Parameters.AddWithValue("@EndTime", session.EndTime);
             cmd.Parameters.AddWithValue("@StartSoc", session.StartSoc);
             cmd.Parameters.AddWithValue("@EndSoc", session.EndSoc);
-            cmd.Parameters.AddWithValue("@IsHomeCharging", session.IsHomeCharging ? 1 : 0);
+            cmd.Parameters.AddWithValue("@IsHomeCharge", session.IsHomeCharge ? 1 : 0);
 
             cmd.Parameters.AddWithValue("@KwhAdded", session.KwhAdded);
-            cmd.Parameters.AddWithValue("@ChargingCost", session.SessionCost);
+            cmd.Parameters.AddWithValue("@BatteryKwhAdded", session.BatteryKwhAdded);
+            cmd.Parameters.AddWithValue("@SessionCost", session.SessionCost);
 
             cmd.Parameters.AddWithValue("@GridKwh", session.GridKwh);
             cmd.Parameters.AddWithValue("@SolarKwh", session.SolarKwh);
@@ -87,7 +81,7 @@ namespace THMS.Data.Stores.SqlTables
         // ---------------------------------------------------------
         // GET BY VEHICLE + DATE RANGE
         // ---------------------------------------------------------
-        public IEnumerable<EvChargingSession> GetByVehicleAndRange(
+        public IEnumerable<EvChargeSession> GetByVehicleAndRange(
             SqliteConnection conn,
             Guid vehicleId,
             DateTime start,
@@ -97,7 +91,7 @@ namespace THMS.Data.Stores.SqlTables
             cmd.CommandText =
             @"
             SELECT *
-            FROM EvChargingSessions
+            FROM EvChargeSessions
             WHERE VehicleId = @VehicleId
               AND StartTime >= @Start
               AND StartTime <= @End
@@ -110,7 +104,7 @@ namespace THMS.Data.Stores.SqlTables
 
             using var reader = cmd.ExecuteReader();
 
-            var list = new List<EvChargingSession>();
+            var list = new List<EvChargeSession>();
             while (reader.Read())
                 list.Add(Read(reader));
 
@@ -120,10 +114,10 @@ namespace THMS.Data.Stores.SqlTables
         // ---------------------------------------------------------
         // GET BY ID
         // ---------------------------------------------------------
-        public EvChargingSession? GetById(SqliteConnection conn, Guid sessionId)
+        public EvChargeSession? GetById(SqliteConnection conn, Guid sessionId)
         {
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT * FROM EvChargingSessions WHERE Id = @Id;";
+            cmd.CommandText = "SELECT * FROM EvChargeSessions WHERE Id = @Id;";
             cmd.Parameters.AddWithValue("@Id", sessionId.ToString());
 
             using var reader = cmd.ExecuteReader();
@@ -133,26 +127,24 @@ namespace THMS.Data.Stores.SqlTables
         // ---------------------------------------------------------
         // UPDATE
         // ---------------------------------------------------------
-        public void Update(SqliteConnection conn, EvChargingSession session)
+        public void Update(SqliteConnection conn, EvChargeSession session)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText =
             @"
-            UPDATE EvChargingSessions SET
-                VehicleId = @VehicleId,
+            UPDATE EvChargeSessions SET
 
                 LastOdometer = @LastOdometer,
                 LastSoc = @LastSoc,
 
-                OdometerMiles = @OdometerMiles,
                 StartTime = @StartTime,
-                EndTime = @EndTime,
                 StartSoc = @StartSoc,
                 EndSoc = @EndSoc,
-                IsHomeCharging = @IsHomeCharging,
+                IsHomeCharge = @IsHomeCharge,
 
                 KwhAdded = @KwhAdded,
-                ChargingCost = @ChargingCost,
+                BatteryKwhAdded = @BatteryKwhAdded,
+                SessionCost = @SessionCost,
 
                 GridKwh = @GridKwh,
                 SolarKwh = @SolarKwh,
@@ -162,20 +154,18 @@ namespace THMS.Data.Stores.SqlTables
             ";
 
             cmd.Parameters.AddWithValue("@Id", session.Id.ToString());
-            cmd.Parameters.AddWithValue("@VehicleId", session.VehicleId.ToString());
 
             cmd.Parameters.AddWithValue("@LastOdometer", session.LastOdometer);
             cmd.Parameters.AddWithValue("@LastSoc", session.LastSoc);
 
-            cmd.Parameters.AddWithValue("@OdometerMiles", session.OdometerMiles);
             cmd.Parameters.AddWithValue("@StartTime", session.StartTime);
-            cmd.Parameters.AddWithValue("@EndTime", session.EndTime);
             cmd.Parameters.AddWithValue("@StartSoc", session.StartSoc);
             cmd.Parameters.AddWithValue("@EndSoc", session.EndSoc);
-            cmd.Parameters.AddWithValue("@IsHomeCharging", session.IsHomeCharging ? 1 : 0);
+            cmd.Parameters.AddWithValue("@IsHomeCharge", session.IsHomeCharge ? 1 : 0);
 
             cmd.Parameters.AddWithValue("@KwhAdded", session.KwhAdded);
-            cmd.Parameters.AddWithValue("@ChargingCost", session.SessionCost);
+            cmd.Parameters.AddWithValue("@BatteryKwhAdded", session.BatteryKwhAdded);
+            cmd.Parameters.AddWithValue("@SessionCost", session.SessionCost);
 
             cmd.Parameters.AddWithValue("@GridKwh", session.GridKwh);
             cmd.Parameters.AddWithValue("@SolarKwh", session.SolarKwh);
@@ -190,7 +180,7 @@ namespace THMS.Data.Stores.SqlTables
         public void Delete(SqliteConnection conn, Guid id)
         {
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "DELETE FROM EvChargingSessions WHERE Id = @Id;";
+            cmd.CommandText = "DELETE FROM EvChargeSessions WHERE Id = @Id;";
             cmd.Parameters.AddWithValue("@Id", id.ToString());
             cmd.ExecuteNonQuery();
         }
@@ -198,25 +188,23 @@ namespace THMS.Data.Stores.SqlTables
         // ---------------------------------------------------------
         // READ HELPER
         // ---------------------------------------------------------
-        private EvChargingSession Read(SqliteDataReader reader)
+        private EvChargeSession Read(SqliteDataReader reader)
         {
-            return new EvChargingSession
+            return new EvChargeSession
             {
                 Id = Guid.Parse(reader["Id"].ToString()!),
-                VehicleId = Guid.Parse(reader["VehicleId"].ToString()!),
 
                 LastOdometer = Convert.ToDecimal(reader["LastOdometer"]),
                 LastSoc = Convert.ToDecimal(reader["LastSoc"]),
 
-                OdometerMiles = Convert.ToDecimal(reader["OdometerMiles"]),
                 StartTime = DateTime.Parse(reader["StartTime"].ToString()!),
-                EndTime = DateTime.Parse(reader["EndTime"].ToString()!),
                 StartSoc = Convert.ToDecimal(reader["StartSoc"]),
                 EndSoc = Convert.ToDecimal(reader["EndSoc"]),
-                IsHomeCharging = Convert.ToInt32(reader["IsHomeCharging"]) == 1,
+                IsHomeCharge = Convert.ToInt32(reader["IsHomeCharge"]) == 1,
 
                 KwhAdded = Convert.ToDecimal(reader["KwhAdded"]),
-                SessionCost = Convert.ToDecimal(reader["ChargingCost"]),
+                BatteryKwhAdded = Convert.ToDecimal(reader["BatteryKwhAdded"]),
+                SessionCost = Convert.ToDecimal(reader["SessionCost"]),
 
                 GridKwh = Convert.ToDecimal(reader["GridKwh"]),
                 SolarKwh = Convert.ToDecimal(reader["SolarKwh"]),

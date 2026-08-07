@@ -6,14 +6,14 @@ namespace THMS.Logic.Finance
     /// <summary>
     /// Computes cost summaries for commercial EV charging (e.g., ChargePoint).
     /// </summary>
-    public class CommercialChargingCostEngine
+    public class CommercialChargeCostEngine
     {
         private IFinanceDataStore? _financeStore;
         private IEnergyDataStore? _energyStore;
 
-        public CommercialChargingCostEngine() { }
+        public CommercialChargeCostEngine() { }
 
-        public CommercialChargingCostEngine(
+        public CommercialChargeCostEngine(
             IFinanceDataStore financeStore,
             IEnergyDataStore energyStore)
         {
@@ -29,14 +29,14 @@ namespace THMS.Logic.Finance
             _energyStore = energyStore;
         }
 
-        public CommercialChargingCostSummary ComputeSummary(DateTime start, DateTime end)
+        public CommercialChargeCostSummary ComputeSummary(DateTime start, DateTime end)
         {
             var costRecords = _financeStore
-                .GetCommercialChargingCostRecords(start, end)
+                .GetCommercialChargeCostRecords(start, end)
                 .ToList();
 
             var energyRecords = _energyStore
-                .GetEvCommercialChargingSessions(start, end)
+                .GetEvCommercialChargeSessions(start, end)
                 .ToList();
 
             decimal totalCost = costRecords.Sum(r => r.Cost);
@@ -44,7 +44,7 @@ namespace THMS.Logic.Finance
 
             decimal avgCostPerKwh = totalKwh > 0 ? totalCost / totalKwh : 0;
 
-            return new CommercialChargingCostSummary
+            return new CommercialChargeCostSummary
             {
                 Start = start,
                 End = end,

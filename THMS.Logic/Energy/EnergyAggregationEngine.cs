@@ -57,16 +57,16 @@ namespace THMS.Logic.Energy
                 var summary = summaries[key];
 
                 // Energy totals
-                summary.EvChargingWh += attr.EvChargingWh;
-                summary.EvChargingSolarWh += attr.SolarWh;
-                summary.EvChargingBatteryWh += attr.BatteryWh;
-                summary.EvChargingGridWh += attr.GridWh;
+                summary.EvChargeWh += attr.EvChargeWh;
+                summary.EvChargeSolarWh += attr.SolarWh;
+                summary.EvChargeBatteryWh += attr.BatteryWh;
+                summary.EvChargeGridWh += attr.GridWh;
 
                 // Cost totals
                 summary.SolarAvoidedCost += cost.SolarAvoidedCost;
                 summary.BatteryValue += cost.BatteryValue;
                 summary.GridCost += cost.GridCost;
-                summary.CommercialChargingCost += cost.CommercialChargingCost;
+                summary.CommercialChargeCost += cost.CommercialChargeCost;
 
                 // Partial flag
                 if (attr.IsPartial || cost.IsPartial)

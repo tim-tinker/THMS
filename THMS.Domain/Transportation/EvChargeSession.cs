@@ -1,24 +1,20 @@
 ﻿namespace THMS.Domain.Transportation
 {
-    public class EvChargingSession
+    public class EvChargeSession : MileageRecordBase
     {
-        public Guid Id { get; set; }
-        public Guid VehicleId { get; set; }
-
         // Previous session context (must be persisted)
         public decimal LastOdometer { get; set; }
         public decimal LastSoc { get; set; }
 
         // Basic session data
-        public decimal OdometerMiles { get; set; }
         public DateTime StartTime { get; set; }
-        public DateTime EndTime { get; set; }
         public decimal StartSoc { get; set; }
         public decimal EndSoc { get; set; }
-        public bool IsHomeCharging { get; set; }
+        public bool IsHomeCharge { get; set; }
 
         // Source-dependent data (manual for commercial, computed for home)
         public decimal KwhAdded { get; set; }
+        public decimal BatteryKwhAdded { get; set; }
         public decimal SessionCost { get; set; }
 
         // home energy source data (if applicable)

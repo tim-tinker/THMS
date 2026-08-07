@@ -9,10 +9,10 @@
         public int Month { get; set; }
 
         // Energy-based economics
-        public decimal SolarChargingValue { get; set; }
-        public decimal BatteryChargingValue { get; set; }
-        public decimal GridChargingCost { get; set; }
-        public decimal CommercialChargingCost { get; set; }
+        public decimal SolarChargeValue { get; set; }
+        public decimal BatteryChargeValue { get; set; }
+        public decimal GridChargeCost { get; set; }
+        public decimal CommercialChargeCost { get; set; }
 
         // Loan economics
         public decimal LoanPayment { get; set; }
@@ -21,10 +21,10 @@
 
         // Net ROI
         public decimal NetRoi =>
-            SolarChargingValue +
-            BatteryChargingValue -
-            GridChargingCost -
-            CommercialChargingCost -
+            SolarChargeValue +
+            BatteryChargeValue -
+            GridChargeCost -
+            CommercialChargeCost -
             LoanPayment;
 
         // Flags

@@ -1,6 +1,6 @@
 ﻿namespace THMS.Domain.Transportation
 {
-    public class ChargingCostRecord : BaseDomainModel
+    public class ChargeCostRecord : BaseDomainModel
     {
         public Guid VehicleId { get; set; }
         public DateTime Timestamp { get; set; }

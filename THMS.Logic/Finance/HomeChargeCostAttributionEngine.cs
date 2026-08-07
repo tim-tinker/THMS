@@ -5,14 +5,14 @@ using THMS.Domain.Energy;
 
 namespace THMS.Logic.Finance
 {
-    public class HomeChargingCostAttributionEngine
+    public class HomeChargeCostAttributionEngine
     {
         private IFinanceDataStore? _financeStore;
         private IEnergyDataStore? _energyStore;
 
-        public HomeChargingCostAttributionEngine() { }
+        public HomeChargeCostAttributionEngine() { }
 
-        public HomeChargingCostAttributionEngine(
+        public HomeChargeCostAttributionEngine(
             IEnergyDataStore energyStore,
             IFinanceDataStore financeStore)
         {
@@ -28,7 +28,7 @@ namespace THMS.Logic.Finance
             _energyStore = energyStore;
         }
 
-        public HomeChargingCostSummary ComputeMonthlyCost(DateTime monthStart, DateTime monthEnd)
+        public HomeChargeCostSummary ComputeMonthlyCost(DateTime monthStart, DateTime monthEnd)
         {
             // -----------------------------------------
             // 1. Get the monthly utility bill
@@ -108,7 +108,7 @@ namespace THMS.Logic.Finance
             // -----------------------------------------
             decimal evCost = totalBillCost * evShare;
 
-            return new HomeChargingCostSummary
+            return new HomeChargeCostSummary
             {
                 Start = monthStart,
                 End = monthEnd,

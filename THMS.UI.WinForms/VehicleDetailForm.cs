@@ -48,7 +48,7 @@ namespace THMS.UI.WinForms
             _vm.EndTime = EndOfDay(end);
 
             LoadVehicle();
-            BindChargingGrid();
+            BindChargeGrid();
             LoadGrids();
         }
 
@@ -68,19 +68,19 @@ namespace THMS.UI.WinForms
             }
         }
 
-        private void BindChargingGrid()
+        private void BindChargeGrid()
         {
             if (_chargingGridBound)
                 return;
 
             chargingGrid.AutoGenerateColumns = true;
-            chargingGrid.DataSource = _vm.ChargingSessions;
-            HideChargingGridColumn("Id");
-            HideChargingGridColumn("VehicleId");
+            chargingGrid.DataSource = _vm.ChargeSessions;
+            HideChargeGridColumn("Id");
+            HideChargeGridColumn("VehicleId");
             _chargingGridBound = true;
         }
 
-        private void HideChargingGridColumn(string dataPropertyName)
+        private void HideChargeGridColumn(string dataPropertyName)
         {
             if (chargingGrid.Columns[dataPropertyName] is DataGridViewColumn column)
                 column.Visible = false;
@@ -91,7 +91,7 @@ namespace THMS.UI.WinForms
             fuelGrid.DataSource = _vm.FuelReceipts
                 .Select(f => new
                 {
-                    f.Date,
+                    f.EndTime,
                     f.OdometerMiles,
                     f.GallonsAdded,
                     f.FuelCost,
@@ -119,9 +119,9 @@ namespace THMS.UI.WinForms
             }
         }
 
-        private void btnAddCharging_Click(object sender, EventArgs e)
+        private void btnAddCharge_Click(object sender, EventArgs e)
         {
-            var last = _vm.GetLatestChargingSession();
+            var last = _vm.GetLatestChargeSession();
 
             using var form = new EvChargeSessionForm(
                 _vm.VehicleId,
@@ -132,17 +132,17 @@ namespace THMS.UI.WinForms
 
             if (form.ShowDialog(this) == DialogResult.OK && form.SavedSession != null)
             {
-                _vm.UpsertChargingSession(form.SavedSession);
+                _vm.UpsertChargeSession(form.SavedSession);
             }
         }
 
-        private void OnCellDoubleClickChargingSession(object sender, DataGridViewCellEventArgs e)
+        private void OnCellDoubleClickChargeSession(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0)
                 return;
 
             var row = chargingGrid.Rows[e.RowIndex];
-            var session = row.DataBoundItem as EvChargingSession;
+            var session = row.DataBoundItem as EvChargeSession;
             if (session is null)
                 return;
 
@@ -154,7 +154,7 @@ namespace THMS.UI.WinForms
 
             if (form.ShowDialog(this) == DialogResult.OK && form.SavedSession != null)
             {
-                _vm.UpsertChargingSession(form.SavedSession);
+                _vm.UpsertChargeSession(form.SavedSession);
             }
         }
 

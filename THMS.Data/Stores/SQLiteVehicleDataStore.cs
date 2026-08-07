@@ -18,7 +18,7 @@ namespace THMS.Data.Stores.SQLite
         private readonly IceMileageTable _iceMileageTable = new();
         private readonly MileageRecordTable _mileageRecordTable = new();
         private readonly MaintenanceInvoiceTable _maintenanceInvoiceTable = new();
-        private readonly EvChargingSessionTable _evSessionTable = new();
+        private readonly EvChargeSessionTable _evSessionTable = new();
 
         public SQLiteVehicleDataStore(string connectionString)
         {
@@ -107,7 +107,7 @@ namespace THMS.Data.Stores.SQLite
                     Year = year,
                     Vin = vin,
                     BatteryCapacityKwh = batteryCapacityKwh,
-                    ChargingPortType = chargingPortType
+                    ChargePortType = chargingPortType
                 };
             }
 
@@ -155,7 +155,7 @@ namespace THMS.Data.Stores.SQLite
 
             var results = new List<IceMileageRecord>();
 
-            foreach (var (id, vId, date, odo, notes, _) in baseRows)
+            foreach (var (id, vId, date, odo, _) in baseRows)
             {
                 var derived = _iceMileageTable.GetById(conn, id);
                 if (derived == null) continue;
@@ -166,16 +166,15 @@ namespace THMS.Data.Stores.SQLite
                 {
                     Id = id,
                     VehicleId = vId,
-                    Date = date,
+                    EndTime = date,
                     OdometerMiles = odo,
-                    Notes = notes,
                     GallonsAdded = gallonsAdded,
                     IsFullFillUp = isFullFillUp,
                     FuelCost = fuelCost
                 });
             }
 
-            return results.OrderBy(r => r.Date);
+            return results.OrderBy(r => r.EndTime);
         }
 
         public decimal GetMilesDrivenInPeriod(Guid vehicleId, DateTime start, DateTime end)
@@ -184,7 +183,7 @@ namespace THMS.Data.Stores.SQLite
 
             var records = _mileageRecordTable
                 .GetRange(conn, vehicleId, start, end)
-                .OrderBy(r => r.Date)
+                .OrderBy(r => r.EndTime)
                 .ToList();
 
             if (records.Count < 2)
@@ -200,34 +199,65 @@ namespace THMS.Data.Stores.SQLite
         // EV CHARGING SESSIONS
         // ---------------------------------------------------------
 
-        public void AddEvChargingSession(EvChargingSession session)
+        public void AddEvChargeSession(EvChargeSession session)
         {
             using var conn = OpenConnection();
+            _mileageRecordTable.Insert(conn, session, "Ev");
             _evSessionTable.Insert(conn, session);
         }
 
-        public IEnumerable<EvChargingSession> GetEvChargingSessions(Guid vehicleId, DateTime start, DateTime end)
+        public IEnumerable<EvChargeSession> GetEvChargeSessions(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _evSessionTable.GetByVehicleAndRange(conn, vehicleId, start, end).ToList();
+
+            var mileageRecords = _mileageRecordTable.GetRange(conn, vehicleId, start, end);
+
+            foreach (var record in mileageRecords)
+            {
+                var ev = _evSessionTable.GetById(conn, record.Id);
+                if (ev != null)
+                {
+                    // copy mileage fields
+                    ev.VehicleId = record.VehicleId;
+                    ev.OdometerMiles = record.OdometerMiles;
+                    ev.EndTime = record.EndTime;
+
+                    yield return ev;
+                }
+            }
         }
 
-        public EvChargingSession? GetEvChargingSession(Guid sessionId)
+        public EvChargeSession? GetEvChargeSession(Guid sessionId)
         {
             using var conn = OpenConnection();
-            return _evSessionTable.GetById(conn, sessionId);
+            var session = _evSessionTable.GetById(conn, sessionId);
+            if (session == null)
+                return null;
+
+            // Load mileage fields
+            var mileageRecord = _mileageRecordTable.GetById(conn, sessionId);
+            if (mileageRecord != null)
+            {
+                session.VehicleId = mileageRecord.Value.VehicleId;
+                session.OdometerMiles = mileageRecord.Value.OdometerMiles;
+                session.EndTime = mileageRecord.Value.EndTime;
+            }
+
+            return session;
         }
 
-        public void UpdateEvChargingSession(EvChargingSession session)
+        public void UpdateEvChargeSession(EvChargeSession session)
         {
             using var conn = OpenConnection();
+            _mileageRecordTable.Update(conn, session);
             _evSessionTable.Update(conn, session);
         }
 
-        public void DeleteEvChargingSession(Guid sessionId)
+        public void DeleteEvChargeSession(Guid sessionId)
         {
             using var conn = OpenConnection();
             _evSessionTable.Delete(conn, sessionId);
+            _mileageRecordTable.Delete(conn, sessionId);
         }
 
         // ---------------------------------------------------------

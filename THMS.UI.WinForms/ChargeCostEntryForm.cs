@@ -4,16 +4,16 @@ using THMS.Logic.ViewModels.Transportation;
 
 namespace THMS.UI.WinForms
 {
-    public partial class ChargingCostEntryForm : Form
+    public partial class ChargeCostEntryForm : Form
     {
-        private readonly ChargingCostEntryViewModel _vm;
+        private readonly ChargeCostEntryViewModel _vm;
         private readonly VehicleDetailViewModel _parentVm;
 
-        public ChargingCostEntryForm(Guid vehicleId, VehicleDetailViewModel parentVm)
+        public ChargeCostEntryForm(Guid vehicleId, VehicleDetailViewModel parentVm)
         {
             InitializeComponent();
             _parentVm = parentVm;
-            _vm = new ChargingCostEntryViewModel(parentVm.VehicleStore, vehicleId);
+            _vm = new ChargeCostEntryViewModel(parentVm.VehicleStore, vehicleId);
 
             dtpTimestamp.Value = DateTime.Now;
         }

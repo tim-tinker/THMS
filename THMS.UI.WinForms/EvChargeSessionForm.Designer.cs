@@ -74,6 +74,12 @@
             _btnCancel = new Button();
             _numLastOdometer = new NumericUpDown();
             _numLastSoc = new NumericUpDown();
+            _numBatteryKwhAdded = new NumericUpDown();
+            label1 = new Label();
+            _textChargeLossKwh = new TextBox();
+            label23 = new Label();
+            _textChargeEfficiency = new TextBox();
+            label24 = new Label();
             ((System.ComponentModel.ISupportInitialize)_numOdometer).BeginInit();
             ((System.ComponentModel.ISupportInitialize)_numStartSoc).BeginInit();
             ((System.ComponentModel.ISupportInitialize)_numEndSoc).BeginInit();
@@ -81,21 +87,22 @@
             ((System.ComponentModel.ISupportInitialize)_numSessionCost).BeginInit();
             ((System.ComponentModel.ISupportInitialize)_numLastOdometer).BeginInit();
             ((System.ComponentModel.ISupportInitialize)_numLastSoc).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)_numBatteryKwhAdded).BeginInit();
             SuspendLayout();
             // 
             // _numOdometer
             // 
-            _numOdometer.Location = new Point(192, 11);
+            _numOdometer.Location = new Point(226, 95);
             _numOdometer.Maximum = new decimal(new int[] { 1000000, 0, 0, 0 });
             _numOdometer.Name = "_numOdometer";
             _numOdometer.Size = new Size(183, 35);
-            _numOdometer.TabIndex = 0;
+            _numOdometer.TabIndex = 2;
             _numOdometer.ValueChanged += OnValueChanged;
             // 
             // label2
             // 
             label2.AutoSize = true;
-            label2.Location = new Point(12, 13);
+            label2.Location = new Point(12, 97);
             label2.Name = "label2";
             label2.Size = new Size(107, 30);
             label2.TabIndex = 3;
@@ -104,15 +111,15 @@
             // _dateStart
             // 
             _dateStart.Format = DateTimePickerFormat.Short;
-            _dateStart.Location = new Point(192, 51);
+            _dateStart.Location = new Point(226, 136);
             _dateStart.Name = "_dateStart";
             _dateStart.Size = new Size(183, 35);
-            _dateStart.TabIndex = 1;
+            _dateStart.TabIndex = 3;
             // 
             // label3
             // 
             label3.AutoSize = true;
-            label3.Location = new Point(12, 53);
+            label3.Location = new Point(12, 138);
             label3.Name = "label3";
             label3.Size = new Size(105, 30);
             label3.TabIndex = 5;
@@ -120,25 +127,25 @@
             // 
             // _numStartSoc
             // 
-            _numStartSoc.Location = new Point(192, 136);
+            _numStartSoc.Location = new Point(226, 301);
             _numStartSoc.Name = "_numStartSoc";
             _numStartSoc.Size = new Size(183, 35);
-            _numStartSoc.TabIndex = 3;
+            _numStartSoc.TabIndex = 7;
             _numStartSoc.ValueChanged += OnValueChanged;
             // 
             // _timeStart
             // 
             _timeStart.Format = DateTimePickerFormat.Time;
-            _timeStart.Location = new Point(192, 95);
+            _timeStart.Location = new Point(226, 178);
             _timeStart.Name = "_timeStart";
             _timeStart.ShowUpDown = true;
             _timeStart.Size = new Size(183, 35);
-            _timeStart.TabIndex = 2;
+            _timeStart.TabIndex = 4;
             // 
             // label4
             // 
             label4.AutoSize = true;
-            label4.Location = new Point(12, 97);
+            label4.Location = new Point(12, 180);
             label4.Name = "label4";
             label4.Size = new Size(106, 30);
             label4.TabIndex = 8;
@@ -147,7 +154,7 @@
             // label5
             // 
             label5.AutoSize = true;
-            label5.Location = new Point(12, 138);
+            label5.Location = new Point(12, 304);
             label5.Name = "label5";
             label5.Size = new Size(136, 30);
             label5.TabIndex = 9;
@@ -156,15 +163,15 @@
             // _dateEnd
             // 
             _dateEnd.Format = DateTimePickerFormat.Short;
-            _dateEnd.Location = new Point(192, 178);
+            _dateEnd.Location = new Point(226, 219);
             _dateEnd.Name = "_dateEnd";
             _dateEnd.Size = new Size(183, 35);
-            _dateEnd.TabIndex = 4;
+            _dateEnd.TabIndex = 5;
             // 
             // label6
             // 
             label6.AutoSize = true;
-            label6.Location = new Point(12, 180);
+            label6.Location = new Point(12, 221);
             label6.Name = "label6";
             label6.Size = new Size(98, 30);
             label6.TabIndex = 5;
@@ -172,25 +179,25 @@
             // 
             // _numEndSoc
             // 
-            _numEndSoc.Location = new Point(192, 260);
+            _numEndSoc.Location = new Point(226, 342);
             _numEndSoc.Name = "_numEndSoc";
             _numEndSoc.Size = new Size(183, 35);
-            _numEndSoc.TabIndex = 6;
+            _numEndSoc.TabIndex = 8;
             _numEndSoc.ValueChanged += OnValueChanged;
             // 
             // _timeEnd
             // 
             _timeEnd.Format = DateTimePickerFormat.Time;
-            _timeEnd.Location = new Point(192, 219);
+            _timeEnd.Location = new Point(226, 260);
             _timeEnd.Name = "_timeEnd";
             _timeEnd.ShowUpDown = true;
             _timeEnd.Size = new Size(183, 35);
-            _timeEnd.TabIndex = 5;
+            _timeEnd.TabIndex = 6;
             // 
             // label7
             // 
             label7.AutoSize = true;
-            label7.Location = new Point(12, 221);
+            label7.Location = new Point(12, 262);
             label7.Name = "label7";
             label7.Size = new Size(99, 30);
             label7.TabIndex = 8;
@@ -199,7 +206,7 @@
             // label8
             // 
             label8.AutoSize = true;
-            label8.Location = new Point(12, 262);
+            label8.Location = new Point(12, 344);
             label8.Name = "label8";
             label8.Size = new Size(129, 30);
             label8.TabIndex = 9;
@@ -208,16 +215,16 @@
             // _numKwhAdded
             // 
             _numKwhAdded.DecimalPlaces = 3;
-            _numKwhAdded.Location = new Point(192, 342);
+            _numKwhAdded.Location = new Point(226, 465);
             _numKwhAdded.Name = "_numKwhAdded";
             _numKwhAdded.Size = new Size(183, 35);
-            _numKwhAdded.TabIndex = 9;
+            _numKwhAdded.TabIndex = 12;
             _numKwhAdded.ValueChanged += OnValueChanged;
             // 
             // label9
             // 
             label9.AutoSize = true;
-            label9.Location = new Point(12, 344);
+            label9.Location = new Point(12, 467);
             label9.Name = "label9";
             label9.Size = new Size(122, 30);
             label9.TabIndex = 11;
@@ -226,10 +233,10 @@
             // _checkHomeCharger
             // 
             _checkHomeCharger.AutoSize = true;
-            _checkHomeCharger.Location = new Point(12, 301);
+            _checkHomeCharger.Location = new Point(12, 424);
             _checkHomeCharger.Name = "_checkHomeCharger";
             _checkHomeCharger.Size = new Size(174, 34);
-            _checkHomeCharger.TabIndex = 7;
+            _checkHomeCharger.TabIndex = 10;
             _checkHomeCharger.Text = "Home Charger";
             _checkHomeCharger.UseVisualStyleBackColor = true;
             _checkHomeCharger.CheckedChanged += OnCheckedChangedHomeCharger;
@@ -237,17 +244,17 @@
             // _numSessionCost
             // 
             _numSessionCost.DecimalPlaces = 2;
-            _numSessionCost.Location = new Point(192, 383);
+            _numSessionCost.Location = new Point(226, 506);
             _numSessionCost.Maximum = new decimal(new int[] { 1000, 0, 0, 0 });
             _numSessionCost.Name = "_numSessionCost";
             _numSessionCost.Size = new Size(183, 35);
-            _numSessionCost.TabIndex = 10;
+            _numSessionCost.TabIndex = 13;
             _numSessionCost.ValueChanged += OnValueChanged;
             // 
             // label10
             // 
             label10.AutoSize = true;
-            label10.Location = new Point(12, 385);
+            label10.Location = new Point(12, 508);
             label10.Name = "label10";
             label10.Size = new Size(83, 30);
             label10.TabIndex = 14;
@@ -255,10 +262,10 @@
             // 
             // _btnLoadCircuitData
             // 
-            _btnLoadCircuitData.Location = new Point(192, 298);
+            _btnLoadCircuitData.Location = new Point(226, 421);
             _btnLoadCircuitData.Name = "_btnLoadCircuitData";
             _btnLoadCircuitData.Size = new Size(183, 40);
-            _btnLoadCircuitData.TabIndex = 8;
+            _btnLoadCircuitData.TabIndex = 11;
             _btnLoadCircuitData.Text = "View Circuit Data";
             _btnLoadCircuitData.UseVisualStyleBackColor = true;
             _btnLoadCircuitData.Click += OnClickLoadCircuitData;
@@ -267,7 +274,7 @@
             // 
             label11.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             label11.AutoSize = true;
-            label11.Location = new Point(508, 344);
+            label11.Location = new Point(568, 385);
             label11.Name = "label11";
             label11.Size = new Size(99, 30);
             label11.TabIndex = 17;
@@ -277,7 +284,7 @@
             // 
             label12.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             label12.AutoSize = true;
-            label12.Location = new Point(508, 138);
+            label12.Location = new Point(527, 56);
             label12.Name = "label12";
             label12.Size = new Size(140, 30);
             label12.TabIndex = 18;
@@ -287,7 +294,7 @@
             // 
             label13.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             label13.AutoSize = true;
-            label13.Location = new Point(508, 303);
+            label13.Location = new Point(512, 98);
             label13.Name = "label13";
             label13.Size = new Size(155, 30);
             label13.TabIndex = 19;
@@ -297,7 +304,7 @@
             // 
             label14.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             label14.AutoSize = true;
-            label14.Location = new Point(508, 97);
+            label14.Location = new Point(553, 15);
             label14.Name = "label14";
             label14.Size = new Size(114, 30);
             label14.TabIndex = 20;
@@ -307,7 +314,7 @@
             // 
             label15.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             label15.AutoSize = true;
-            label15.Location = new Point(508, 180);
+            label15.Location = new Point(560, 139);
             label15.Name = "label15";
             label15.Size = new Size(107, 30);
             label15.TabIndex = 21;
@@ -316,7 +323,7 @@
             // label16
             // 
             label16.AutoSize = true;
-            label16.Location = new Point(12, 426);
+            label16.Location = new Point(595, 347);
             label16.Name = "label16";
             label16.Size = new Size(72, 30);
             label16.TabIndex = 22;
@@ -326,7 +333,7 @@
             // 
             label17.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             label17.AutoSize = true;
-            label17.Location = new Point(508, 221);
+            label17.Location = new Point(574, 262);
             label17.Name = "label17";
             label17.Size = new Size(93, 30);
             label17.TabIndex = 23;
@@ -336,7 +343,7 @@
             // 
             label18.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             label18.AutoSize = true;
-            label18.Location = new Point(508, 262);
+            label18.Location = new Point(598, 306);
             label18.Name = "label18";
             label18.Size = new Size(69, 30);
             label18.TabIndex = 24;
@@ -346,7 +353,7 @@
             // 
             label19.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             label19.AutoSize = true;
-            label19.Location = new Point(508, 385);
+            label19.Location = new Point(560, 426);
             label19.Name = "label19";
             label19.Size = new Size(107, 30);
             label19.TabIndex = 25;
@@ -355,7 +362,7 @@
             // _textSocAdded
             // 
             _textSocAdded.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textSocAdded.Location = new Point(664, 301);
+            _textSocAdded.Location = new Point(673, 95);
             _textSocAdded.Name = "_textSocAdded";
             _textSocAdded.ReadOnly = true;
             _textSocAdded.Size = new Size(183, 35);
@@ -364,7 +371,7 @@
             // _textSocUsed
             // 
             _textSocUsed.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textSocUsed.Location = new Point(664, 136);
+            _textSocUsed.Location = new Point(673, 54);
             _textSocUsed.Name = "_textSocUsed";
             _textSocUsed.ReadOnly = true;
             _textSocUsed.Size = new Size(183, 35);
@@ -373,7 +380,7 @@
             // _textMilesUsed
             // 
             _textMilesUsed.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textMilesUsed.Location = new Point(664, 95);
+            _textMilesUsed.Location = new Point(673, 13);
             _textMilesUsed.Name = "_textMilesUsed";
             _textMilesUsed.ReadOnly = true;
             _textMilesUsed.Size = new Size(183, 35);
@@ -382,7 +389,7 @@
             // _textKwhUsed
             // 
             _textKwhUsed.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textKwhUsed.Location = new Point(664, 178);
+            _textKwhUsed.Location = new Point(673, 136);
             _textKwhUsed.Name = "_textKwhUsed";
             _textKwhUsed.ReadOnly = true;
             _textKwhUsed.Size = new Size(183, 35);
@@ -390,7 +397,7 @@
             // 
             // _textCostPerMile
             // 
-            _textCostPerMile.Location = new Point(192, 424);
+            _textCostPerMile.Location = new Point(673, 344);
             _textCostPerMile.Name = "_textCostPerMile";
             _textCostPerMile.ReadOnly = true;
             _textCostPerMile.Size = new Size(183, 35);
@@ -399,7 +406,7 @@
             // _textWhPerMile
             // 
             _textWhPerMile.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textWhPerMile.Location = new Point(664, 219);
+            _textWhPerMile.Location = new Point(673, 262);
             _textWhPerMile.Name = "_textWhPerMile";
             _textWhPerMile.ReadOnly = true;
             _textWhPerMile.Size = new Size(183, 35);
@@ -408,7 +415,7 @@
             // _textMpge
             // 
             _textMpge.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textMpge.Location = new Point(664, 260);
+            _textMpge.Location = new Point(673, 303);
             _textMpge.Name = "_textMpge";
             _textMpge.ReadOnly = true;
             _textMpge.Size = new Size(183, 35);
@@ -417,7 +424,7 @@
             // _textGridKwh
             // 
             _textGridKwh.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textGridKwh.Location = new Point(664, 342);
+            _textGridKwh.Location = new Point(673, 383);
             _textGridKwh.Name = "_textGridKwh";
             _textGridKwh.ReadOnly = true;
             _textGridKwh.Size = new Size(183, 35);
@@ -426,7 +433,7 @@
             // _textSolarKwh
             // 
             _textSolarKwh.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textSolarKwh.Location = new Point(664, 383);
+            _textSolarKwh.Location = new Point(673, 424);
             _textSolarKwh.Name = "_textSolarKwh";
             _textSolarKwh.ReadOnly = true;
             _textSolarKwh.Size = new Size(183, 35);
@@ -436,7 +443,7 @@
             // 
             label20.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             label20.AutoSize = true;
-            label20.Location = new Point(508, 13);
+            label20.Location = new Point(12, 15);
             label20.Name = "label20";
             label20.Size = new Size(150, 30);
             label20.TabIndex = 36;
@@ -446,7 +453,7 @@
             // 
             label21.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             label21.AutoSize = true;
-            label21.Location = new Point(508, 53);
+            label21.Location = new Point(12, 56);
             label21.Name = "label21";
             label21.Size = new Size(131, 30);
             label21.TabIndex = 38;
@@ -455,7 +462,7 @@
             // _textBatteryKwh
             // 
             _textBatteryKwh.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textBatteryKwh.Location = new Point(664, 424);
+            _textBatteryKwh.Location = new Point(673, 465);
             _textBatteryKwh.Name = "_textBatteryKwh";
             _textBatteryKwh.ReadOnly = true;
             _textBatteryKwh.Size = new Size(183, 35);
@@ -465,7 +472,7 @@
             // 
             label22.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             label22.AutoSize = true;
-            label22.Location = new Point(508, 426);
+            label22.Location = new Point(541, 467);
             label22.Name = "label22";
             label22.Size = new Size(126, 30);
             label22.TabIndex = 40;
@@ -474,7 +481,7 @@
             // _btnSave
             // 
             _btnSave.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            _btnSave.Location = new Point(716, 491);
+            _btnSave.Location = new Point(725, 539);
             _btnSave.Name = "_btnSave";
             _btnSave.Size = new Size(131, 40);
             _btnSave.TabIndex = 41;
@@ -485,7 +492,7 @@
             // _btnCancel
             // 
             _btnCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            _btnCancel.Location = new Point(579, 491);
+            _btnCancel.Location = new Point(588, 539);
             _btnCancel.Name = "_btnCancel";
             _btnCancel.Size = new Size(131, 40);
             _btnCancel.TabIndex = 42;
@@ -495,27 +502,84 @@
             // 
             // _numLastOdometer
             // 
-            _numLastOdometer.Location = new Point(664, 11);
+            _numLastOdometer.Location = new Point(226, 13);
             _numLastOdometer.Maximum = new decimal(new int[] { 1000000, 0, 0, 0 });
             _numLastOdometer.Name = "_numLastOdometer";
             _numLastOdometer.Size = new Size(183, 35);
-            _numLastOdometer.TabIndex = 11;
+            _numLastOdometer.TabIndex = 0;
             _numLastOdometer.ValueChanged += OnValueChanged;
             // 
             // _numLastSoc
             // 
-            _numLastSoc.Location = new Point(664, 51);
+            _numLastSoc.Location = new Point(226, 54);
             _numLastSoc.Name = "_numLastSoc";
             _numLastSoc.Size = new Size(183, 35);
-            _numLastSoc.TabIndex = 12;
+            _numLastSoc.TabIndex = 1;
             _numLastSoc.ValueChanged += OnValueChanged;
+            // 
+            // _numBatteryKwhAdded
+            // 
+            _numBatteryKwhAdded.Location = new Point(226, 383);
+            _numBatteryKwhAdded.Name = "_numBatteryKwhAdded";
+            _numBatteryKwhAdded.Size = new Size(183, 35);
+            _numBatteryKwhAdded.TabIndex = 9;
+            _numBatteryKwhAdded.ValueChanged += OnValueChanged;
+            // 
+            // label1
+            // 
+            label1.AutoSize = true;
+            label1.Location = new Point(12, 385);
+            label1.Name = "label1";
+            label1.Size = new Size(193, 30);
+            label1.TabIndex = 44;
+            label1.Text = "Battery kWh Added";
+            // 
+            // _textChargeLossKwh
+            // 
+            _textChargeLossKwh.Location = new Point(673, 177);
+            _textChargeLossKwh.Name = "_textChargeLossKwh";
+            _textChargeLossKwh.ReadOnly = true;
+            _textChargeLossKwh.Size = new Size(183, 35);
+            _textChargeLossKwh.TabIndex = 45;
+            // 
+            // label23
+            // 
+            label23.AutoSize = true;
+            label23.Location = new Point(482, 179);
+            label23.Name = "label23";
+            label23.Size = new Size(185, 30);
+            label23.TabIndex = 46;
+            label23.Text = "Charge Loss (kWh)";
+            // 
+            // _textChargeEfficiency
+            // 
+            _textChargeEfficiency.Location = new Point(673, 219);
+            _textChargeEfficiency.Name = "_textChargeEfficiency";
+            _textChargeEfficiency.ReadOnly = true;
+            _textChargeEfficiency.Size = new Size(183, 35);
+            _textChargeEfficiency.TabIndex = 45;
+            // 
+            // label24
+            // 
+            label24.AutoSize = true;
+            label24.Location = new Point(459, 221);
+            label24.Name = "label24";
+            label24.Size = new Size(208, 30);
+            label24.TabIndex = 46;
+            label24.Text = "Charge Efficiency (%)";
             // 
             // EvChargeSessionForm
             // 
             AutoScaleDimensions = new SizeF(12F, 30F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = _btnCancel;
-            ClientSize = new Size(859, 543);
+            ClientSize = new Size(868, 591);
+            Controls.Add(label24);
+            Controls.Add(label23);
+            Controls.Add(_textChargeEfficiency);
+            Controls.Add(_textChargeLossKwh);
+            Controls.Add(label1);
+            Controls.Add(_numBatteryKwhAdded);
             Controls.Add(_numLastSoc);
             Controls.Add(_numLastOdometer);
             Controls.Add(_btnCancel);
@@ -572,6 +636,7 @@
             ((System.ComponentModel.ISupportInitialize)_numSessionCost).EndInit();
             ((System.ComponentModel.ISupportInitialize)_numLastOdometer).EndInit();
             ((System.ComponentModel.ISupportInitialize)_numLastSoc).EndInit();
+            ((System.ComponentModel.ISupportInitialize)_numBatteryKwhAdded).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -623,5 +688,11 @@
         private Button _btnCancel;
         private NumericUpDown _numLastOdometer;
         private NumericUpDown _numLastSoc;
+        private NumericUpDown _numBatteryKwhAdded;
+        private Label label1;
+        private TextBox _textChargeLossKwh;
+        private Label label23;
+        private TextBox _textChargeEfficiency;
+        private Label label24;
     }
 }

@@ -4,13 +4,13 @@
     /// Represents the financial portion of a commercial EV charging session.
     /// Energy (Wh) is stored separately in IEnergyDataStore.
     /// </summary>
-    public class CommercialChargingCostRecord
+    public class CommercialChargeCostRecord
     {
         public Guid Id { get; set; }
 
         /// <summary>
         /// Timestamp of the charging session start.
-        /// This aligns with the EvChargingSession.Timestamp stored in IEnergyDataStore.
+        /// This aligns with the EvChargeSession.Timestamp stored in IEnergyDataStore.
         /// </summary>
         public DateTime Date { get; set; }
 

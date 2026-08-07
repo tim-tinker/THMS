@@ -13,7 +13,7 @@ namespace THMS.Logic.Transportation
     {
         public IEnumerable<MpgResult> ComputeMpg(IEnumerable<IceMileageRecord> records)
         {
-            var ordered = records.OrderBy(r => r.Date).ToList();
+            var ordered = records.OrderBy(r => r.EndTime).ToList();
 
             // Identify all full fill-ups
             var fullFillUps = ordered.Where(r => r.IsFullFillUp).ToList();
@@ -27,7 +27,7 @@ namespace THMS.Logic.Transportation
 
                 // All records between the two full fill-ups
                 var between = ordered
-                    .Where(r => r.Date > previousFull.Date && r.Date <= currentFull.Date)
+                    .Where(r => r.EndTime > previousFull.EndTime && r.EndTime <= currentFull.EndTime)
                     .ToList();
 
                 // Sum gallons from partial + current full
@@ -38,7 +38,7 @@ namespace THMS.Logic.Transportation
 
                 results.Add(new MpgResult
                 {
-                    Date = currentFull.Date,
+                    Date = currentFull.EndTime,
                     MilesDriven = milesDriven,
                     GallonsUsed = totalGallons
                 });
@@ -60,7 +60,7 @@ namespace THMS.Logic.Transportation
         public decimal ComputeMonthlyMpg(IEnumerable<IceMileageRecord> records, DateTime monthStart, DateTime monthEnd)
         {
             var monthlyRecords = records
-                .Where(r => r.Date >= monthStart && r.Date <= monthEnd)
+                .Where(r => r.EndTime >= monthStart && r.EndTime <= monthEnd)
                 .ToList();
 
             return ComputeAverageMpg(monthlyRecords);

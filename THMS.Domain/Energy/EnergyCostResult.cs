@@ -7,13 +7,13 @@
     {
         public DateTime Timestamp { get; set; }
 
-        public decimal EvChargingWh { get; set; }
+        public decimal EvChargeWh { get; set; }
 
         public decimal SolarAvoidedCost { get; set; }
         public decimal BatteryValue { get; set; }
         public decimal GridCost { get; set; }
 
-        public decimal CommercialChargingCost { get; set; }
+        public decimal CommercialChargeCost { get; set; }
 
         /// <summary>
         /// True if cost attribution is incomplete due to missing billing data.

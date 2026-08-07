@@ -6,7 +6,7 @@
         public decimal TotalCost { get; set; }
         public decimal CostPerMile { get; set; }
 
-        public decimal HomeChargingCost { get; set; }
-        public decimal CommercialChargingCost { get; set; }
+        public decimal HomeChargeCost { get; set; }
+        public decimal CommercialChargeCost { get; set; }
     }
 }

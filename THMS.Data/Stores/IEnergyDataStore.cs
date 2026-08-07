@@ -30,9 +30,9 @@ namespace THMS.Data.Stores
         // COMMERCIAL CHARGING SESSIONS
         // ---------------------------------------------------------
 
-        void AddEvCommercialChargingSession(EvCommercialChargingSession session);
+        void AddEvCommercialChargeSession(EvCommercialChargeSession session);
 
-        IEnumerable<EvCommercialChargingSession> GetEvCommercialChargingSessions(
+        IEnumerable<EvCommercialChargeSession> GetEvCommercialChargeSessions(
             DateTime start,
             DateTime end);
 
@@ -41,13 +41,13 @@ namespace THMS.Data.Stores
         // COMMERCIAL CHARGING COST RECORDS
         // ---------------------------------------------------------
 
-        void AddCommercialChargingCostRecord(CommercialChargingCostRecord record);
+        void AddCommercialChargeCostRecord(CommercialChargeCostRecord record);
 
-        IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecords(
+        IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecords(
             DateTime start,
             DateTime end);
 
-        IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecordsByVendor(
+        IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecordsByVendor(
             string vendor,
             DateTime start,
             DateTime end);
@@ -67,5 +67,18 @@ namespace THMS.Data.Stores
 
         // Optional convenience: roll-up summary
         EvCircuitSegmentSummary GetEvCircuitSummary(Guid sessionId);
+
+        // ---------------------------------------------------------
+        // BATTERY SOC RECORDS
+        // ---------------------------------------------------------
+
+        IReadOnlyCollection<BatterySocRecord> GetBatterySocTimeline(DateTime start, DateTime end);
+
+        // ---------------------------------------------------------
+        // ENERGY ATTRIBUTION RESULTS
+        // ---------------------------------------------------------
+
+        IReadOnlyCollection<EnergyAttributionResult> GetEvAttribution(DateTime start, DateTime end);
+
     }
 }

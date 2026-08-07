@@ -3,11 +3,11 @@ using THMS.Domain.Transportation;
 
 namespace THMS.Logic.ViewModels.Transportation
 {
-    public class ChargingCostEntryViewModel
+    public class ChargeCostEntryViewModel
     {
         private readonly IVehicleDataStore _store;
 
-        public ChargingCostEntryViewModel(IVehicleDataStore store, Guid vehicleId)
+        public ChargeCostEntryViewModel(IVehicleDataStore store, Guid vehicleId)
         {
             _store = store;
             VehicleId = vehicleId;
@@ -20,14 +20,14 @@ namespace THMS.Logic.ViewModels.Transportation
 
         public void Save()
         {
-            var record = new ChargingCostRecord
+            var record = new ChargeCostRecord
             {
                 VehicleId = VehicleId,
                 Timestamp = Timestamp,
                 Cost = Cost
             };
 
-            //_store.AddChargingCostRecord(record);
+            //_store.AddChargeCostRecord(record);
         }
     }
 }

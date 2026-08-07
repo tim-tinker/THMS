@@ -21,15 +21,15 @@ namespace THMS.Ingestion.Importers.Energy
                 throw new InvalidOperationException("IFinanceStore is not set. Cannot import data.");
             }
 
-            foreach (var entry in ReadChargingSessions(filePath))
+            foreach (var entry in ReadChargeSessions(filePath))
             {
                 var chargingSession = entry.Item1;
                 var costRecord = entry.Item2;
-                EnergyStore.AddEvCommercialChargingSession(chargingSession);
-                FinanceStore.AddCommercialChargingCostRecord(costRecord);
+                EnergyStore.AddEvCommercialChargeSession(chargingSession);
+                FinanceStore.AddCommercialChargeCostRecord(costRecord);
             }
         }
 
-        protected abstract IEnumerable<Tuple<EvCommercialChargingSession, CommercialChargingCostRecord>> ReadChargingSessions(string filePath);
+        protected abstract IEnumerable<Tuple<EvCommercialChargeSession, CommercialChargeCostRecord>> ReadChargeSessions(string filePath);
    }
 }

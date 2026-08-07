@@ -39,10 +39,10 @@ namespace THMS.Logic.Finance
                     Year = summary.Year,
                     Month = summary.Month,
 
-                    SolarChargingValue = summary.SolarAvoidedCost,
-                    BatteryChargingValue = summary.BatteryValue,
-                    GridChargingCost = summary.GridCost,
-                    CommercialChargingCost = summary.CommercialChargingCost,
+                    SolarChargeValue = summary.SolarAvoidedCost,
+                    BatteryChargeValue = summary.BatteryValue,
+                    GridChargeCost = summary.GridCost,
+                    CommercialChargeCost = summary.CommercialChargeCost,
 
                     LoanPayment = loan?.PaymentAmount ?? 0,
                     LoanInterestPaid = loan?.InterestPaid ?? 0,

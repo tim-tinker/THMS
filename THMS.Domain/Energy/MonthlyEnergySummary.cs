@@ -17,16 +17,16 @@
         public decimal BatteryDischargedWh { get; set; }
 
         // EV charging totals (Wh)
-        public decimal EvChargingWh { get; set; }
-        public decimal EvChargingSolarWh { get; set; }
-        public decimal EvChargingBatteryWh { get; set; }
-        public decimal EvChargingGridWh { get; set; }
+        public decimal EvChargeWh { get; set; }
+        public decimal EvChargeSolarWh { get; set; }
+        public decimal EvChargeBatteryWh { get; set; }
+        public decimal EvChargeGridWh { get; set; }
 
         // Cost totals ($)
         public decimal SolarAvoidedCost { get; set; }
         public decimal BatteryValue { get; set; }
         public decimal GridCost { get; set; }
-        public decimal CommercialChargingCost { get; set; }
+        public decimal CommercialChargeCost { get; set; }
 
         // Flags
         public bool IsPartial { get; set; }

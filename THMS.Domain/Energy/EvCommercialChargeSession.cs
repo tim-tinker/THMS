@@ -1,6 +1,6 @@
 ﻿namespace THMS.Domain.Energy
 {
-    public class EvCommercialChargingSession
+    public class EvCommercialChargeSession
     {
         public Guid Id { get; set; }
 
@@ -8,7 +8,7 @@
         public DateTime EndTime { get; set; }
         public decimal KwhAdded { get; set; }
 
-        public decimal? ChargingCost { get; set; }
+        public decimal? ChargeCost { get; set; }
 
         // Optional vendor metadata
         public string? VendorSessionId { get; set; }

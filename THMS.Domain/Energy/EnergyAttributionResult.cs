@@ -7,7 +7,7 @@
     {
         public DateTime Timestamp { get; set; }
 
-        public decimal EvChargingWh { get; set; }
+        public decimal EvChargeWh { get; set; }
 
         public decimal SolarWh { get; set; }
         public decimal BatteryWh { get; set; }

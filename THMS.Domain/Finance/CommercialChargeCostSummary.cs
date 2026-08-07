@@ -8,7 +8,7 @@ namespace THMS.Domain.Finance
     /// Represents the commercial EV charging cost summary for a given period.
     /// Typically generated monthly, but can represent any date range.
     /// </summary>
-    public class CommercialChargingCostSummary
+    public class CommercialChargeCostSummary
     {
         /// <summary>
         /// Beginning of the reporting period.

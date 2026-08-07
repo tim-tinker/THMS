@@ -10,7 +10,7 @@ namespace THMS.Domain.Finance
     /// <see cref="SolarVendorInterval"/>, and 
     /// <see cref="ElectricUtilityBill"/>.
     /// </summary>
-    public class HomeChargingCostSummary
+    public class HomeChargeCostSummary
     {
         public DateTime Start { get; set; }
         public DateTime End { get; set; }

@@ -97,11 +97,11 @@ namespace THMS.Data.Stores.SQLite
         // COMMERCIAL CHARGING COST RECORDS
         // ---------------------------------------------------------
 
-        public void AddCommercialChargingCostRecord(CommercialChargingCostRecord record)
+        public void AddCommercialChargeCostRecord(CommercialChargeCostRecord record)
         {
             using var conn = OpenConnection();
             using var cmd = new SqliteCommand(@"
-                INSERT INTO CommercialChargingCostRecords
+                INSERT INTO CommercialChargeCostRecords
                 (Id, SessionId, Date, Cost)
                 VALUES
                 (@Id, @SessionId, @Date, @Cost);", conn);
@@ -114,14 +114,14 @@ namespace THMS.Data.Stores.SQLite
             cmd.ExecuteNonQuery();
         }
 
-        public IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecords(
+        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecords(
             DateTime start,
             DateTime end)
         {
             using var conn = OpenConnection();
             using var cmd = new SqliteCommand(@"
                 SELECT Id, SessionId, Date, Cost
-                FROM CommercialChargingCostRecords
+                FROM CommercialChargeCostRecords
                 WHERE Date >= @Start AND Date <= @End
                 ORDER BY Date;", conn);
 
@@ -129,11 +129,11 @@ namespace THMS.Data.Stores.SQLite
             cmd.Parameters.AddWithValue("@End", end);
 
             using var reader = cmd.ExecuteReader();
-            var list = new List<CommercialChargingCostRecord>();
+            var list = new List<CommercialChargeCostRecord>();
 
             while (reader.Read())
             {
-                list.Add(new CommercialChargingCostRecord
+                list.Add(new CommercialChargeCostRecord
                 {
                     Id = Guid.Parse(reader.GetString(0)),
                     SessionId = reader.GetString(1),
@@ -145,7 +145,7 @@ namespace THMS.Data.Stores.SQLite
             return list;
         }
 
-        public IEnumerable<CommercialChargingCostRecord> GetCommercialChargingCostRecordsByVendor(
+        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecordsByVendor(
             string vendor,
             DateTime start,
             DateTime end)
@@ -153,7 +153,7 @@ namespace THMS.Data.Stores.SQLite
             using var conn = OpenConnection();
             using var cmd = new SqliteCommand(@"
                 SELECT Id, SessionId, Date, Cost, Vendor
-                FROM CommercialChargingCostRecords
+                FROM CommercialChargeCostRecords
                 WHERE Vendor = @Vendor
                 AND Date >= @Start AND Date <= @End
                 ORDER BY Date;", conn);
@@ -163,11 +163,11 @@ namespace THMS.Data.Stores.SQLite
             cmd.Parameters.AddWithValue("@End", end);
 
             using var reader = cmd.ExecuteReader();
-            var list = new List<CommercialChargingCostRecord>();
+            var list = new List<CommercialChargeCostRecord>();
 
             while (reader.Read())
             {
-                list.Add(new CommercialChargingCostRecord
+                list.Add(new CommercialChargeCostRecord
                 {
                     Id = Guid.Parse(reader.GetString(0)),
                     SessionId = reader.GetString(1),
@@ -243,28 +243,28 @@ namespace THMS.Data.Stores.SQLite
         // INCOMPLETE COST RECORDS
         // ---------------------------------------------------------
 
-        public IEnumerable<EvChargingSession> GetEvChargingSessionsWithMissingCost()
+        public IEnumerable<EvChargeSession> GetEvChargeSessionsWithMissingCost()
         {
             using var conn = OpenConnection();
             using var cmd = new SqliteCommand(@"
                 SELECT Id, StartTime, EndTime, KwhAdded,
-                       IsHomeCharging, ChargingCost, VehicleDataId
-                FROM EvChargingSessions
-                WHERE ChargingCost IS NULL
+                       IsHomeCharge, ChargeCost, VehicleDataId
+                FROM EvChargeSessions
+                WHERE ChargeCost IS NULL
                 ORDER BY StartTime;", conn);
 
             using var reader = cmd.ExecuteReader();
-            var list = new List<EvChargingSession>();
+            var list = new List<EvChargeSession>();
 
             while (reader.Read())
             {
-                list.Add(new EvChargingSession
+                list.Add(new EvChargeSession
                 {
                     Id = Guid.Parse(reader.GetString(0)),
                     StartTime = reader.GetDateTime(1),
                     EndTime = reader.GetDateTime(2),
                     KwhAdded = reader.GetDecimal(3),
-                    IsHomeCharging = reader.GetBoolean(4),
+                    IsHomeCharge = reader.GetBoolean(4),
                     SessionCost = 0,
                 });
             }
@@ -304,12 +304,12 @@ namespace THMS.Data.Stores.SQLite
         // COST UPDATES
         // ---------------------------------------------------------
 
-        public void UpdateEvChargingSessionCost(Guid sessionId, decimal cost)
+        public void UpdateEvChargeSessionCost(Guid sessionId, decimal cost)
         {
             using var conn = OpenConnection();
             using var cmd = new SqliteCommand(@"
-                UPDATE EvChargingSessions
-                SET ChargingCost = @Cost
+                UPDATE EvChargeSessions
+                SET ChargeCost = @Cost
                 WHERE Id = @Id;", conn);
 
             cmd.Parameters.AddWithValue("@Id", sessionId.ToString());

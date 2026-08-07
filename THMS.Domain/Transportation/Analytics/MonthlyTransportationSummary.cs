@@ -12,12 +12,12 @@
 
         // Costs
         public decimal FuelCost { get; set; }
-        public decimal ChargingCost { get; set; }
+        public decimal ChargeCost { get; set; }
         public decimal MaintenanceCost { get; set; }
 
         // Derived metrics
         public decimal CostPerMile =>
-            MilesDriven > 0 ? (FuelCost + ChargingCost + MaintenanceCost) / MilesDriven : 0;
+            MilesDriven > 0 ? (FuelCost + ChargeCost + MaintenanceCost) / MilesDriven : 0;
 
         public bool IsPartial { get; set; }
     }

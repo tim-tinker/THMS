@@ -16,7 +16,7 @@ namespace THMS.UI.WinForms
         private bool _loadingControls;
 
         /// <summary>Session written on Save; null if the dialog was cancelled.</summary>
-        public EvChargingSession? SavedSession { get; private set; }
+        public EvChargeSession? SavedSession { get; private set; }
 
         protected decimal BatteryCapacityKwh => _vehicle?.BatteryCapacityKwh ?? 0;
 
@@ -25,7 +25,7 @@ namespace THMS.UI.WinForms
             InitializeComponent();
         }
 
-        public EvChargeSessionForm(Guid vehicleId, VehicleDetailViewModel vm, decimal lastOdometer, decimal lastSoc, EvChargingSession? existingSession = null)
+        public EvChargeSessionForm(Guid vehicleId, VehicleDetailViewModel vm, decimal lastOdometer, decimal lastSoc, EvChargeSession? existingSession = null)
             : this()
         {
             Vehicle = vm.Vehicle as VehicleEv ?? throw new ArgumentException("Vehicle is not an EV.", nameof(vm));
@@ -34,7 +34,7 @@ namespace THMS.UI.WinForms
 
         private void OnLoadForm(object sender, EventArgs e)
         {
-            Text = $"EV Charging Session for {Vehicle.Name} ({Vehicle.Year} {Vehicle.Make} {Vehicle.Model})";
+            Text = $"EV Charge Session for {Vehicle.Name} ({Vehicle.Year} {Vehicle.Make} {Vehicle.Model})";
             LoadControlsFromViewModel();
         }
 
@@ -53,8 +53,9 @@ namespace THMS.UI.WinForms
 
                 _numStartSoc.Value = ClampToNumeric(_numStartSoc, _sessionVM.StartSoc);
                 _numEndSoc.Value = ClampToNumeric(_numEndSoc, _sessionVM.EndSoc);
+                _numBatteryKwhAdded.Value = ClampToNumeric(_numBatteryKwhAdded, _sessionVM.BatteryKwhAdded);
 
-                _checkHomeCharger.Checked = _sessionVM.IsHomeCharging;
+                _checkHomeCharger.Checked = _sessionVM.IsHomeCharge;
                 _numKwhAdded.Value = ClampToNumeric(_numKwhAdded, _sessionVM.KwhAdded);
                 _numSessionCost.Value = ClampToNumeric(_numSessionCost, _sessionVM.SessionCost);
 
@@ -62,7 +63,7 @@ namespace THMS.UI.WinForms
                 _textSolarKwh.Text = $"{_sessionVM.SolarKwh:0.000}";
                 _textBatteryKwh.Text = $"{_sessionVM.BatteryKwh:0.000}";
 
-                EnableHomeControls(_sessionVM.IsHomeCharging);
+                EnableHomeControls(_sessionVM.IsHomeCharge);
             }
             finally
             {
@@ -74,7 +75,14 @@ namespace THMS.UI.WinForms
 
         private void OnCheckedChangedHomeCharger(object sender, EventArgs e)
         {
+            if (_loadingControls)
+                return;
+
+            // Persist the checkbox to the shared VM immediately; otherwise a later
+            // LoadControlsFromViewModel (e.g. after circuit import) restores false.
+            _sessionVM.IsHomeCharge = _checkHomeCharger.Checked;
             EnableHomeControls(_checkHomeCharger.Checked);
+            UpdateConsumption();
         }
 
         private void EnableHomeControls(bool enable)
@@ -104,6 +112,9 @@ namespace THMS.UI.WinForms
             _textWhPerMile.Text = $"{_sessionVM.WhPerMile:N1}";
             _textMpge.Text = $"{_sessionVM.Mpge:N1}";
             _textCostPerMile.Text = $"{_sessionVM.CostPerMile:N2}";
+
+            _textChargeLossKwh.Text = $"{_sessionVM.ChargeLossKwh:N3}";
+            _textChargeEfficiency.Text = $"{_sessionVM.ChargeEfficiency:P2}";
         }
 
         private void OnClickSave(object sender, EventArgs e)
@@ -130,7 +141,8 @@ namespace THMS.UI.WinForms
             _sessionVM.EndTime = Combine(_dateEnd.Value, _timeEnd.Value);
             _sessionVM.StartSoc = _numStartSoc.Value;
             _sessionVM.EndSoc = _numEndSoc.Value;
-            _sessionVM.IsHomeCharging = _checkHomeCharger.Checked;
+            _sessionVM.BatteryKwhAdded = _numBatteryKwhAdded.Value;
+            _sessionVM.IsHomeCharge = _checkHomeCharger.Checked;
             _sessionVM.KwhAdded = _numKwhAdded.Value;
             _sessionVM.SessionCost = _numSessionCost.Value;
             _sessionVM.GridKwh = ParseDecimal(_textGridKwh.Text);
@@ -171,6 +183,10 @@ namespace THMS.UI.WinForms
 
         private void OnClickLoadCircuitData(object sender, EventArgs e)
         {
+            // Flush all current control values into the VM before the child form
+            // runs (BatteryKwhAdded / Home Charger may not have been applied yet).
+            ApplyControlsToViewModel();
+
             using var form = new EvCircuitDataForm(_sessionVM);
 
             form.ShowDialog();

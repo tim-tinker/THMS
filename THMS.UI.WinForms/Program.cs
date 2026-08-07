@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using THMS.Data.Stores;
+using THMS.Logic.Energy;
 using THMS.UI.WinForms.Navigation;
 
 namespace THMS.UI.WinForms;
@@ -32,6 +33,7 @@ internal static class Program
         services.AddSingleton<VehicleListDashboardForm>();
         services.AddSingleton<SettingsDashboardForm>();
 
+        services.AddSingleton<EnergyAggregationService>();
         services.AddSingleton<NavigationService>();
         services.AddSingleton<MainForm>();
 

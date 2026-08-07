@@ -49,7 +49,7 @@ namespace THMS.Logic.ViewModels.Transportation
 
             // Assign the backing fields so the range is complete before the first
             // Refresh; the setters would each trigger a redundant load.
-            _startTime = VehicleStore.GetEarliestIceMileageRecord(VehicleId)?.Date
+            _startTime = VehicleStore.GetEarliestIceMileageRecord(VehicleId)?.EndTime
                 ?? DateTime.MinValue;
             _endTime = DateTime.MaxValue;
 
@@ -60,7 +60,7 @@ namespace THMS.Logic.ViewModels.Transportation
 
         public VehicleBase? Vehicle { get; private set; }
         public decimal Mileage { get; private set; } = 0m;
-        public BindingList<EvChargingSession> ChargingSessions { get; } = new();
+        public BindingList<EvChargeSession> ChargeSessions { get; } = new();
         public IReadOnlyCollection<IceMileageRecord> FuelReceipts { get; private set; } = Array.Empty<IceMileageRecord>();
         public IReadOnlyCollection<MaintenanceInvoiceRecord> MaintenanceInvoices { get; private set; } = Array.Empty<MaintenanceInvoiceRecord>();
 
@@ -69,18 +69,18 @@ namespace THMS.Logic.ViewModels.Transportation
             Vehicle = VehicleStore.GetVehicle(VehicleId);
             Mileage = VehicleStore.GetMilesDrivenInPeriod(VehicleId, StartTime, EndTime);
 
-            ChargingSessions.Clear();
-            foreach (var session in VehicleStore.GetEvChargingSessions(VehicleId, StartTime, EndTime))
-                ChargingSessions.Add(session);
+            ChargeSessions.Clear();
+            foreach (var session in VehicleStore.GetEvChargeSessions(VehicleId, StartTime, EndTime))
+                ChargeSessions.Add(session);
 
             FuelReceipts = VehicleStore.GetIceMileageRecords(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
             MaintenanceInvoices = VehicleStore.GetMaintenanceInvoices(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
         }
 
-        public EvChargingSession? GetLatestChargingSession()
+        public EvChargeSession? GetLatestChargeSession()
         {
             return VehicleStore
-                .GetEvChargingSessions(VehicleId, DateTime.MinValue, DateTime.MaxValue)
+                .GetEvChargeSessions(VehicleId, DateTime.MinValue, DateTime.MaxValue)
                 .OrderBy(s => s.StartTime)
                 .LastOrDefault();
         }
@@ -89,7 +89,7 @@ namespace THMS.Logic.ViewModels.Transportation
         /// Inserts or replaces a session in the bound list when it falls inside the
         /// current date filter. Outside the filter, an existing row is removed.
         /// </summary>
-        public void UpsertChargingSession(EvChargingSession session)
+        public void UpsertChargeSession(EvChargeSession session)
         {
             var index = IndexOfSession(session.Id);
             var inRange = session.StartTime >= StartTime && session.StartTime <= EndTime;
@@ -97,21 +97,21 @@ namespace THMS.Logic.ViewModels.Transportation
             if (index >= 0)
             {
                 if (inRange)
-                    ChargingSessions[index] = session;
+                    ChargeSessions[index] = session;
                 else
-                    ChargingSessions.RemoveAt(index);
+                    ChargeSessions.RemoveAt(index);
             }
             else if (inRange)
             {
-                ChargingSessions.Add(session);
+                ChargeSessions.Add(session);
             }
         }
 
         private int IndexOfSession(Guid sessionId)
         {
-            for (var i = 0; i < ChargingSessions.Count; i++)
+            for (var i = 0; i < ChargeSessions.Count; i++)
             {
-                if (ChargingSessions[i].Id == sessionId)
+                if (ChargeSessions[i].Id == sessionId)
                     return i;
             }
 
