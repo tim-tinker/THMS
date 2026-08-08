@@ -53,41 +53,41 @@ namespace THMS.Logic.Energy
             var evAttr = _store.GetEvAttribution(start, end);
             var soc = _store.GetBatterySocTimeline(start, end);
 
-            var hours = AggregateHourly(intervals, evAttr);
+            var intervalsHalfHour = AggregateHalfHourly(intervals, evAttr);
 
             return new EnergyDay
             {
                 Date = date,
-                Hours = hours,
+                Intervals = intervalsHalfHour,
                 BatterySocTimeline = [.. soc],
 
-                SolarKwh = hours.Sum(h => h.SolarKwh),
-                BatteryChargeKwh = hours.Sum(h => h.BatteryChargeKwh),
-                BatteryDischargeKwh = hours.Sum(h => h.BatteryDischargeKwh),
-                GridImportKwh = hours.Sum(h => h.GridImportKwh),
-                GridExportKwh = hours.Sum(h => h.GridExportKwh),
-                HomeConsumptionKwh = hours.Sum(h => h.HomeConsumptionKwh),
-                EvChargingKwh = hours.Sum(h => h.EvChargingKwh)
+                SolarKwh = intervalsHalfHour.Sum(h => h.SolarKwh),
+                BatteryChargeKwh = intervalsHalfHour.Sum(h => h.BatteryChargeKwh),
+                BatteryDischargeKwh = intervalsHalfHour.Sum(h => h.BatteryDischargeKwh),
+                GridImportKwh = intervalsHalfHour.Sum(h => h.GridImportKwh),
+                GridExportKwh = intervalsHalfHour.Sum(h => h.GridExportKwh),
+                HomeConsumptionKwh = intervalsHalfHour.Sum(h => h.HomeConsumptionKwh),
+                EvChargingKwh = intervalsHalfHour.Sum(h => h.EvChargingKwh)
             };
         }
 
-        private List<EnergyHourRecord> AggregateHourly(
+        private List<EnergyIntervalRecord> AggregateHalfHourly(
             IEnumerable<SolarVendorInterval> intervals,
             IEnumerable<EnergyAttributionResult> evAttr)
         {
             var grouped = intervals
-                .GroupBy(i => new DateTime(i.Timestamp.Year, i.Timestamp.Month, i.Timestamp.Day, i.Timestamp.Hour, 0, 0))
+                .GroupBy(i => TimeBucket.GetHalfHour(i.Timestamp))
                 .OrderBy(g => g.Key);
 
             var evGrouped = evAttr
-                .GroupBy(a => new DateTime(a.Timestamp.Year, a.Timestamp.Month, a.Timestamp.Day, a.Timestamp.Hour, 0, 0))
+                .GroupBy(a => TimeBucket.GetHalfHour(a.Timestamp))
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            var list = new List<EnergyHourRecord>();
+            var list = new List<EnergyIntervalRecord>();
 
             foreach (var g in grouped)
             {
-                var hour = g.Key;
+                var bucket = g.Key;
 
                 decimal solar = g.Sum(x => x.EnergyProducedWh) / 1000m;
                 decimal consumed = g.Sum(x => x.EnergyConsumedWh) / 1000m;
@@ -97,12 +97,12 @@ namespace THMS.Logic.Energy
                 decimal battDischarge = g.Sum(x => x.DischargedFromBatteriesWh) / 1000m;
 
                 decimal ev = 0;
-                if (evGrouped.TryGetValue(hour, out var evList))
+                if (evGrouped.TryGetValue(bucket, out var evList))
                     ev = evList.Sum(x => x.EvChargeWh) / 1000m;
 
-                list.Add(new EnergyHourRecord
+                list.Add(new EnergyIntervalRecord
                 {
-                    Timestamp = hour,
+                    Timestamp = bucket,
                     SolarKwh = solar,
                     HomeConsumptionKwh = consumed,
                     GridImportKwh = gridIn,
@@ -114,6 +114,22 @@ namespace THMS.Logic.Energy
             }
 
             return list;
+        }
+
+        private DateTime GetHalfHourBucket(DateTime timestamp)
+        {
+            var minute = timestamp.Minute;
+            var bucketMinute = minute < 15 ? 0 :
+                               minute < 45 ? 30 : 0;
+
+            var bucketHour = minute < 45 ? timestamp.Hour : (timestamp.Hour + 1) % 24;
+            return new DateTime(
+                timestamp.Year,
+                timestamp.Month,
+                timestamp.Day,
+                bucketHour,
+                bucketMinute,
+                0);
         }
 
         // ---------------------------------------------------------

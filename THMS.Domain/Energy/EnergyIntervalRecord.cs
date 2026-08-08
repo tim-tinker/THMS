@@ -4,7 +4,7 @@ using System.Text;
 
 namespace THMS.Domain.Energy
 {
-    public class EnergyHourRecord
+    public class EnergyIntervalRecord
     {
         public DateTime Timestamp { get; set; }
         public decimal SolarKwh { get; set; }

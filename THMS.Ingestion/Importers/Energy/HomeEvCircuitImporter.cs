@@ -9,6 +9,9 @@ namespace THMS.Ingestion.Importers.Energy
     {
         private readonly IEnergyDataStore _store;
 
+        public DateTime StartDate { get; private set; } = DateTime.MinValue;
+        public DateTime EndDate { get; private set; } = DateTime.MinValue;
+
         public HomeEvCircuitImporter(IEnergyDataStore store)
         {
             _store = store;
@@ -33,6 +36,16 @@ namespace THMS.Ingestion.Importers.Energy
                     Timestamp = timeStamp,
                     KiloWattHours = circuitEnergyKwh,
                 };
+
+                if (StartDate == DateTime.MinValue)
+                {
+                    StartDate = timeStamp;
+                }
+
+                EndDate = timeStamp;
+
+                _store.AddEvCircuitReading(reading);
+
                 yield return reading;
             }
         }

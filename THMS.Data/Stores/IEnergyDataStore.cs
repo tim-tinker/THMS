@@ -69,14 +69,10 @@ namespace THMS.Data.Stores
         EvCircuitSegmentSummary GetEvCircuitSummary(Guid sessionId);
 
         // ---------------------------------------------------------
-        // BATTERY SOC RECORDS
-        // ---------------------------------------------------------
-
-        IReadOnlyCollection<BatterySocRecord> GetBatterySocTimeline(DateTime start, DateTime end);
-
-        // ---------------------------------------------------------
         // ENERGY ATTRIBUTION RESULTS
         // ---------------------------------------------------------
+
+        void AddEvAttribution(EnergyAttributionResult result);
 
         IReadOnlyCollection<EnergyAttributionResult> GetEvAttribution(DateTime start, DateTime end);
 

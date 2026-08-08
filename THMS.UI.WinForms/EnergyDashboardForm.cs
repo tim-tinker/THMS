@@ -1,8 +1,10 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Windows.Forms;
+using Microsoft.Extensions.DependencyInjection;
 using THMS.Data.Stores;
 using THMS.Ingestion.Importers.Energy;
+using THMS.Logic.Energy;
 using THMS.Logic.ViewModels.Energy;
 using THMS.UI.WinForms.Charts;
 using THMS.UI.WinForms.Controls;
@@ -26,7 +28,7 @@ namespace THMS.UI.WinForms
         public EnergyDashboardForm(IEnergyDataStore energyDataStore)
             : this()
         {
-            _energyDataStore = energyDataStore;
+            _energyDataStore = energyDataStore ?? throw new ArgumentNullException(nameof(energyDataStore));
         }
 
         private void InitializeDynamicLayout()
@@ -221,7 +223,6 @@ namespace THMS.UI.WinForms
         {
             // Chart rendering will be added later
             RenderDayEnergyFlowChart();
-            RenderDayBatterySocChart();
             RenderDayBreakdown();
         }
 
@@ -230,20 +231,10 @@ namespace THMS.UI.WinForms
             // Placeholder: chart control will be added later
             _panelDayEnergyFlow.Controls.Clear();
 
-            var chart = EnergyChartFactory.CreateDayEnergyFlowChart(_vm.Day);
+            var chart = EnergyChartFactory.CreateDayChart(_vm.Day);
             chart.Dock = DockStyle.Fill;
 
             _panelDayEnergyFlow.Controls.Add(chart);
-        }
-
-        private void RenderDayBatterySocChart()
-        {
-            _panelDayBatterySoc.Controls.Clear();
-
-            var chart = EnergyChartFactory.CreateBatterySocChart(_vm.Day);
-            chart.Dock = DockStyle.Fill;
-
-            _panelDayBatterySoc.Controls.Add(chart);
         }
 
         private void RenderDayBreakdown()
@@ -354,13 +345,30 @@ namespace THMS.UI.WinForms
             if (dialog.ShowDialog() != DialogResult.OK)
                 return;
 
-            var importer = new EnphaseSolarImporter(_energyDataStore);
-            importer.Import(dialog.FileName);
+            try
+            {
+                var importer = new EnphaseSolarImporter(_energyDataStore);
+                importer.Import(dialog.FileName);
 
-            MessageBox.Show("Solar data imported successfully.", "THMS",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                CalculateEvAttribution(importer.StartDate, importer.EndDate);
 
+                MessageBox.Show($"Solar data imported successfully for {importer.StartDate.Date} to {importer.EndDate.Date}.", "THMS",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            } 
+            catch (Exception ex) 
+            {
+                MessageBox.Show($"Error importing solar data: {ex.Message}", "THMS", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
             RefreshDashboard();
+        }
+
+        private void CalculateEvAttribution(DateTime start, DateTime end)
+        {
+            if (_energyDataStore.GetEvCircuitReadings(start, end).Any())
+            {
+                var engine = new EvAttributionEngine(_energyDataStore);
+                engine.Compute(start, end);
+            }
         }
 
         private static void OnPaintLoadSolarDataButton(object? sender, PaintEventArgs e)

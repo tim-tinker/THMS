@@ -16,7 +16,6 @@ namespace THMS.Data.Stores.SQLite
 
         private readonly EvCircuitSegmentsTable _evCircuitSegmentsTable = new();
         private readonly EvAttributionTable _evAttrTable = new();
-        private readonly BatterySocTable _batterySocTable = new();
         private readonly SolarVendorIntervalsTable _solarTable = new();
 
         public SQLiteEnergyDataStore(string databasePath)
@@ -37,7 +36,6 @@ namespace THMS.Data.Stores.SQLite
         {
             _evCircuitSegmentsTable.InitializeSchema(conn);
             _evAttrTable.InitializeSchema(conn);
-            _batterySocTable.InitializeSchema(conn);
             _solarTable.InitializeSchema(conn);
         }
 
@@ -289,19 +287,17 @@ namespace THMS.Data.Stores.SQLite
         // ---------------------------------------------------------
         // EV ATTRIBUTION
         // ---------------------------------------------------------
+
+        public void AddEvAttribution(EnergyAttributionResult result)
+        {
+            using var conn = OpenConnection();
+            _evAttrTable.Insert(conn, result);
+        }
+
         public IReadOnlyCollection<EnergyAttributionResult> GetEvAttribution(DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
             return _evAttrTable.GetRange(conn, start, end);
-        }
-
-        // ---------------------------------------------------------
-        // BATTERY SOC TIMELINE
-        // ---------------------------------------------------------
-        public IReadOnlyCollection<BatterySocRecord> GetBatterySocTimeline(DateTime start, DateTime end)
-        {
-            using var conn = OpenConnection();
-            return _batterySocTable.GetRange(conn, start, end);
         }
     }
 }

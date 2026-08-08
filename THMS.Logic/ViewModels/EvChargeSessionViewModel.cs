@@ -3,6 +3,7 @@ using THMS.Data.Stores;
 using THMS.Domain.Energy;
 using THMS.Domain.Transportation;
 using THMS.Ingestion.Importers.Energy;
+using THMS.Logic.Energy;
 
 namespace THMS.Logic.ViewModels.Transportation
 {
@@ -112,6 +113,7 @@ namespace THMS.Logic.ViewModels.Transportation
             var importer = new HomeEvCircuitImporter(EnergyStore);
             var readings = importer.Import(filename);
             LoadCircuitReadings(readings);
+            CalculateEvAttribution(importer.StartDate, importer.EndDate);
         }
 
         public void LoadCircuitReadings(IEnumerable<EvCircuitReading> readings)
@@ -127,6 +129,15 @@ namespace THMS.Logic.ViewModels.Transportation
 
             // Save updated session
             Save();
+        }
+
+        private void CalculateEvAttribution(DateTime start, DateTime end)
+        {
+            if (_energyStore.GetSolarVendorIntervals(start, end).Any())
+            {
+                var engine = new EvAttributionEngine(_energyStore);
+                engine.Compute(start, end);
+            }
         }
 
         private List<EvCircuitSegment> ConvertReadingsToSegments(IEnumerable<EvCircuitReading> readings)

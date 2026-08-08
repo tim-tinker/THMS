@@ -27,7 +27,6 @@ namespace THMS.UI.WinForms
             _tabs = new TabControl();
             _tabDay = new TabPage();
             _panelDayBreakdown = new Panel();
-            _panelDayBatterySoc = new Panel();
             _panelDayEnergyFlow = new Panel();
             _tabWeek = new TabPage();
             _tabMonth = new TabPage();
@@ -168,7 +167,6 @@ namespace THMS.UI.WinForms
             // _tabDay
             // 
             _tabDay.Controls.Add(_panelDayBreakdown);
-            _tabDay.Controls.Add(_panelDayBatterySoc);
             _tabDay.Controls.Add(_panelDayEnergyFlow);
             _tabDay.Location = new Point(4, 39);
             _tabDay.Name = "_tabDay";
@@ -185,15 +183,6 @@ namespace THMS.UI.WinForms
             _panelDayBreakdown.Name = "_panelDayBreakdown";
             _panelDayBreakdown.Size = new Size(1618, 367);
             _panelDayBreakdown.TabIndex = 0;
-            // 
-            // _panelDayBatterySoc
-            // 
-            _panelDayBatterySoc.BorderStyle = BorderStyle.FixedSingle;
-            _panelDayBatterySoc.Dock = DockStyle.Top;
-            _panelDayBatterySoc.Location = new Point(10, 260);
-            _panelDayBatterySoc.Name = "_panelDayBatterySoc";
-            _panelDayBatterySoc.Size = new Size(1618, 150);
-            _panelDayBatterySoc.TabIndex = 1;
             // 
             // _panelDayEnergyFlow
             // 
@@ -319,7 +308,6 @@ namespace THMS.UI.WinForms
         private TabPage _tabCustom;
 
         private Panel _panelDayEnergyFlow;
-        private Panel _panelDayBatterySoc;
         private Panel _panelDayBreakdown;
 
         private Panel _panelPeriodChart;

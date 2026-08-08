@@ -14,7 +14,6 @@ namespace THMS.Data.Stores
         private readonly List<CommercialChargeCostRecord> _commercialCosts = new();
         private readonly InMemorySolarVendorIntervalStore _solarStore = new();
         private readonly InMemoryEvAttributionStore _evAttrStore = new();
-        private readonly InMemoryBatterySocStore _batterySocStore = new();
 
         public InMemoryEnergyDataStore()
         {
@@ -53,18 +52,17 @@ namespace THMS.Data.Stores
         // ---------------------------------------------------------
         // EV ATTRIBUTION
         // ---------------------------------------------------------
+
+        public void AddEvAttribution(EnergyAttributionResult result)
+        {
+            _evAttrStore.Add(result);
+        }
+
         public IReadOnlyCollection<EnergyAttributionResult> GetEvAttribution(DateTime start, DateTime end)
         {
             return _evAttrStore.GetRange(start, end);
         }
 
-        // ---------------------------------------------------------
-        // BATTERY SOC TIMELINE
-        // ---------------------------------------------------------
-        public IReadOnlyCollection<BatterySocRecord> GetBatterySocTimeline(DateTime start, DateTime end)
-        {
-            return _batterySocStore.GetRange(start, end);
-        }
         // ---------------------------------------------------------
         // COMMERCIAL CHARGING SESSIONS
         // ---------------------------------------------------------

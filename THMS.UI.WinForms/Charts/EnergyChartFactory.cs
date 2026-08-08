@@ -2,6 +2,8 @@
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms.DataVisualization.Charting;
+using THMS.Domain.Energy;
+using THMS.Logic.Energy;
 using THMS.Logic.ViewModels.Energy;
 
 namespace THMS.UI.WinForms.Charts
@@ -11,69 +13,108 @@ namespace THMS.UI.WinForms.Charts
         // ============================================================
         // DAILY ENERGY FLOW CHART
         // ============================================================
-        public static Chart CreateDayEnergyFlowChart(EnergyDayViewModel vm)
+        public static Chart CreateDayChart(EnergyDayViewModel vm)
         {
             var chart = CreateBaseChart();
+            chart.Titles.Add($"Energy Flow ({vm.Date:yyyy-MM-dd})");
 
-            chart.Titles.Add("Energy Flow (Daily)");
+            var solar = CreateSeries("Solar", SeriesChartType.Line, Color.Goldenrod, 5);
+            var home = CreateSeries("Home Consumption", SeriesChartType.Line, Color.SteelBlue, 5);
+            var gridImport = CreateSeries("Grid Import", SeriesChartType.Line, Color.Red, 2);
+            var gridExport = CreateSeries("Grid Export", SeriesChartType.Line, Color.Green, 2);
+            var ev = CreateSeries("EV Charging", SeriesChartType.Column, Color.MediumPurple, 5);
 
-            var areaSolar = CreateSeries("Solar", SeriesChartType.Column, Color.Goldenrod);
-            var areaBatteryCharge = CreateSeries("Battery", SeriesChartType.Column, Color.LightGreen);
-            var areaBatteryDischarge = CreateSeries("Battery Discharge", SeriesChartType.Column, Color.DarkGreen);
-            var areaGridImport = CreateSeries("Grid Import", SeriesChartType.Column, Color.SteelBlue);
-            var areaGridExport = CreateSeries("Grid Export", SeriesChartType.Column, Color.OrangeRed);
-            var areaHome = CreateSeries("Home Consumption", SeriesChartType.Column, Color.Gray);
-            var areaEv = CreateSeries("EV Charging", SeriesChartType.Column, Color.MediumPurple);
-
-            foreach (var h in vm.Hours)
+            int index = 0;
+            foreach (var interval in vm.Intervals)
             {
-                string hourLabel = h.Timestamp.ToString("HH:mm");
+                string label = interval.Timestamp.Hour % 3 == 0 && interval.Timestamp.Minute == 0
+                    ? interval.Timestamp.ToString("HH:mm") : string.Empty;
 
-                areaSolar.Points.AddXY(hourLabel, h.SolarKwh);
-                areaBatteryCharge.Points.AddXY(hourLabel, h.BatteryChargeKwh);
-                areaBatteryDischarge.Points.AddXY(hourLabel, h.BatteryDischargeKwh);
-                areaGridImport.Points.AddXY(hourLabel, h.GridImportKwh);
-                areaGridExport.Points.AddXY(hourLabel, h.GridExportKwh);
-                areaHome.Points.AddXY(hourLabel, h.HomeConsumptionKwh);
-                areaEv.Points.AddXY(hourLabel, h.EvChargingKwh);
+                AddIndexedPoint(solar, index, interval.SolarKwh, label);
+
+                AddIndexedPoint(home, index, -interval.HomeConsumptionKwh, label);
+                AddIndexedPoint(gridImport, index, interval.GridImportKwh, label);
+                AddIndexedPoint(gridExport, index, interval.GridExportKwh, label);
+                AddIndexedPoint(ev, index, interval.EvChargingKwh, label);
+
+                index++;
             }
 
-            chart.Series.Add(areaSolar);
-            chart.Series.Add(areaBatteryCharge);
-            chart.Series.Add(areaBatteryDischarge);
-            chart.Series.Add(areaGridImport);
-            chart.Series.Add(areaGridExport);
-            chart.Series.Add(areaHome);
-            chart.Series.Add(areaEv);
+            chart.Series.Add(home);
+            chart.Series.Add(gridImport);
+            chart.Series.Add(ev);
+
+            chart.Series.Add(solar);
+            chart.Series.Add(gridExport);
+
+            chart.ChartAreas[0].AxisY.MajorGrid.LineColor = Color.LightGray;
+            chart.ChartAreas[0].AxisX.Interval = 1;
+            chart.ChartAreas[0].AxisX.IsMarksNextToAxis = false;
+            chart.ChartAreas[0].AxisY.Crossing = 0;
+
+            chart.Legends.Add(new Legend("Legend"));
+
+            var showBatteryShading = true;
+            if (showBatteryShading && 0 < vm.Intervals.Count())
+            {
+                chart.PostPaint += (sender, e) =>
+                {
+                    if (e.ChartElement is ChartArea area)
+                    {
+                        DrawBatteryShading(e.ChartGraphics.Graphics, area, vm);
+                    }
+                };
+            }
 
             return chart;
         }
 
-        // ============================================================
-        // DAILY BATTERY SOC CHART
-        // ============================================================
-        public static Chart CreateBatterySocChart(EnergyDayViewModel vm)
+        private static void DrawBatteryShading(Graphics g, ChartArea area, EnergyDayViewModel vm)
         {
-            var chart = CreateBaseChart();
+            var ca = area;
 
-            chart.Titles.Add("Battery SOC (Daily)");
-
-            var series = CreateSeries("SOC %", SeriesChartType.Line, Color.DarkGreen);
-            series.BorderWidth = 3;
-
-            foreach (var soc in vm.BatterySocTimeline)
+            var xAxisIndex = 0;
+            foreach (var interval in vm.Intervals)
             {
-                string hourLabel = soc.Timestamp.ToString("HH:mm");
-                series.Points.AddXY(hourLabel, soc.SocPercent);
+                xAxisIndex++;
+
+                // Determine battery direction
+                bool charging = interval.BatteryChargeKwh > 0;
+                bool discharging = interval.BatteryDischargeKwh > 0;
+
+                if (!charging && !discharging)
+                    continue;
+
+                // Pick shading color
+                Color shade = charging
+                    ? discharging
+                        ? Color.FromArgb(40, Color.Yellow)      // translucent yellow
+                        : Color.FromArgb(40, Color.Green)       // translucent green
+                    : discharging
+                        ? Color.FromArgb(40, Color.Orange)      // translucent orange
+                        : Color.FromArgb(0, 0, 0, 0);           // No color (if statement prevents this case)
+
+                // Convert time range to pixel coordinates
+                // each interval is 30 minutes
+                double xStart = ca.AxisX.ValueToPixelPosition(xAxisIndex - 1);
+                double xEnd = ca.AxisX.ValueToPixelPosition(xAxisIndex);
+
+                // Full height of chart area
+                double yTop = ca.AxisY.ValueToPixelPosition(ca.AxisY.Maximum);
+                double yBottom = ca.AxisY.ValueToPixelPosition(ca.AxisY.Minimum);
+
+                // Draw rectangle
+                var rect = new RectangleF(
+                    (float)xStart,
+                    (float)yTop,
+                    (float)(xEnd - xStart),
+                    (float)(yBottom - yTop));
+
+                g.FillRectangle(new SolidBrush(shade), rect);
             }
-
-            chart.Series.Add(series);
-
-            chart.ChartAreas[0].AxisY.Minimum = 0;
-            chart.ChartAreas[0].AxisY.Maximum = 100;
-
-            return chart;
         }
+        
+
 
         // ============================================================
         // PERIOD BAR CHART (Week / Month / Year / Custom)
@@ -92,17 +133,20 @@ namespace THMS.UI.WinForms.Charts
             var battDischarge = CreateSeries("Battery Discharge", SeriesChartType.Column, Color.DarkGreen);
             var ev = CreateSeries("EV Charging", SeriesChartType.Column, Color.MediumPurple);
 
+            int index = 0;
             foreach (var r in vm.Records)
             {
                 string label = r.Date.ToString("MM/dd");
 
-                solar.Points.AddXY(label, r.SolarKwh);
-                home.Points.AddXY(label, r.HomeConsumptionKwh);
-                gridIn.Points.AddXY(label, r.GridImportKwh);
-                gridOut.Points.AddXY(label, r.GridExportKwh);
-                battCharge.Points.AddXY(label, r.BatteryChargeKwh);
-                battDischarge.Points.AddXY(label, r.BatteryDischargeKwh);
-                ev.Points.AddXY(label, r.EvChargingKwh);
+                AddIndexedPoint(solar, index, r.SolarKwh, label);
+                AddIndexedPoint(home, index, -r.HomeConsumptionKwh, label);
+                AddIndexedPoint(gridIn, index, -r.GridImportKwh, label);
+                AddIndexedPoint(gridOut, index, r.GridExportKwh, label);
+                AddIndexedPoint(battCharge, index, r.BatteryChargeKwh, label);
+                AddIndexedPoint(battDischarge, index, -r.BatteryDischargeKwh, label);
+                AddIndexedPoint(ev, index, -r.EvChargingKwh, label);
+
+                index++;
             }
 
             chart.Series.Add(solar);
@@ -139,14 +183,27 @@ namespace THMS.UI.WinForms.Charts
             return chart;
         }
 
-        private static Series CreateSeries(string name, SeriesChartType type, Color color)
+        private static Series CreateSeries(string name, SeriesChartType type, Color color, int width = 2)
         {
-            return new Series(name)
+            var series = new Series(name)
             {
                 ChartType = type,
-                Color = color,
-                BorderWidth = 2
+                Color = Color.FromArgb(128, color),
+                BorderWidth = width,
+                BorderDashStyle = ChartDashStyle.Solid,
+                XValueType = ChartValueType.Int32,
+                IsVisibleInLegend = true,
             };
+            series["LineTension"] = "0.4"; // For smooth lines
+            series["PointWidth"] = "1.0"; // For bar width
+
+            return series;
+        }
+
+        private static void AddIndexedPoint(Series series, int xIndex, decimal y, string axisLabel)
+        {
+            int pointIndex = series.Points.AddXY(xIndex, (double)y);
+            series.Points[pointIndex].AxisLabel = axisLabel;
         }
     }
 }

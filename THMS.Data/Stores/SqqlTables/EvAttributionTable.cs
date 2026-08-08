@@ -22,6 +22,23 @@ namespace THMS.Data.Stores
             cmd.ExecuteNonQuery();
         }
 
+        public void Insert(SqliteConnection conn, EnergyAttributionResult result)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+            @"
+            INSERT INTO EvAttribution (Timestamp, EvChargeWh, SolarWh, BatteryWh, GridWh, IsPartial)
+            VALUES ($timestamp, $evChargeWh, $solarWh, $batteryWh, $gridWh, $isPartial);
+            ";
+            cmd.Parameters.AddWithValue("$timestamp", result.Timestamp.ToString("o"));
+            cmd.Parameters.AddWithValue("$evChargeWh", result.EvChargeWh * 1000);
+            cmd.Parameters.AddWithValue("$solarWh", result.SolarWh * 1000);
+            cmd.Parameters.AddWithValue("$batteryWh", result.BatteryWh * 1000);
+            cmd.Parameters.AddWithValue("$gridWh", result.GridWh * 1000);
+            cmd.Parameters.AddWithValue("$isPartial", result.IsPartial ? 1 : 0);
+            cmd.ExecuteNonQuery();
+        }
+
         public IReadOnlyCollection<EnergyAttributionResult> GetRange(
             SqliteConnection conn, DateTime start, DateTime end)
         {

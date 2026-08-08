@@ -14,7 +14,7 @@ namespace THMS.Domain.Energy
         // ---------------------------------------------------------
         // Hourly time-series data (for charts)
         // ---------------------------------------------------------
-        public IReadOnlyList<EnergyHourRecord> Hours { get; set; }
+        public IReadOnlyList<EnergyIntervalRecord> Intervals { get; set; }
 
         // ---------------------------------------------------------
         // Battery SOC timeline (for SOC chart)

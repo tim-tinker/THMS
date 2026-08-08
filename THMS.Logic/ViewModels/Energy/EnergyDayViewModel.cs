@@ -14,7 +14,7 @@ namespace THMS.Logic.ViewModels.Energy
         // ---------------------------------------------------------
         // Hourly time-series data (for charts)
         // ---------------------------------------------------------
-        public IReadOnlyList<EnergyHourRecord> Hours { get; }
+        public IReadOnlyList<EnergyIntervalRecord> Intervals { get; }
 
         // ---------------------------------------------------------
         // Battery SOC timeline (for SOC chart)
@@ -39,7 +39,7 @@ namespace THMS.Logic.ViewModels.Energy
         {
             Date = day.Date;
 
-            Hours = day.Hours;
+            Intervals = day.Intervals;
             BatterySocTimeline = day.BatterySocTimeline;
 
             SolarKwh = day.SolarKwh;
