@@ -78,7 +78,7 @@ namespace THMS.Logic.ViewModels
                 Station = Station
             };
 
-            _financeStore.AddGasPurchase(purchase);
+            _financeStore.UpsertGasPurchase(purchase);
         }
 
         private void OnChanged(string propertyName)

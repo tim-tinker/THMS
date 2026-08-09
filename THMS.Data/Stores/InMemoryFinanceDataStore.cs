@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using THMS.Domain.Energy;
+﻿using THMS.Data.Stores.InMemoryStores;
 using THMS.Domain.Finance;
 using THMS.Domain.Finance.Billing;
 using THMS.Domain.Transportation;
@@ -10,17 +7,14 @@ namespace THMS.Data.Stores
 {
     public class InMemoryFinanceDataStore : IFinanceDataStore
     {
-        private readonly List<ElectricUtilityBill> _utilityBills = new();
-        private readonly List<CommercialChargeCostRecord> _commercialCosts = new();
-        private readonly List<GasPurchase> _gasPurchases = new();
-        private readonly List<EvChargeSession> _evChargeSessions = new();
+        private readonly InMemoryElectricUtilityBillStore _utilityBills = new();
+        private readonly InMemoryCommercialChargeCostStore _commercialCosts = new();
+        private readonly InMemoryGasPurchaseStore _gasPurchases = new();
+        private readonly InMemoryEvChargeSessionCostStore _evChargeSessionCosts = new();
 
         public InMemoryFinanceDataStore()
         {
-            // ---------------------------------------------------------
-            // ELECTRIC UTILITY BILLS
-            // ---------------------------------------------------------
-            AddElectricUtilityBill(new ElectricUtilityBill
+            UpsertElectricUtilityBill(new ElectricUtilityBill
             {
                 Id = Guid.NewGuid(),
                 StartDate = DateTime.Today.AddMonths(-1).AddDays(-5),
@@ -33,20 +27,17 @@ namespace THMS.Data.Stores
                 TotalKwh = 650
             });
 
-            // ---------------------------------------------------------
-            // GAS PURCHASES
-            // ---------------------------------------------------------
-            AddGasPurchase(new GasPurchase
+            UpsertGasPurchase(new GasPurchase
             {
                 Id = Guid.NewGuid(),
-                VehicleId = Guid.Empty, // replace with ICE vehicle ID in UI
+                VehicleId = Guid.Empty,
                 Date = DateTime.Today.AddDays(-7),
                 Gallons = 11.2m,
                 FuelCost = 34.80m,
                 Station = "Shell"
             });
 
-            AddGasPurchase(new GasPurchase
+            UpsertGasPurchase(new GasPurchase
             {
                 Id = Guid.NewGuid(),
                 VehicleId = Guid.Empty,
@@ -56,10 +47,7 @@ namespace THMS.Data.Stores
                 Station = "Chevron"
             });
 
-            // ---------------------------------------------------------
-            // COMMERCIAL CHARGING COST RECORDS
-            // ---------------------------------------------------------
-            AddCommercialChargeCostRecord(new CommercialChargeCostRecord
+            UpsertCommercialChargeCostRecord(new CommercialChargeCostRecord
             {
                 Id = Guid.NewGuid(),
                 SessionId = "EA-2026-07-22-ABC123",
@@ -68,7 +56,7 @@ namespace THMS.Data.Stores
                 Vendor = "Electrify America"
             });
 
-            AddCommercialChargeCostRecord(new CommercialChargeCostRecord
+            UpsertCommercialChargeCostRecord(new CommercialChargeCostRecord
             {
                 Id = Guid.NewGuid(),
                 SessionId = "CP-2026-07-20-XYZ789",
@@ -82,106 +70,56 @@ namespace THMS.Data.Stores
         // ELECTRIC UTILITY BILLS
         // ---------------------------------------------------------
 
-        public void AddElectricUtilityBill(ElectricUtilityBill bill)
-        {
-            _utilityBills.Add(bill);
-        }
+        public void UpsertElectricUtilityBill(ElectricUtilityBill bill) =>
+            _utilityBills.Upsert(bill);
 
-        public IEnumerable<ElectricUtilityBill> GetElectricUtilityBills(DateTime start, DateTime end)
-        {
-            return _utilityBills
-                .Where(b => b.StartDate >= start && b.EndDate <= end)
-                .OrderBy(b => b.StartDate);
-        }
+        public IEnumerable<ElectricUtilityBill> GetElectricUtilityBills(DateTime start, DateTime end) =>
+            _utilityBills.GetRange(start, end);
 
         // ---------------------------------------------------------
         // COMMERCIAL CHARGING COST RECORDS
         // ---------------------------------------------------------
 
-        public void AddCommercialChargeCostRecord(CommercialChargeCostRecord record)
-        {
-            _commercialCosts.Add(record);
-        }
+        public void UpsertCommercialChargeCostRecord(CommercialChargeCostRecord record) =>
+            _commercialCosts.Upsert(record);
 
-        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecords(DateTime start, DateTime end)
-        {
-            return _commercialCosts
-                .Where(c => c.Date >= start && c.Date <= end)
-                .OrderBy(c => c.Date);
-        }
+        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecords(DateTime start, DateTime end) =>
+            _commercialCosts.GetRange(start, end);
 
         public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecordsByVendor(
             string vendor,
             DateTime start,
-            DateTime end)
-        {
-            return _commercialCosts
-                .Where(c => c.Vendor.Equals(vendor, StringComparison.OrdinalIgnoreCase))
-                .Where(c => c.Date >= start && c.Date <= end)
-                .OrderBy(c => c.Date);
-        }
+            DateTime end) =>
+            _commercialCosts.GetRangeByVendor(vendor, start, end);
 
         // ---------------------------------------------------------
         // GAS PURCHASES
         // ---------------------------------------------------------
 
-        public void AddGasPurchase(GasPurchase purchase)
-        {
-            _gasPurchases.Add(purchase);
-        }
+        public void UpsertGasPurchase(GasPurchase purchase) =>
+            _gasPurchases.Upsert(purchase);
 
-        public IEnumerable<GasPurchase> GetGasPurchases(Guid vehicleId, DateTime start, DateTime end)
-        {
-            return _gasPurchases
-                .Where(g => g.VehicleId == vehicleId &&
-                            g.Date >= start &&
-                            g.Date <= end)
-                .OrderBy(g => g.Date);
-        }
+        public IEnumerable<GasPurchase> GetGasPurchases(Guid vehicleId, DateTime start, DateTime end) =>
+            _gasPurchases.GetRange(vehicleId, start, end);
 
         // ---------------------------------------------------------
         // INCOMPLETE COST RECORDS
         // ---------------------------------------------------------
 
-        public IEnumerable<EvChargeSession> GetEvChargeSessionsWithMissingCost()
-        {
-            return _evChargeSessions
-                .Where(s => s.SessionCost == null)
-                .OrderBy(s => s.StartTime);
-        }
+        public IEnumerable<EvChargeSession> GetEvChargeSessionsWithMissingCost() =>
+            _evChargeSessionCosts.GetWithMissingCost();
 
-        public IEnumerable<GasPurchase> GetGasPurchasesWithMissingCost()
-        {
-            return _gasPurchases
-                .Where(g => g.FuelCost == 0)
-                .OrderBy(g => g.Date);
-        }
+        public IEnumerable<GasPurchase> GetGasPurchasesWithMissingCost() =>
+            _gasPurchases.GetWithMissingCost();
 
         // ---------------------------------------------------------
         // COST UPDATES
         // ---------------------------------------------------------
 
-        public void UpdateEvChargeSessionCost(Guid sessionId, decimal cost)
-        {
-            var session = _evChargeSessions.FirstOrDefault(s => s.Id == sessionId);
-            if (session != null)
-                session.SessionCost = cost;
-        }
+        public void UpdateEvChargeSessionCost(Guid sessionId, decimal cost) =>
+            _evChargeSessionCosts.UpdateCost(sessionId, cost);
 
-        public void UpdateGasPurchaseCost(Guid purchaseId, decimal cost)
-        {
-            var purchase = _gasPurchases.FirstOrDefault(g => g.Id == purchaseId);
-            if (purchase != null)
-                purchase.FuelCost = cost;
-        }
-
-        // ---------------------------------------------------------
-        // EV SESSION STORAGE (FinanceStore needs cost access)
-        // ---------------------------------------------------------
-
-        public void AddEvChargeSession(EvChargeSession session)
-        {
-            _evChargeSessions.Add(session);
-        }
+        public void UpdateGasPurchaseCost(Guid purchaseId, decimal cost) =>
+            _gasPurchases.UpdateCost(purchaseId, cost);
     }
 }

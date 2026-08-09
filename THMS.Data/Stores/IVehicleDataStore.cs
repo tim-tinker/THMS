@@ -7,44 +7,41 @@ namespace THMS.Data.Stores
         // ---------------------------------------------------------
         // VEHICLES
         // ---------------------------------------------------------
-        void AddVehicle(VehicleBase vehicle);
+        /// <summary>Upsert key: <see cref="VehicleBase.Id"/>.</summary>
+        void UpsertVehicle(VehicleBase vehicle);
         VehicleBase? GetVehicle(Guid id);
         IEnumerable<VehicleBase> GetAllVehicles();
 
         // ---------------------------------------------------------
         // ICE MILEAGE
         // ---------------------------------------------------------
-        void AddIceMileageRecord(IceMileageRecord record);
+        /// <summary>Upsert key: <see cref="IceMileageRecord.Id"/>.</summary>
+        void UpsertIceMileageRecord(IceMileageRecord record);
         IceMileageRecord? GetEarliestIceMileageRecord(Guid vehicleId);
         IEnumerable<IceMileageRecord> GetIceMileageRecords(Guid vehicleId, DateTime start, DateTime end);
 
-        // Aggregated mileage (used by TransportationAnalyticsEngine)
+        // ---------------------------------------------------------
+        // SHARED MILEAGE (ICE + EV)
+        // ---------------------------------------------------------
         decimal GetMilesDrivenInPeriod(Guid vehicleId, DateTime start, DateTime end);
 
         // ---------------------------------------------------------
         // EV CHARGING SESSIONS (vehicle‑assigned)
         // ---------------------------------------------------------
-        // Create
-        void AddEvChargeSession(EvChargeSession session);
-
-        // Read (single)
+        /// <summary>Upsert key: <see cref="EvChargeSession.Id"/>.</summary>
+        void UpsertEvChargeSession(EvChargeSession session);
         EvChargeSession? GetEvChargeSession(Guid sessionId);
-
-        // Read (filtered by period)
         IEnumerable<EvChargeSession> GetEvChargeSessions(Guid vehicleId, DateTime start, DateTime end);
-
-        // Update
-        void UpdateEvChargeSession(EvChargeSession session);
-
-        // Delete (optional)
+        /// <summary>Most recent session by <see cref="EvChargeSession.EndTime"/>, or null if none.</summary>
+        EvChargeSession? GetLatestEvChargeSession();
         void DeleteEvChargeSession(Guid sessionId);
 
         // ---------------------------------------------------------
         // MAINTENANCE
         // ---------------------------------------------------------
-        void AddMaintenanceInvoice(MaintenanceInvoiceRecord invoice);
+        /// <summary>Upsert key: <see cref="MaintenanceInvoiceRecord.Id"/>.</summary>
+        void UpsertMaintenanceInvoice(MaintenanceInvoiceRecord invoice);
         IEnumerable<MaintenanceInvoiceRecord> GetMaintenanceInvoices(Guid vehicleId, DateTime start, DateTime end);
-
         decimal GetMaintenanceCostInPeriod(Guid vehicleId, DateTime start, DateTime end);
     }
 }

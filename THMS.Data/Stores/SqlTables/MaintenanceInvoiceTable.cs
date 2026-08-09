@@ -20,14 +20,20 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
-        public void Insert(SqliteConnection conn, MaintenanceInvoiceRecord invoice)
+        public void Upsert(SqliteConnection conn, MaintenanceInvoiceRecord invoice)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO MaintenanceInvoices
                 (Id, VehicleId, Date, Cost, Description, Vendor)
                 VALUES
-                (@Id, @VehicleId, @Date, @Cost, @Description, @Vendor);";
+                (@Id, @VehicleId, @Date, @Cost, @Description, @Vendor)
+                ON CONFLICT(Id) DO UPDATE SET
+                    VehicleId = excluded.VehicleId,
+                    Date = excluded.Date,
+                    Cost = excluded.Cost,
+                    Description = excluded.Description,
+                    Vendor = excluded.Vendor;";
 
             cmd.Parameters.AddWithValue("@Id", invoice.Id.ToString());
             cmd.Parameters.AddWithValue("@VehicleId", invoice.VehicleId.ToString());

@@ -60,7 +60,7 @@ namespace THMS.Logic.ViewModels
 
         public void AddVehicle(VehicleBase vehicle)
         {
-            _vehicleStore.AddVehicle(vehicle);
+            _vehicleStore.UpsertVehicle(vehicle);
             Vehicles.Add(CreateListItem(vehicle));
         }
 

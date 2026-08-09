@@ -25,8 +25,8 @@ namespace THMS.Ingestion.Importers.Energy
             {
                 var chargingSession = entry.Item1;
                 var costRecord = entry.Item2;
-                EnergyStore.AddEvCommercialChargeSession(chargingSession);
-                FinanceStore.AddCommercialChargeCostRecord(costRecord);
+                EnergyStore.UpsertEvCommercialChargeSession(chargingSession);
+                FinanceStore.UpsertCommercialChargeCostRecord(costRecord);
             }
         }
 

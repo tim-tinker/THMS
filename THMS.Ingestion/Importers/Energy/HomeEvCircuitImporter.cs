@@ -44,7 +44,7 @@ namespace THMS.Ingestion.Importers.Energy
 
                 EndDate = timeStamp;
 
-                _store.AddEvCircuitReading(reading);
+                _store.UpsertEvCircuitReading(reading);
 
                 yield return reading;
             }

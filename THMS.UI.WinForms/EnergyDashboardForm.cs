@@ -125,7 +125,36 @@ namespace THMS.UI.WinForms
 
             // Insert VCR at the top of the Day tab
             _tabDay.Controls.Add(vcr);
+
+            var btnEvRefresh = new Button
+            {
+                Text = "Refresh EV Data",
+                Dock = DockStyle.Bottom,
+                Margin = new Padding(4),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                UseVisualStyleBackColor = true,
+                Height = 50,
+            };
+            btnEvRefresh.Click += OnClickRefreshEvData;
+            _tabDay.Controls.Add(btnEvRefresh);
         }
+
+        private void OnClickRefreshEvData(object? sender, EventArgs e)
+        {
+            RecalculateEvForDay(_vm.Day.Date);
+        }
+
+        private void RecalculateEvForDay(DateTime day)
+        {
+            var start = day.Date;
+            var end = day.Date.AddDays(1).AddSeconds(-1);
+
+            var attributionEngine = new EvAttributionEngine(_energyDataStore);
+            attributionEngine.Compute(start, end);
+
+            RefreshDashboard();
+        }
+
 
         // ============================================================
         // WEEK / MONTH / YEAR TABS

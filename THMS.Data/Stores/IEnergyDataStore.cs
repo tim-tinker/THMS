@@ -9,46 +9,39 @@ namespace THMS.Data.Stores
         // HOME CHARGING CIRCUIT READINGS
         // ---------------------------------------------------------
 
-        void AddEvCircuitReading(EvCircuitReading reading);
+        /// <summary>Upsert key: <see cref="EvCircuitReading.Timestamp"/>.</summary>
+        void UpsertEvCircuitReading(EvCircuitReading reading);
 
         IEnumerable<EvCircuitReading> GetEvCircuitReadings(
             DateTime start,
             DateTime end);
 
+        /// <summary>Most recent reading by <see cref="EvCircuitReading.Timestamp"/>, or null if none.</summary>
+        EvCircuitReading? GetLatestEvCircuitReading();
+
         // ---------------------------------------------------------
         // HOME SOLAR VENDOR INTERVALS
         // ---------------------------------------------------------
 
-        void AddSolarVendorInterval(SolarVendorInterval interval);
+        /// <summary>Upsert key: <see cref="SolarVendorInterval.Timestamp"/>.</summary>
+        void UpsertSolarVendorInterval(SolarVendorInterval interval);
 
         IEnumerable<SolarVendorInterval> GetSolarVendorIntervals(
             DateTime start,
             DateTime end);
+
+        /// <summary>Most recent interval by <see cref="SolarVendorInterval.Timestamp"/>, or null if none.</summary>
+        SolarVendorInterval? GetLatestSolarVendorInterval();
 
 
         // ---------------------------------------------------------
         // COMMERCIAL CHARGING SESSIONS
         // ---------------------------------------------------------
 
-        void AddEvCommercialChargeSession(EvCommercialChargeSession session);
+        /// <summary>Upsert key: <see cref="EvCommercialChargeSession.EndTime"/>.</summary>
+        void UpsertEvCommercialChargeSession(EvCommercialChargeSession session);
 
         IEnumerable<EvCommercialChargeSession> GetEvCommercialChargeSessions(
-            DateTime start,
-            DateTime end);
-
-
-        // ---------------------------------------------------------
-        // COMMERCIAL CHARGING COST RECORDS
-        // ---------------------------------------------------------
-
-        void AddCommercialChargeCostRecord(CommercialChargeCostRecord record);
-
-        IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecords(
-            DateTime start,
-            DateTime end);
-
-        IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecordsByVendor(
-            string vendor,
             DateTime start,
             DateTime end);
 
@@ -72,9 +65,13 @@ namespace THMS.Data.Stores
         // ENERGY ATTRIBUTION RESULTS
         // ---------------------------------------------------------
 
-        void AddEvAttribution(EnergyAttributionResult result);
+        /// <summary>Upsert key: <see cref="EnergyAttributionResult.Timestamp"/>.</summary>
+        void UpsertEvAttribution(EnergyAttributionResult result);
 
         IReadOnlyCollection<EnergyAttributionResult> GetEvAttribution(DateTime start, DateTime end);
+
+        /// <summary>Most recent result by <see cref="EnergyAttributionResult.Timestamp"/>, or null if none.</summary>
+        EnergyAttributionResult? GetLatestEvAttribution();
 
     }
 }

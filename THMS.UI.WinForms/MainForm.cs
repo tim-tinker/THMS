@@ -5,6 +5,7 @@ namespace THMS.UI
     public partial class MainForm : Form
     {
         private readonly Dictionary<string, BaseDashboardForm> _dashboards = new();
+        private DataCenterForm _dataCenterForm;
 
         /// <summary>Designer only.</summary>
         public MainForm()
@@ -16,21 +17,27 @@ namespace THMS.UI
             TransportationDashboardForm transportationDashboard,
             EnergyDashboardForm energyDashboard,
             FinanceDashboardForm financeDashboard,
-            VehicleListDashboardForm vehicleListDashboard) : this()
+            VehicleListDashboardForm vehicleListDashboard,
+            DataCenterForm dataCenterForm
+            ) 
+            : this()
         {
             _dashboards["Transportation"] = transportationDashboard;
             _dashboards["Energy"] = energyDashboard;
             _dashboards["Finance"] = financeDashboard;
             _dashboards["Vehicles"] = vehicleListDashboard;
+            _dataCenterForm = dataCenterForm;
 
             foreach (var form in _dashboards.Values)
             {
                 form.ConfigureAsEmbeddedDashboard();
-                form.Dock = DockStyle.Fill;
                 form.Visible = false;
                 dashboardHostPanel.Controls.Add(form);
                 form.InitializeDashboard();
             }
+
+            _dataCenterForm.ConfigureAsEmbeddedForm();
+            dashboardHostPanel.Controls.Add(_dataCenterForm);
         }
 
         private void ShowModule(string moduleName)
@@ -61,6 +68,19 @@ namespace THMS.UI
         private void OnClickVehicles(object sender, EventArgs e)
         {
             ShowModule("Vehicles");
+        }
+
+        private void OnClickDataCenter(object sender, EventArgs e)
+        {
+            ShowFormInMainPanel(_dataCenterForm);
+        }
+
+        private void ShowFormInMainPanel(Form form)
+        {
+            foreach (var dashboard in _dashboards.Values)
+                dashboard.Visible = false;
+
+            form.Visible = true;
         }
     }
 }

@@ -1,47 +1,42 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using THMS.Data.Stores.InMemoryStores;
+﻿using THMS.Data.Stores.InMemoryStores;
 using THMS.Domain.Energy;
-using THMS.Domain.Finance;
 
 namespace THMS.Data.Stores
 {
     public class InMemoryEnergyDataStore : IEnergyDataStore
     {
-        private readonly List<EvCircuitReading> _circuitReadings = new();
-        private readonly List<EvCommercialChargeSession> _commercialSessions = new();
-        private readonly List<CommercialChargeCostRecord> _commercialCosts = new();
+        private readonly InMemoryEvCircuitReadingStore _circuitReadingsStore = new();
+        private readonly InMemoryEvCommercialChargeSessionStore _commercialSessionsStore = new();
+        private readonly InMemoryEvCircuitSegmentsStore _circuitSegmentsStore = new();
         private readonly InMemorySolarVendorIntervalStore _solarStore = new();
         private readonly InMemoryEvAttributionStore _evAttrStore = new();
-
-        public InMemoryEnergyDataStore()
-        {
-        }
 
         // ---------------------------------------------------------
         // HOME CHARGING CIRCUIT READINGS
         // ---------------------------------------------------------
 
-        public void AddEvCircuitReading(EvCircuitReading reading)
+        public void UpsertEvCircuitReading(EvCircuitReading reading)
         {
-            _circuitReadings.Add(reading);
+            _circuitReadingsStore.Upsert(reading);
         }
 
         public IEnumerable<EvCircuitReading> GetEvCircuitReadings(DateTime start, DateTime end)
         {
-            return _circuitReadings
-                .Where(r => r.Timestamp >= start && r.Timestamp <= end)
-                .OrderBy(r => r.Timestamp);
+            return _circuitReadingsStore.GetRange(start, end);
+        }
+
+        public EvCircuitReading? GetLatestEvCircuitReading()
+        {
+            return _circuitReadingsStore.GetLatest();
         }
 
         // ---------------------------------------------------------
-        // HOME CHARGING CIRCUIT READINGS
+        // HOME SOLAR VENDOR INTERVALS
         // ---------------------------------------------------------
 
-        public void AddSolarVendorInterval(SolarVendorInterval interval)
+        public void UpsertSolarVendorInterval(SolarVendorInterval interval)
         {
-            _solarStore.Add(interval);
+            _solarStore.Upsert(interval);
         }
 
         public IEnumerable<SolarVendorInterval> GetSolarVendorIntervals(DateTime start, DateTime end)
@@ -49,13 +44,18 @@ namespace THMS.Data.Stores
             return _solarStore.GetRange(start, end);
         }
 
+        public SolarVendorInterval? GetLatestSolarVendorInterval()
+        {
+            return _solarStore.GetLatest();
+        }
+
         // ---------------------------------------------------------
         // EV ATTRIBUTION
         // ---------------------------------------------------------
 
-        public void AddEvAttribution(EnergyAttributionResult result)
+        public void UpsertEvAttribution(EnergyAttributionResult result)
         {
-            _evAttrStore.Add(result);
+            _evAttrStore.Upsert(result);
         }
 
         public IReadOnlyCollection<EnergyAttributionResult> GetEvAttribution(DateTime start, DateTime end)
@@ -63,106 +63,49 @@ namespace THMS.Data.Stores
             return _evAttrStore.GetRange(start, end);
         }
 
+        public EnergyAttributionResult? GetLatestEvAttribution()
+        {
+            return _evAttrStore.GetLatest();
+        }
+
         // ---------------------------------------------------------
         // COMMERCIAL CHARGING SESSIONS
         // ---------------------------------------------------------
 
-        public void AddEvCommercialChargeSession(EvCommercialChargeSession session)
+        public void UpsertEvCommercialChargeSession(EvCommercialChargeSession session)
         {
-            _commercialSessions.Add(session);
+            _commercialSessionsStore.Upsert(session);
         }
 
         public IEnumerable<EvCommercialChargeSession> GetEvCommercialChargeSessions(
             DateTime start,
             DateTime end)
         {
-            return _commercialSessions
-                .Where(s => s.StartTime >= start && s.EndTime <= end)
-                .OrderBy(s => s.StartTime);
-        }
-
-        // ---------------------------------------------------------
-        // COMMERCIAL CHARGING COST RECORDS
-        // ---------------------------------------------------------
-
-        public void AddCommercialChargeCostRecord(CommercialChargeCostRecord record)
-        {
-            _commercialCosts.Add(record);
-        }
-
-        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecords(
-            DateTime start,
-            DateTime end)
-        {
-            return _commercialCosts
-                .Where(c => c.Date >= start && c.Date <= end)
-                .OrderBy(c => c.Date);
-        }
-
-        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecordsByVendor(
-            string vendor,
-            DateTime start,
-            DateTime end)
-        {
-            return _commercialCosts
-                .Where(c => c.Vendor.Equals(vendor, StringComparison.OrdinalIgnoreCase))
-                .Where(c => c.Date >= start && c.Date <= end)
-                .OrderBy(c => c.Date);
+            return _commercialSessionsStore.GetRange(start, end);
         }
 
         // ----------------------------------------------------------
         // HOME EV CIRCUIT SEGMENTS
         // ----------------------------------------------------------
 
-
-        private readonly Dictionary<Guid, List<EvCircuitSegment>> _segments
-            = new Dictionary<Guid, List<EvCircuitSegment>>();
-
         public void SaveEvCircuitSegments(Guid sessionId, IEnumerable<EvCircuitSegment> segments)
         {
-            _segments[sessionId] = segments.ToList();
+            _circuitSegmentsStore.Save(sessionId, segments);
         }
 
         public IEnumerable<EvCircuitSegment> GetEvCircuitSegments(Guid sessionId)
         {
-            return _segments.TryGetValue(sessionId, out var list)
-                ? list
-                : Enumerable.Empty<EvCircuitSegment>();
+            return _circuitSegmentsStore.Get(sessionId);
         }
 
         public void DeleteEvCircuitSegments(Guid sessionId)
         {
-            _segments.Remove(sessionId);
+            _circuitSegmentsStore.Delete(sessionId);
         }
 
         public EvCircuitSegmentSummary GetEvCircuitSummary(Guid sessionId)
         {
-            var segs = GetEvCircuitSegments(sessionId).ToList();
-
-            if (!segs.Any())
-            {
-                return new EvCircuitSegmentSummary  
-                {
-                    SessionId = sessionId,
-                    TotalKwh = 0,
-                    GridKwh = 0,
-                    SolarKwh = 0,
-                    BatteryKwh = 0,
-                    SegmentCount = 0
-                };
-            }
-
-            return new EvCircuitSegmentSummary
-            {
-                SessionId = sessionId,
-                TotalKwh = segs.Sum(s => s.Kwh),
-                GridKwh = segs.Sum(s => s.GridKwh),
-                SolarKwh = segs.Sum(s => s.SolarKwh),
-                BatteryKwh = segs.Sum(s => s.BatteryKwh),
-                SegmentCount = segs.Count,
-                StartTime = segs.Min(s => s.Timestamp),
-                EndTime = segs.Max(s => s.Timestamp)
-            };
+            return _circuitSegmentsStore.GetSummary(sessionId);
         }
     }
 }

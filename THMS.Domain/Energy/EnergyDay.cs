@@ -17,11 +17,6 @@ namespace THMS.Domain.Energy
         public IReadOnlyList<EnergyIntervalRecord> Intervals { get; set; }
 
         // ---------------------------------------------------------
-        // Battery SOC timeline (for SOC chart)
-        // ---------------------------------------------------------
-        public List<BatterySocRecord> BatterySocTimeline { get; set; }
-
-        // ---------------------------------------------------------
         // Daily totals (for summary + breakdown)
         // ---------------------------------------------------------
         public decimal SolarKwh { get; set; }

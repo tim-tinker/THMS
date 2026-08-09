@@ -60,7 +60,7 @@ namespace THMS.Ingestion.Importers.Energy
 
                 EndDate = interval.Timestamp;
 
-                _store.AddSolarVendorInterval(interval);
+                _store.UpsertSolarVendorInterval(interval);
             }
         }
     }

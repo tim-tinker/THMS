@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using THMS.Domain.Energy;
 
-namespace THMS.Data.Stores.SqqlTables
+namespace THMS.Data.Stores.SqlTables
 {
     public class SolarVendorIntervalsTable
     {
@@ -23,11 +23,13 @@ namespace THMS.Data.Stores.SqqlTables
                 StoredInBatteriesWh INTEGER NOT NULL,
                 DischargedFromBatteriesWh INTEGER NOT NULL
             );
+            CREATE UNIQUE INDEX IF NOT EXISTS IX_SolarVendorIntervals_Timestamp
+                ON SolarVendorIntervals (Timestamp);
             ";
             cmd.ExecuteNonQuery();
         }
 
-        public void Insert(SqliteConnection conn, SolarVendorInterval interval)
+        public void Upsert(SqliteConnection conn, SolarVendorInterval interval)
         {
             using var cmd = new SqliteCommand(@"
                 INSERT INTO SolarVendorIntervals
@@ -37,7 +39,14 @@ namespace THMS.Data.Stores.SqqlTables
                 VALUES
                 (@Id, @Timestamp, @EnergyProducedWh, @EnergyConsumedWh,
                  @ExportedToGridWh, @ImportedFromGridWh,
-                 @StoredInBatteriesWh, @DischargedFromBatteriesWh);", conn);
+                 @StoredInBatteriesWh, @DischargedFromBatteriesWh)
+                ON CONFLICT(Timestamp) DO UPDATE SET
+                    EnergyProducedWh = excluded.EnergyProducedWh,
+                    EnergyConsumedWh = excluded.EnergyConsumedWh,
+                    ExportedToGridWh = excluded.ExportedToGridWh,
+                    ImportedFromGridWh = excluded.ImportedFromGridWh,
+                    StoredInBatteriesWh = excluded.StoredInBatteriesWh,
+                    DischargedFromBatteriesWh = excluded.DischargedFromBatteriesWh;", conn);
 
             cmd.Parameters.AddWithValue("@Id", interval.Id.ToString());
             cmd.Parameters.AddWithValue("@Timestamp", interval.Timestamp);
@@ -65,23 +74,38 @@ namespace THMS.Data.Stores.SqqlTables
             cmd.Parameters.AddWithValue("@End", end);
 
             using var reader = cmd.ExecuteReader();
-            var list = new List<SolarVendorInterval>();
 
             while (reader.Read())
-            {
-                yield return new SolarVendorInterval
-                {
-                    Id = Guid.Parse(reader.GetString(0)),
-                    Timestamp = reader.GetDateTime(1),
-                    EnergyProducedWh = reader.GetInt32(2),
-                    EnergyConsumedWh = reader.GetInt32(3),
-                    ExportedToGridWh = reader.GetInt32(4),
-                    ImportedFromGridWh = reader.GetInt32(5),
-                    StoredInBatteriesWh = reader.GetInt32(6),
-                    DischargedFromBatteriesWh = reader.GetInt32(7)
-                };
-            }
+                yield return Read(reader);
+        }
 
+        public SolarVendorInterval? GetLatest(SqliteConnection conn)
+        {
+            using var cmd = new SqliteCommand(@"
+                SELECT Id, Timestamp, EnergyProducedWh, EnergyConsumedWh,
+                       ExportedToGridWh, ImportedFromGridWh,
+                       StoredInBatteriesWh, DischargedFromBatteriesWh
+                FROM SolarVendorIntervals
+                ORDER BY Timestamp DESC
+                LIMIT 1;", conn);
+
+            using var reader = cmd.ExecuteReader();
+            return reader.Read() ? Read(reader) : null;
+        }
+
+        private static SolarVendorInterval Read(SqliteDataReader reader)
+        {
+            return new SolarVendorInterval
+            {
+                Id = Guid.Parse(reader.GetString(0)),
+                Timestamp = reader.GetDateTime(1),
+                EnergyProducedWh = reader.GetInt32(2),
+                EnergyConsumedWh = reader.GetInt32(3),
+                ExportedToGridWh = reader.GetInt32(4),
+                ImportedFromGridWh = reader.GetInt32(5),
+                StoredInBatteriesWh = reader.GetInt32(6),
+                DischargedFromBatteriesWh = reader.GetInt32(7)
+            };
         }
     }
 }

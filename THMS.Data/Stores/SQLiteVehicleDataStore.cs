@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Microsoft.Data.Sqlite;
-using THMS.Data.Stores;
-using THMS.Data.Stores.SqlTables;
+﻿using Microsoft.Data.Sqlite;
+using THMS.Data.Stores.SqliteStores;
 using THMS.Domain.Transportation;
 
 namespace THMS.Data.Stores.SQLite
@@ -12,17 +8,18 @@ namespace THMS.Data.Stores.SQLite
     {
         private readonly string _connectionString;
 
-        private readonly VehicleTable _vehicleTable = new();
-        private readonly VehicleIceTable _vehicleIceTable = new();
-        private readonly VehicleEvTable _vehicleEvTable = new();
-        private readonly IceMileageTable _iceMileageTable = new();
-        private readonly MileageRecordTable _mileageRecordTable = new();
-        private readonly MaintenanceInvoiceTable _maintenanceInvoiceTable = new();
-        private readonly EvChargeSessionTable _evSessionTable = new();
+        private readonly SqliteMileageRecordStore _mileageStore = new();
+        private readonly SqliteVehicleStore _vehicleStore = new();
+        private readonly SqliteIceMileageStore _iceMileageStore;
+        private readonly SqliteEvChargeSessionStore _evChargeSessionStore;
+        private readonly SqliteMaintenanceInvoiceStore _maintenanceStore = new();
 
         public SQLiteVehicleDataStore(string connectionString)
         {
             _connectionString = connectionString;
+            _iceMileageStore = new SqliteIceMileageStore(_mileageStore);
+            _evChargeSessionStore = new SqliteEvChargeSessionStore(_mileageStore);
+
             using var conn = OpenConnection();
             InitializeSchema(conn);
         }
@@ -36,250 +33,121 @@ namespace THMS.Data.Stores.SQLite
 
         private void InitializeSchema(SqliteConnection conn)
         {
-            _vehicleTable.InitializeSchema(conn);
-            _vehicleIceTable.InitializeSchema(conn);
-            _vehicleEvTable.InitializeSchema(conn);
-            _iceMileageTable.InitializeSchema(conn);
-            _mileageRecordTable.InitializeSchema(conn);
-            _maintenanceInvoiceTable.InitializeSchema(conn);
-            _evSessionTable.InitializeSchema(conn);
+            _vehicleStore.InitializeSchema(conn);
+            _mileageStore.InitializeSchema(conn);
+            _iceMileageStore.InitializeSchema(conn);
+            _evChargeSessionStore.InitializeSchema(conn);
+            _maintenanceStore.InitializeSchema(conn);
         }
 
         // ---------------------------------------------------------
         // VEHICLES
         // ---------------------------------------------------------
 
-        public void AddVehicle(VehicleBase vehicle)
+        public void UpsertVehicle(VehicleBase vehicle)
         {
             using var conn = OpenConnection();
-
-            _vehicleTable.Insert(conn, vehicle);
-
-            if (vehicle is VehicleIce ice)
-                _vehicleIceTable.Insert(conn, ice);
-            else if (vehicle is VehicleEv ev)
-                _vehicleEvTable.Insert(conn, ev);
+            _vehicleStore.Upsert(conn, vehicle);
         }
 
         public VehicleBase? GetVehicle(Guid id)
         {
             using var conn = OpenConnection();
-
-            var baseInfo = _vehicleTable.GetBase(conn, id);
-            if (baseInfo == null)
-                return null;
-
-            var (name, make, model, year, vin, type) = baseInfo.Value;
-
-            if (type == nameof(VehicleIce))
-            {
-                var iceInfo = _vehicleIceTable.Get(conn, id);
-                if (iceInfo == null) return null;
-
-                var (fuelTankCapacityGallons, fuelType) = iceInfo.Value;
-
-                return new VehicleIce
-                {
-                    Id = id,
-                    Name = name,
-                    Make = make,
-                    Model = model,
-                    Year = year,
-                    Vin = vin,
-                    FuelTankCapacityGallons = fuelTankCapacityGallons,
-                    FuelType = fuelType
-                };
-            }
-
-            if (type == nameof(VehicleEv))
-            {
-                var evInfo = _vehicleEvTable.Get(conn, id);
-                if (evInfo == null) return null;
-
-                var (batteryCapacityKwh, chargingPortType) = evInfo.Value;
-
-                return new VehicleEv
-                {
-                    Id = id,
-                    Name = name,
-                    Make = make,
-                    Model = model,
-                    Year = year,
-                    Vin = vin,
-                    BatteryCapacityKwh = batteryCapacityKwh,
-                    ChargePortType = chargingPortType
-                };
-            }
-
-            return null;
+            return _vehicleStore.Get(conn, id);
         }
 
         public IEnumerable<VehicleBase> GetAllVehicles()
         {
             using var conn = OpenConnection();
-            var ids = _vehicleTable.GetAllIds(conn);
-
-            return ids
-                .Select(GetVehicle)
-                .Where(v => v != null)!;
+            return _vehicleStore.GetAll(conn).ToList();
         }
 
         // ---------------------------------------------------------
         // ICE MILEAGE
         // ---------------------------------------------------------
 
-        public void AddIceMileageRecord(IceMileageRecord record)
+        public void UpsertIceMileageRecord(IceMileageRecord record)
         {
             using var conn = OpenConnection();
-
-            // base
-            _mileageRecordTable.Insert(conn, record, "Ice");
-            // derived
-            _iceMileageTable.Insert(conn, record);
+            _iceMileageStore.Upsert(conn, record);
         }
 
         public IceMileageRecord? GetEarliestIceMileageRecord(Guid vehicleId)
         {
-            return GetIceMileageRecords(vehicleId, DateTime.MinValue, DateTime.MaxValue)
-                .FirstOrDefault();
+            using var conn = OpenConnection();
+            return _iceMileageStore.GetEarliest(conn, vehicleId);
         }
 
         public IEnumerable<IceMileageRecord> GetIceMileageRecords(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-
-            var baseRows = _mileageRecordTable
-                .GetRange(conn, vehicleId, start, end)
-                .Where(r => r.VehicleId == vehicleId && r.Type == "Ice")
-                .ToList();
-
-            var results = new List<IceMileageRecord>();
-
-            foreach (var (id, vId, date, odo, _) in baseRows)
-            {
-                var derived = _iceMileageTable.GetById(conn, id);
-                if (derived == null) continue;
-
-                var (gallonsAdded, isFullFillUp, fuelCost) = derived.Value;
-
-                results.Add(new IceMileageRecord
-                {
-                    Id = id,
-                    VehicleId = vId,
-                    EndTime = date,
-                    OdometerMiles = odo,
-                    GallonsAdded = gallonsAdded,
-                    IsFullFillUp = isFullFillUp,
-                    FuelCost = fuelCost
-                });
-            }
-
-            return results.OrderBy(r => r.EndTime);
+            return _iceMileageStore.GetRange(conn, vehicleId, start, end).ToList();
         }
+
+        // ---------------------------------------------------------
+        // SHARED MILEAGE
+        // ---------------------------------------------------------
 
         public decimal GetMilesDrivenInPeriod(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-
-            var records = _mileageRecordTable
-                .GetRange(conn, vehicleId, start, end)
-                .OrderBy(r => r.EndTime)
-                .ToList();
-
-            if (records.Count < 2)
-                return 0m;
-
-            var startMiles = records.First().OdometerMiles;
-            var endMiles = records.Last().OdometerMiles;
-
-            return endMiles - startMiles;
+            return _mileageStore.GetMilesDrivenInPeriod(conn, vehicleId, start, end);
         }
 
         // ---------------------------------------------------------
         // EV CHARGING SESSIONS
         // ---------------------------------------------------------
 
-        public void AddEvChargeSession(EvChargeSession session)
+        public void UpsertEvChargeSession(EvChargeSession session)
         {
             using var conn = OpenConnection();
-            _mileageRecordTable.Insert(conn, session, "Ev");
-            _evSessionTable.Insert(conn, session);
-        }
-
-        public IEnumerable<EvChargeSession> GetEvChargeSessions(Guid vehicleId, DateTime start, DateTime end)
-        {
-            using var conn = OpenConnection();
-
-            var mileageRecords = _mileageRecordTable.GetRange(conn, vehicleId, start, end);
-
-            foreach (var record in mileageRecords)
-            {
-                var ev = _evSessionTable.GetById(conn, record.Id);
-                if (ev != null)
-                {
-                    // copy mileage fields
-                    ev.VehicleId = record.VehicleId;
-                    ev.OdometerMiles = record.OdometerMiles;
-                    ev.EndTime = record.EndTime;
-
-                    yield return ev;
-                }
-            }
+            _evChargeSessionStore.Upsert(conn, session);
         }
 
         public EvChargeSession? GetEvChargeSession(Guid sessionId)
         {
             using var conn = OpenConnection();
-            var session = _evSessionTable.GetById(conn, sessionId);
-            if (session == null)
-                return null;
-
-            // Load mileage fields
-            var mileageRecord = _mileageRecordTable.GetById(conn, sessionId);
-            if (mileageRecord != null)
-            {
-                session.VehicleId = mileageRecord.Value.VehicleId;
-                session.OdometerMiles = mileageRecord.Value.OdometerMiles;
-                session.EndTime = mileageRecord.Value.EndTime;
-            }
-
-            return session;
+            return _evChargeSessionStore.Get(conn, sessionId);
         }
 
-        public void UpdateEvChargeSession(EvChargeSession session)
+        public IEnumerable<EvChargeSession> GetEvChargeSessions(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            _mileageRecordTable.Update(conn, session);
-            _evSessionTable.Update(conn, session);
+            return _evChargeSessionStore.GetRange(conn, vehicleId, start, end).ToList();
+        }
+
+        public EvChargeSession? GetLatestEvChargeSession()
+        {
+            using var conn = OpenConnection();
+            return _evChargeSessionStore.GetLatest(conn);
         }
 
         public void DeleteEvChargeSession(Guid sessionId)
         {
             using var conn = OpenConnection();
-            _evSessionTable.Delete(conn, sessionId);
-            _mileageRecordTable.Delete(conn, sessionId);
+            _evChargeSessionStore.Delete(conn, sessionId);
         }
 
         // ---------------------------------------------------------
         // MAINTENANCE
         // ---------------------------------------------------------
 
-        public void AddMaintenanceInvoice(MaintenanceInvoiceRecord invoice)
+        public void UpsertMaintenanceInvoice(MaintenanceInvoiceRecord invoice)
         {
             using var conn = OpenConnection();
-            _maintenanceInvoiceTable.Insert(conn, invoice);
+            _maintenanceStore.Upsert(conn, invoice);
         }
 
         public IEnumerable<MaintenanceInvoiceRecord> GetMaintenanceInvoices(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _maintenanceInvoiceTable.GetRange(conn, vehicleId, start, end).ToList();
+            return _maintenanceStore.GetRange(conn, vehicleId, start, end).ToList();
         }
 
         public decimal GetMaintenanceCostInPeriod(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _maintenanceInvoiceTable.GetTotalCost(conn, vehicleId, start, end);
+            return _maintenanceStore.GetTotalCost(conn, vehicleId, start, end);
         }
     }
 }

@@ -26,6 +26,7 @@ namespace THMS.Ingestion.Importers.Finance
             {
                 var interval = new ElectricUtilityBill
                 {
+                    Id = Guid.NewGuid(),
                     StartDate = csv.GetField<DateTime>("Start"),
                     EndDate = csv.GetField<DateTime>("End"),
                     GridImportCost = csv.GetField<decimal>("Grid Import Cost"),
@@ -35,7 +36,7 @@ namespace THMS.Ingestion.Importers.Finance
                     TaxesAndFees = csv.GetField<decimal>("Taxes and Fees")
                 };
 
-                _store.AddElectricUtilityBill(interval);
+                _store.UpsertElectricUtilityBill(interval);
             }
         }
     }

@@ -33,7 +33,7 @@ namespace THMS.Logic.ViewModels.Transportation
                 IsFullFillUp = IsFullFillUp
             };
 
-            _store.AddIceMileageRecord(record);
+            _store.UpsertIceMileageRecord(record);
         }
     }
 }

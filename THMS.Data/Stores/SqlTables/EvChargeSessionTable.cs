@@ -34,9 +34,9 @@ namespace THMS.Data.Stores.SqlTables
         }
 
         // ---------------------------------------------------------
-        // INSERT
+        // UPSERT
         // ---------------------------------------------------------
-        public void Insert(SqliteConnection conn, EvChargeSession session)
+        public void Upsert(SqliteConnection conn, EvChargeSession session)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText =
@@ -54,23 +54,32 @@ namespace THMS.Data.Stores.SqlTables
                 @StartTime, @StartSoc, @EndSoc, @IsHomeCharge,
                 @KwhAdded, @BatteryKwhAdded, @SessionCost,
                 @GridKwh, @SolarKwh, @BatteryKwh
-            );
+            )
+            ON CONFLICT(Id) DO UPDATE SET
+                LastOdometer = excluded.LastOdometer,
+                LastSoc = excluded.LastSoc,
+                StartTime = excluded.StartTime,
+                StartSoc = excluded.StartSoc,
+                EndSoc = excluded.EndSoc,
+                IsHomeCharge = excluded.IsHomeCharge,
+                KwhAdded = excluded.KwhAdded,
+                BatteryKwhAdded = excluded.BatteryKwhAdded,
+                SessionCost = excluded.SessionCost,
+                GridKwh = excluded.GridKwh,
+                SolarKwh = excluded.SolarKwh,
+                BatteryKwh = excluded.BatteryKwh;
             ";
 
             cmd.Parameters.AddWithValue("@Id", session.Id.ToString());
-
             cmd.Parameters.AddWithValue("@LastOdometer", session.LastOdometer);
             cmd.Parameters.AddWithValue("@LastSoc", session.LastSoc);
-
             cmd.Parameters.AddWithValue("@StartTime", session.StartTime);
             cmd.Parameters.AddWithValue("@StartSoc", session.StartSoc);
             cmd.Parameters.AddWithValue("@EndSoc", session.EndSoc);
             cmd.Parameters.AddWithValue("@IsHomeCharge", session.IsHomeCharge ? 1 : 0);
-
             cmd.Parameters.AddWithValue("@KwhAdded", session.KwhAdded);
             cmd.Parameters.AddWithValue("@BatteryKwhAdded", session.BatteryKwhAdded);
             cmd.Parameters.AddWithValue("@SessionCost", session.SessionCost);
-
             cmd.Parameters.AddWithValue("@GridKwh", session.GridKwh);
             cmd.Parameters.AddWithValue("@SolarKwh", session.SolarKwh);
             cmd.Parameters.AddWithValue("@BatteryKwh", session.BatteryKwh);
@@ -122,56 +131,6 @@ namespace THMS.Data.Stores.SqlTables
 
             using var reader = cmd.ExecuteReader();
             return reader.Read() ? Read(reader) : null;
-        }
-
-        // ---------------------------------------------------------
-        // UPDATE
-        // ---------------------------------------------------------
-        public void Update(SqliteConnection conn, EvChargeSession session)
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText =
-            @"
-            UPDATE EvChargeSessions SET
-
-                LastOdometer = @LastOdometer,
-                LastSoc = @LastSoc,
-
-                StartTime = @StartTime,
-                StartSoc = @StartSoc,
-                EndSoc = @EndSoc,
-                IsHomeCharge = @IsHomeCharge,
-
-                KwhAdded = @KwhAdded,
-                BatteryKwhAdded = @BatteryKwhAdded,
-                SessionCost = @SessionCost,
-
-                GridKwh = @GridKwh,
-                SolarKwh = @SolarKwh,
-                BatteryKwh = @BatteryKwh
-
-            WHERE Id = @Id;
-            ";
-
-            cmd.Parameters.AddWithValue("@Id", session.Id.ToString());
-
-            cmd.Parameters.AddWithValue("@LastOdometer", session.LastOdometer);
-            cmd.Parameters.AddWithValue("@LastSoc", session.LastSoc);
-
-            cmd.Parameters.AddWithValue("@StartTime", session.StartTime);
-            cmd.Parameters.AddWithValue("@StartSoc", session.StartSoc);
-            cmd.Parameters.AddWithValue("@EndSoc", session.EndSoc);
-            cmd.Parameters.AddWithValue("@IsHomeCharge", session.IsHomeCharge ? 1 : 0);
-
-            cmd.Parameters.AddWithValue("@KwhAdded", session.KwhAdded);
-            cmd.Parameters.AddWithValue("@BatteryKwhAdded", session.BatteryKwhAdded);
-            cmd.Parameters.AddWithValue("@SessionCost", session.SessionCost);
-
-            cmd.Parameters.AddWithValue("@GridKwh", session.GridKwh);
-            cmd.Parameters.AddWithValue("@SolarKwh", session.SolarKwh);
-            cmd.Parameters.AddWithValue("@BatteryKwh", session.BatteryKwh);
-
-            cmd.ExecuteNonQuery();
         }
 
         // ---------------------------------------------------------

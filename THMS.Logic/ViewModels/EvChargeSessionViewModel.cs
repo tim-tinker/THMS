@@ -224,15 +224,7 @@ namespace THMS.Logic.ViewModels.Transportation
         // ---------------------------------------------------------
         public EvChargeSession Save()
         {
-            if (_vehicleStore.GetEvChargeSession(_session.Id) == null)
-            {
-                _vehicleStore.AddEvChargeSession(_session);
-            }
-            else
-            {
-                _vehicleStore.UpdateEvChargeSession(_session);
-            }
-
+            _vehicleStore.UpsertEvChargeSession(_session);
             return _session;
         }
     }

@@ -1,7 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
 using THMS.Domain.Energy;
 
-namespace THMS.Data.Stores.Sqlite
+namespace THMS.Data.Stores.SqlTables
 {
     public class EvCircuitSegmentsTable
     {

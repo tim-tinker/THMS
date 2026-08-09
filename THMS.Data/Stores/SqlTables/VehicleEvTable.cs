@@ -17,12 +17,15 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
-        public void Insert(SqliteConnection conn, VehicleEv ev)
+        public void Upsert(SqliteConnection conn, VehicleEv ev)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO VehicleEv (VehicleId, BatteryCapacityKwh, ChargePortType)
-                VALUES (@VehicleId, @BatteryCapacityKwh, @ChargePortType);";
+                VALUES (@VehicleId, @BatteryCapacityKwh, @ChargePortType)
+                ON CONFLICT(VehicleId) DO UPDATE SET
+                    BatteryCapacityKwh = excluded.BatteryCapacityKwh,
+                    ChargePortType = excluded.ChargePortType;";
 
             cmd.Parameters.AddWithValue("@VehicleId", ev.Id.ToString());
             cmd.Parameters.AddWithValue("@BatteryCapacityKwh", ev.BatteryCapacityKwh);

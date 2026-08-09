@@ -17,12 +17,15 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
-        public void Insert(SqliteConnection conn, VehicleIce ice)
+        public void Upsert(SqliteConnection conn, VehicleIce ice)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO VehicleIce (VehicleId, FuelTankCapacityGallons, FuelType)
-                VALUES (@VehicleId, @FuelTankCapacityGallons, @FuelType);";
+                VALUES (@VehicleId, @FuelTankCapacityGallons, @FuelType)
+                ON CONFLICT(VehicleId) DO UPDATE SET
+                    FuelTankCapacityGallons = excluded.FuelTankCapacityGallons,
+                    FuelType = excluded.FuelType;";
 
             cmd.Parameters.AddWithValue("@VehicleId", ice.Id.ToString());
             cmd.Parameters.AddWithValue("@FuelTankCapacityGallons", ice.FuelTankCapacityGallons);

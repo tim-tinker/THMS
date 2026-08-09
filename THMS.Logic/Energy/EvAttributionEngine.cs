@@ -57,7 +57,7 @@ public class EvAttributionEngine
                 GridWh = gridToEv * 1000m
             };
 
-            _store.AddEvAttribution(result);
+            _store.UpsertEvAttribution(result);
         }
     }
 

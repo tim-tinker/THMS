@@ -10,7 +10,8 @@ namespace THMS.Data.Stores
         // ELECTRIC UTILITY BILLS (HOME ENERGY)
         // ---------------------------------------------------------
 
-        void AddElectricUtilityBill(ElectricUtilityBill bill);
+        /// <summary>Upsert key: <see cref="ElectricUtilityBill.EndDate"/>.</summary>
+        void UpsertElectricUtilityBill(ElectricUtilityBill bill);
 
         IEnumerable<ElectricUtilityBill> GetElectricUtilityBills(
             DateTime start,
@@ -21,7 +22,8 @@ namespace THMS.Data.Stores
         // COMMERCIAL CHARGING COST RECORDS (RAW ENERGY DOMAIN)
         // ---------------------------------------------------------
 
-        void AddCommercialChargeCostRecord(CommercialChargeCostRecord record);
+        /// <summary>Upsert key: <see cref="CommercialChargeCostRecord.Id"/>.</summary>
+        void UpsertCommercialChargeCostRecord(CommercialChargeCostRecord record);
 
         IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecords(
             DateTime start,
@@ -36,7 +38,8 @@ namespace THMS.Data.Stores
         // GAS PURCHASES (ICE VEHICLES)
         // ---------------------------------------------------------
 
-        void AddGasPurchase(GasPurchase purchase);
+        /// <summary>Upsert key: <see cref="GasPurchase.Id"/>.</summary>
+        void UpsertGasPurchase(GasPurchase purchase);
 
         IEnumerable<GasPurchase> GetGasPurchases(
             Guid vehicleId,

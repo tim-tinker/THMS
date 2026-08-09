@@ -27,12 +27,14 @@ namespace THMS.UI
             _btnEnergy = new Button();
             _btnVehicles = new Button();
             dashboardHostPanel = new Panel();
+            _btnDataCenter = new Button();
             navigationPanel.SuspendLayout();
             SuspendLayout();
             // 
             // navigationPanel
             // 
             navigationPanel.BackColor = Color.LightGray;
+            navigationPanel.Controls.Add(_btnDataCenter);
             navigationPanel.Controls.Add(_btnFinance);
             navigationPanel.Controls.Add(_btnTransportation);
             navigationPanel.Controls.Add(_btnEnergy);
@@ -92,6 +94,16 @@ namespace THMS.UI
             dashboardHostPanel.Size = new Size(1433, 999);
             dashboardHostPanel.TabIndex = 0;
             // 
+            // _btnDataCenter
+            // 
+            _btnDataCenter.Location = new Point(10, 208);
+            _btnDataCenter.Name = "_btnDataCenter";
+            _btnDataCenter.Size = new Size(160, 40);
+            _btnDataCenter.TabIndex = 0;
+            _btnDataCenter.Text = "Data Center";
+            _btnDataCenter.UseVisualStyleBackColor = true;
+            _btnDataCenter.Click += OnClickDataCenter;
+            // 
             // MainForm
             // 
             ClientSize = new Size(1613, 999);
@@ -108,5 +120,6 @@ namespace THMS.UI
 
         private Button _btnTransportation;
         private Button _btnEnergy;
+        private Button _btnDataCenter;
     }
 }

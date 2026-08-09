@@ -21,12 +21,19 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
-        public void Insert(SqliteConnection conn, VehicleBase vehicle)
+        public void Upsert(SqliteConnection conn, VehicleBase vehicle)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO Vehicles (Id, Name, Make, Model, Year, Vin, Type)
-                VALUES (@Id, @Name, @Make, @Model, @Year, @Vin, @Type);";
+                VALUES (@Id, @Name, @Make, @Model, @Year, @Vin, @Type)
+                ON CONFLICT(Id) DO UPDATE SET
+                    Name = excluded.Name,
+                    Make = excluded.Make,
+                    Model = excluded.Model,
+                    Year = excluded.Year,
+                    Vin = excluded.Vin,
+                    Type = excluded.Type;";
 
             cmd.Parameters.AddWithValue("@Id", vehicle.Id.ToString());
             cmd.Parameters.AddWithValue("@Name", vehicle.Name);

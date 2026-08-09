@@ -51,7 +51,6 @@ namespace THMS.Logic.Energy
 
             var intervals = _store.GetSolarVendorIntervals(start, end);
             var evAttr = _store.GetEvAttribution(start, end);
-            var soc = _store.GetBatterySocTimeline(start, end);
 
             var intervalsHalfHour = AggregateHalfHourly(intervals, evAttr);
 
@@ -59,7 +58,6 @@ namespace THMS.Logic.Energy
             {
                 Date = date,
                 Intervals = intervalsHalfHour,
-                BatterySocTimeline = [.. soc],
 
                 SolarKwh = intervalsHalfHour.Sum(h => h.SolarKwh),
                 BatteryChargeKwh = intervalsHalfHour.Sum(h => h.BatteryChargeKwh),
