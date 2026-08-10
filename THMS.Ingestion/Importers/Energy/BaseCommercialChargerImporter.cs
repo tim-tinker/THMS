@@ -4,7 +4,7 @@ using THMS.Domain.Finance;
 
 namespace THMS.Ingestion.Importers.Energy
 {
-    public abstract class CommercialChargerImporter
+    public abstract class BaseCommercialChargerImporter
     {
         protected IEnergyDataStore? EnergyStore { get; set; }
         protected IFinanceDataStore? FinanceStore { get; set; }

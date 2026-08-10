@@ -6,6 +6,10 @@ namespace THMS.Logic.Energy;
 public class EvAttributionEngine
 {
     private readonly IEnergyDataStore _store;
+    private readonly List<EnergyAttributionResult> _results = [];
+
+    public IEnumerable<EnergyAttributionResult> Results => _results;
+    public int ResultCount => _results.Count;
 
     public EvAttributionEngine(IEnergyDataStore store)
     {
@@ -14,6 +18,8 @@ public class EvAttributionEngine
 
     public void Compute(DateTime start, DateTime end)
     {
+        _results.Clear();
+
         // Raw data
         var solar = _store.GetSolarVendorIntervals(start, end);
         var ev = _store.GetEvCircuitReadings(start, end);
@@ -57,7 +63,7 @@ public class EvAttributionEngine
                 GridWh = gridToEv * 1000m
             };
 
-            _store.UpsertEvAttribution(result);
+            _results.Add(result);
         }
     }
 

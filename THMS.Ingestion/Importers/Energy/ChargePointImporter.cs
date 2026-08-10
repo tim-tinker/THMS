@@ -7,7 +7,7 @@ using THMS.Domain.Finance;
 
 namespace THMS.Ingestion.Importers.Energy
 {
-    public class ChargePointImporter : CommercialChargerImporter
+    public class ChargePointImporter : BaseCommercialChargerImporter
     {
         public ChargePointImporter(
             IEnergyDataStore energyStore,
@@ -35,6 +35,7 @@ namespace THMS.Ingestion.Importers.Energy
                 var durationString = csv.GetField("Duration");
                 var kwhString = csv.GetField("Energy (kWh)");
                 var costString = csv.GetField("Cost");
+                var stationString = csv.GetField("Station");
 
                 var startTime = ParseChargePointDateTime(startString);
                 var endTime = ParseChargePointDateTime(endString);
@@ -54,7 +55,7 @@ namespace THMS.Ingestion.Importers.Energy
                     KwhAdded = totalKwh,          // kWh, not Wh
                     ChargeCost = totalCost,     // ChargePoint always provides cost
                     VendorSessionId = null,       // ChargePoint CSV does not include this
-                    Location = "ChargePoint"
+                    Location = $"ChargePoint {stationString}"
                 };
 
                 // ---------------------------------------------------------

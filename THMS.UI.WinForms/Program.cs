@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using THMS.Data.Stores;
 using THMS.Logic.Energy;
 using THMS.UI.WinForms.Navigation;
+using THMS.UI.WinForms.Updates;
 
 namespace THMS.UI.WinForms;
 
@@ -37,6 +38,11 @@ internal static class Program
         services.AddSingleton<EnergyAggregationService>();
         services.AddSingleton<NavigationService>();
         services.AddSingleton<MainForm>();
+
+        // Data source update services
+        services.AddSingleton<IDataSourceUpdater, SolarDataUpdater>();
+        services.AddSingleton<IDataSourceUpdater, EvCircuitUpdater>();
+        services.AddSingleton<IDataSourceUpdater, EvAttributionUpdater>();
 
         // Later, switch implementations without touching forms:
         // services.AddSingleton<IVehicleDataStore, SQLiteVehicleDataStore>();

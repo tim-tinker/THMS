@@ -114,22 +114,6 @@ namespace THMS.Logic.Energy
             return list;
         }
 
-        private DateTime GetHalfHourBucket(DateTime timestamp)
-        {
-            var minute = timestamp.Minute;
-            var bucketMinute = minute < 15 ? 0 :
-                               minute < 45 ? 30 : 0;
-
-            var bucketHour = minute < 45 ? timestamp.Hour : (timestamp.Hour + 1) % 24;
-            return new DateTime(
-                timestamp.Year,
-                timestamp.Month,
-                timestamp.Day,
-                bucketHour,
-                bucketMinute,
-                0);
-        }
-
         // ---------------------------------------------------------
         // WEEK / MONTH / YEAR / CUSTOM
         // ---------------------------------------------------------

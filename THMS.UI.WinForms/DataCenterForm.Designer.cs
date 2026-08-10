@@ -41,78 +41,41 @@ namespace THMS.UI.WinForms
 
         private void InitializeComponent()
         {
-            components = new System.ComponentModel.Container();
-
-            //
+            tblDynamicSources = new TableLayoutPanel();
+            SuspendLayout();
+            // 
             // tblDynamicSources
-            //
-            tblDynamicSources = new System.Windows.Forms.TableLayoutPanel();
-            tblDynamicSources.ColumnCount = 5;
-            tblDynamicSources.RowCount = 1;
-            tblDynamicSources.Dock = System.Windows.Forms.DockStyle.Top;
+            // 
             tblDynamicSources.AutoSize = true;
-            tblDynamicSources.CellBorderStyle = System.Windows.Forms.TableLayoutPanelCellBorderStyle.Single;
-
-            tblDynamicSources.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            tblDynamicSources.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 15F));
-            tblDynamicSources.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 20F));
-            tblDynamicSources.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 20F));
-            tblDynamicSources.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 20F));
-
-            // Header row
-            tblDynamicSources.Controls.Add(new System.Windows.Forms.Label
-            {
-                Text = "Data Source",
-                Dock = System.Windows.Forms.DockStyle.Fill,
-                TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
-                Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold)
-            }, 0, 0);
-
-            tblDynamicSources.Controls.Add(new System.Windows.Forms.Label
-            {
-                Text = "Status",
-                Dock = System.Windows.Forms.DockStyle.Fill,
-                TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
-                Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold)
-            }, 1, 0);
-
-            tblDynamicSources.Controls.Add(new System.Windows.Forms.Label
-            {
-                Text = "Last",
-                Dock = System.Windows.Forms.DockStyle.Fill,
-                TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
-                Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold)
-            }, 2, 0);
-
-            tblDynamicSources.Controls.Add(new System.Windows.Forms.Label
-            {
-                Text = "Expected",
-                Dock = System.Windows.Forms.DockStyle.Fill,
-                TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
-                Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold)
-            }, 3, 0);
-
-            tblDynamicSources.Controls.Add(new System.Windows.Forms.Label
-            {
-                Text = "Action",
-                Dock = System.Windows.Forms.DockStyle.Fill,
-                TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
-                Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold)
-            }, 4, 0);
-
-            //
+            tblDynamicSources.CellBorderStyle = TableLayoutPanelCellBorderStyle.Single;
+            tblDynamicSources.ColumnCount = 5;
+            tblDynamicSources.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            tblDynamicSources.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15F));
+            tblDynamicSources.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tblDynamicSources.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tblDynamicSources.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tblDynamicSources.Dock = DockStyle.Top;
+            tblDynamicSources.Location = new Point(0, 0);
+            tblDynamicSources.Margin = new Padding(5, 6, 5, 6);
+            tblDynamicSources.Name = "tblDynamicSources";
+            tblDynamicSources.RowCount = 1;
+            tblDynamicSources.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));
+            tblDynamicSources.Size = new Size(1543, 22);
+            tblDynamicSources.TabIndex = 0;
+            // 
             // DataCenterForm
-            //
-            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackColor = System.Drawing.Color.White;
-            this.ClientSize = new System.Drawing.Size(900, 600);
-            this.Controls.Add(tblDynamicSources);
-            this.Name = "DataCenterForm";
-            this.Text = "Data Center";
-
-            // Initialize fixed controls (optional)
-            InitializeFixedControls();
+            // 
+            AutoScaleDimensions = new SizeF(12F, 30F);
+            AutoScaleMode = AutoScaleMode.Font;
+            BackColor = Color.White;
+            ClientSize = new Size(1543, 1200);
+            Controls.Add(tblDynamicSources);
+            Margin = new Padding(5, 6, 5, 6);
+            Name = "DataCenterForm";
+            Text = "Data Center";
+            Load += OnLoadForm;
+            ResumeLayout(false);
+            PerformLayout();
         }
 
         private void InitializeFixedControls()

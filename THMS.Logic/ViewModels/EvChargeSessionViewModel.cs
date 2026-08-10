@@ -111,8 +111,8 @@ namespace THMS.Logic.ViewModels.Transportation
         public void LoadCircuitData(string filename)
         {
             var importer = new HomeEvCircuitImporter(EnergyStore);
-            var readings = importer.Import(filename);
-            LoadCircuitReadings(readings);
+            importer.Import(filename);
+            LoadCircuitReadings(importer.Readings);
             CalculateEvAttribution(importer.StartDate, importer.EndDate);
         }
 

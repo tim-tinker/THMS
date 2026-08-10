@@ -3,18 +3,23 @@ using System.Windows.Forms;
 using THMS.Data.Stores;
 using THMS.Logic.DataCenter;
 using THMS.Logic.ViewModels;
+using THMS.UI.WinForms.Updates;
 
 namespace THMS.UI.WinForms
 {
     public partial class DataCenterForm : Form
     {
+        const float _rowHeight = 50f;
+
         private readonly DataAvailabilityService _availabilityService;
+        private readonly Dictionary<string, IDataSourceUpdater> _dataSourceUpdaters = [];
         private DataCenterViewModel _vm;
 
         public DataCenterForm(
             IEnergyDataStore energyStore,
             IFinanceDataStore financeStore,
-            IVehicleDataStore vehicleStore)
+            IVehicleDataStore vehicleStore,
+            IEnumerable<IDataSourceUpdater> updaters)
         {
             InitializeComponent();
 
@@ -23,8 +28,12 @@ namespace THMS.UI.WinForms
                 financeStore,
                 vehicleStore);
 
+            ConfigureDataSources(updaters.ToArray());
+        }
+
+        private void OnLoadForm(object sender, EventArgs e)
+        {
             LoadAvailability();
-            RenderDataSourceStatuses();
         }
 
         /// <summary>
@@ -42,20 +51,37 @@ namespace THMS.UI.WinForms
 
         private void LoadAvailability()
         {
-            _vm = _availabilityService.GetAvailability();
+            foreach (var updater in _dataSourceUpdaters.Values)
+            {
+                updater.Status.QueryStatus();
+                DisplayDataSourceStatus(updater.Status);
+            }
         }
 
-        private void RenderDataSourceStatuses()
+        private void ConfigureDataSources(IDataSourceUpdater[] updaters)
         {
-            const float rowHeight = 50f;
-
             tblDynamicSources.SuspendLayout();
+
+            ConfigureDataSourceTableHeader(updaters.Length);
+
+            for (int i = 0; i < updaters.Length; i++)
+            {
+                IDataSourceUpdater? updater = updaters[i];
+                ConfigureDataSource(updater);
+                ConfigureDataSourceStatus(i + 1, updater);
+            }
+
+            tblDynamicSources.ResumeLayout();
+        }
+
+        private void ConfigureDataSourceTableHeader(int dataSourceCount)
+        {
             tblDynamicSources.Controls.Clear();
             tblDynamicSources.RowStyles.Clear();
-            tblDynamicSources.RowCount = _vm._dataSourceStatuses.Count + 1;
+            tblDynamicSources.RowCount = dataSourceCount + 1;
 
             for (int i = 0; i < tblDynamicSources.RowCount; i++)
-                tblDynamicSources.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
+                tblDynamicSources.RowStyles.Add(new RowStyle(SizeType.Absolute, _rowHeight));
 
             // Header row
             tblDynamicSources.Controls.Add(CreateCellLabel("Data Source", bold: true), 0, 0);
@@ -63,49 +89,40 @@ namespace THMS.UI.WinForms
             tblDynamicSources.Controls.Add(CreateCellLabel("Last", bold: true), 2, 0);
             tblDynamicSources.Controls.Add(CreateCellLabel("Expected", bold: true), 3, 0);
             tblDynamicSources.Controls.Add(CreateCellLabel("Action", bold: true), 4, 0);
+        }
 
-            int row = 1;
+        private void ConfigureDataSource(IDataSourceUpdater updater)
+        {
+            _dataSourceUpdaters[updater.Name] = updater;
+        }
 
-            foreach (var status in _vm._dataSourceStatuses)
+        private void ConfigureDataSourceStatus(int rowIndex, IDataSourceUpdater updater)
+        {
+            var status = updater.Status;
+            if (status == null)
+                return;
+
+            var lblName = CreateCellLabel(status.DataSourceName);
+
+            var lblStatus = CreateCellLabel("status");
+
+            var lblLast = CreateCellLabel("Last Retrieved");
+
+            var lblExpected = CreateCellLabel("When Expected");
+
+            var btnAction = new Button
             {
-                var lblName = CreateCellLabel(status.DataSourceName);
+                Text = "Update",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(4, 4, 4, 4)
+            };
+            btnAction.Click += (s, e) => OnClickUpdateDataSource(status);
 
-                var statusText = status.LastRetrieval == null ? "Missing" : "OK";
-                var lblStatus = CreateCellLabel(statusText);
-                ApplyStatusColor(lblStatus, statusText);
-
-                var lblLast = CreateCellLabel(status.LastRetrieval?.ToString("yyyy-MM-dd") ?? "—");
-
-                string expectedText = "—";
-                if (status is IPeriodicDataSourceStatus periodic)
-                {
-                    expectedText = periodic.NextExpectedRetrieval.ToString("yyyy-MM-dd");
-                }
-                else if (status is IUpdateDataSourceStatus update)
-                { 
-                    expectedText = update.IsReadyForUpdate ? "Ready" : "—";
-                }
-
-                var lblExpected = CreateCellLabel(expectedText);
-
-                var btnAction = new Button
-                {
-                    Text = "Manage",
-                    Dock = DockStyle.Fill,
-                    Margin = new Padding(4, 4, 4, 4)
-                };
-                btnAction.Click += (s, e) => OnClickManageDataSource(status);
-
-                tblDynamicSources.Controls.Add(lblName, 0, row);
-                tblDynamicSources.Controls.Add(lblStatus, 1, row);
-                tblDynamicSources.Controls.Add(lblLast, 2, row);
-                tblDynamicSources.Controls.Add(lblExpected, 3, row);
-                tblDynamicSources.Controls.Add(btnAction, 4, row);
-
-                row++;
-            }
-
-            tblDynamicSources.ResumeLayout();
+            tblDynamicSources.Controls.Add(lblName, 0, rowIndex);
+            tblDynamicSources.Controls.Add(lblStatus, 1, rowIndex);
+            tblDynamicSources.Controls.Add(lblLast, 2, rowIndex);
+            tblDynamicSources.Controls.Add(lblExpected, 3, rowIndex);
+            tblDynamicSources.Controls.Add(btnAction, 4, rowIndex);
         }
 
         private static Label CreateCellLabel(string text, bool bold = false)
@@ -122,12 +139,63 @@ namespace THMS.UI.WinForms
             };
         }
 
-        private string GetStatusText(bool hasData, bool warning, bool missing)
+        private void DisplayDataSourceStatus(IDataSourceStatus status)
         {
-            if (!hasData) return "Missing";
-            if (missing) return "Missing Month";
-            if (warning) return "Warning";
-            return "OK";
+            if (status == null)
+                return;
+
+            var rowIndex = GetRowIndexForDataSource(status.DataSourceName);
+            if (rowIndex == -1) return;
+
+            var statusText = status.LastRetrieval == null ? "Missing" : "OK";
+            var lblStatus = GetTableLabel(rowIndex, 1);
+            if (lblStatus is not null)
+            {
+                lblStatus.Text = statusText;
+                ApplyStatusColor(lblStatus, statusText);
+            }
+
+            var lastText = status.LastRetrieval?.ToString("g") ?? "N/A";
+            var lblLast = GetTableLabel(rowIndex, 2);
+            if (lblLast is not null)
+            {
+                lblLast.Text = lastText;
+            }
+
+            string expectedText = "—";
+            if (status is IPeriodicDataSourceStatus periodic)
+            {
+                expectedText = periodic.NextExpectedRetrieval.ToString("yyyy-MM-dd");
+            }
+            else if (status is IUpdateDataSourceStatus update)
+            {
+                expectedText = update.IsReadyForUpdate ? "Ready" : "—";
+            }
+
+            var lblExpected = GetTableLabel(rowIndex, 3);
+            if (lblExpected is not null)
+            {
+                lblExpected.Text = expectedText;
+            }
+        }
+
+        private int GetRowIndexForDataSource(string dataSourceName)
+        {
+            for (int i = 1; i < tblDynamicSources.RowCount; i++)
+            {
+                var control = tblDynamicSources.GetControlFromPosition(0, i);
+                if (control is Label lbl && lbl.Text == dataSourceName)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        private Label? GetTableLabel(int rowIndex, int columnIndex)
+        {
+            var control = tblDynamicSources.GetControlFromPosition(columnIndex, rowIndex);
+            return control as Label;
         }
 
         private string FormatDate(DateTime? dt)
@@ -166,10 +234,17 @@ namespace THMS.UI.WinForms
             }
         }
 
-        private void OnClickManageDataSource(IDataSourceStatus status)
+        private void OnClickUpdateDataSource(IDataSourceStatus status)
         {
-            MessageBox.Show($"Manage action for {status.DataSourceName} not implemented yet.");
+            if (_dataSourceUpdaters.TryGetValue(status.DataSourceName, out var updater))
+            {
+                updater.UpdateDataSource();
+                LoadAvailability();
+            }
+            else
+            {
+                MessageBox.Show($"No manager registered for {status.DataSourceName}");
+            }
         }
-
     }
 }
