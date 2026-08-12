@@ -1,4 +1,5 @@
 ﻿using THMS.Data.Stores;
+using THMS.Domain.Energy;
 using THMS.Ingestion.Importers.Energy;
 using THMS.Logic.Energy;
 
@@ -51,6 +52,11 @@ namespace THMS.Logic.Orchestrators
                     _energyStore.UpsertEvAttribution(result);
                 }
             }
+        }
+
+        public IEnumerable<SolarVendorInterval> GetSolarIntervals(DateTime start, DateTime end)
+        {
+            return _energyStore.GetSolarVendorIntervals(start, end);
         }
     }
 }

@@ -13,6 +13,6 @@ namespace THMS.Domain.Energy
         public decimal GridImportKwh { get; set; }
         public decimal GridExportKwh { get; set; }
         public decimal HomeConsumptionKwh { get; set; }
-        public decimal EvChargingKwh { get; set; }
+        public decimal EvChargeKwh { get; set; }
     }
 }

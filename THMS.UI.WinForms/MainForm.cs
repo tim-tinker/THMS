@@ -4,8 +4,8 @@ namespace THMS.UI
 {
     public partial class MainForm : Form
     {
-        private readonly Dictionary<string, BaseDashboardForm> _dashboards = new();
-        private DataCenterForm _dataCenterForm;
+        private readonly Dictionary<string, BaseDashboardForm> _dashboards = [];
+        private readonly Dictionary<string, BaseEmbeddedForm> _embeddedForms = [];
 
         /// <summary>Designer only.</summary>
         public MainForm()
@@ -18,7 +18,8 @@ namespace THMS.UI
             EnergyDashboardForm energyDashboard,
             FinanceDashboardForm financeDashboard,
             VehicleListDashboardForm vehicleListDashboard,
-            DataCenterForm dataCenterForm
+            DataCenterForm dataCenterForm,
+            DataManagerForm dataManagerForm
             ) 
             : this()
         {
@@ -26,7 +27,8 @@ namespace THMS.UI
             _dashboards["Energy"] = energyDashboard;
             _dashboards["Finance"] = financeDashboard;
             _dashboards["Vehicles"] = vehicleListDashboard;
-            _dataCenterForm = dataCenterForm;
+            _embeddedForms["Data Center"] = dataCenterForm;
+            _embeddedForms["Data Manager"] = dataManagerForm;
 
             foreach (var form in _dashboards.Values)
             {
@@ -36,18 +38,34 @@ namespace THMS.UI
                 form.InitializeDashboard();
             }
 
-            _dataCenterForm.ConfigureAsEmbeddedForm();
-            dashboardHostPanel.Controls.Add(_dataCenterForm);
+            foreach (var form in _embeddedForms.Values)
+            {
+                form.ConfigureAsEmbeddedForm();
+                form.Visible=false;
+                dashboardHostPanel.Controls.Add(form);
+            }
         }
 
         private void ShowModule(string moduleName)
         {
-            foreach (var form in _dashboards.Values)
-                form.Visible = false;
+            HideAllEmbeddedForms();
 
             var dashboard = _dashboards[moduleName];
             dashboard.Visible = true;
             dashboard.RefreshDashboard();
+        }
+
+        private void HideAllEmbeddedForms()
+        {
+            foreach (var form in _dashboards.Values)
+            {
+                form.Visible = false;
+            }
+
+            foreach(var form in _embeddedForms.Values)
+            {
+                form.Visible = false;
+            }
         }
 
         private void btnTransportation_Click(object sender, EventArgs e)
@@ -72,15 +90,20 @@ namespace THMS.UI
 
         private void OnClickDataCenter(object sender, EventArgs e)
         {
-            ShowFormInMainPanel(_dataCenterForm);
+            ShowFormInMainPanel("Data Center");
         }
 
-        private void ShowFormInMainPanel(Form form)
+        private void OnClickDataManager(object sender, EventArgs e)
         {
-            foreach (var dashboard in _dashboards.Values)
-                dashboard.Visible = false;
+            ShowFormInMainPanel("Data Manager");
+        }
 
-            form.Visible = true;
+        private void ShowFormInMainPanel(string formName)
+        {
+            HideAllEmbeddedForms();
+
+            var dashboard = _embeddedForms[formName];
+            dashboard.Visible = true;
         }
     }
 }

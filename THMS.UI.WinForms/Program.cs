@@ -34,6 +34,7 @@ internal static class Program
         services.AddSingleton<VehicleListDashboardForm>();
         services.AddSingleton<SettingsDashboardForm>();
         services.AddSingleton<DataCenterForm>();
+        services.AddSingleton<DataManagerForm>();
 
         services.AddSingleton<EnergyAggregationService>();
         services.AddSingleton<NavigationService>();

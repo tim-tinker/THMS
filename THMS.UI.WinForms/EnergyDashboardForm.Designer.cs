@@ -21,13 +21,15 @@ namespace THMS.UI.WinForms
             _labelConsumed = new Label();
             _labelImported = new Label();
             _labelExported = new Label();
-            _labelBattery = new Label();
-            _labelNet = new Label();
-            _labelEvCharging = new Label();
+            _labelNetGrid = new Label();
+            _labelGridDependence = new Label();
+            _labelNetGridDependence = new Label();
+            _labelBatteryCharge = new Label();
+            _labelBatteryDischarge = new Label();
+            _labelEvCharge = new Label();
+            _labelEvConsumption = new Label();
             _tabs = new TabControl();
             _tabDay = new TabPage();
-            _panelDayBreakdown = new Panel();
-            _panelDayEnergyFlow = new Panel();
             _tabWeek = new TabPage();
             _tabMonth = new TabPage();
             _tabYear = new TabPage();
@@ -36,7 +38,7 @@ namespace THMS.UI.WinForms
             _panelCustomChart = new Panel();
             _panelCustomRange = new Panel();
             _panelPeriodChart = new Panel();
-            _panelPeriodBreakdown = new Panel();
+            _panelPeriodMetrics = new Panel();
             _panelSummary.SuspendLayout();
             _tableSummary.SuspendLayout();
             _tabs.SuspendLayout();
@@ -56,28 +58,35 @@ namespace THMS.UI.WinForms
             // 
             // _tableSummary
             // 
-            _tableSummary.ColumnCount = 8;
-            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 12.5F));
-            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 12.5F));
-            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 12.5F));
-            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 12.5F));
-            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 12.5F));
-            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 12.20339F));
-            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 12.7118645F));
-            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 12.5F));
+            _tableSummary.ColumnCount = 11;
+            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 9.09091F));
+            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 9.09091F));
+            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 9.09091F));
+            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 9.09091F));
+            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 9.09091F));
+            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 9.09091F));
+            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 9.09091F));
+            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 9.09091F));
+            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 9.09091F));
+            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 9.09091F));
+            _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 9.09091F));
             _tableSummary.Controls.Add(_labelProduced, 0, 0);
             _tableSummary.Controls.Add(_labelConsumed, 1, 0);
             _tableSummary.Controls.Add(_labelImported, 2, 0);
             _tableSummary.Controls.Add(_labelExported, 3, 0);
-            _tableSummary.Controls.Add(_labelBattery, 4, 0);
-            _tableSummary.Controls.Add(_labelNet, 5, 0);
-            _tableSummary.Controls.Add(_labelEvCharging, 6, 0);
+            _tableSummary.Controls.Add(_labelNetGrid, 4, 0);
+            _tableSummary.Controls.Add(_labelGridDependence, 5, 0);
+            _tableSummary.Controls.Add(_labelNetGridDependence, 6, 0);
+            _tableSummary.Controls.Add(_labelBatteryCharge, 7, 0);
+            _tableSummary.Controls.Add(_labelBatteryDischarge, 8, 0);
+            _tableSummary.Controls.Add(_labelEvCharge, 9, 0);
+            _tableSummary.Controls.Add(_labelEvConsumption, 10, 0);
             _tableSummary.Dock = DockStyle.Fill;
             _tableSummary.Location = new Point(10, 10);
             _tableSummary.Name = "_tableSummary";
             _tableSummary.RowCount = 1;
             _tableSummary.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            _tableSummary.Size = new Size(1626, 50);
+            _tableSummary.Size = new Size(1626, 68);
             _tableSummary.TabIndex = 0;
             // 
             // _labelProduced
@@ -85,70 +94,110 @@ namespace THMS.UI.WinForms
             _labelProduced.Dock = DockStyle.Fill;
             _labelProduced.Location = new Point(3, 0);
             _labelProduced.Name = "_labelProduced";
-            _labelProduced.Size = new Size(197, 50);
+            _labelProduced.Size = new Size(141, 68);
             _labelProduced.TabIndex = 0;
-            _labelProduced.Text = "Produced: 0 kWh";
+            _labelProduced.Text = "Produced";
             _labelProduced.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // _labelConsumed
             // 
             _labelConsumed.Dock = DockStyle.Fill;
-            _labelConsumed.Location = new Point(206, 0);
+            _labelConsumed.Location = new Point(150, 0);
             _labelConsumed.Name = "_labelConsumed";
-            _labelConsumed.Size = new Size(197, 50);
+            _labelConsumed.Size = new Size(141, 68);
             _labelConsumed.TabIndex = 1;
-            _labelConsumed.Text = "Consumed: 0 kWh";
+            _labelConsumed.Text = "Consumed";
             _labelConsumed.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // _labelImported
             // 
             _labelImported.Dock = DockStyle.Fill;
-            _labelImported.Location = new Point(409, 0);
+            _labelImported.Location = new Point(297, 0);
             _labelImported.Name = "_labelImported";
-            _labelImported.Size = new Size(197, 50);
+            _labelImported.Size = new Size(141, 68);
             _labelImported.TabIndex = 2;
-            _labelImported.Text = "Imported: 0 kWh";
+            _labelImported.Text = "Imported";
             _labelImported.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // _labelExported
             // 
             _labelExported.Dock = DockStyle.Fill;
-            _labelExported.Location = new Point(612, 0);
+            _labelExported.Location = new Point(444, 0);
             _labelExported.Name = "_labelExported";
-            _labelExported.Size = new Size(197, 50);
+            _labelExported.Size = new Size(141, 68);
             _labelExported.TabIndex = 3;
-            _labelExported.Text = "Exported: 0 kWh";
+            _labelExported.Text = "Exported";
             _labelExported.TextAlign = ContentAlignment.MiddleLeft;
             // 
-            // _labelBattery
+            // _labelNetGrid
             // 
-            _labelBattery.Dock = DockStyle.Fill;
-            _labelBattery.Location = new Point(815, 0);
-            _labelBattery.Name = "_labelBattery";
-            _labelBattery.Size = new Size(197, 50);
-            _labelBattery.TabIndex = 4;
-            _labelBattery.Text = "Battery: 0 kWh";
-            _labelBattery.TextAlign = ContentAlignment.MiddleLeft;
+            _labelNetGrid.Dock = DockStyle.Fill;
+            _labelNetGrid.Location = new Point(591, 0);
+            _labelNetGrid.Name = "_labelNetGrid";
+            _labelNetGrid.Size = new Size(141, 68);
+            _labelNetGrid.TabIndex = 5;
+            _labelNetGrid.Text = "Net Grid";
+            _labelNetGrid.TextAlign = ContentAlignment.MiddleLeft;
             // 
-            // _labelNet
+            // _labelGridDependence
             // 
-            _labelNet.Dock = DockStyle.Fill;
-            _labelNet.Location = new Point(1018, 0);
-            _labelNet.Name = "_labelNet";
-            _labelNet.Size = new Size(192, 50);
-            _labelNet.TabIndex = 5;
-            _labelNet.Text = "Net: 0 kWh";
-            _labelNet.TextAlign = ContentAlignment.MiddleLeft;
+            _labelGridDependence.Dock = DockStyle.Fill;
+            _labelGridDependence.Location = new Point(738, 0);
+            _labelGridDependence.Name = "_labelGridDependence";
+            _labelGridDependence.Size = new Size(141, 68);
+            _labelGridDependence.TabIndex = 3;
+            _labelGridDependence.Text = "Grid Dependence";
+            _labelGridDependence.TextAlign = ContentAlignment.MiddleLeft;
             // 
-            // _labelEvCharging
+            // _labelNetGridDependence
             // 
-            _labelEvCharging.Dock = DockStyle.Fill;
-            _labelEvCharging.Location = new Point(1216, 0);
-            _labelEvCharging.Name = "_labelEvCharging";
-            _labelEvCharging.Size = new Size(200, 50);
-            _labelEvCharging.TabIndex = 6;
-            _labelEvCharging.Text = "EV Charging: 0 kWh";
-            _labelEvCharging.TextAlign = ContentAlignment.MiddleLeft;
+            _labelNetGridDependence.Dock = DockStyle.Fill;
+            _labelNetGridDependence.Location = new Point(885, 0);
+            _labelNetGridDependence.Name = "_labelNetGridDependence";
+            _labelNetGridDependence.Size = new Size(141, 68);
+            _labelNetGridDependence.TabIndex = 5;
+            _labelNetGridDependence.Text = "Net Grid Dependence";
+            _labelNetGridDependence.TextAlign = ContentAlignment.MiddleLeft;
+            // 
+            // _labelBatteryCharge
+            // 
+            _labelBatteryCharge.Dock = DockStyle.Fill;
+            _labelBatteryCharge.Location = new Point(1032, 0);
+            _labelBatteryCharge.Name = "_labelBatteryCharge";
+            _labelBatteryCharge.Size = new Size(141, 68);
+            _labelBatteryCharge.TabIndex = 4;
+            _labelBatteryCharge.Text = "Battery +";
+            _labelBatteryCharge.TextAlign = ContentAlignment.MiddleLeft;
+            // 
+            // _labelBatteryDischarge
+            // 
+            _labelBatteryDischarge.Dock = DockStyle.Fill;
+            _labelBatteryDischarge.Location = new Point(1179, 0);
+            _labelBatteryDischarge.Name = "_labelBatteryDischarge";
+            _labelBatteryDischarge.Size = new Size(141, 68);
+            _labelBatteryDischarge.TabIndex = 4;
+            _labelBatteryDischarge.Text = "Battery -";
+            _labelBatteryDischarge.TextAlign = ContentAlignment.MiddleLeft;
+            // 
+            // _labelEvCharge
+            // 
+            _labelEvCharge.Dock = DockStyle.Fill;
+            _labelEvCharge.Location = new Point(1326, 0);
+            _labelEvCharge.Name = "_labelEvCharge";
+            _labelEvCharge.Size = new Size(141, 68);
+            _labelEvCharge.TabIndex = 6;
+            _labelEvCharge.Text = "EV Charge";
+            _labelEvCharge.TextAlign = ContentAlignment.MiddleLeft;
+            // 
+            // _labelEvConsumption
+            // 
+            _labelEvConsumption.Dock = DockStyle.Fill;
+            _labelEvConsumption.Location = new Point(1473, 0);
+            _labelEvConsumption.Name = "_labelEvConsumption";
+            _labelEvConsumption.Size = new Size(150, 68);
+            _labelEvConsumption.TabIndex = 6;
+            _labelEvConsumption.Text = "EV Consumption";
+            _labelEvConsumption.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // _tabs
             // 
@@ -158,46 +207,27 @@ namespace THMS.UI.WinForms
             _tabs.Controls.Add(_tabYear);
             _tabs.Controls.Add(_tabCustom);
             _tabs.Dock = DockStyle.Fill;
-            _tabs.Location = new Point(0, 70);
+            _tabs.Location = new Point(0, 88);
             _tabs.Name = "_tabs";
             _tabs.SelectedIndex = 0;
-            _tabs.Size = new Size(1646, 830);
+            _tabs.Size = new Size(1646, 812);
             _tabs.TabIndex = 0;
+            _tabs.SelectedIndexChanged += OnSelectedIndexChangedTabControl;
             // 
             // _tabDay
             // 
-            _tabDay.Controls.Add(_panelDayBreakdown);
-            _tabDay.Controls.Add(_panelDayEnergyFlow);
             _tabDay.Location = new Point(4, 39);
             _tabDay.Name = "_tabDay";
             _tabDay.Padding = new Padding(10);
-            _tabDay.Size = new Size(1638, 787);
+            _tabDay.Size = new Size(1638, 769);
             _tabDay.TabIndex = 0;
             _tabDay.Text = "Day";
-            // 
-            // _panelDayBreakdown
-            // 
-            _panelDayBreakdown.BorderStyle = BorderStyle.FixedSingle;
-            _panelDayBreakdown.Dock = DockStyle.Fill;
-            _panelDayBreakdown.Location = new Point(10, 410);
-            _panelDayBreakdown.Name = "_panelDayBreakdown";
-            _panelDayBreakdown.Size = new Size(1618, 367);
-            _panelDayBreakdown.TabIndex = 0;
-            // 
-            // _panelDayEnergyFlow
-            // 
-            _panelDayEnergyFlow.BorderStyle = BorderStyle.FixedSingle;
-            _panelDayEnergyFlow.Dock = DockStyle.Top;
-            _panelDayEnergyFlow.Location = new Point(10, 10);
-            _panelDayEnergyFlow.Name = "_panelDayEnergyFlow";
-            _panelDayEnergyFlow.Size = new Size(1618, 250);
-            _panelDayEnergyFlow.TabIndex = 2;
             // 
             // _tabWeek
             // 
             _tabWeek.Location = new Point(4, 39);
             _tabWeek.Name = "_tabWeek";
-            _tabWeek.Size = new Size(1192, 787);
+            _tabWeek.Size = new Size(1638, 769);
             _tabWeek.TabIndex = 1;
             _tabWeek.Text = "Week";
             // 
@@ -205,7 +235,7 @@ namespace THMS.UI.WinForms
             // 
             _tabMonth.Location = new Point(4, 39);
             _tabMonth.Name = "_tabMonth";
-            _tabMonth.Size = new Size(1192, 787);
+            _tabMonth.Size = new Size(1638, 769);
             _tabMonth.TabIndex = 2;
             _tabMonth.Text = "Month";
             // 
@@ -213,7 +243,7 @@ namespace THMS.UI.WinForms
             // 
             _tabYear.Location = new Point(4, 39);
             _tabYear.Name = "_tabYear";
-            _tabYear.Size = new Size(1192, 787);
+            _tabYear.Size = new Size(1638, 769);
             _tabYear.TabIndex = 3;
             _tabYear.Text = "Year";
             // 
@@ -225,7 +255,7 @@ namespace THMS.UI.WinForms
             _tabCustom.Location = new Point(4, 39);
             _tabCustom.Name = "_tabCustom";
             _tabCustom.Padding = new Padding(10);
-            _tabCustom.Size = new Size(1192, 787);
+            _tabCustom.Size = new Size(1638, 769);
             _tabCustom.TabIndex = 4;
             _tabCustom.Text = "Custom";
             // 
@@ -235,7 +265,7 @@ namespace THMS.UI.WinForms
             _panelCustomBreakdown.Dock = DockStyle.Fill;
             _panelCustomBreakdown.Location = new Point(10, 370);
             _panelCustomBreakdown.Name = "_panelCustomBreakdown";
-            _panelCustomBreakdown.Size = new Size(1172, 407);
+            _panelCustomBreakdown.Size = new Size(1618, 389);
             _panelCustomBreakdown.TabIndex = 0;
             // 
             // _panelCustomChart
@@ -244,7 +274,7 @@ namespace THMS.UI.WinForms
             _panelCustomChart.Dock = DockStyle.Top;
             _panelCustomChart.Location = new Point(10, 70);
             _panelCustomChart.Name = "_panelCustomChart";
-            _panelCustomChart.Size = new Size(1172, 300);
+            _panelCustomChart.Size = new Size(1618, 300);
             _panelCustomChart.TabIndex = 1;
             // 
             // _panelCustomRange
@@ -253,7 +283,7 @@ namespace THMS.UI.WinForms
             _panelCustomRange.Dock = DockStyle.Top;
             _panelCustomRange.Location = new Point(10, 10);
             _panelCustomRange.Name = "_panelCustomRange";
-            _panelCustomRange.Size = new Size(1172, 60);
+            _panelCustomRange.Size = new Size(1618, 60);
             _panelCustomRange.TabIndex = 2;
             // 
             // _panelPeriodChart
@@ -263,12 +293,12 @@ namespace THMS.UI.WinForms
             _panelPeriodChart.Size = new Size(200, 100);
             _panelPeriodChart.TabIndex = 0;
             // 
-            // _panelPeriodBreakdown
+            // _panelPeriodMetrics
             // 
-            _panelPeriodBreakdown.Location = new Point(0, 0);
-            _panelPeriodBreakdown.Name = "_panelPeriodBreakdown";
-            _panelPeriodBreakdown.Size = new Size(200, 100);
-            _panelPeriodBreakdown.TabIndex = 0;
+            _panelPeriodMetrics.Location = new Point(0, 0);
+            _panelPeriodMetrics.Name = "_panelPeriodMetrics";
+            _panelPeriodMetrics.Size = new Size(200, 100);
+            _panelPeriodMetrics.TabIndex = 0;
             // 
             // EnergyDashboardForm
             // 
@@ -296,9 +326,13 @@ namespace THMS.UI.WinForms
         private Label _labelConsumed;
         private Label _labelImported;
         private Label _labelExported;
-        private Label _labelBattery;
-        private Label _labelNet;
-        private Label _labelEvCharging;
+        private Label _labelNetGrid;
+        private Label _labelEvCharge;
+        private Label _labelGridDependence;
+        private Label _labelNetGridDependence;
+        private Label _labelBatteryCharge;
+        private Label _labelBatteryDischarge;
+        private Label _labelEvConsumption;
 
         private TabControl _tabs;
         private TabPage _tabDay;
@@ -307,11 +341,8 @@ namespace THMS.UI.WinForms
         private TabPage _tabYear;
         private TabPage _tabCustom;
 
-        private Panel _panelDayEnergyFlow;
-        private Panel _panelDayBreakdown;
-
         private Panel _panelPeriodChart;
-        private Panel _panelPeriodBreakdown;
+        private Panel _panelPeriodMetrics;
 
         private Panel _panelCustomRange;
         private Panel _panelCustomChart;

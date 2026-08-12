@@ -13,10 +13,10 @@ namespace THMS.UI.WinForms.Charts
         // ============================================================
         // DAILY ENERGY FLOW CHART
         // ============================================================
-        public static Chart CreateDayChart(EnergyDayViewModel vm)
+        public static Chart CreateDayChart(EnergyPeriodViewModel vm)
         {
             var chart = CreateBaseChart();
-            chart.Titles.Add($"Energy Flow ({vm.Date:yyyy-MM-dd})");
+            chart.Titles.Add($"Energy Flow ({vm.Start:yyyy-MM-dd})");
 
             var solar = CreateSeries("Solar", SeriesChartType.Line, Color.Goldenrod, 5);
             var home = CreateSeries("Home Consumption", SeriesChartType.Line, Color.SteelBlue, 5);
@@ -27,7 +27,7 @@ namespace THMS.UI.WinForms.Charts
             int index = 0;
             foreach (var interval in vm.Intervals)
             {
-                string label = interval.Timestamp.Hour % 3 == 0 && interval.Timestamp.Minute == 0
+                string label = interval.Timestamp.Minute == 0 && interval.Timestamp.Hour % 3 == 0
                     ? interval.Timestamp.ToString("HH:mm") : string.Empty;
 
                 AddIndexedPoint(solar, index, interval.SolarKwh, label);
@@ -35,7 +35,7 @@ namespace THMS.UI.WinForms.Charts
                 AddIndexedPoint(home, index, -interval.HomeConsumptionKwh, label);
                 AddIndexedPoint(gridImport, index, interval.GridImportKwh, label);
                 AddIndexedPoint(gridExport, index, interval.GridExportKwh, label);
-                AddIndexedPoint(ev, index, interval.EvChargingKwh, label);
+                AddIndexedPoint(ev, index, interval.EvChargeKwh, label);
 
                 index++;
             }
@@ -55,7 +55,7 @@ namespace THMS.UI.WinForms.Charts
             chart.Legends.Add(new Legend("Legend"));
 
             var showBatteryShading = true;
-            if (showBatteryShading && 0 < vm.Intervals.Count())
+            if (showBatteryShading && vm.Intervals.Count > 0)
             {
                 chart.PostPaint += (sender, e) =>
                 {
@@ -69,7 +69,7 @@ namespace THMS.UI.WinForms.Charts
             return chart;
         }
 
-        private static void DrawBatteryShading(Graphics g, ChartArea area, EnergyDayViewModel vm)
+        private static void DrawBatteryShading(Graphics g, ChartArea area, EnergyPeriodViewModel vm)
         {
             var ca = area;
 
@@ -144,7 +144,7 @@ namespace THMS.UI.WinForms.Charts
                 AddIndexedPoint(gridOut, index, r.GridExportKwh, label);
                 AddIndexedPoint(battCharge, index, r.BatteryChargeKwh, label);
                 AddIndexedPoint(battDischarge, index, -r.BatteryDischargeKwh, label);
-                AddIndexedPoint(ev, index, -r.EvChargingKwh, label);
+                AddIndexedPoint(ev, index, -r.EvChargeKwh, label);
 
                 index++;
             }

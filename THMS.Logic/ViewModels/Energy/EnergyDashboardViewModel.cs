@@ -11,6 +11,9 @@ namespace THMS.Logic.ViewModels.Energy
 
         protected DateTime CurrentDate { get; private set; } = DateTime.Now;
 
+        public EnergyTab SelectedTab { get; set; }
+
+
         // ---------------------------------------------------------
         // Summary (always visible)
         // ---------------------------------------------------------
@@ -19,7 +22,7 @@ namespace THMS.Logic.ViewModels.Energy
         // ---------------------------------------------------------
         // Time-range view models
         // ---------------------------------------------------------
-        public EnergyDayViewModel Day { get; private set; }
+        public EnergyPeriodViewModel Day { get; private set; }
         public EnergyPeriodViewModel Week { get; private set; }
         public EnergyPeriodViewModel Month { get; private set; }
         public EnergyPeriodViewModel Year { get; private set; }
@@ -37,102 +40,71 @@ namespace THMS.Logic.ViewModels.Energy
 
         public void Refresh()
         {
-            LoadSummary();
-            LoadDay();
-            LoadWeek();
-            LoadMonth();
-            LoadYear();
+            Day = new EnergyPeriodViewModel(_service.GetDay(CurrentDate));
+            Week = new EnergyPeriodViewModel(_service.GetWeek(CurrentDate));
+            Month = new EnergyPeriodViewModel(_service.GetMonth(CurrentDate));
+            Year = new EnergyPeriodViewModel(_service.GetYear(CurrentDate));
             // Custom starts empty until user selects a range
             Custom = new EnergyPeriodViewModel();
-        }
+            //Custom = new EnergyPeriodViewModel(_service.GetRange(start, end));
 
-        // ---------------------------------------------------------
-        // Loaders
-        // ---------------------------------------------------------
-        private void LoadSummary()
-        {
-            var summary = _service.GetSummary(CurrentDate);
-            Summary = new EnergySummaryViewModel(summary);
-        }
-
-        private void LoadDay()
-        {
-            var day = _service.GetDay(CurrentDate);
-            Day = new EnergyDayViewModel(day);
-        }
-
-        private void LoadWeek()
-        {
-            var week = _service.GetWeek(CurrentDate);
-            Week = new EnergyPeriodViewModel(week);
-        }
-
-        private void LoadMonth()
-        {
-            var month = _service.GetMonth(CurrentDate);
-            Month = new EnergyPeriodViewModel(month);
-        }
-
-        private void LoadYear()
-        {
-            var year = _service.GetYear(CurrentDate);
-            Year = new EnergyPeriodViewModel(year);
-        }
-
-        // ---------------------------------------------------------
-        // Custom range loader
-        // ---------------------------------------------------------
-        public void LoadCustom(DateTime start, DateTime end)
-        {
-            var custom = _service.GetRange(start, end);
-            Custom = new EnergyPeriodViewModel(custom);
+            // Select correct summary based on active tab
+            Summary = SelectedTab switch
+            {
+                EnergyTab.Day => new EnergySummaryViewModel(_service.GetPeriodSummary(_service.GetDay(CurrentDate))),
+                EnergyTab.Week => new EnergySummaryViewModel(_service.GetPeriodSummary(_service.GetWeek(CurrentDate))),
+                EnergyTab.Month => new EnergySummaryViewModel(_service.GetPeriodSummary(_service.GetMonth(CurrentDate))),
+                EnergyTab.Year => new EnergySummaryViewModel(_service.GetPeriodSummary(_service.GetYear(CurrentDate))),
+                //EnergyTab.Custom => _service.GetPeriodSummary(_service.GetRange(start, end)),
+                _ => new EnergySummaryViewModel(_service.GetPeriodSummary(_service.GetDay(CurrentDate)))
+            };
         }
 
         public void MoveDay(int delta)
         {
             CurrentDate = CurrentDate.AddDays(delta);
-            LoadDay();
+            Refresh();
         }
 
         public void JumpToDay(DateTime date)
         {
             CurrentDate = date.Date;
-            LoadDay();
+            Refresh();
         }
 
         public void MoveWeek(int delta)
         {
             CurrentDate = CurrentDate.AddDays(7 * delta);
-            LoadWeek();
+            Refresh();
         }
 
         public void JumpToWeek(DateTime date)
         {
             CurrentDate = date.Date;
-            LoadWeek();
+            Refresh();
         }
 
         public void MoveMonth(int delta)
         {
             CurrentDate = CurrentDate.AddMonths(delta);
-            LoadMonth();
+            Refresh();
         }
 
         public void JumpToMonth(DateTime date)
         {
             CurrentDate = date.Date;
-            LoadMonth();
+            Refresh();
         }
         public void MoveYear(int delta)
         {
             CurrentDate = CurrentDate.AddYears(delta);
-            LoadYear();
+            Refresh();
         }
 
         public void JumpToYear(DateTime date)
         {
             CurrentDate = date.Date;
-            LoadYear();
+            Refresh();
         }
 
     }

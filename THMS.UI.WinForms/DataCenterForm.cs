@@ -7,13 +7,11 @@ using THMS.UI.WinForms.Updates;
 
 namespace THMS.UI.WinForms
 {
-    public partial class DataCenterForm : Form
+    public partial class DataCenterForm : BaseEmbeddedForm
     {
         const float _rowHeight = 50f;
 
-        private readonly DataAvailabilityService _availabilityService;
         private readonly Dictionary<string, IDataSourceUpdater> _dataSourceUpdaters = [];
-        private DataCenterViewModel _vm;
 
         public DataCenterForm(
             IEnergyDataStore energyStore,
@@ -23,30 +21,12 @@ namespace THMS.UI.WinForms
         {
             InitializeComponent();
 
-            _availabilityService = new DataAvailabilityService(
-                energyStore,
-                financeStore,
-                vehicleStore);
-
             ConfigureDataSources(updaters.ToArray());
         }
 
         private void OnLoadForm(object sender, EventArgs e)
         {
             LoadAvailability();
-        }
-
-        /// <summary>
-        /// Call from MainForm before adding this form to a host panel.
-        /// Kept out of the constructor so the Designer can open derived forms.
-        /// </summary>
-        public void ConfigureAsEmbeddedForm()
-        {
-            TopLevel = false;
-            FormBorderStyle = FormBorderStyle.None;
-            Dock = DockStyle.Fill;
-            BackColor = Color.White;
-            DoubleBuffered = true;
         }
 
         private void LoadAvailability()

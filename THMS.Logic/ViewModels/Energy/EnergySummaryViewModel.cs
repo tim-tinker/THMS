@@ -8,9 +8,13 @@ namespace THMS.Logic.ViewModels.Energy
         public decimal ConsumedKwh { get; }
         public decimal GridImportKwh { get; }
         public decimal GridExportKwh { get; }
-        public decimal BatteryNetKwh { get; }
         public decimal NetImportKwh { get; }
-        public decimal EvChargingKwh { get; }
+        public decimal GridDependence { get; }
+        public decimal NetGridDependence { get; }
+        public decimal BatteryChargeKwh { get; }
+        public decimal BatteryDischargeKwh { get; }
+        public decimal EvChargeKwh { get; }
+        public decimal EvConsumption { get; }
 
         public EnergySummaryViewModel(EnergySummary summary)
         {
@@ -18,9 +22,13 @@ namespace THMS.Logic.ViewModels.Energy
             ConsumedKwh = summary.ConsumedKwh;
             GridImportKwh = summary.GridImportKwh;
             GridExportKwh = summary.GridExportKwh;
-            BatteryNetKwh = summary.BatteryNetKwh;
             NetImportKwh = summary.NetImportKwh;
-            EvChargingKwh = summary.EvChargingKwh;
+            GridDependence = summary.GridDependence;
+            NetGridDependence = summary.NetGridDependence;
+            BatteryChargeKwh = summary.BatteryChargeKwh;
+            BatteryDischargeKwh = summary.BatteryDischargeKwh;
+            EvChargeKwh = summary.EvChargeKwh;
+            EvConsumption = summary.EvConsumption;
         }
     }
 }

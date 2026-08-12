@@ -33,12 +33,33 @@ namespace THMS.UI.WinForms
 
         private void InitializeDynamicLayout()
         {
+            AddVcrControl();
             InitializeSummaryPanel();
 
-            ConfigureDayTab();
+            ConfigurePeriodTab(_tabDay);
             ConfigurePeriodTab(_tabWeek);
             ConfigurePeriodTab(_tabMonth);
             ConfigurePeriodTab(_tabYear);
+        }
+
+        private void AddVcrControl()
+        {
+            var vcr = new VcrControl
+            {
+                Dock = DockStyle.Top,
+                Tag = "Global"
+            };
+
+            vcr.MoveBackward += OnMoveTabBackward;
+            vcr.MoveForward += OnMoveTabForward;
+            vcr.DateSelected += OnTabDateSelected;
+
+
+            var parent = _panelSummary.Parent;
+
+            // Insert VCR above the summary panel
+            parent.Controls.Add(vcr);
+            parent.Controls.SetChildIndex(vcr, parent.Controls.GetChildIndex(_panelSummary));
         }
 
         private void InitializeSummaryPanel()
@@ -48,19 +69,22 @@ namespace THMS.UI.WinForms
             _tableSummary.SuspendLayout();
             _tableSummary.Controls.Clear();
             _tableSummary.ColumnStyles.Clear();
-            _tableSummary.ColumnCount = 8;
-            for (int i = 0; i < 8; i++)
-                _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 12.5F));
+            _tableSummary.ColumnCount = 11;
+            for (int i = 0; i < _tableSummary.ColumnCount; i++)
+                _tableSummary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 9.09F));
 
             _tableSummary.Controls.Add(CreateMetricCell("Produced", _labelProduced), 0, 0);
             _tableSummary.Controls.Add(CreateMetricCell("Consumed", _labelConsumed), 1, 0);
             _tableSummary.Controls.Add(CreateMetricCell("Imported", _labelImported), 2, 0);
             _tableSummary.Controls.Add(CreateMetricCell("Exported", _labelExported), 3, 0);
-            _tableSummary.Controls.Add(CreateMetricCell("Battery", _labelBattery), 4, 0);
-            _tableSummary.Controls.Add(CreateMetricCell("Net", _labelNet), 5, 0);
-            _tableSummary.Controls.Add(CreateMetricCell("EV Charging", _labelEvCharging), 6, 0);
+            _tableSummary.Controls.Add(CreateMetricCell("Net Grid", _labelNetGrid), 4, 0);
+            _tableSummary.Controls.Add(CreateMetricCell("Grid Dependence", _labelGridDependence), 5, 0);
+            _tableSummary.Controls.Add(CreateMetricCell("Net Grid Dependence", _labelNetGridDependence), 6, 0);
+            _tableSummary.Controls.Add(CreateMetricCell("Battery+", _labelBatteryCharge), 7, 0);
+            _tableSummary.Controls.Add(CreateMetricCell("Battery-", _labelBatteryDischarge), 8, 0);
+            _tableSummary.Controls.Add(CreateMetricCell("EV Charge", _labelEvCharge), 9, 0);
+            _tableSummary.Controls.Add(CreateMetricCell("EV Consumption", _labelEvConsumption), 10, 0);
 
-            AddLoadSolarDataButton();
             _tableSummary.ResumeLayout();
         }
 
@@ -97,76 +121,12 @@ namespace THMS.UI.WinForms
             return cell;
         }
 
-        private void AddLoadSolarDataButton()
-        {
-            // WinForms themed buttons do not render newlines in Text reliably.
-            // Keep the caption in Tag and draw it ourselves.
-            var btn = new Button
-            {
-                Text = string.Empty,
-                Tag = "Load" + Environment.NewLine + "Solar Data",
-                Dock = DockStyle.Fill,
-                Margin = new Padding(4),
-                Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                UseVisualStyleBackColor = true,
-            };
-
-            btn.Paint += OnPaintLoadSolarDataButton;
-            btn.Click += OnClickLoadSolarData;
-            _tableSummary.Controls.Add(btn, 7, 0);
-        }
-
-        private void ConfigureDayTab()
-        {
-            var vcr = new VcrControl() { Tag = "Day", Dock = DockStyle.Top };
-            vcr.MoveBackward += OnMoveTabBackward;
-            vcr.MoveForward += OnMoveTabForward;
-            vcr.DateSelected += OnTabDateSelected;
-
-            // Insert VCR at the top of the Day tab
-            _tabDay.Controls.Add(vcr);
-
-            var btnEvRefresh = new Button
-            {
-                Text = "Refresh EV Data",
-                Dock = DockStyle.Bottom,
-                Margin = new Padding(4),
-                Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                UseVisualStyleBackColor = true,
-                Height = 50,
-            };
-            btnEvRefresh.Click += OnClickRefreshEvData;
-            _tabDay.Controls.Add(btnEvRefresh);
-        }
-
-        private void OnClickRefreshEvData(object? sender, EventArgs e)
-        {
-            RecalculateEvForDay(_vm.Day.Date);
-        }
-
-        private void RecalculateEvForDay(DateTime day)
-        {
-            var start = day.Date;
-            var end = day.Date.AddDays(1).AddSeconds(-1);
-
-            var attributionEngine = new EvAttributionEngine(_energyDataStore);
-            attributionEngine.Compute(start, end);
-
-            RefreshDashboard();
-        }
-
-
         // ============================================================
         // WEEK / MONTH / YEAR TABS
         // ============================================================
         void ConfigurePeriodTab(TabPage tab)
         {
             tab.Padding = new Padding(10);
-
-            var vcr = new VcrControl() { Tag = tab.Text, Dock = DockStyle.Top };
-            vcr.MoveBackward += OnMoveTabBackward;
-            vcr.MoveForward += OnMoveTabForward;
-            vcr.DateSelected += OnTabDateSelected;
 
             _panelPeriodChart = new Panel
             {
@@ -176,18 +136,17 @@ namespace THMS.UI.WinForms
                 Name = "_panelPeriodChart"
             };
 
-            _panelPeriodBreakdown = new Panel
+            _panelPeriodMetrics = new Panel
             {
                 Dock = DockStyle.Fill,
                 BorderStyle = BorderStyle.FixedSingle,
-                Name = "_panelPeriodBreakdown",
+                Name = "_panelPeriodMetrics",
                 MinimumSize = new Size(0, 200),
                 AutoScroll = true
             };
 
-            tab.Controls.Add(_panelPeriodBreakdown);
+            tab.Controls.Add(_panelPeriodMetrics);
             tab.Controls.Add(_panelPeriodChart);
-            tab.Controls.Add(vcr);
         }
 
         public override void InitializeDashboard()
@@ -240,45 +199,24 @@ namespace THMS.UI.WinForms
             _labelConsumed.Text = $"{_vm.Summary.ConsumedKwh:N1} kWh";
             _labelImported.Text = $"{_vm.Summary.GridImportKwh:N1} kWh";
             _labelExported.Text = $"{_vm.Summary.GridExportKwh:N1} kWh";
-            _labelBattery.Text = $"{_vm.Summary.BatteryNetKwh:N1} kWh";
-            _labelNet.Text = $"{_vm.Summary.NetImportKwh:N1} kWh";
-            _labelEvCharging.Text = $"{_vm.Summary.EvChargingKwh:N1} kWh";
+            _labelNetGrid.Text = $"{_vm.Summary.NetImportKwh:N1} kWh";
+            _labelGridDependence.Text = $"{_vm.Summary.GridDependence:N1}%";
+            _labelNetGridDependence.Text = $"{_vm.Summary.NetGridDependence:N1}%";
+            _labelBatteryCharge.Text = $"{_vm.Summary.BatteryChargeKwh:N1} kWh";
+            _labelBatteryDischarge.Text = $"{_vm.Summary.BatteryDischargeKwh:N1} kWh";
+            _labelEvCharge.Text = $"{_vm.Summary.EvChargeKwh:N1} kWh";
+            _labelEvConsumption.Text = $"{_vm.Summary.EvConsumption:N1}%";
         }
 
         // ============================================================
-        // DAY TAB
+        // DAY / WEEK / MONTH / YEAR TABS
         // ============================================================
         private void LoadDayTab()
         {
-            // Chart rendering will be added later
-            RenderDayEnergyFlowChart();
-            RenderDayBreakdown();
+            RenderDayChart(_tabDay, _vm.Day);
+            RenderPeriodBreakdown(_tabDay, _vm.Day);
         }
 
-        private void RenderDayEnergyFlowChart()
-        {
-            // Placeholder: chart control will be added later
-            _panelDayEnergyFlow.Controls.Clear();
-
-            var chart = EnergyChartFactory.CreateDayChart(_vm.Day);
-            chart.Dock = DockStyle.Fill;
-
-            _panelDayEnergyFlow.Controls.Add(chart);
-        }
-
-        private void RenderDayBreakdown()
-        {
-            _panelDayBreakdown.Controls.Clear();
-
-            var breakdown = new EnergyBreakdownControl(_vm.Day);
-            breakdown.Dock = DockStyle.Fill;
-
-            _panelDayBreakdown.Controls.Add(breakdown);
-        }
-
-        // ============================================================
-        // WEEK / MONTH / YEAR TABS
-        // ============================================================
         private void LoadWeekTab()
         {
             RenderPeriodChart(_tabWeek, _vm.Week);
@@ -297,6 +235,18 @@ namespace THMS.UI.WinForms
             RenderPeriodBreakdown(_tabYear, _vm.Year);
         }
 
+        private void RenderDayChart(TabPage tab, EnergyPeriodViewModel period)
+        {
+            var chartPanel = FindPanel(tab, "_panelPeriodChart");
+            chartPanel.Controls.Clear();
+
+            var chart = EnergyChartFactory.CreateDayChart(period);
+            chart.Dock = DockStyle.Fill;
+
+            chartPanel.Controls.Add(chart);
+        }
+
+
         private void RenderPeriodChart(TabPage tab, EnergyPeriodViewModel period)
         {
             var chartPanel = FindPanel(tab, "_panelPeriodChart");
@@ -310,13 +260,14 @@ namespace THMS.UI.WinForms
 
         private void RenderPeriodBreakdown(TabPage tab, EnergyPeriodViewModel period)
         {
-            var breakdownPanel = FindPanel(tab, "_panelPeriodBreakdown");
-            breakdownPanel.Controls.Clear();
+            var metricsPanel = FindPanel(tab, "_panelPeriodMetrics");
+            metricsPanel.Controls.Clear();
 
-            var breakdown = new EnergyBreakdownControl(period);
-            breakdown.Dock = DockStyle.Fill;
+            var metricsControl = new EnergyMetricsTableControl();
+            metricsControl.Bind(period);
+            metricsControl.Dock = DockStyle.Fill;
 
-            breakdownPanel.Controls.Add(breakdown);
+            metricsPanel.Controls.Add(metricsControl);
         }
 
         // ============================================================
@@ -343,10 +294,11 @@ namespace THMS.UI.WinForms
         {
             _panelCustomBreakdown.Controls.Clear();
 
-            var breakdown = new EnergyBreakdownControl(_vm.Custom);
-            breakdown.Dock = DockStyle.Fill;
+            var metricsControl = new EnergyMetricsTableControl();
+            metricsControl.Bind(_vm.Custom);
+            metricsControl.Dock = DockStyle.Fill;
 
-            _panelCustomBreakdown.Controls.Add(breakdown);
+            _panelCustomBreakdown.Controls.Add(metricsControl);
         }
 
         // ============================================================
@@ -363,96 +315,41 @@ namespace THMS.UI.WinForms
             throw new InvalidOperationException($"Panel '{name}' not found in tab '{tab.Name}'.");
         }
 
-        private void OnClickLoadSolarData(object sender, EventArgs e)
+        private void OnMoveTabBackward(object? sender, EventArgs e)
         {
-            using var dialog = new OpenFileDialog
+            switch (_vm.SelectedTab)
             {
-                Filter = "CSV Files (*.csv)|*.csv",
-                Title = "Import Enphase Solar Data"
-            };
-
-            if (dialog.ShowDialog() != DialogResult.OK)
-                return;
-
-            try
-            {
-                var importer = new EnphaseSolarImporter(_energyDataStore);
-                importer.Import(dialog.FileName);
-
-                CalculateEvAttribution(importer.StartDate, importer.EndDate);
-
-                MessageBox.Show($"Solar data imported successfully for {importer.StartDate.Date} to {importer.EndDate.Date}.", "THMS",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-            } 
-            catch (Exception ex) 
-            {
-                MessageBox.Show($"Error importing solar data: {ex.Message}", "THMS", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            RefreshDashboard();
-        }
-
-        private void CalculateEvAttribution(DateTime start, DateTime end)
-        {
-            if (_energyDataStore.GetEvCircuitReadings(start, end).Any())
-            {
-                var engine = new EvAttributionEngine(_energyDataStore);
-                engine.Compute(start, end);
-            }
-        }
-
-        private static void OnPaintLoadSolarDataButton(object? sender, PaintEventArgs e)
-        {
-            if (sender is not Button btn || btn.Tag is not string caption)
-                return;
-
-            TextRenderer.DrawText(
-                e.Graphics,
-                caption,
-                btn.Font,
-                btn.ClientRectangle,
-                btn.ForeColor,
-                TextFormatFlags.HorizontalCenter
-                    | TextFormatFlags.VerticalCenter
-                    | TextFormatFlags.WordBreak);
-        }
-
-        private void OnMoveTabBackward(object? sender, EventArgs e) 
-        {
-            var vcrControl = sender as VcrControl;
-            switch (vcrControl?.Tag)
-            {
-                case "Year":
-                    _vm.MoveYear(-1);
-                    break;
-                case "Month":
-                    _vm.MoveMonth(-1);
-                    break;
-                case "Week":
-                    _vm.MoveWeek(-1);
-                    break;
-                case "Day":
+                case EnergyTab.Day:
                     _vm.MoveDay(-1);
                     break;
+                case EnergyTab.Week:
+                    _vm.MoveWeek(-1);
+                    break;
+                case EnergyTab.Month:
+                    _vm.MoveMonth(-1);
+                    break;
+                case EnergyTab.Year:
+                    _vm.MoveYear(-1);
+                    break;
             }
             RefreshDashboard();
         }
 
-        private void OnMoveTabForward(object? sender, EventArgs e) 
+        private void OnMoveTabForward(object? sender, EventArgs e)
         {
-            var vcrControl = sender as VcrControl;
-            switch (vcrControl?.Tag)
+            switch (_vm.SelectedTab)
             {
-                case "Year":
-                    _vm.MoveYear(1);
+                case EnergyTab.Day:
+                    _vm.MoveDay(1);
                     break;
-                case "Month":
-                    _vm.MoveMonth(1);
-                    break;
-                case "Week":
+                case EnergyTab.Week:
                     _vm.MoveWeek(1);
                     break;
-                case "Day":
-                    _vm.MoveDay(1);
+                case EnergyTab.Month:
+                    _vm.MoveMonth(1);
+                    break;
+                case EnergyTab.Year:
+                    _vm.MoveYear(1);
                     break;
             }
             RefreshDashboard();
@@ -460,22 +357,50 @@ namespace THMS.UI.WinForms
 
         private void OnTabDateSelected(object? sender, EventArgs<DateTime> e)
         {
-            var vcrControl = sender as VcrControl;
-            switch (vcrControl?.Tag)
+            switch (_vm.SelectedTab)
             {
-                case "Year":
-                    _vm.JumpToYear(e.Value);
-                    break;
-                case "Month":
-                    _vm.JumpToMonth(e.Value);
-                    break;
-                case "Week":
-                    _vm.JumpToWeek(e.Value);
-                    break;
-                case "Day":
+                case EnergyTab.Day:
                     _vm.JumpToDay(e.Value);
                     break;
+                case EnergyTab.Week:
+                    _vm.JumpToWeek(e.Value);
+                    break;
+                case EnergyTab.Month:
+                    _vm.JumpToMonth(e.Value);
+                    break;
+                case EnergyTab.Year:
+                    _vm.JumpToYear(e.Value);
+                    break;
             }
+            RefreshDashboard();
+        }
+
+        private void OnSelectedIndexChangedTabControl(object sender, EventArgs e)
+        {
+
+            switch (_tabs.SelectedTab?.Name)
+            {
+                case "_tabDay":
+                    _vm.SelectedTab = EnergyTab.Day;
+                    break;
+
+                case "_tabWeek":
+                    _vm.SelectedTab = EnergyTab.Week;
+                    break;
+
+                case "_tabMonth":
+                    _vm.SelectedTab = EnergyTab.Month;
+                    break;
+
+                case "_tabYear":
+                    _vm.SelectedTab = EnergyTab.Year;
+                    break;
+
+                case "_tabCustom":
+                    _vm.SelectedTab = EnergyTab.Custom;
+                    break;
+            }
+
             RefreshDashboard();
         }
     }

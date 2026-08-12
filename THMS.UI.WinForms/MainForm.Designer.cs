@@ -22,18 +22,20 @@ namespace THMS.UI
         private void InitializeComponent()
         {
             navigationPanel = new Panel();
+            _btnDataCenter = new Button();
             _btnFinance = new Button();
             _btnTransportation = new Button();
             _btnEnergy = new Button();
             _btnVehicles = new Button();
             dashboardHostPanel = new Panel();
-            _btnDataCenter = new Button();
+            btnDataManager = new Button();
             navigationPanel.SuspendLayout();
             SuspendLayout();
             // 
             // navigationPanel
             // 
             navigationPanel.BackColor = Color.LightGray;
+            navigationPanel.Controls.Add(btnDataManager);
             navigationPanel.Controls.Add(_btnDataCenter);
             navigationPanel.Controls.Add(_btnFinance);
             navigationPanel.Controls.Add(_btnTransportation);
@@ -44,6 +46,16 @@ namespace THMS.UI
             navigationPanel.Name = "navigationPanel";
             navigationPanel.Size = new Size(180, 999);
             navigationPanel.TabIndex = 1;
+            // 
+            // _btnDataCenter
+            // 
+            _btnDataCenter.Location = new Point(10, 208);
+            _btnDataCenter.Name = "_btnDataCenter";
+            _btnDataCenter.Size = new Size(160, 40);
+            _btnDataCenter.TabIndex = 0;
+            _btnDataCenter.Text = "Data Center";
+            _btnDataCenter.UseVisualStyleBackColor = true;
+            _btnDataCenter.Click += OnClickDataCenter;
             // 
             // _btnFinance
             // 
@@ -94,15 +106,15 @@ namespace THMS.UI
             dashboardHostPanel.Size = new Size(1433, 999);
             dashboardHostPanel.TabIndex = 0;
             // 
-            // _btnDataCenter
+            // btnDataManager
             // 
-            _btnDataCenter.Location = new Point(10, 208);
-            _btnDataCenter.Name = "_btnDataCenter";
-            _btnDataCenter.Size = new Size(160, 40);
-            _btnDataCenter.TabIndex = 0;
-            _btnDataCenter.Text = "Data Center";
-            _btnDataCenter.UseVisualStyleBackColor = true;
-            _btnDataCenter.Click += OnClickDataCenter;
+            btnDataManager.Location = new Point(10, 254);
+            btnDataManager.Name = "btnDataManager";
+            btnDataManager.Size = new Size(160, 40);
+            btnDataManager.TabIndex = 0;
+            btnDataManager.Text = "Data Manager";
+            btnDataManager.UseVisualStyleBackColor = true;
+            btnDataManager.Click += OnClickDataManager;
             // 
             // MainForm
             // 
@@ -121,5 +133,6 @@ namespace THMS.UI
         private Button _btnTransportation;
         private Button _btnEnergy;
         private Button _btnDataCenter;
+        private Button btnDataManager;
     }
 }
