@@ -57,9 +57,9 @@ namespace THMS.Logic.Transportation
                 // 2. Get EV energy attribution in the date range
                 // ---------------------------------------------------------
                 _energyAttributionEngine.Compute(start, end);
-                var energyAttr = _energyStore.GetEvAttribution(start, end);
+                var energyAttr = _energyStore.GetHomeCircuitAttribution(start, end);
 
-                decimal totalWh = energyAttr.Sum(a => a.EvChargeWh);
+                decimal totalWh = energyAttr.Sum(a => a.TotalWh);
                 decimal totalKwh = totalWh / 1000m;
 
                 // ---------------------------------------------------------

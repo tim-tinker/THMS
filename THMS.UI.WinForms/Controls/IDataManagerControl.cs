@@ -7,6 +7,6 @@ namespace THMS.UI.WinForms.Controls
     public interface IDataManagerControl
     {
         Control GetControl();
-        void LoadData();
+        void SetGridDataSource(string period);
     }
 }

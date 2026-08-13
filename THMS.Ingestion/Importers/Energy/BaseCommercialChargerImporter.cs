@@ -1,12 +1,12 @@
 ﻿using THMS.Data.Stores;
-using THMS.Domain.Energy;
-using THMS.Domain.Finance;
+using THMS.Domain.Transportation;
 
 namespace THMS.Ingestion.Importers.Energy
 {
     public abstract class BaseCommercialChargerImporter
     {
         protected IEnergyDataStore? EnergyStore { get; set; }
+        protected IVehicleDataStore? VehicleStore { get; set; }
         protected IFinanceDataStore? FinanceStore { get; set; }
 
         public void Import(string filePath)
@@ -21,15 +21,12 @@ namespace THMS.Ingestion.Importers.Energy
                 throw new InvalidOperationException("IFinanceStore is not set. Cannot import data.");
             }
 
-            foreach (var entry in ReadChargeSessions(filePath))
+            foreach (var chargeSession in ReadChargeSessions(filePath))
             {
-                var chargingSession = entry.Item1;
-                var costRecord = entry.Item2;
-                EnergyStore.UpsertEvCommercialChargeSession(chargingSession);
-                FinanceStore.UpsertCommercialChargeCostRecord(costRecord);
+                VehicleStore.UpsertEvChargeSession(chargeSession);
             }
         }
 
-        protected abstract IEnumerable<Tuple<EvCommercialChargeSession, CommercialChargeCostRecord>> ReadChargeSessions(string filePath);
+        protected abstract IEnumerable<EvChargeSession> ReadChargeSessions(string filePath);
    }
 }

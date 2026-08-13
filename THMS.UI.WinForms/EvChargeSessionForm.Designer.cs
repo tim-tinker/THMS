@@ -47,39 +47,14 @@
             _checkHomeCharger = new CheckBox();
             _numSessionCost = new NumericUpDown();
             label10 = new Label();
-            _btnLoadCircuitData = new Button();
-            label11 = new Label();
-            label12 = new Label();
-            label13 = new Label();
-            label14 = new Label();
-            label15 = new Label();
-            label16 = new Label();
-            label17 = new Label();
-            label18 = new Label();
-            label19 = new Label();
-            _textSocAdded = new TextBox();
-            _textSocUsed = new TextBox();
-            _textMilesUsed = new TextBox();
-            _textKwhUsed = new TextBox();
-            _textCostPerMile = new TextBox();
-            _textWhPerMile = new TextBox();
-            _textMpge = new TextBox();
-            _textGridKwh = new TextBox();
-            _textSolarKwh = new TextBox();
             label20 = new Label();
             label21 = new Label();
-            _textBatteryKwh = new TextBox();
-            label22 = new Label();
             _btnSave = new Button();
             _btnCancel = new Button();
             _numLastOdometer = new NumericUpDown();
             _numLastSoc = new NumericUpDown();
             _numBatteryKwhAdded = new NumericUpDown();
             label1 = new Label();
-            _textChargeLossKwh = new TextBox();
-            label23 = new Label();
-            _textChargeEfficiency = new TextBox();
-            label24 = new Label();
             ((System.ComponentModel.ISupportInitialize)_numOdometer).BeginInit();
             ((System.ComponentModel.ISupportInitialize)_numStartSoc).BeginInit();
             ((System.ComponentModel.ISupportInitialize)_numEndSoc).BeginInit();
@@ -260,185 +235,6 @@
             label10.TabIndex = 14;
             label10.Text = "Cost ($)";
             // 
-            // _btnLoadCircuitData
-            // 
-            _btnLoadCircuitData.Location = new Point(226, 421);
-            _btnLoadCircuitData.Name = "_btnLoadCircuitData";
-            _btnLoadCircuitData.Size = new Size(183, 40);
-            _btnLoadCircuitData.TabIndex = 11;
-            _btnLoadCircuitData.Text = "View Circuit Data";
-            _btnLoadCircuitData.UseVisualStyleBackColor = true;
-            _btnLoadCircuitData.Click += OnClickLoadCircuitData;
-            // 
-            // label11
-            // 
-            label11.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            label11.AutoSize = true;
-            label11.Location = new Point(568, 385);
-            label11.Name = "label11";
-            label11.Size = new Size(99, 30);
-            label11.TabIndex = 17;
-            label11.Text = "Grid kWh";
-            // 
-            // label12
-            // 
-            label12.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            label12.AutoSize = true;
-            label12.Location = new Point(527, 56);
-            label12.Name = "label12";
-            label12.Size = new Size(140, 30);
-            label12.TabIndex = 18;
-            label12.Text = "SOC Used (%)";
-            // 
-            // label13
-            // 
-            label13.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            label13.AutoSize = true;
-            label13.Location = new Point(512, 98);
-            label13.Name = "label13";
-            label13.Size = new Size(155, 30);
-            label13.TabIndex = 19;
-            label13.Text = "SOC Added (%)";
-            // 
-            // label14
-            // 
-            label14.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            label14.AutoSize = true;
-            label14.Location = new Point(553, 15);
-            label14.Name = "label14";
-            label14.Size = new Size(114, 30);
-            label14.TabIndex = 20;
-            label14.Text = "Miles Used";
-            // 
-            // label15
-            // 
-            label15.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            label15.AutoSize = true;
-            label15.Location = new Point(560, 139);
-            label15.Name = "label15";
-            label15.Size = new Size(107, 30);
-            label15.TabIndex = 21;
-            label15.Text = "kWh Used";
-            // 
-            // label16
-            // 
-            label16.AutoSize = true;
-            label16.Location = new Point(595, 347);
-            label16.Name = "label16";
-            label16.Size = new Size(72, 30);
-            label16.TabIndex = 22;
-            label16.Text = "$/Mile";
-            // 
-            // label17
-            // 
-            label17.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            label17.AutoSize = true;
-            label17.Location = new Point(574, 262);
-            label17.Name = "label17";
-            label17.Size = new Size(93, 30);
-            label17.TabIndex = 23;
-            label17.Text = "Wh/Mile";
-            // 
-            // label18
-            // 
-            label18.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            label18.AutoSize = true;
-            label18.Location = new Point(598, 306);
-            label18.Name = "label18";
-            label18.Size = new Size(69, 30);
-            label18.TabIndex = 24;
-            label18.Text = "MPGe";
-            // 
-            // label19
-            // 
-            label19.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            label19.AutoSize = true;
-            label19.Location = new Point(560, 426);
-            label19.Name = "label19";
-            label19.Size = new Size(107, 30);
-            label19.TabIndex = 25;
-            label19.Text = "Solar kWh";
-            // 
-            // _textSocAdded
-            // 
-            _textSocAdded.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textSocAdded.Location = new Point(673, 95);
-            _textSocAdded.Name = "_textSocAdded";
-            _textSocAdded.ReadOnly = true;
-            _textSocAdded.Size = new Size(183, 35);
-            _textSocAdded.TabIndex = 26;
-            // 
-            // _textSocUsed
-            // 
-            _textSocUsed.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textSocUsed.Location = new Point(673, 54);
-            _textSocUsed.Name = "_textSocUsed";
-            _textSocUsed.ReadOnly = true;
-            _textSocUsed.Size = new Size(183, 35);
-            _textSocUsed.TabIndex = 27;
-            // 
-            // _textMilesUsed
-            // 
-            _textMilesUsed.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textMilesUsed.Location = new Point(673, 13);
-            _textMilesUsed.Name = "_textMilesUsed";
-            _textMilesUsed.ReadOnly = true;
-            _textMilesUsed.Size = new Size(183, 35);
-            _textMilesUsed.TabIndex = 28;
-            // 
-            // _textKwhUsed
-            // 
-            _textKwhUsed.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textKwhUsed.Location = new Point(673, 136);
-            _textKwhUsed.Name = "_textKwhUsed";
-            _textKwhUsed.ReadOnly = true;
-            _textKwhUsed.Size = new Size(183, 35);
-            _textKwhUsed.TabIndex = 29;
-            // 
-            // _textCostPerMile
-            // 
-            _textCostPerMile.Location = new Point(673, 344);
-            _textCostPerMile.Name = "_textCostPerMile";
-            _textCostPerMile.ReadOnly = true;
-            _textCostPerMile.Size = new Size(183, 35);
-            _textCostPerMile.TabIndex = 30;
-            // 
-            // _textWhPerMile
-            // 
-            _textWhPerMile.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textWhPerMile.Location = new Point(673, 262);
-            _textWhPerMile.Name = "_textWhPerMile";
-            _textWhPerMile.ReadOnly = true;
-            _textWhPerMile.Size = new Size(183, 35);
-            _textWhPerMile.TabIndex = 31;
-            // 
-            // _textMpge
-            // 
-            _textMpge.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textMpge.Location = new Point(673, 303);
-            _textMpge.Name = "_textMpge";
-            _textMpge.ReadOnly = true;
-            _textMpge.Size = new Size(183, 35);
-            _textMpge.TabIndex = 32;
-            // 
-            // _textGridKwh
-            // 
-            _textGridKwh.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textGridKwh.Location = new Point(673, 383);
-            _textGridKwh.Name = "_textGridKwh";
-            _textGridKwh.ReadOnly = true;
-            _textGridKwh.Size = new Size(183, 35);
-            _textGridKwh.TabIndex = 33;
-            // 
-            // _textSolarKwh
-            // 
-            _textSolarKwh.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textSolarKwh.Location = new Point(673, 424);
-            _textSolarKwh.Name = "_textSolarKwh";
-            _textSolarKwh.ReadOnly = true;
-            _textSolarKwh.Size = new Size(183, 35);
-            _textSolarKwh.TabIndex = 34;
-            // 
             // label20
             // 
             label20.Anchor = AnchorStyles.Top | AnchorStyles.Right;
@@ -458,25 +254,6 @@
             label21.Size = new Size(131, 30);
             label21.TabIndex = 38;
             label21.Text = "Last SOC (%)";
-            // 
-            // _textBatteryKwh
-            // 
-            _textBatteryKwh.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _textBatteryKwh.Location = new Point(673, 465);
-            _textBatteryKwh.Name = "_textBatteryKwh";
-            _textBatteryKwh.ReadOnly = true;
-            _textBatteryKwh.Size = new Size(183, 35);
-            _textBatteryKwh.TabIndex = 39;
-            // 
-            // label22
-            // 
-            label22.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            label22.AutoSize = true;
-            label22.Location = new Point(541, 467);
-            label22.Name = "label22";
-            label22.Size = new Size(126, 30);
-            label22.TabIndex = 40;
-            label22.Text = "Battery kWh";
             // 
             // _btnSave
             // 
@@ -534,79 +311,20 @@
             label1.TabIndex = 44;
             label1.Text = "Battery kWh Added";
             // 
-            // _textChargeLossKwh
-            // 
-            _textChargeLossKwh.Location = new Point(673, 177);
-            _textChargeLossKwh.Name = "_textChargeLossKwh";
-            _textChargeLossKwh.ReadOnly = true;
-            _textChargeLossKwh.Size = new Size(183, 35);
-            _textChargeLossKwh.TabIndex = 45;
-            // 
-            // label23
-            // 
-            label23.AutoSize = true;
-            label23.Location = new Point(482, 179);
-            label23.Name = "label23";
-            label23.Size = new Size(185, 30);
-            label23.TabIndex = 46;
-            label23.Text = "Charge Loss (kWh)";
-            // 
-            // _textChargeEfficiency
-            // 
-            _textChargeEfficiency.Location = new Point(673, 219);
-            _textChargeEfficiency.Name = "_textChargeEfficiency";
-            _textChargeEfficiency.ReadOnly = true;
-            _textChargeEfficiency.Size = new Size(183, 35);
-            _textChargeEfficiency.TabIndex = 45;
-            // 
-            // label24
-            // 
-            label24.AutoSize = true;
-            label24.Location = new Point(459, 221);
-            label24.Name = "label24";
-            label24.Size = new Size(208, 30);
-            label24.TabIndex = 46;
-            label24.Text = "Charge Efficiency (%)";
-            // 
             // EvChargeSessionForm
             // 
             AutoScaleDimensions = new SizeF(12F, 30F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = _btnCancel;
             ClientSize = new Size(868, 591);
-            Controls.Add(label24);
-            Controls.Add(label23);
-            Controls.Add(_textChargeEfficiency);
-            Controls.Add(_textChargeLossKwh);
             Controls.Add(label1);
             Controls.Add(_numBatteryKwhAdded);
             Controls.Add(_numLastSoc);
             Controls.Add(_numLastOdometer);
             Controls.Add(_btnCancel);
             Controls.Add(_btnSave);
-            Controls.Add(label22);
-            Controls.Add(_textBatteryKwh);
             Controls.Add(label21);
             Controls.Add(label20);
-            Controls.Add(_textSolarKwh);
-            Controls.Add(_textGridKwh);
-            Controls.Add(_textMpge);
-            Controls.Add(_textWhPerMile);
-            Controls.Add(_textCostPerMile);
-            Controls.Add(_textKwhUsed);
-            Controls.Add(_textMilesUsed);
-            Controls.Add(_textSocUsed);
-            Controls.Add(_textSocAdded);
-            Controls.Add(label19);
-            Controls.Add(label18);
-            Controls.Add(label17);
-            Controls.Add(label16);
-            Controls.Add(label15);
-            Controls.Add(label14);
-            Controls.Add(label13);
-            Controls.Add(label12);
-            Controls.Add(label11);
-            Controls.Add(_btnLoadCircuitData);
             Controls.Add(label10);
             Controls.Add(_numSessionCost);
             Controls.Add(_checkHomeCharger);
@@ -661,38 +379,13 @@
         private CheckBox _checkHomeCharger;
         private NumericUpDown _numSessionCost;
         private Label label10;
-        private Button _btnLoadCircuitData;
-        private Label label11;
-        private Label label12;
-        private Label label13;
-        private Label label14;
-        private Label label15;
-        private Label label16;
-        private Label label17;
-        private Label label18;
-        private Label label19;
-        private TextBox _textSocAdded;
-        private TextBox _textSocUsed;
-        private TextBox _textMilesUsed;
-        private TextBox _textKwhUsed;
-        private TextBox _textCostPerMile;
-        private TextBox _textWhPerMile;
-        private TextBox _textMpge;
-        private TextBox _textGridKwh;
-        private TextBox _textSolarKwh;
         private Label label20;
         private Label label21;
-        private TextBox _textBatteryKwh;
-        private Label label22;
         private Button _btnSave;
         private Button _btnCancel;
         private NumericUpDown _numLastOdometer;
         private NumericUpDown _numLastSoc;
         private NumericUpDown _numBatteryKwhAdded;
         private Label label1;
-        private TextBox _textChargeLossKwh;
-        private Label label23;
-        private TextBox _textChargeEfficiency;
-        private Label label24;
     }
 }

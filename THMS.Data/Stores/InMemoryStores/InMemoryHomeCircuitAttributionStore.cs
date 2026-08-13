@@ -2,11 +2,11 @@
 
 namespace THMS.Data.Stores.InMemoryStores
 {
-    public class InMemoryEvAttributionStore
+    public class InMemoryHomeCircuitAttributionStore
     {
-        private readonly List<EnergyAttributionResult> _items = new();
+        private readonly List<HomeCircuitAttribution> _items = new();
 
-        public void Upsert(EnergyAttributionResult item)
+        public void Upsert(HomeCircuitAttribution item)
         {
             var existing = _items.FirstOrDefault(i => i.Timestamp == item.Timestamp);
             if (existing is null)
@@ -15,14 +15,13 @@ namespace THMS.Data.Stores.InMemoryStores
                 return;
             }
 
-            existing.EvChargeWh = item.EvChargeWh;
+            existing.TotalWh = item.TotalWh;
             existing.SolarWh = item.SolarWh;
             existing.BatteryWh = item.BatteryWh;
             existing.GridWh = item.GridWh;
-            existing.IsPartial = item.IsPartial;
         }
 
-        public IReadOnlyCollection<EnergyAttributionResult> GetRange(DateTime start, DateTime end)
+        public IReadOnlyCollection<HomeCircuitAttribution> GetRange(DateTime start, DateTime end)
         {
             return _items
                 .Where(i => i.Timestamp >= start && i.Timestamp <= end)
@@ -31,7 +30,7 @@ namespace THMS.Data.Stores.InMemoryStores
                 .AsReadOnly();
         }
 
-        public EnergyAttributionResult? GetLatest()
+        public HomeCircuitAttribution? GetLatest()
         {
             return _items
                 .OrderByDescending(i => i.Timestamp)

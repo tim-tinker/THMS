@@ -44,7 +44,7 @@ namespace THMS.Logic.Finance
             // 2. Get EV circuit readings for the month
             // -----------------------------------------
             var evReadings = _energyStore
-                .GetEvCircuitReadings(monthStart, monthEnd)
+                .GetHomeCircuitReadings(monthStart, monthEnd)
                 .OrderBy(r => r.Timestamp)
                 .ToList();
 

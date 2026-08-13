@@ -3,11 +3,11 @@ using THMS.Logic.Energy;
 
 namespace THMS.Logic.Orchestrators
 {
-    public class EvAttributionOrchestrator
+    public class HomeCircuitAttributionOrchestrator
     {
         private IEnergyDataStore _energyStore;
 
-        public EvAttributionOrchestrator(IEnergyDataStore energyStore)
+        public HomeCircuitAttributionOrchestrator(IEnergyDataStore energyStore)
         {
             _energyStore = energyStore;
         }
@@ -21,7 +21,7 @@ namespace THMS.Logic.Orchestrators
 
             foreach (var result in engine.Results)
             {
-                _energyStore.UpsertEvAttribution(result);
+                _energyStore.UpsertHomeCircuitAttribution(result);
             }
         }
     }

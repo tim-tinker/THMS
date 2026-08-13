@@ -15,7 +15,7 @@ public class BillDataStatus
     public DateTime ExpectedAvailableDate { get; set; }
 }
 
-public class EvCircuitStatus
+public class HomeCircuitStatus
 {
     public bool HasData { get; set; }
     public DateTime? LastReading { get; set; }

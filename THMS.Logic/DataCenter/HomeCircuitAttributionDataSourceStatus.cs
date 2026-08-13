@@ -2,7 +2,7 @@
 
 namespace THMS.Logic.DataCenter
 {
-    public class EvAttributionDataSourceStatus : IUpdateDataSourceStatus
+    public class HomeCircuitAttributionDataSourceStatus : IUpdateDataSourceStatus
     {
         private readonly IEnergyDataStore _energyStore;
 
@@ -12,14 +12,14 @@ namespace THMS.Logic.DataCenter
 
         public bool IsReadyForUpdate {  get; private set; }
 
-        public EvAttributionDataSourceStatus(IEnergyDataStore energyStore)
+        public HomeCircuitAttributionDataSourceStatus(IEnergyDataStore energyStore)
         {
             _energyStore = energyStore;
         }
 
         public void QueryStatus()
         {
-            var lastAttribution = _energyStore.GetLatestEvAttribution()?.Timestamp
+            var lastAttribution = _energyStore.GetLatestHomeCircuitAttribution()?.Timestamp
                 ?? DateTime.MinValue;
 
             LastRetrieval = lastAttribution == DateTime.MinValue ? null : lastAttribution;
@@ -27,11 +27,11 @@ namespace THMS.Logic.DataCenter
             var lastSolarInterval = _energyStore.GetLatestSolarVendorInterval()?.Timestamp
                 ?? DateTime.MinValue;
 
-            var lastEvCircuitReading = _energyStore.GetLatestEvCircuitReading()?.Timestamp
+            var lastHomeCircuitReading = _energyStore.GetLatestHomeCircuitReading()?.Timestamp
                 ?? DateTime.MinValue;
 
-            IsReadyForUpdate = lastEvCircuitReading > lastAttribution
-                && lastSolarInterval > lastEvCircuitReading;
+            IsReadyForUpdate = lastHomeCircuitReading > lastAttribution
+                && lastSolarInterval > lastHomeCircuitReading;
         }
     }
 }

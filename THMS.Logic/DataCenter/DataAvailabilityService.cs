@@ -21,9 +21,9 @@ namespace THMS.Logic.DataCenter
             _vehicleStore = vehicleStore;
 
             _dataSourceStatuses.Add(new SolarDataSourceStatus(_energyStore));
-            _dataSourceStatuses.Add(new EvCircuitReadingDataSourceStatus(_energyStore));
+            _dataSourceStatuses.Add(new HomeCircuitReadingDataSourceStatus(_energyStore));
             _dataSourceStatuses.Add(new EvChargeSessionDataSourceStatus(_vehicleStore));
-            _dataSourceStatuses.Add(new EvAttributionDataSourceStatus(_energyStore));
+            _dataSourceStatuses.Add(new HomeCircuitAttributionDataSourceStatus(_energyStore));
         }
 
         public DataCenterViewModel GetAvailability()

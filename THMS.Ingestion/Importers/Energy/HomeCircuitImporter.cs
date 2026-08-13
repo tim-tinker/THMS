@@ -5,18 +5,18 @@ using THMS.Domain.Energy;
 
 namespace THMS.Ingestion.Importers.Energy
 {
-    public class HomeEvCircuitImporter
+    public class HomeCircuitImporter
     {
         private readonly IEnergyDataStore _store;
-        private readonly List<EvCircuitReading> _readings = [];
+        private readonly List<HomeCircuitReading> _readings = [];
 
-        public IEnumerable<EvCircuitReading> Readings => _readings;
+        public IEnumerable<HomeCircuitReading> Readings => _readings;
         public DateTime StartDate { get; private set; } = DateTime.MinValue;
         public DateTime EndDate { get; private set; } = DateTime.MinValue;
         public int ReadingCount => _readings.Count;
         public string ErrorMessage { get; private set; }
 
-        public HomeEvCircuitImporter(IEnergyDataStore store)
+        public HomeCircuitImporter(IEnergyDataStore store)
         {
             _store = store;
         }
@@ -45,7 +45,7 @@ namespace THMS.Ingestion.Importers.Energy
 
                     var circuitEnergyKwh = csv.GetField<decimal>(1);
 
-                    var reading = new EvCircuitReading
+                    var reading = new HomeCircuitReading
                     {
                         Timestamp = timeStamp,
                         KiloWattHours = circuitEnergyKwh,

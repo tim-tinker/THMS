@@ -1,10 +1,11 @@
 ﻿using THMS.Data.Stores;
+using THMS.Domain.Energy;
 using THMS.Ingestion.Importers.Energy;
 using THMS.Logic.Energy;
 
 namespace THMS.Logic.Orchestrators
 {
-    public class EvCircuitOrchestrator
+    public class HomeCircuitReadingOrchestrator : BaseOrchestrator
     {
         private readonly IEnergyDataStore _energyStore;
 
@@ -13,14 +14,14 @@ namespace THMS.Logic.Orchestrators
         public int ReadingCount { get; private set; }
         public string ErrorMessage { get; private set; }
 
-        public EvCircuitOrchestrator(IEnergyDataStore energyStore)
+        public HomeCircuitReadingOrchestrator(IEnergyDataStore energyStore)
         {
             _energyStore = energyStore;
         }
 
         public void Update(string filePath)
         {
-            var importer = new HomeEvCircuitImporter(_energyStore);
+            var importer = new HomeCircuitImporter(_energyStore);
             importer.Import(filePath);
             StartDate = importer.StartDate;
             EndDate = importer.EndDate;
@@ -31,7 +32,7 @@ namespace THMS.Logic.Orchestrators
             {
                 foreach (var reading in importer.Readings)
                 {
-                    _energyStore.UpsertEvCircuitReading(reading);
+                    _energyStore.UpsertHomeCircuitReading(reading);
                 }
 
                 CalculateEvAttribution(StartDate, EndDate);
@@ -45,8 +46,22 @@ namespace THMS.Logic.Orchestrators
 
             foreach (var result in engine.Results)
             {
-                _energyStore.UpsertEvAttribution(result);
+                _energyStore.UpsertHomeCircuitAttribution(result);
             }
+        }
+
+        public IEnumerable<HomeCircuitReading> GetHomeCircuitReadings(string period)
+        {
+            var readings = Array.Empty<HomeCircuitReading>();
+            var latest = _energyStore.GetLatestHomeCircuitReading();
+            if (latest is not null)
+            {
+                var end = latest.Timestamp;
+                var start = GetStartDate(end, period);
+                readings = _energyStore.GetHomeCircuitReadings(start, end).ToArray();
+            }
+
+            return readings;
         }
     }
 }

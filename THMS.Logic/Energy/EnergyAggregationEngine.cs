@@ -19,7 +19,7 @@ namespace THMS.Logic.Energy
         /// Aggregates attribution + cost results into monthly summaries.
         /// </summary>
         public IReadOnlyCollection<MonthlyEnergySummary> Aggregate(
-            IReadOnlyCollection<EnergyAttributionResult> attributionResults,
+            IReadOnlyCollection<HomeCircuitAttribution> attributionResults,
             IReadOnlyCollection<EnergyCostResult> costResults,
             DateTime start,
             DateTime end)
@@ -57,7 +57,7 @@ namespace THMS.Logic.Energy
                 var summary = summaries[key];
 
                 // Energy totals
-                summary.EvChargeWh += attr.EvChargeWh;
+                summary.EvChargeWh += attr.TotalWh;
                 summary.EvChargeSolarWh += attr.SolarWh;
                 summary.EvChargeBatteryWh += attr.BatteryWh;
                 summary.EvChargeGridWh += attr.GridWh;
@@ -67,10 +67,6 @@ namespace THMS.Logic.Energy
                 summary.BatteryValue += cost.BatteryValue;
                 summary.GridCost += cost.GridCost;
                 summary.CommercialChargeCost += cost.CommercialChargeCost;
-
-                // Partial flag
-                if (attr.IsPartial || cost.IsPartial)
-                    summary.IsPartial = true;
             }
 
             // ---------------------------------------------------------

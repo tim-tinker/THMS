@@ -42,8 +42,8 @@ internal static class Program
 
         // Data source update services
         services.AddSingleton<IDataSourceUpdater, SolarDataUpdater>();
-        services.AddSingleton<IDataSourceUpdater, EvCircuitUpdater>();
-        services.AddSingleton<IDataSourceUpdater, EvAttributionUpdater>();
+        services.AddSingleton<IDataSourceUpdater, HomeCircuitUpdater>();
+        services.AddSingleton<IDataSourceUpdater, HomeCircuitAttributionUpdater>();
 
         // Later, switch implementations without touching forms:
         // services.AddSingleton<IVehicleDataStore, SQLiteVehicleDataStore>();

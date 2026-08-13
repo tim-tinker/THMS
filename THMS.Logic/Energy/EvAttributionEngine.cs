@@ -6,9 +6,9 @@ namespace THMS.Logic.Energy;
 public class EvAttributionEngine
 {
     private readonly IEnergyDataStore _store;
-    private readonly List<EnergyAttributionResult> _results = [];
+    private readonly List<HomeCircuitAttribution> _results = [];
 
-    public IEnumerable<EnergyAttributionResult> Results => _results;
+    public IEnumerable<HomeCircuitAttribution> Results => _results;
     public int ResultCount => _results.Count;
 
     public EvAttributionEngine(IEnergyDataStore store)
@@ -22,7 +22,7 @@ public class EvAttributionEngine
 
         // Raw data
         var solar = _store.GetSolarVendorIntervals(start, end);
-        var ev = _store.GetEvCircuitReadings(start, end);
+        var ev = _store.GetHomeCircuitReadings(start, end);
 
         // Half-hour buckets
         var buckets = HalfHourBucketJoin(solar, ev);
@@ -54,10 +54,10 @@ public class EvAttributionEngine
             decimal batteryToEv = remaining;
 
             // Store result
-            var result = new EnergyAttributionResult
+            var result = new HomeCircuitAttribution
             {
                 Timestamp = b.Timestamp,
-                EvChargeWh = evKwh * 1000m,
+                TotalWh = evKwh * 1000m,
                 SolarWh = solarToEv * 1000m,
                 BatteryWh = batteryToEv * 1000m,
                 GridWh = gridToEv * 1000m
@@ -69,7 +69,7 @@ public class EvAttributionEngine
 
     private IEnumerable<HalfHourBucket> HalfHourBucketJoin(
         IEnumerable<SolarVendorInterval> solar,
-        IEnumerable<EvCircuitReading> ev)
+        IEnumerable<HomeCircuitReading> ev)
     {
         // Step 1: bucket solar intervals
         var solarBuckets = solar
@@ -117,7 +117,7 @@ public class EvAttributionEngine
         };
     }
 
-    private EvBucket AggregateEv(IEnumerable<EvCircuitReading> g)
+    private EvBucket AggregateEv(IEnumerable<HomeCircuitReading> g)
     {
         return new EvBucket
         {

@@ -110,13 +110,13 @@ namespace THMS.Logic.ViewModels.Transportation
 
         public void LoadCircuitData(string filename)
         {
-            var importer = new HomeEvCircuitImporter(EnergyStore);
+            var importer = new HomeCircuitImporter(EnergyStore);
             importer.Import(filename);
             LoadCircuitReadings(importer.Readings);
             CalculateEvAttribution(importer.StartDate, importer.EndDate);
         }
 
-        public void LoadCircuitReadings(IEnumerable<EvCircuitReading> readings)
+        public void LoadCircuitReadings(IEnumerable<HomeCircuitReading> readings)
         {
             // Convert raw readings → segments
             var segments = ConvertReadingsToSegments(readings);
@@ -140,7 +140,7 @@ namespace THMS.Logic.ViewModels.Transportation
             }
         }
 
-        private List<EvCircuitSegment> ConvertReadingsToSegments(IEnumerable<EvCircuitReading> readings)
+        private List<EvCircuitSegment> ConvertReadingsToSegments(IEnumerable<HomeCircuitReading> readings)
         {
             var rawList = (from rawData in readings
                            where rawData.Timestamp >= StartTime.AddMinutes(-10) && rawData.Timestamp <= EndTime.AddMinutes(10)

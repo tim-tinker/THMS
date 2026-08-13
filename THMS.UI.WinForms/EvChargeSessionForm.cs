@@ -59,18 +59,12 @@ namespace THMS.UI.WinForms
                 _numKwhAdded.Value = ClampToNumeric(_numKwhAdded, _sessionVM.KwhAdded);
                 _numSessionCost.Value = ClampToNumeric(_numSessionCost, _sessionVM.SessionCost);
 
-                _textGridKwh.Text = $"{_sessionVM.GridKwh:0.000}";
-                _textSolarKwh.Text = $"{_sessionVM.SolarKwh:0.000}";
-                _textBatteryKwh.Text = $"{_sessionVM.BatteryKwh:0.000}";
-
                 EnableHomeControls(_sessionVM.IsHomeCharge);
             }
             finally
             {
                 _loadingControls = false;
             }
-
-            UpdateConsumption();
         }
 
         private void OnCheckedChangedHomeCharger(object sender, EventArgs e)
@@ -82,39 +76,12 @@ namespace THMS.UI.WinForms
             // LoadControlsFromViewModel (e.g. after circuit import) restores false.
             _sessionVM.IsHomeCharge = _checkHomeCharger.Checked;
             EnableHomeControls(_checkHomeCharger.Checked);
-            UpdateConsumption();
         }
 
         private void EnableHomeControls(bool enable)
         {
-            _btnLoadCircuitData.Enabled = enable;
             _numKwhAdded.Enabled = !enable;
             _numSessionCost.Enabled = !enable;
-        }
-
-        private void OnValueChanged(object sender, EventArgs e)
-        {
-            UpdateConsumption();
-        }
-
-        private void UpdateConsumption()
-        {
-            if (_loadingControls)
-                return;
-
-            ApplyControlsToViewModel();
-
-            _textMilesUsed.Text = $"{_sessionVM.MilesUsed:0}";
-            _textSocUsed.Text = $"{_sessionVM.SocUsed:0}";
-            _textSocAdded.Text = $"{_sessionVM.SocAdded:0}";
-
-            _textKwhUsed.Text = $"{_sessionVM.KwhUsed:N1}";
-            _textWhPerMile.Text = $"{_sessionVM.WhPerMile:N1}";
-            _textMpge.Text = $"{_sessionVM.Mpge:N1}";
-            _textCostPerMile.Text = $"{_sessionVM.CostPerMile:N2}";
-
-            _textChargeLossKwh.Text = $"{_sessionVM.ChargeLossKwh:N3}";
-            _textChargeEfficiency.Text = $"{_sessionVM.ChargeEfficiency:P2}";
         }
 
         private void OnClickSave(object sender, EventArgs e)
@@ -145,9 +112,6 @@ namespace THMS.UI.WinForms
             _sessionVM.IsHomeCharge = _checkHomeCharger.Checked;
             _sessionVM.KwhAdded = _numKwhAdded.Value;
             _sessionVM.SessionCost = _numSessionCost.Value;
-            _sessionVM.GridKwh = ParseDecimal(_textGridKwh.Text);
-            _sessionVM.SolarKwh = ParseDecimal(_textSolarKwh.Text);
-            _sessionVM.BatteryKwh = ParseDecimal(_textBatteryKwh.Text);
         }
 
         private void OnClickCancel(object sender, EventArgs e)
@@ -187,7 +151,7 @@ namespace THMS.UI.WinForms
             // runs (BatteryKwhAdded / Home Charger may not have been applied yet).
             ApplyControlsToViewModel();
 
-            using var form = new EvCircuitDataForm(_sessionVM);
+            using var form = new HomeCircuitDataForm(_sessionVM);
 
             form.ShowDialog();
 

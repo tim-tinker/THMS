@@ -5,6 +5,6 @@ namespace THMS.Ingestion.EnergyIngestion
     public class EnergyIngestionResult
     {
         public List<string> Errors { get; set; } = new();
-        public EnergyAttributionResult? Attribution { get; set; }
+        public HomeCircuitAttribution? Attribution { get; set; }
     }
 }

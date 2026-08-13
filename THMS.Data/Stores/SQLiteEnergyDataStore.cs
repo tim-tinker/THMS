@@ -10,10 +10,8 @@ namespace THMS.Data.Stores.SQLite
     {
         private readonly string _connectionString;
 
-        private readonly EvCircuitReadingsTable _evCircuitReadingsTable = new();
-        private readonly EvCommercialChargeSessionsTable _evCommercialSessionsTable = new();
-        private readonly EvCircuitSegmentsTable _evCircuitSegmentsTable = new();
-        private readonly EvAttributionTable _evAttrTable = new();
+        private readonly HomeCircuitReadingsTable _homeCircuitReadingsTable = new();
+        private readonly HomeCircuitAttributionTable _homeCircuitAttributionTable = new();
         private readonly SolarVendorIntervalsTable _solarTable = new();
 
         public SQLiteEnergyDataStore(string databasePath)
@@ -32,10 +30,8 @@ namespace THMS.Data.Stores.SQLite
 
         private void InitializeSchema(SqliteConnection conn)
         {
-            _evCircuitReadingsTable.InitializeSchema(conn);
-            _evCommercialSessionsTable.InitializeSchema(conn);
-            _evCircuitSegmentsTable.InitializeSchema(conn);
-            _evAttrTable.InitializeSchema(conn);
+            _homeCircuitReadingsTable.InitializeSchema(conn);
+            _homeCircuitAttributionTable.InitializeSchema(conn);
             _solarTable.InitializeSchema(conn);
         }
 
@@ -43,22 +39,22 @@ namespace THMS.Data.Stores.SQLite
         // HOME CHARGING CIRCUIT READINGS
         // ---------------------------------------------------------
 
-        public void UpsertEvCircuitReading(EvCircuitReading reading)
+        public void UpsertHomeCircuitReading(HomeCircuitReading reading)
         {
             using var conn = OpenConnection();
-            _evCircuitReadingsTable.Upsert(conn, reading);
+            _homeCircuitReadingsTable.Upsert(conn, reading);
         }
 
-        public IEnumerable<EvCircuitReading> GetEvCircuitReadings(DateTime start, DateTime end)
+        public IEnumerable<HomeCircuitReading> GetHomeCircuitReadings(DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _evCircuitReadingsTable.GetRange(conn, start, end);
+            return _homeCircuitReadingsTable.GetRange(conn, start, end);
         }
 
-        public EvCircuitReading? GetLatestEvCircuitReading()
+        public HomeCircuitReading? GetLatestHomeCircuitReading()
         {
             using var conn = OpenConnection();
-            return _evCircuitReadingsTable.GetLatest(conn);
+            return _homeCircuitReadingsTable.GetLatest(conn);
         }
 
         // ---------------------------------------------------------
@@ -84,71 +80,25 @@ namespace THMS.Data.Stores.SQLite
         }
 
         // ---------------------------------------------------------
-        // COMMERCIAL CHARGING SESSIONS
-        // ---------------------------------------------------------
-
-        public void UpsertEvCommercialChargeSession(EvCommercialChargeSession session)
-        {
-            using var conn = OpenConnection();
-            _evCommercialSessionsTable.Upsert(conn, session);
-        }
-
-        public IEnumerable<EvCommercialChargeSession> GetEvCommercialChargeSessions(
-            DateTime start,
-            DateTime end)
-        {
-            using var conn = OpenConnection();
-            return _evCommercialSessionsTable.GetRange(conn, start, end);
-        }
-
-        // ----------------------------------------------------------
-        // HOME EV CIRCUIT SEGMENTS
-        // ----------------------------------------------------------
-
-        public void SaveEvCircuitSegments(Guid sessionId, IEnumerable<EvCircuitSegment> segments)
-        {
-            using var conn = OpenConnection();
-            _evCircuitSegmentsTable.SaveEvCircuitSegments(conn, sessionId, segments);
-        }
-
-        public IEnumerable<EvCircuitSegment> GetEvCircuitSegments(Guid sessionId)
-        {
-            using var conn = OpenConnection();
-            return _evCircuitSegmentsTable.GetEvCircuitSegments(conn, sessionId);
-        }
-
-        public void DeleteEvCircuitSegments(Guid sessionId)
-        {
-            using var conn = OpenConnection();
-            _evCircuitSegmentsTable.DeleteEvCircuitSegments(conn, sessionId);
-        }
-
-        public EvCircuitSegmentSummary GetEvCircuitSummary(Guid sessionId)
-        {
-            using var conn = OpenConnection();
-            return _evCircuitSegmentsTable.GetEvCircuitSummary(conn, sessionId);
-        }
-
-        // ---------------------------------------------------------
         // EV ATTRIBUTION
         // ---------------------------------------------------------
 
-        public void UpsertEvAttribution(EnergyAttributionResult result)
+        public void UpsertHomeCircuitAttribution(HomeCircuitAttribution result)
         {
             using var conn = OpenConnection();
-            _evAttrTable.Upsert(conn, result);
+            _homeCircuitAttributionTable.Upsert(conn, result);
         }
 
-        public IReadOnlyCollection<EnergyAttributionResult> GetEvAttribution(DateTime start, DateTime end)
+        public IReadOnlyCollection<HomeCircuitAttribution> GetHomeCircuitAttribution(DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _evAttrTable.GetRange(conn, start, end);
+            return _homeCircuitAttributionTable.GetRange(conn, start, end);
         }
 
-        public EnergyAttributionResult? GetLatestEvAttribution()
+        public HomeCircuitAttribution? GetLatestHomeCircuitAttribution()
         {
             using var conn = OpenConnection();
-            return _evAttrTable.GetLatest(conn);
+            return _homeCircuitAttributionTable.GetLatest(conn);
         }
     }
 }

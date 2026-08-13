@@ -2,7 +2,7 @@
 
 namespace THMS.UI.WinForms
 {
-    public partial class EvCircuitDataForm : Form
+    public partial class HomeCircuitDataForm : Form
     {
         private readonly EvChargeSessionViewModel _sessionVM = null!;
         private bool _gridBound;
@@ -10,12 +10,12 @@ namespace THMS.UI.WinForms
         /// <summary>
         /// Default ctor for designer support. Do not use this constructor in production code.
         /// </summary>
-        public EvCircuitDataForm()
+        public HomeCircuitDataForm()
         {
             InitializeComponent();
         }
 
-        public EvCircuitDataForm(EvChargeSessionViewModel sessionVM)
+        public HomeCircuitDataForm(EvChargeSessionViewModel sessionVM)
             : this()
         {
             _sessionVM = sessionVM ?? throw new ArgumentNullException(nameof(sessionVM));

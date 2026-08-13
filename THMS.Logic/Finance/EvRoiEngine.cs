@@ -48,7 +48,7 @@ namespace THMS.Logic.Finance
                     LoanInterestPaid = loan?.InterestPaid ?? 0,
                     LoanPrincipalPaid = loan?.PrincipalPaid ?? 0,
 
-                    IsPartial = summary.IsPartial || loan == null
+                    IsPartial = loan == null
                 };
 
                 results.Add(roi);

@@ -11,7 +11,6 @@ namespace THMS.Data.Stores.SQLite
         private readonly string _connectionString;
 
         private readonly SqliteElectricUtilityBillStore _utilityBills = new();
-        private readonly SqliteCommercialChargeCostStore _commercialCosts = new();
         private readonly SqliteGasPurchaseStore _gasPurchases = new();
         private readonly SqliteEvChargeSessionCostStore _evChargeSessionCosts = new();
 
@@ -32,7 +31,6 @@ namespace THMS.Data.Stores.SQLite
         private void InitializeSchema(SqliteConnection conn)
         {
             _utilityBills.InitializeSchema(conn);
-            _commercialCosts.InitializeSchema(conn);
             _gasPurchases.InitializeSchema(conn);
         }
 
@@ -50,33 +48,6 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             return _utilityBills.GetRange(conn, start, end).ToList();
-        }
-
-        // ---------------------------------------------------------
-        // COMMERCIAL CHARGING COST RECORDS
-        // ---------------------------------------------------------
-
-        public void UpsertCommercialChargeCostRecord(CommercialChargeCostRecord record)
-        {
-            using var conn = OpenConnection();
-            _commercialCosts.Upsert(conn, record);
-        }
-
-        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecords(
-            DateTime start,
-            DateTime end)
-        {
-            using var conn = OpenConnection();
-            return _commercialCosts.GetRange(conn, start, end).ToList();
-        }
-
-        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecordsByVendor(
-            string vendor,
-            DateTime start,
-            DateTime end)
-        {
-            using var conn = OpenConnection();
-            return _commercialCosts.GetRangeByVendor(conn, vendor, start, end).ToList();
         }
 
         // ---------------------------------------------------------

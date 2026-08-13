@@ -22,8 +22,6 @@
             chargingGrid = new DataGridView();
             fuelGrid = new DataGridView();
             maintenanceGrid = new DataGridView();
-            btnAddMileage = new Button();
-            btnAddCharge = new Button();
             _splitFuelMaintenance = new SplitContainer();
             _splitFuelCharge = new SplitContainer();
             label3 = new Label();
@@ -106,26 +104,6 @@
             maintenanceGrid.Size = new Size(1330, 182);
             maintenanceGrid.TabIndex = 11;
             // 
-            // btnAddMileage
-            // 
-            btnAddMileage.Dock = DockStyle.Bottom;
-            btnAddMileage.Location = new Point(0, 207);
-            btnAddMileage.Name = "btnAddMileage";
-            btnAddMileage.Size = new Size(1330, 35);
-            btnAddMileage.TabIndex = 12;
-            btnAddMileage.Text = "Add Gas";
-            btnAddMileage.Click += btnAddMileage_Click;
-            // 
-            // btnAddCharge
-            // 
-            btnAddCharge.Dock = DockStyle.Bottom;
-            btnAddCharge.Location = new Point(0, 221);
-            btnAddCharge.Name = "btnAddCharge";
-            btnAddCharge.Size = new Size(1330, 35);
-            btnAddCharge.TabIndex = 13;
-            btnAddCharge.Text = "Add Charge Session";
-            btnAddCharge.Click += btnAddCharge_Click;
-            // 
             // _splitFuelMaintenance
             // 
             _splitFuelMaintenance.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
@@ -157,13 +135,11 @@
             // 
             _splitFuelCharge.Panel1.Controls.Add(fuelGrid);
             _splitFuelCharge.Panel1.Controls.Add(label3);
-            _splitFuelCharge.Panel1.Controls.Add(btnAddMileage);
             // 
             // _splitFuelCharge.Panel2
             // 
             _splitFuelCharge.Panel2.Controls.Add(chargingGrid);
             _splitFuelCharge.Panel2.Controls.Add(label4);
-            _splitFuelCharge.Panel2.Controls.Add(btnAddCharge);
             _splitFuelCharge.Size = new Size(1330, 502);
             _splitFuelCharge.SplitterDistance = 242;
             _splitFuelCharge.TabIndex = 0;
@@ -296,8 +272,6 @@
         private System.Windows.Forms.DataGridView fuelGrid;
         private System.Windows.Forms.DataGridView maintenanceGrid;
 
-        private System.Windows.Forms.Button btnAddMileage;
-        private System.Windows.Forms.Button btnAddCharge;
         private SplitContainer _splitFuelMaintenance;
         private Button _btnAddInvoice;
         private Label label2;

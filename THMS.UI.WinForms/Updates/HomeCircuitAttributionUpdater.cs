@@ -7,18 +7,18 @@ using THMS.Logic.Orchestrators;
 
 namespace THMS.UI.WinForms.Updates
 {
-    public class EvAttributionUpdater : IDataSourceUpdater
+    public class HomeCircuitAttributionUpdater : IDataSourceUpdater
     {
         private IEnergyDataStore _energyStore;
-        private EvAttributionOrchestrator _orchestrator;
+        private HomeCircuitAttributionOrchestrator _orchestrator;
 
         public IDataSourceStatus Status { get; }
 
-        public EvAttributionUpdater(IEnergyDataStore energyStore)
+        public HomeCircuitAttributionUpdater(IEnergyDataStore energyStore)
         {
             _energyStore = energyStore;
-            Status = new EvAttributionDataSourceStatus(energyStore);
-            _orchestrator = new EvAttributionOrchestrator(energyStore);
+            Status = new HomeCircuitAttributionDataSourceStatus(energyStore);
+            _orchestrator = new HomeCircuitAttributionOrchestrator(energyStore);
         }
 
         public void UpdateDataSource()

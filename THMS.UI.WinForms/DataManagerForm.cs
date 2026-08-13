@@ -12,63 +12,69 @@ namespace THMS.UI.WinForms
         {
             _energyStore = energyStore;
             InitializeComponent();
-            LoadStoreList();
-        }
-
-        // ---------------------------------------------------------
-        // Load available data stores into the combo box
-        // ---------------------------------------------------------
-        private void LoadStoreList()
-        {
-            //comboStores.Items.Add("EV Sessions");
-            comboStores.Items.Add("Solar Intervals");
-            //comboStores.Items.Add("Billing Records");
-            //comboStores.Items.Add("Financial Transactions");
-
-            if (comboStores.Items.Count > 0)
-                comboStores.SelectedIndex = 0;
-        }
-
-        // ---------------------------------------------------------
-        // Handle store selection change
-        // ---------------------------------------------------------
-        private void comboStores_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            var selected = comboStores.SelectedItem?.ToString();
-            if (!string.IsNullOrWhiteSpace(selected))
-                LoadManagerControl(selected);
-        }
-
-        // ---------------------------------------------------------
-        // Load the appropriate manager control into the host panel
-        // ---------------------------------------------------------
-        private void LoadManagerControl(string storeName)
-        {
-            panelHost.Controls.Clear();
-            _currentControl = null;
-
-            IDataManagerControl control = storeName switch
-            {
-                //"EV Sessions" => new EVSessionManagerControl(_services),
-                "Solar Intervals" => new SolarIntervalManagerControl(_energyStore),
-                //"Billing Records" => new BillingRecordManagerControl(_services),
-                //"Financial Transactions" => new FinanceManagerControl(_services),
-                //    _ => throw new InvalidOperationException($"Unknown store type: {storeName}")
-            };
-
-            _currentControl = control;
-
-            var ui = control.GetControl();
-            ui.Dock = DockStyle.Fill;
-
-            panelHost.Controls.Add(ui);
-
-            control.LoadData();
         }
 
         private void OnClickClose(object sender, EventArgs e)
         {
             Close();
+        }
+
+        private void OnClickSolarType(object sender, EventArgs e)
+        {
+            var control = new SolarIntervalManagerControl(_energyStore) { Dock = DockStyle.Fill };
+            _currentControl = control;
+
+            panelHost.Controls.Add(control);
+            control.BringToFront();
+        }
+
+        private void OnClickHomeCircuitType(object sender, EventArgs e)
+        {
+            var control = new HomeCircuitManagerControl(_energyStore) { Dock = DockStyle.Fill };
+            _currentControl = control;
+
+            panelHost.Controls.Add(control);
+            control.BringToFront();
+        }
+
+        private void OnClickEvSegmentType(object sender, EventArgs e)
+        {
+
+        }
+
+        private void OnClickEvChargeSessionType(object sender, EventArgs e)
+        {
+
+        }
+
+        private void OnClickViewMonth(object sender, EventArgs e)
+        {
+            _currentControl?.SetGridDataSource("Month");
+        }
+
+        private void OnClickViewYear(object sender, EventArgs e)
+        {
+            _currentControl?.SetGridDataSource("Year");
+        }
+
+        private void OnClickViewLifetime(object sender, EventArgs e)
+        {
+            _currentControl?.SetGridDataSource("Lifetime");
+        }
+
+        private void OnClickEditAddAction(object sender, EventArgs e)
+        {
+
+        }
+
+        private void OnClickEditEditAction(object sender, EventArgs e)
+        {
+
+        }
+
+        private void OnClickEditDeleteAction(object sender, EventArgs e)
+        {
+
         }
     }
 }

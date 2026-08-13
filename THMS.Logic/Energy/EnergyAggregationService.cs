@@ -46,7 +46,7 @@ namespace THMS.Logic.Energy
 
         private List<EnergyIntervalRecord> AggregateHalfHourly(
             IEnumerable<SolarVendorInterval> intervals,
-            IEnumerable<EnergyAttributionResult> evAttr)
+            IEnumerable<HomeCircuitAttribution> evAttr)
         {
             var grouped = intervals
                 .GroupBy(i => TimeBucket.GetHalfHour(i.Timestamp))
@@ -71,7 +71,7 @@ namespace THMS.Logic.Energy
 
                 decimal ev = 0;
                 if (evGrouped.TryGetValue(bucket, out var evList))
-                    ev = evList.Sum(x => x.EvChargeWh) / 1000m;
+                    ev = evList.Sum(x => x.TotalWh) / 1000m;
 
                 list.Add(new EnergyIntervalRecord
                 {
@@ -124,7 +124,7 @@ namespace THMS.Logic.Energy
             // day's midnight as a second "day" (GetDay/Week/Month/Year all use exclusive end).
             var intervals = _store.GetSolarVendorIntervals(start, end)
                 .Where(i => i.Timestamp >= start && i.Timestamp < end);
-            var evAttr = _store.GetEvAttribution(start, end)
+            var evAttr = _store.GetHomeCircuitAttribution(start, end)
                 .Where(a => a.Timestamp >= start && a.Timestamp < end);
 
             var groupedByDay = intervals
@@ -147,7 +147,7 @@ namespace THMS.Logic.Energy
                 // Raw EV attribution for this day
                 var dayEvAttr = evGroupedByDay.TryGetValue(day, out var evList)
                     ? evList
-                    : Enumerable.Empty<EnergyAttributionResult>();
+                    : Enumerable.Empty<HomeCircuitAttribution>();
 
                 // Use your existing half-hour aggregator
                 var halfHourIntervals = AggregateHalfHourly(dayVendorIntervals, dayEvAttr);

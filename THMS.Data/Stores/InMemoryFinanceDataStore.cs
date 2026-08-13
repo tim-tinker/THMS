@@ -8,7 +8,6 @@ namespace THMS.Data.Stores
     public class InMemoryFinanceDataStore : IFinanceDataStore
     {
         private readonly InMemoryElectricUtilityBillStore _utilityBills = new();
-        private readonly InMemoryCommercialChargeCostStore _commercialCosts = new();
         private readonly InMemoryGasPurchaseStore _gasPurchases = new();
         private readonly InMemoryEvChargeSessionCostStore _evChargeSessionCosts = new();
 
@@ -46,24 +45,6 @@ namespace THMS.Data.Stores
                 FuelCost = 38.10m,
                 Station = "Chevron"
             });
-
-            UpsertCommercialChargeCostRecord(new CommercialChargeCostRecord
-            {
-                Id = Guid.NewGuid(),
-                SessionId = "EA-2026-07-22-ABC123",
-                Date = DateTime.Today.AddDays(-2),
-                Cost = 11.99m,
-                Vendor = "Electrify America"
-            });
-
-            UpsertCommercialChargeCostRecord(new CommercialChargeCostRecord
-            {
-                Id = Guid.NewGuid(),
-                SessionId = "CP-2026-07-20-XYZ789",
-                Date = DateTime.Today.AddDays(-5),
-                Cost = 9.50m,
-                Vendor = "ChargePoint"
-            });
         }
 
         // ---------------------------------------------------------
@@ -75,22 +56,6 @@ namespace THMS.Data.Stores
 
         public IEnumerable<ElectricUtilityBill> GetElectricUtilityBills(DateTime start, DateTime end) =>
             _utilityBills.GetRange(start, end);
-
-        // ---------------------------------------------------------
-        // COMMERCIAL CHARGING COST RECORDS
-        // ---------------------------------------------------------
-
-        public void UpsertCommercialChargeCostRecord(CommercialChargeCostRecord record) =>
-            _commercialCosts.Upsert(record);
-
-        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecords(DateTime start, DateTime end) =>
-            _commercialCosts.GetRange(start, end);
-
-        public IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecordsByVendor(
-            string vendor,
-            DateTime start,
-            DateTime end) =>
-            _commercialCosts.GetRangeByVendor(vendor, start, end);
 
         // ---------------------------------------------------------
         // GAS PURCHASES

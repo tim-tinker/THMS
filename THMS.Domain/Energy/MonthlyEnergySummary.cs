@@ -27,8 +27,5 @@
         public decimal BatteryValue { get; set; }
         public decimal GridCost { get; set; }
         public decimal CommercialChargeCost { get; set; }
-
-        // Flags
-        public bool IsPartial { get; set; }
     }
 }

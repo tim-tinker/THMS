@@ -2,7 +2,7 @@
 using CsvHelper;
 using CsvHelper.Configuration;
 using THMS.Data.Stores;
-using THMS.Domain.Energy;
+using THMS.Domain.Transportation;
 using THMS.Domain.Finance;
 
 namespace THMS.Ingestion.Importers.Energy
@@ -10,14 +10,14 @@ namespace THMS.Ingestion.Importers.Energy
     public class ChargePointImporter : BaseCommercialChargerImporter
     {
         public ChargePointImporter(
-            IEnergyDataStore energyStore,
+            IVehicleDataStore vehicleStore,
             IFinanceDataStore financeStore)
         {
-            EnergyStore = energyStore;
+            VehicleStore = vehicleStore;
             FinanceStore = financeStore;
         }
 
-        protected override IEnumerable<Tuple<EvCommercialChargeSession, CommercialChargeCostRecord>> ReadChargeSessions(string filePath)
+        protected override IEnumerable<EvChargeSession> ReadChargeSessions(string filePath)
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
@@ -44,33 +44,16 @@ namespace THMS.Ingestion.Importers.Energy
                 var totalKwh = decimal.Parse(kwhString, CultureInfo.InvariantCulture);
                 var totalCost = decimal.Parse(costString, CultureInfo.InvariantCulture);
 
-                // ---------------------------------------------------------
-                // ENERGY PORTION (EvCommercialChargeSession)
-                // ---------------------------------------------------------
-                var energyRecord = new EvCommercialChargeSession
+                var evChargeSession = new EvChargeSession
                 {
                     Id = Guid.NewGuid(),
                     StartTime = startTime,
                     EndTime = endTime,
                     KwhAdded = totalKwh,          // kWh, not Wh
-                    ChargeCost = totalCost,     // ChargePoint always provides cost
-                    VendorSessionId = null,       // ChargePoint CSV does not include this
-                    Location = $"ChargePoint {stationString}"
+                    SessionCost = totalCost,     // ChargePoint always provides cost
                 };
 
-                // ---------------------------------------------------------
-                // FINANCIAL PORTION (CommercialChargeCostRecord)
-                // ---------------------------------------------------------
-                var costRecord = new CommercialChargeCostRecord
-                {
-                    Id = Guid.NewGuid(),
-                    Date = startTime,
-                    Cost = totalCost,
-                    Vendor = "ChargePoint",
-                    SessionId = energyRecord.Id.ToString()
-                };
-
-                yield return Tuple.Create(energyRecord, costRecord);
+                yield return evChargeSession;
             }
         }
 

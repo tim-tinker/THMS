@@ -19,22 +19,6 @@ namespace THMS.Data.Stores
 
 
         // ---------------------------------------------------------
-        // COMMERCIAL CHARGING COST RECORDS (RAW ENERGY DOMAIN)
-        // ---------------------------------------------------------
-
-        /// <summary>Upsert key: <see cref="CommercialChargeCostRecord.Id"/>.</summary>
-        void UpsertCommercialChargeCostRecord(CommercialChargeCostRecord record);
-
-        IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecords(
-            DateTime start,
-            DateTime end);
-
-        IEnumerable<CommercialChargeCostRecord> GetCommercialChargeCostRecordsByVendor(
-            string vendor,
-            DateTime start,
-            DateTime end);
-
-        // ---------------------------------------------------------
         // GAS PURCHASES (ICE VEHICLES)
         // ---------------------------------------------------------
 

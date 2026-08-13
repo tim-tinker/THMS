@@ -20,9 +20,9 @@ namespace THMS.UI.WinForms
         private System.Windows.Forms.Label lblBillExpected;
         private System.Windows.Forms.Button btnBillImport;
 
-        private System.Windows.Forms.Label lblEvCircuitStatus;
-        private System.Windows.Forms.Label lblEvCircuitLast;
-        private System.Windows.Forms.Button btnEvCircuitRecalc;
+        private System.Windows.Forms.Label lblHomeCircuitStatus;
+        private System.Windows.Forms.Label lblHomeCircuitLast;
+        private System.Windows.Forms.Button btnHomeCircuitRecalc;
 
         private System.Windows.Forms.Label lblEvCommercialStatus;
         private System.Windows.Forms.Label lblEvCommercialLast;
@@ -93,9 +93,9 @@ namespace THMS.UI.WinForms
             lblBillExpected = new System.Windows.Forms.Label();
             btnBillImport = new System.Windows.Forms.Button();
 
-            lblEvCircuitStatus = new System.Windows.Forms.Label();
-            lblEvCircuitLast = new System.Windows.Forms.Label();
-            btnEvCircuitRecalc = new System.Windows.Forms.Button();
+            lblHomeCircuitStatus = new System.Windows.Forms.Label();
+            lblHomeCircuitLast = new System.Windows.Forms.Label();
+            btnHomeCircuitRecalc = new System.Windows.Forms.Button();
 
             lblEvCommercialStatus = new System.Windows.Forms.Label();
             lblEvCommercialLast = new System.Windows.Forms.Label();

@@ -3,29 +3,29 @@ using THMS.Domain.Energy;
 
 namespace THMS.Data.Stores.SqlTables
 {
-    public class EvCircuitReadingsTable
+    public class HomeCircuitReadingsTable
     {
         public void InitializeSchema(SqliteConnection conn)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText =
             @"
-            CREATE TABLE IF NOT EXISTS EvCircuitReadings (
+            CREATE TABLE IF NOT EXISTS HomeCircuitReadings (
                 Id TEXT PRIMARY KEY,
                 Timestamp TEXT NOT NULL,
                 WattHours REAL NOT NULL,
                 CircuitId TEXT
             );
-            CREATE UNIQUE INDEX IF NOT EXISTS IX_EvCircuitReadings_Timestamp
-                ON EvCircuitReadings (Timestamp);
+            CREATE UNIQUE INDEX IF NOT EXISTS IX_HomeCircuitReadings_Timestamp
+                ON HomeCircuitReadings (Timestamp);
             ";
             cmd.ExecuteNonQuery();
         }
 
-        public void Upsert(SqliteConnection conn, EvCircuitReading reading)
+        public void Upsert(SqliteConnection conn, HomeCircuitReading reading)
         {
             using var cmd = new SqliteCommand(@"
-                INSERT INTO EvCircuitReadings
+                INSERT INTO HomeCircuitReadings
                 (Id, Timestamp, WattHours, CircuitId)
                 VALUES
                 (@Id, @Timestamp, @WattHours, @CircuitId)
@@ -41,11 +41,11 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
-        public IEnumerable<EvCircuitReading> GetRange(SqliteConnection conn, DateTime start, DateTime end)
+        public IEnumerable<HomeCircuitReading> GetRange(SqliteConnection conn, DateTime start, DateTime end)
         {
             using var cmd = new SqliteCommand(@"
                 SELECT Id, Timestamp, WattHours, CircuitId
-                FROM EvCircuitReadings
+                FROM HomeCircuitReadings
                 WHERE Timestamp >= @Start AND Timestamp <= @End
                 ORDER BY Timestamp;", conn);
 
@@ -53,7 +53,7 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@End", end);
 
             using var reader = cmd.ExecuteReader();
-            var list = new List<EvCircuitReading>();
+            var list = new List<HomeCircuitReading>();
 
             while (reader.Read())
                 list.Add(Read(reader));
@@ -61,11 +61,11 @@ namespace THMS.Data.Stores.SqlTables
             return list;
         }
 
-        public EvCircuitReading? GetLatest(SqliteConnection conn)
+        public HomeCircuitReading? GetLatest(SqliteConnection conn)
         {
             using var cmd = new SqliteCommand(@"
                 SELECT Id, Timestamp, WattHours, CircuitId
-                FROM EvCircuitReadings
+                FROM HomeCircuitReadings
                 ORDER BY Timestamp DESC
                 LIMIT 1;", conn);
 
@@ -73,9 +73,9 @@ namespace THMS.Data.Stores.SqlTables
             return reader.Read() ? Read(reader) : null;
         }
 
-        private static EvCircuitReading Read(SqliteDataReader reader)
+        private static HomeCircuitReading Read(SqliteDataReader reader)
         {
-            return new EvCircuitReading
+            return new HomeCircuitReading
             {
                 Id = Guid.Parse(reader.GetString(0)),
                 Timestamp = reader.GetDateTime(1),

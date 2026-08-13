@@ -1,6 +1,6 @@
 ﻿namespace THMS.UI.WinForms
 {
-    partial class EvCircuitDataForm
+    partial class HomeCircuitDataForm
     {
         /// <summary>
         /// Required designer variable.
@@ -231,7 +231,7 @@
             BatteryKwhColumn.Name = "BatteryKwhColumn";
             BatteryKwhColumn.Width = 167;
             // 
-            // EvCircuitDataForm
+            // HomeCircuitDataForm
             // 
             AutoScaleDimensions = new SizeF(12F, 30F);
             AutoScaleMode = AutoScaleMode.Font;
@@ -240,8 +240,8 @@
             Controls.Add(_groupSummary);
             Controls.Add(_btnLoad);
             Controls.Add(_btnClose);
-            Name = "EvCircuitDataForm";
-            Text = "Circuit data for Session (date/time)";
+            Name = "HomeCircuitDataForm";
+            Text = "Home Circuit data (date/time)";
             Load += OnLoadForm;
             _groupSummary.ResumeLayout(false);
             _groupSummary.PerformLayout();

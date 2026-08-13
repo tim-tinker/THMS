@@ -1,6 +1,6 @@
 ﻿namespace THMS.Domain.Energy
 {
-    public class EvCircuitReading
+    public class HomeCircuitReading
     {
         public Guid Id { get; set; }
         public DateTime Timestamp { get; set; }

@@ -77,8 +77,8 @@ namespace THMS.Logic.ViewModels
                         _pipeline.IngestChargePointData(SelectedFile);
                         break;
 
-                    case ImporterType.HomeEvCircuit:
-                        _pipeline.IngestHomeEvCircuitData(SelectedFile);
+                    case ImporterType.HomeCircuit:
+                        _pipeline.IngestHomeCircuitData(SelectedFile);
                         break;
 
                     case ImporterType.SolarVendor:

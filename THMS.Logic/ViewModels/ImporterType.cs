@@ -3,7 +3,7 @@
     public enum ImporterType
     {
         ChargePoint,
-        HomeEvCircuit,
+        HomeCircuit,
         SolarVendor
     }
 }

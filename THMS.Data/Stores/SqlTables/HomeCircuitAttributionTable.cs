@@ -3,7 +3,7 @@ using THMS.Domain.Energy;
 
 namespace THMS.Data.Stores.SqlTables
 {
-    public class EvAttributionTable
+    public class HomeCircuitAttributionTable
     {
         public void InitializeSchema(SqliteConnection conn)
         {
@@ -22,7 +22,7 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
-        public void Upsert(SqliteConnection conn, EnergyAttributionResult result)
+        public void Upsert(SqliteConnection conn, HomeCircuitAttribution result)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText =
@@ -34,26 +34,24 @@ namespace THMS.Data.Stores.SqlTables
                 SolarWh = excluded.SolarWh,
                 BatteryWh = excluded.BatteryWh,
                 GridWh = excluded.GridWh,
-                IsPartial = excluded.IsPartial;
             ";
             cmd.Parameters.AddWithValue("$timestamp", result.Timestamp.ToString("o"));
-            cmd.Parameters.AddWithValue("$evChargeWh", result.EvChargeWh * 1000);
+            cmd.Parameters.AddWithValue("$evChargeWh", result.TotalWh * 1000);
             cmd.Parameters.AddWithValue("$solarWh", result.SolarWh * 1000);
             cmd.Parameters.AddWithValue("$batteryWh", result.BatteryWh * 1000);
             cmd.Parameters.AddWithValue("$gridWh", result.GridWh * 1000);
-            cmd.Parameters.AddWithValue("$isPartial", result.IsPartial ? 1 : 0);
             cmd.ExecuteNonQuery();
         }
 
-        public IReadOnlyCollection<EnergyAttributionResult> GetRange(
+        public IReadOnlyCollection<HomeCircuitAttribution> GetRange(
             SqliteConnection conn, DateTime start, DateTime end)
         {
-            var list = new List<EnergyAttributionResult>();
+            var list = new List<HomeCircuitAttribution>();
 
             using var cmd = conn.CreateCommand();
             cmd.CommandText =
             @"
-                SELECT Timestamp, EvChargeWh, SolarWh, BatteryWh, GridWh, IsPartial
+                SELECT Timestamp, EvChargeWh, SolarWh, BatteryWh, GridWh
                 FROM EvAttribution
                 WHERE Timestamp >= @Start AND Timestamp <= @End
                 ORDER BY Timestamp;
@@ -69,12 +67,12 @@ namespace THMS.Data.Stores.SqlTables
             return list;
         }
 
-        public EnergyAttributionResult? GetLatest(SqliteConnection conn)
+        public HomeCircuitAttribution? GetLatest(SqliteConnection conn)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText =
             @"
-                SELECT Timestamp, EvChargeWh, SolarWh, BatteryWh, GridWh, IsPartial
+                SELECT Timestamp, EvChargeWh, SolarWh, BatteryWh, GridWh
                 FROM EvAttribution
                 ORDER BY Timestamp DESC
                 LIMIT 1;
@@ -84,16 +82,15 @@ namespace THMS.Data.Stores.SqlTables
             return reader.Read() ? Read(reader) : null;
         }
 
-        private static EnergyAttributionResult Read(SqliteDataReader reader)
+        private static HomeCircuitAttribution Read(SqliteDataReader reader)
         {
-            return new EnergyAttributionResult
+            return new HomeCircuitAttribution
             {
                 Timestamp = reader.GetDateTime(0),
-                EvChargeWh = reader.GetDecimal(1),
+                TotalWh = reader.GetDecimal(1),
                 SolarWh = reader.GetDecimal(2),
                 BatteryWh = reader.GetDecimal(3),
                 GridWh = reader.GetDecimal(4),
-                IsPartial = reader.GetInt32(5) != 0
             };
         }
     }

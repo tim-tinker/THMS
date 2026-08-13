@@ -2,11 +2,11 @@ using THMS.Domain.Energy;
 
 namespace THMS.Data.Stores.InMemoryStores
 {
-    public class InMemoryEvCircuitReadingStore
+    public class InMemoryHomeCircuitReadingStore
     {
-        private readonly List<EvCircuitReading> _items = new();
+        private readonly List<HomeCircuitReading> _items = new();
 
-        public void Upsert(EvCircuitReading item)
+        public void Upsert(HomeCircuitReading item)
         {
             var existing = _items.FirstOrDefault(r => r.Timestamp == item.Timestamp);
             if (existing is null)
@@ -21,7 +21,7 @@ namespace THMS.Data.Stores.InMemoryStores
                 existing.Id = item.Id;
         }
 
-        public IReadOnlyCollection<EvCircuitReading> GetRange(DateTime start, DateTime end)
+        public IReadOnlyCollection<HomeCircuitReading> GetRange(DateTime start, DateTime end)
         {
             return _items
                 .Where(r => r.Timestamp >= start && r.Timestamp <= end)
@@ -30,7 +30,7 @@ namespace THMS.Data.Stores.InMemoryStores
                 .AsReadOnly();
         }
 
-        public EvCircuitReading? GetLatest()
+        public HomeCircuitReading? GetLatest()
         {
             return _items
                 .OrderByDescending(r => r.Timestamp)

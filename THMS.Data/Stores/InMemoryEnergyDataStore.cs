@@ -5,27 +5,25 @@ namespace THMS.Data.Stores
 {
     public class InMemoryEnergyDataStore : IEnergyDataStore
     {
-        private readonly InMemoryEvCircuitReadingStore _circuitReadingsStore = new();
-        private readonly InMemoryEvCommercialChargeSessionStore _commercialSessionsStore = new();
-        private readonly InMemoryEvCircuitSegmentsStore _circuitSegmentsStore = new();
+        private readonly InMemoryHomeCircuitReadingStore _circuitReadingsStore = new();
         private readonly InMemorySolarVendorIntervalStore _solarStore = new();
-        private readonly InMemoryEvAttributionStore _evAttrStore = new();
+        private readonly InMemoryHomeCircuitAttributionStore _evAttrStore = new();
 
         // ---------------------------------------------------------
         // HOME CHARGING CIRCUIT READINGS
         // ---------------------------------------------------------
 
-        public void UpsertEvCircuitReading(EvCircuitReading reading)
+        public void UpsertHomeCircuitReading(HomeCircuitReading reading)
         {
             _circuitReadingsStore.Upsert(reading);
         }
 
-        public IEnumerable<EvCircuitReading> GetEvCircuitReadings(DateTime start, DateTime end)
+        public IEnumerable<HomeCircuitReading> GetHomeCircuitReadings(DateTime start, DateTime end)
         {
             return _circuitReadingsStore.GetRange(start, end);
         }
 
-        public EvCircuitReading? GetLatestEvCircuitReading()
+        public HomeCircuitReading? GetLatestHomeCircuitReading()
         {
             return _circuitReadingsStore.GetLatest();
         }
@@ -53,59 +51,19 @@ namespace THMS.Data.Stores
         // EV ATTRIBUTION
         // ---------------------------------------------------------
 
-        public void UpsertEvAttribution(EnergyAttributionResult result)
+        public void UpsertHomeCircuitAttribution(HomeCircuitAttribution result)
         {
             _evAttrStore.Upsert(result);
         }
 
-        public IReadOnlyCollection<EnergyAttributionResult> GetEvAttribution(DateTime start, DateTime end)
+        public IReadOnlyCollection<HomeCircuitAttribution> GetHomeCircuitAttribution(DateTime start, DateTime end)
         {
             return _evAttrStore.GetRange(start, end);
         }
 
-        public EnergyAttributionResult? GetLatestEvAttribution()
+        public HomeCircuitAttribution? GetLatestHomeCircuitAttribution()
         {
             return _evAttrStore.GetLatest();
-        }
-
-        // ---------------------------------------------------------
-        // COMMERCIAL CHARGING SESSIONS
-        // ---------------------------------------------------------
-
-        public void UpsertEvCommercialChargeSession(EvCommercialChargeSession session)
-        {
-            _commercialSessionsStore.Upsert(session);
-        }
-
-        public IEnumerable<EvCommercialChargeSession> GetEvCommercialChargeSessions(
-            DateTime start,
-            DateTime end)
-        {
-            return _commercialSessionsStore.GetRange(start, end);
-        }
-
-        // ----------------------------------------------------------
-        // HOME EV CIRCUIT SEGMENTS
-        // ----------------------------------------------------------
-
-        public void SaveEvCircuitSegments(Guid sessionId, IEnumerable<EvCircuitSegment> segments)
-        {
-            _circuitSegmentsStore.Save(sessionId, segments);
-        }
-
-        public IEnumerable<EvCircuitSegment> GetEvCircuitSegments(Guid sessionId)
-        {
-            return _circuitSegmentsStore.Get(sessionId);
-        }
-
-        public void DeleteEvCircuitSegments(Guid sessionId)
-        {
-            _circuitSegmentsStore.Delete(sessionId);
-        }
-
-        public EvCircuitSegmentSummary GetEvCircuitSummary(Guid sessionId)
-        {
-            return _circuitSegmentsStore.GetSummary(sessionId);
         }
     }
 }

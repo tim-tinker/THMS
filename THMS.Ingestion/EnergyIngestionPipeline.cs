@@ -7,13 +7,16 @@ namespace THMS.Ingestion
     {
         private readonly IEnergyDataStore _energyStore;
         private readonly IFinanceDataStore _financeStore;
+        private readonly IVehicleDataStore _vehicleStore;
 
         public EnergyIngestionPipeline(
             IEnergyDataStore energyStore,
-            IFinanceDataStore financeStore)
+            IFinanceDataStore financeStore,
+            IVehicleDataStore vehicleStore)
         {
             _energyStore = energyStore;
             _financeStore = financeStore;
+            _vehicleStore = vehicleStore;
         }
 
         // ---------------------------------------------------------
@@ -22,7 +25,7 @@ namespace THMS.Ingestion
 
         public void IngestChargePointData(string filePath)
         {
-            var importer = new ChargePointImporter(_energyStore, _financeStore);
+            var importer = new ChargePointImporter(_vehicleStore, _financeStore);
             importer.Import(filePath);
         }
 
@@ -30,9 +33,9 @@ namespace THMS.Ingestion
         // HOME EV CIRCUIT (SPAN)
         // ---------------------------------------------------------
 
-        public void IngestHomeEvCircuitData(string filePath)
+        public void IngestHomeCircuitData(string filePath)
         {
-            var importer = new HomeEvCircuitImporter(_energyStore);
+            var importer = new HomeCircuitImporter(_energyStore);
             importer.Import(filePath);
         }
 

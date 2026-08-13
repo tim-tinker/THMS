@@ -12,7 +12,7 @@ namespace THMS.Logic.ViewModels
 
         public SolarDataStatus SolarStatus { get; set; }
         public BillDataStatus BillStatus { get; set; }
-        public EvCircuitStatus EvCircuitStatus { get; set; }
+        public HomeCircuitStatus HomeCircuitStatus { get; set; }
         public EvCommercialStatus EvCommercialStatus { get; set; }
         public AttributionStatus AttributionStatus { get; set; }
 

@@ -6,7 +6,7 @@ using THMS.Data.Stores;
 
 namespace THMS.Logic.DataCenter
 {
-    public class EvCircuitReadingDataSourceStatus : IDataSourceStatus
+    public class HomeCircuitReadingDataSourceStatus : IDataSourceStatus
     {
         private readonly IEnergyDataStore _energyStore;
 
@@ -14,14 +14,14 @@ namespace THMS.Logic.DataCenter
 
         public DateTime? LastRetrieval { get; private set; }
 
-        public EvCircuitReadingDataSourceStatus(IEnergyDataStore energyStore)
+        public HomeCircuitReadingDataSourceStatus(IEnergyDataStore energyStore)
         {
             _energyStore = energyStore;
         }
 
         public void QueryStatus()
         {
-            var lastReading = _energyStore.GetLatestEvCircuitReading();
+            var lastReading = _energyStore.GetLatestHomeCircuitReading();
 
             LastRetrieval = lastReading?.Timestamp;
         }

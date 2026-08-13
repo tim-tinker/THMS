@@ -1,11 +1,12 @@
-﻿using THMS.Data.Stores;
+﻿using System.ComponentModel;
+using THMS.Data.Stores;
 using THMS.Domain.Energy;
 using THMS.Ingestion.Importers.Energy;
 using THMS.Logic.Energy;
 
 namespace THMS.Logic.Orchestrators
 {
-    public class SolarIntervalOrchestrator
+    public class SolarIntervalOrchestrator : BaseOrchestrator
     {
         private readonly IEnergyDataStore _energyStore;
 
@@ -42,21 +43,30 @@ namespace THMS.Logic.Orchestrators
 
         private void CalculateEvAttribution(DateTime start, DateTime end)
         {
-            if (_energyStore.GetEvCircuitReadings(start, end).Any())
+            if (_energyStore.GetHomeCircuitReadings(start, end).Any())
             {
                 var engine = new EvAttributionEngine(_energyStore);
                 engine.Compute(start, end);
 
                 foreach (var result in engine.Results)
                 {
-                    _energyStore.UpsertEvAttribution(result);
+                    _energyStore.UpsertHomeCircuitAttribution(result);
                 }
             }
         }
 
-        public IEnumerable<SolarVendorInterval> GetSolarIntervals(DateTime start, DateTime end)
+        public IEnumerable<SolarVendorInterval> GetSolarIntervals(string period)
         {
-            return _energyStore.GetSolarVendorIntervals(start, end);
+            var intervals = Array.Empty<SolarVendorInterval>();
+            var latest = _energyStore.GetLatestSolarVendorInterval();
+            if (latest is not null)
+            {
+                var end = latest.Timestamp;
+                var start = GetStartDate(end, period);
+                intervals = _energyStore.GetSolarVendorIntervals(start, end).ToArray();
+            }
+
+            return intervals;
         }
     }
 }
