@@ -24,7 +24,7 @@ namespace THMS.Logic.DataCenter
 
             LastRetrieval = lastAttribution == DateTime.MinValue ? null : lastAttribution;
 
-            var lastSolarInterval = _energyStore.GetLatestSolarVendorInterval()?.Timestamp
+            var lastSolarInterval = _energyStore.GetLatestSolarProductionInterval()?.Timestamp
                 ?? DateTime.MinValue;
 
             var lastHomeCircuitReading = _energyStore.GetLatestHomeCircuitReading()?.Timestamp

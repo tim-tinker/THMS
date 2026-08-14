@@ -45,7 +45,7 @@ namespace THMS.Logic.Energy
         }
 
         private List<EnergyIntervalRecord> AggregateHalfHourly(
-            IEnumerable<SolarVendorInterval> intervals,
+            IEnumerable<SolarProductionInterval> intervals,
             IEnumerable<HomeCircuitAttribution> evAttr)
         {
             var grouped = intervals
@@ -122,7 +122,7 @@ namespace THMS.Logic.Energy
         {
             // Period bounds are [start, end). Inclusive end would pull in the next
             // day's midnight as a second "day" (GetDay/Week/Month/Year all use exclusive end).
-            var intervals = _store.GetSolarVendorIntervals(start, end)
+            var intervals = _store.GetSolarProductionIntervals(start, end)
                 .Where(i => i.Timestamp >= start && i.Timestamp < end);
             var evAttr = _store.GetHomeCircuitAttribution(start, end)
                 .Where(a => a.Timestamp >= start && a.Timestamp < end);

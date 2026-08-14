@@ -22,7 +22,7 @@
             dataTypeToolStripMenuItem = new ToolStripMenuItem();
             _menuSolarType = new ToolStripMenuItem();
             _menuHomeCircuitType = new ToolStripMenuItem();
-            _menuEvSegmentType = new ToolStripMenuItem();
+            _menuHomeCircuitAttribution = new ToolStripMenuItem();
             _menuEvChargeSessionType = new ToolStripMenuItem();
             viewToolStripMenuItem = new ToolStripMenuItem();
             _menuViewMonth = new ToolStripMenuItem();
@@ -62,7 +62,7 @@
             // 
             // dataTypeToolStripMenuItem
             // 
-            dataTypeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { _menuSolarType, _menuHomeCircuitType, _menuEvSegmentType, _menuEvChargeSessionType });
+            dataTypeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { _menuSolarType, _menuHomeCircuitType, _menuHomeCircuitAttribution, _menuEvChargeSessionType });
             dataTypeToolStripMenuItem.Name = "dataTypeToolStripMenuItem";
             dataTypeToolStripMenuItem.Size = new Size(124, 34);
             dataTypeToolStripMenuItem.Text = "Data Type";
@@ -81,12 +81,12 @@
             _menuHomeCircuitType.Text = "Home Circuit";
             _menuHomeCircuitType.Click += OnClickHomeCircuitType;
             // 
-            // _menuEvSegmentType
+            // _menuHomeCircuitAttribution
             // 
-            _menuEvSegmentType.Name = "_menuEvSegmentType";
-            _menuEvSegmentType.Size = new Size(315, 40);
-            _menuEvSegmentType.Text = "EV Segment";
-            _menuEvSegmentType.Click += OnClickEvSegmentType;
+            _menuHomeCircuitAttribution.Name = "_menuHomeCircuitAttribution";
+            _menuHomeCircuitAttribution.Size = new Size(315, 40);
+            _menuHomeCircuitAttribution.Text = "Circuit Attribution";
+            _menuHomeCircuitAttribution.Click += OnClickHomeCircuitAttribution;
             // 
             // _menuEvChargeSessionType
             // 
@@ -105,21 +105,21 @@
             // _menuViewMonth
             // 
             _menuViewMonth.Name = "_menuViewMonth";
-            _menuViewMonth.Size = new Size(315, 40);
+            _menuViewMonth.Size = new Size(205, 40);
             _menuViewMonth.Text = "Month";
             _menuViewMonth.Click += OnClickViewMonth;
             // 
             // _menuViewYear
             // 
             _menuViewYear.Name = "_menuViewYear";
-            _menuViewYear.Size = new Size(315, 40);
+            _menuViewYear.Size = new Size(205, 40);
             _menuViewYear.Text = "Year";
             _menuViewYear.Click += OnClickViewYear;
             // 
             // _menuViewLifetime
             // 
             _menuViewLifetime.Name = "_menuViewLifetime";
-            _menuViewLifetime.Size = new Size(315, 40);
+            _menuViewLifetime.Size = new Size(205, 40);
             _menuViewLifetime.Text = "Lifetime";
             _menuViewLifetime.Click += OnClickViewLifetime;
             // 
@@ -140,14 +140,14 @@
             // editToolStripMenuItem1
             // 
             editToolStripMenuItem1.Name = "editToolStripMenuItem1";
-            editToolStripMenuItem1.Size = new Size(315, 40);
+            editToolStripMenuItem1.Size = new Size(191, 40);
             editToolStripMenuItem1.Text = "Edit";
             editToolStripMenuItem1.Click += OnClickEditEditAction;
             // 
             // deleteToolStripMenuItem
             // 
             deleteToolStripMenuItem.Name = "deleteToolStripMenuItem";
-            deleteToolStripMenuItem.Size = new Size(315, 40);
+            deleteToolStripMenuItem.Size = new Size(191, 40);
             deleteToolStripMenuItem.Text = "Delete";
             deleteToolStripMenuItem.Click += OnClickEditDeleteAction;
             // 
@@ -189,7 +189,7 @@
         private ToolStripMenuItem dataTypeToolStripMenuItem;
         private ToolStripMenuItem _menuSolarType;
         private ToolStripMenuItem _menuHomeCircuitType;
-        private ToolStripMenuItem _menuEvSegmentType;
+        private ToolStripMenuItem _menuHomeCircuitAttribution;
         private ToolStripMenuItem _menuEvChargeSessionType;
         private ToolStripMenuItem viewToolStripMenuItem;
         private ToolStripMenuItem _menuViewMonth;

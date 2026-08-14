@@ -12,7 +12,7 @@ namespace THMS.Data.Stores.SQLite
 
         private readonly HomeCircuitReadingsTable _homeCircuitReadingsTable = new();
         private readonly HomeCircuitAttributionTable _homeCircuitAttributionTable = new();
-        private readonly SolarVendorIntervalsTable _solarTable = new();
+        private readonly SolarProductionReadingsTable _solarTable = new();
 
         public SQLiteEnergyDataStore(string databasePath)
         {
@@ -61,19 +61,19 @@ namespace THMS.Data.Stores.SQLite
         // HOME SOLAR VENDOR INTERVALS
         // ---------------------------------------------------------
 
-        public void UpsertSolarVendorInterval(SolarVendorInterval interval)
+        public void UpsertSolarProductionInterval(SolarProductionInterval interval)
         {
             using var conn = OpenConnection();
             _solarTable.Upsert(conn, interval);
         }
 
-        public IEnumerable<SolarVendorInterval> GetSolarVendorIntervals(DateTime start, DateTime end)
+        public IEnumerable<SolarProductionInterval> GetSolarProductionIntervals(DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
             return _solarTable.GetRange(conn, start, end);
         }
 
-        public SolarVendorInterval? GetLatestSolarVendorInterval()
+        public SolarProductionInterval? GetLatestSolarProductionInterval()
         {
             using var conn = OpenConnection();
             return _solarTable.GetLatest(conn);

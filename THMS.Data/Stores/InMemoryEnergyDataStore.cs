@@ -6,7 +6,7 @@ namespace THMS.Data.Stores
     public class InMemoryEnergyDataStore : IEnergyDataStore
     {
         private readonly InMemoryHomeCircuitReadingStore _circuitReadingsStore = new();
-        private readonly InMemorySolarVendorIntervalStore _solarStore = new();
+        private readonly InMemorySolarProductionIntervalStore _solarStore = new();
         private readonly InMemoryHomeCircuitAttributionStore _evAttrStore = new();
 
         // ---------------------------------------------------------
@@ -32,17 +32,17 @@ namespace THMS.Data.Stores
         // HOME SOLAR VENDOR INTERVALS
         // ---------------------------------------------------------
 
-        public void UpsertSolarVendorInterval(SolarVendorInterval interval)
+        public void UpsertSolarProductionInterval(SolarProductionInterval interval)
         {
             _solarStore.Upsert(interval);
         }
 
-        public IEnumerable<SolarVendorInterval> GetSolarVendorIntervals(DateTime start, DateTime end)
+        public IEnumerable<SolarProductionInterval> GetSolarProductionIntervals(DateTime start, DateTime end)
         {
             return _solarStore.GetRange(start, end);
         }
 
-        public SolarVendorInterval? GetLatestSolarVendorInterval()
+        public SolarProductionInterval? GetLatestSolarProductionInterval()
         {
             return _solarStore.GetLatest();
         }

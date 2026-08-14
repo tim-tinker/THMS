@@ -72,7 +72,7 @@ namespace THMS.Logic.Energy
             // ---------------------------------------------------------
             // 2. HOME ENERGY FLOWS (SOLAR VENDOR INTERVALS)
             // ---------------------------------------------------------
-            var homeIntervals = _store.GetSolarVendorIntervals(start, end);
+            var homeIntervals = _store.GetSolarProductionIntervals(start, end);
 
             foreach (var home in homeIntervals)
             {

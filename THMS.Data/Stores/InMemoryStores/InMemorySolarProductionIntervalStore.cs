@@ -2,11 +2,11 @@
 
 namespace THMS.Data.Stores.InMemoryStores
 {
-    public class InMemorySolarVendorIntervalStore
+    public class InMemorySolarProductionIntervalStore
     {
-        private readonly List<SolarVendorInterval> _items = new();
+        private readonly List<SolarProductionInterval> _items = new();
 
-        public void Upsert(SolarVendorInterval item)
+        public void Upsert(SolarProductionInterval item)
         {
             var existing = _items.FirstOrDefault(i => i.Timestamp == item.Timestamp);
             if (existing is null)
@@ -23,7 +23,7 @@ namespace THMS.Data.Stores.InMemoryStores
             existing.DischargedFromBatteriesWh = item.DischargedFromBatteriesWh;
         }
 
-        public IReadOnlyCollection<SolarVendorInterval> GetRange(DateTime start, DateTime end)
+        public IReadOnlyCollection<SolarProductionInterval> GetRange(DateTime start, DateTime end)
         {
             return _items
                 .Where(i => i.Timestamp >= start && i.Timestamp <= end)
@@ -32,7 +32,7 @@ namespace THMS.Data.Stores.InMemoryStores
                 .AsReadOnly();
         }
 
-        public SolarVendorInterval? GetLatest()
+        public SolarProductionInterval? GetLatest()
         {
             return _items
                 .OrderByDescending(i => i.Timestamp)

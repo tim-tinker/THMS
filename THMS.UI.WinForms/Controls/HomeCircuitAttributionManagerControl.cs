@@ -5,19 +5,19 @@ using THMS.Logic.Orchestrators;
 
 namespace THMS.UI.WinForms.Controls
 {
-    public partial class SolarIntervalManagerControl : UserControl, IDataManagerControl
+    public partial class HomeCircuitAttributionManagerControl : UserControl, IDataManagerControl
     {
         private readonly IEnergyDataStore _energyStore;
-        private readonly SolarIntervalOrchestrator _orchestrator;
-        private BindingList<SolarProductionInterval> _intervals;
+        private readonly HomeCircuitAttributionOrchestrator _orchestrator;
+        private BindingList<HomeCircuitAttribution> _attributions;
 
-        public SolarIntervalManagerControl(IEnergyDataStore energyStore)
+        public HomeCircuitAttributionManagerControl(IEnergyDataStore energyStore)
         {
             InitializeComponent();
-            gridSolarIntervals.AutoGenerateColumns = false;
+            gridHomeCircuit.AutoGenerateColumns = false;
 
             _energyStore = energyStore;
-            _orchestrator = new SolarIntervalOrchestrator(energyStore);
+            _orchestrator = new HomeCircuitAttributionOrchestrator(energyStore);
         }
 
         // ---------------------------------------------------------
@@ -27,8 +27,8 @@ namespace THMS.UI.WinForms.Controls
 
         public void SetGridDataSource(string period)
         {
-            _intervals = new BindingList<SolarProductionInterval>(_orchestrator.GetSolarIntervals(period).ToList());
-            gridSolarIntervals.DataSource = _intervals;
+            _attributions = new BindingList<HomeCircuitAttribution>(_orchestrator.GetHomeCircuitAttributions(period).ToList());
+            gridHomeCircuit.DataSource = _attributions;
         }
 
         private void OnLoad(object sender, EventArgs e)

@@ -81,6 +81,9 @@ namespace THMS.Data.Stores
         public EvChargeSession? GetLatestEvChargeSession() =>
             _evChargeSessionStore.GetLatest();
 
+        public EvChargeSession? GetLatestEvChargeSession(Guid vehicleId) =>
+            _evChargeSessionStore.GetLatest(vehicleId);
+
         public void DeleteEvChargeSession(Guid sessionId) => _evChargeSessionStore.Delete(sessionId);
 
         // ---------------------------------------------------------

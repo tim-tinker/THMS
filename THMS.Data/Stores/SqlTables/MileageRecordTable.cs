@@ -114,6 +114,31 @@ namespace THMS.Data.Stores.SqlTables
             );
         }
 
+        public (Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles)?
+            GetLatestByTypeAndVehicle(SqliteConnection conn, string type, Guid vehicleId)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+            SELECT Id, VehicleId, EndTime, OdometerMiles
+            FROM MileageRecords
+            WHERE Type = @Type AND VehicleId = @VehicleId
+            ORDER BY EndTime DESC
+            LIMIT 1;";
+            cmd.Parameters.AddWithValue("@Type", type);
+            cmd.Parameters.AddWithValue("@VehicleId", vehicleId.ToString());
+
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read())
+                return null;
+
+            return (
+                Guid.Parse(reader.GetString(0)),
+                Guid.Parse(reader.GetString(1)),
+                reader.GetDateTime(2),
+                (decimal)(double)reader.GetDouble(3)
+            );
+        }
+
         public void Update(SqliteConnection conn, MileageRecordBase record)
         {
             using var cmd = conn.CreateCommand();

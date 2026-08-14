@@ -34,7 +34,7 @@ namespace THMS.Logic.Orchestrators
             {
                 foreach (var interval in importer.Intervals)
                 {
-                    _energyStore.UpsertSolarVendorInterval(interval);
+                    _energyStore.UpsertSolarProductionInterval(interval);
                 }
 
                 CalculateEvAttribution(StartDate, EndDate);
@@ -45,7 +45,7 @@ namespace THMS.Logic.Orchestrators
         {
             if (_energyStore.GetHomeCircuitReadings(start, end).Any())
             {
-                var engine = new EvAttributionEngine(_energyStore);
+                var engine = new HomeCircuitAttributionEngine(_energyStore);
                 engine.Compute(start, end);
 
                 foreach (var result in engine.Results)
@@ -55,15 +55,15 @@ namespace THMS.Logic.Orchestrators
             }
         }
 
-        public IEnumerable<SolarVendorInterval> GetSolarIntervals(string period)
+        public IEnumerable<SolarProductionInterval> GetSolarIntervals(string period)
         {
-            var intervals = Array.Empty<SolarVendorInterval>();
-            var latest = _energyStore.GetLatestSolarVendorInterval();
+            var intervals = Array.Empty<SolarProductionInterval>();
+            var latest = _energyStore.GetLatestSolarProductionInterval();
             if (latest is not null)
             {
                 var end = latest.Timestamp;
                 var start = GetStartDate(end, period);
-                intervals = _energyStore.GetSolarVendorIntervals(start, end).ToArray();
+                intervals = _energyStore.GetSolarProductionIntervals(start, end).ToArray();
             }
 
             return intervals;

@@ -7,7 +7,7 @@ namespace THMS.Domain.Finance
     /// <summary>
     /// The monthly financial summary of EV charging performed at home, using 
     /// <see cref="HomeCircuitReading"/>, 
-    /// <see cref="SolarVendorInterval"/>, and 
+    /// <see cref="SolarProductionReading"/>, and 
     /// <see cref="ElectricUtilityBill"/>.
     /// </summary>
     public class HomeChargeCostSummary

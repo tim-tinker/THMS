@@ -19,7 +19,7 @@ namespace THMS.Logic.DataCenter
 
         public void QueryStatus()
         {
-            var lastInterval = _energyStore.GetLatestSolarVendorInterval();
+            var lastInterval = _energyStore.GetLatestSolarProductionInterval();
 
             LastRetrieval= lastInterval?.Timestamp;
             NextExpectedRetrieval = LastRetrieval?.AddMonths(1) ?? DateTime.Today;

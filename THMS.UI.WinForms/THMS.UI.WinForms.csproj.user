@@ -34,9 +34,6 @@
     <Compile Update="EvChargeSessionForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="HomeCircuitDataForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Update="FinanceDashboardForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -59,6 +56,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="VehicleListDashboardForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="VehicleSelectionForm.cs">
       <SubType>Form</SubType>
     </Compile>
   </ItemGroup>

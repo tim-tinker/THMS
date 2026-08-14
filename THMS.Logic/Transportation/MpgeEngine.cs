@@ -12,7 +12,7 @@ namespace THMS.Logic.Transportation
     {
         private readonly IVehicleDataStore _vehicleStore;
         private readonly IEnergyDataStore _energyStore;
-        private readonly EvAttributionEngine _energyAttributionEngine;
+        private readonly HomeCircuitAttributionEngine _energyAttributionEngine;
 
         // EPA conversion constant
         private const decimal KwhPerGallonEquivalent = 33.7m;
@@ -21,7 +21,7 @@ namespace THMS.Logic.Transportation
         {
             _vehicleStore = vehicleStore;
             _energyStore = energyStore;
-            _energyAttributionEngine = new EvAttributionEngine(energyStore);
+            _energyAttributionEngine = new HomeCircuitAttributionEngine(energyStore);
         }
 
         public MpgeResult Compute(Guid vehicleId, DateTime start, DateTime end)

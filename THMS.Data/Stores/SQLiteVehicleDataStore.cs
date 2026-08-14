@@ -122,6 +122,12 @@ namespace THMS.Data.Stores.SQLite
             return _evChargeSessionStore.GetLatest(conn);
         }
 
+        public EvChargeSession? GetLatestEvChargeSession(Guid vehicleId)
+        {
+            using var conn = OpenConnection();
+            return _evChargeSessionStore.GetLatest(conn, vehicleId);
+        }
+
         public void DeleteEvChargeSession(Guid sessionId)
         {
             using var conn = OpenConnection();

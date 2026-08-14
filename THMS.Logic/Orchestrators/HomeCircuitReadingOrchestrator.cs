@@ -41,7 +41,7 @@ namespace THMS.Logic.Orchestrators
 
         private void CalculateEvAttribution(DateTime start, DateTime end)
         {
-            var engine = new EvAttributionEngine(_energyStore);
+            var engine = new HomeCircuitAttributionEngine(_energyStore);
             engine.Compute(start, end);
 
             foreach (var result in engine.Results)

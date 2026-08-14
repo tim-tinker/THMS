@@ -4,6 +4,6 @@
     {
         ChargePoint,
         HomeCircuit,
-        SolarVendor
+        SolarProduction
     }
 }

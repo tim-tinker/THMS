@@ -23,15 +23,15 @@ namespace THMS.Data.Stores
         // HOME SOLAR VENDOR INTERVALS
         // ---------------------------------------------------------
 
-        /// <summary>Upsert key: <see cref="SolarVendorInterval.Timestamp"/>.</summary>
-        void UpsertSolarVendorInterval(SolarVendorInterval interval);
+        /// <summary>Upsert key: <see cref="SolarProductionInterval.Timestamp"/>.</summary>
+        void UpsertSolarProductionInterval(SolarProductionInterval interval);
 
-        IEnumerable<SolarVendorInterval> GetSolarVendorIntervals(
+        IEnumerable<SolarProductionInterval> GetSolarProductionIntervals(
             DateTime start,
             DateTime end);
 
-        /// <summary>Most recent interval by <see cref="SolarVendorInterval.Timestamp"/>, or null if none.</summary>
-        SolarVendorInterval? GetLatestSolarVendorInterval();
+        /// <summary>Most recent interval by <see cref="SolarProductionInterval.Timestamp"/>, or null if none.</summary>
+        SolarProductionInterval? GetLatestSolarProductionInterval();
 
         // ---------------------------------------------------------
         // ENERGY ATTRIBUTION RESULTS

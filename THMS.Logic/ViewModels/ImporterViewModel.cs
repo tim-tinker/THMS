@@ -81,7 +81,7 @@ namespace THMS.Logic.ViewModels
                         _pipeline.IngestHomeCircuitData(SelectedFile);
                         break;
 
-                    case ImporterType.SolarVendor:
+                    case ImporterType.SolarProduction:
                         _pipeline.IngestEnphaseSolarData(SelectedFile);
                         break;
 

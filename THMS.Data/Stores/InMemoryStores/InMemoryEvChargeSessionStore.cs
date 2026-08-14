@@ -62,6 +62,14 @@ namespace THMS.Data.Stores.InMemoryStores
                 .FirstOrDefault();
         }
 
+        public EvChargeSession? GetLatest(Guid vehicleId)
+        {
+            return _items
+                .Where(s => vehicleId == s.VehicleId)
+                .OrderByDescending(s => s.EndTime)
+                .FirstOrDefault();
+        }
+
         public void Delete(Guid sessionId)
         {
             var existing = _items.FirstOrDefault(s => s.Id == sessionId);

@@ -26,7 +26,6 @@
             _splitFuelCharge = new SplitContainer();
             label3 = new Label();
             label4 = new Label();
-            _btnAddInvoice = new Button();
             label2 = new Label();
             _dateStart = new DateTimePicker();
             groupBox1 = new GroupBox();
@@ -78,7 +77,6 @@
             chargingGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             chargingGrid.Size = new Size(1330, 191);
             chargingGrid.TabIndex = 9;
-            chargingGrid.CellDoubleClick += OnCellDoubleClickChargeSession;
             // 
             // fuelGrid
             // 
@@ -118,7 +116,6 @@
             // _splitFuelMaintenance.Panel2
             // 
             _splitFuelMaintenance.Panel2.Controls.Add(maintenanceGrid);
-            _splitFuelMaintenance.Panel2.Controls.Add(_btnAddInvoice);
             _splitFuelMaintenance.Panel2.Controls.Add(label2);
             _splitFuelMaintenance.Size = new Size(1330, 758);
             _splitFuelMaintenance.SplitterDistance = 502;
@@ -163,16 +160,6 @@
             label4.Size = new Size(118, 30);
             label4.TabIndex = 14;
             label4.Text = "EV Charges";
-            // 
-            // _btnAddInvoice
-            // 
-            _btnAddInvoice.Dock = DockStyle.Bottom;
-            _btnAddInvoice.Location = new Point(0, 212);
-            _btnAddInvoice.Name = "_btnAddInvoice";
-            _btnAddInvoice.Size = new Size(1330, 40);
-            _btnAddInvoice.TabIndex = 13;
-            _btnAddInvoice.Text = "Add Invoice";
-            _btnAddInvoice.UseVisualStyleBackColor = true;
             // 
             // label2
             // 
@@ -273,7 +260,6 @@
         private System.Windows.Forms.DataGridView maintenanceGrid;
 
         private SplitContainer _splitFuelMaintenance;
-        private Button _btnAddInvoice;
         private Label label2;
         private SplitContainer _splitFuelCharge;
         private Label label3;

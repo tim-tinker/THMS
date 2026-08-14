@@ -64,6 +64,19 @@ namespace THMS.Data.Stores.SqliteStores
         public EvChargeSession? GetLatest(SqliteConnection conn)
         {
             var mileage = _mileageStore.GetLatestByType(conn, "Ev");
+            return LoadFromMileage(conn, mileage);
+        }
+
+        public EvChargeSession? GetLatest(SqliteConnection conn, Guid vehicleId)
+        {
+            var mileage = _mileageStore.GetLatestByTypeAndVehicle(conn, "Ev", vehicleId);
+            return LoadFromMileage(conn, mileage);
+        }
+
+        private EvChargeSession? LoadFromMileage(
+            SqliteConnection conn,
+            (Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles)? mileage)
+        {
             if (mileage is null)
                 return null;
 

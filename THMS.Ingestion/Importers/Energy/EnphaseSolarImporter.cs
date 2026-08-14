@@ -8,9 +8,9 @@ namespace THMS.Ingestion.Importers.Energy
     public class EnphaseSolarImporter
     {
         private readonly IEnergyDataStore _store;
-        private readonly List<SolarVendorInterval> _intervals = [];
+        private readonly List<SolarProductionInterval> _intervals = [];
 
-        public IEnumerable<SolarVendorInterval> Intervals => _intervals;
+        public IEnumerable<SolarProductionInterval> Intervals => _intervals;
         public DateTime StartDate { get; private set; } = DateTime.MinValue;
         public DateTime EndDate { get; private set; } = DateTime.MinValue;
         public int IntervalCount => _intervals.Count;
@@ -51,7 +51,7 @@ namespace THMS.Ingestion.Importers.Energy
             {
                 while (csv.Read())
                 {
-                    var interval = new SolarVendorInterval
+                    var interval = new SolarProductionInterval
                     {
                         Timestamp = csv.GetField<DateTime>("Date/Time"),
                         EnergyProducedWh = csv.GetField<decimal>("Energy Produced (Wh)"),

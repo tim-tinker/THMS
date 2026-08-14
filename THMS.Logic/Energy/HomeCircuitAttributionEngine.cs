@@ -3,7 +3,7 @@ using THMS.Domain.Energy;
 
 namespace THMS.Logic.Energy;
 
-public class EvAttributionEngine
+public class HomeCircuitAttributionEngine
 {
     private readonly IEnergyDataStore _store;
     private readonly List<HomeCircuitAttribution> _results = [];
@@ -11,7 +11,7 @@ public class EvAttributionEngine
     public IEnumerable<HomeCircuitAttribution> Results => _results;
     public int ResultCount => _results.Count;
 
-    public EvAttributionEngine(IEnergyDataStore store)
+    public HomeCircuitAttributionEngine(IEnergyDataStore store)
     {
         _store = store;
     }
@@ -21,23 +21,24 @@ public class EvAttributionEngine
         _results.Clear();
 
         // Raw data
-        var solar = _store.GetSolarVendorIntervals(start, end);
-        var ev = _store.GetHomeCircuitReadings(start, end);
+        var intervals = _store.GetSolarProductionIntervals(start, end).ToList();
+        var readings = _store.GetHomeCircuitReadings(start, end).ToList();
 
         // Half-hour buckets
-        var buckets = HalfHourBucketJoin(solar, ev);
+        var buckets = HalfHourBucketJoin(intervals, readings).ToList();
 
         foreach (var b in buckets)
         {
-            decimal evKwh = b.EvChargingKwh;
+            decimal circuitKwh = b.CircuitDrawKwh;
 
-            if (evKwh <= 0)
+            if (circuitKwh <= 0)
                 continue;
 
+            var otherHomeConsumptionKwh = b.HomeConsumptionKwh - circuitKwh;
             // Available sources
             decimal solarAvailable =
                 b.SolarKwh
-                - b.HomeConsumptionKwh
+                - otherHomeConsumptionKwh
                 - b.BatteryChargeKwh;
 
             if (solarAvailable < 0)
@@ -46,21 +47,21 @@ public class EvAttributionEngine
             decimal gridAvailable = b.GridImportKwh;
 
             // Attribution
-            decimal gridToEv = Math.Min(evKwh, gridAvailable);
-            decimal remaining = evKwh - gridToEv;
+            decimal gridToCircuit = Math.Min(circuitKwh, gridAvailable);
+            decimal remaining = circuitKwh - gridToCircuit;
 
-            decimal solarToEv = Math.Min(remaining, solarAvailable);
-            remaining -= solarToEv;
-            decimal batteryToEv = remaining;
+            decimal solarToCircuit = Math.Min(remaining, solarAvailable);
+            remaining -= solarToCircuit;
+            decimal batteryToCircuit = remaining;
 
             // Store result
             var result = new HomeCircuitAttribution
             {
                 Timestamp = b.Timestamp,
-                TotalWh = evKwh * 1000m,
-                SolarWh = solarToEv * 1000m,
-                BatteryWh = batteryToEv * 1000m,
-                GridWh = gridToEv * 1000m
+                TotalWh = circuitKwh * 1000m,
+                SolarWh = solarToCircuit * 1000m,
+                BatteryWh = batteryToCircuit * 1000m,
+                GridWh = gridToCircuit * 1000m
             };
 
             _results.Add(result);
@@ -68,8 +69,8 @@ public class EvAttributionEngine
     }
 
     private IEnumerable<HalfHourBucket> HalfHourBucketJoin(
-        IEnumerable<SolarVendorInterval> solar,
-        IEnumerable<HomeCircuitReading> ev)
+        IEnumerable<SolarProductionInterval> solar,
+        IEnumerable<HomeCircuitReading> readings)
     {
         // Step 1: bucket solar intervals
         var solarBuckets = solar
@@ -77,34 +78,34 @@ public class EvAttributionEngine
             .ToDictionary(g => g.Key, g => AggregateSolar(g));
 
         // Step 2: bucket EV intervals
-        var evBuckets = ev
+        var circuitBuckets = readings
             .GroupBy(i => TimeBucket.GetHalfHour(i.Timestamp))
             .ToDictionary(g => g.Key, g => AggregateEv(g));
 
         // Step 3: join buckets
-        var keys = solarBuckets.Keys.Union(evBuckets.Keys).OrderBy(k => k);
+        var keys = solarBuckets.Keys.Union(circuitBuckets.Keys).OrderBy(k => k);
 
         foreach (var key in keys)
         {
-            solarBuckets.TryGetValue(key, out var s);
-            evBuckets.TryGetValue(key, out var e);
+            solarBuckets.TryGetValue(key, out var interval);
+            circuitBuckets.TryGetValue(key, out var reading);
 
             yield return new HalfHourBucket
             {
                 Timestamp = key,
-                SolarKwh = s?.SolarKwh ?? 0,
-                HomeConsumptionKwh = s?.HomeConsumptionKwh ?? 0,
-                BatteryChargeKwh = s?.BatteryChargeKwh ?? 0,
-                BatteryDischargeKwh = s?.BatteryDischargeKwh ?? 0,
-                GridImportKwh = s?.GridImportKwh ?? 0,
-                GridExportKwh = s?.GridExportKwh ?? 0,
-                EvChargingKwh = e?.EvChargingKwh ?? 0
+                SolarKwh = interval?.SolarKwh ?? 0,
+                HomeConsumptionKwh = interval?.HomeConsumptionKwh ?? 0,
+                BatteryChargeKwh = interval?.BatteryChargeKwh ?? 0,
+                BatteryDischargeKwh = interval?.BatteryDischargeKwh ?? 0,
+                GridImportKwh = interval?.GridImportKwh ?? 0,
+                GridExportKwh = interval?.GridExportKwh ?? 0,
+                CircuitDrawKwh = reading?.CircuitDrawKwh ?? 0
             };
         }
     }
 
 
-    private SolarBucket AggregateSolar(IEnumerable<SolarVendorInterval> g)
+    private SolarBucket AggregateSolar(IEnumerable<SolarProductionInterval> g)
     {
         return new SolarBucket
         {
@@ -121,7 +122,7 @@ public class EvAttributionEngine
     {
         return new EvBucket
         {
-            EvChargingKwh = g.Sum(x => x.KiloWattHours)
+            CircuitDrawKwh = g.Sum(x => x.KiloWattHours)
         };
     }
 
@@ -129,7 +130,7 @@ public class EvAttributionEngine
 
     private class EvBucket
     {
-        public decimal EvChargingKwh { get; set; }
+        public decimal CircuitDrawKwh { get; set; }
     }
 
     private class HalfHourBucket
@@ -141,6 +142,6 @@ public class EvAttributionEngine
         public decimal BatteryDischargeKwh { get; set; }
         public decimal GridImportKwh { get; set; }
         public decimal GridExportKwh { get; set; }
-        public decimal EvChargingKwh { get; set; }
+        public decimal CircuitDrawKwh { get; set; }
     }
 }

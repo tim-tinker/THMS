@@ -52,7 +52,7 @@ namespace THMS.Logic.Finance
             // 3. Get solar vendor intervals for the month
             // -----------------------------------------
             var solarIntervals = _energyStore
-                .GetSolarVendorIntervals(monthStart, monthEnd)
+                .GetSolarProductionIntervals(monthStart, monthEnd)
                 .OrderBy(i => i.Timestamp)
                 .ToList();
 

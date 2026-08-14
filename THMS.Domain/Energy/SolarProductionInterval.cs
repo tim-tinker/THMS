@@ -1,6 +1,6 @@
 ﻿namespace THMS.Domain.Energy
 {
-    public class SolarVendorInterval : BaseDomainModel
+    public class SolarProductionInterval : BaseDomainModel
     {
         /// <summary>
         /// Timestamp of the interval (vendor data is typically point-based or short-interval).

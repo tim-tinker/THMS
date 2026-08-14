@@ -109,55 +109,6 @@ namespace THMS.UI.WinForms
                 .ToList();
         }
 
-        private void btnAddMileage_Click(object sender, EventArgs e)
-        {
-            var form = new MileageEntryForm(_vm.VehicleId, _vm);
-            if (form.ShowDialog(this) == DialogResult.OK)
-            {
-                _vm.Refresh();
-                LoadGrids();
-            }
-        }
-
-        private void btnAddCharge_Click(object sender, EventArgs e)
-        {
-            var last = _vm.GetLatestChargeSession();
-
-            using var form = new EvChargeSessionForm(
-                _vm.VehicleId,
-                _vm,
-                last?.OdometerMiles ?? 0,
-                last?.EndSoc ?? 0,
-                existingSession: null);
-
-            if (form.ShowDialog(this) == DialogResult.OK && form.SavedSession != null)
-            {
-                _vm.UpsertChargeSession(form.SavedSession);
-            }
-        }
-
-        private void OnCellDoubleClickChargeSession(object sender, DataGridViewCellEventArgs e)
-        {
-            if (e.RowIndex < 0)
-                return;
-
-            var row = chargingGrid.Rows[e.RowIndex];
-            var session = row.DataBoundItem as EvChargeSession;
-            if (session is null)
-                return;
-
-            using var form = new EvChargeSessionForm(
-                _vm.VehicleId,
-                _vm,
-                session.LastOdometer, session.LastSoc,
-                existingSession: session);
-
-            if (form.ShowDialog(this) == DialogResult.OK && form.SavedSession != null)
-            {
-                _vm.UpsertChargeSession(form.SavedSession);
-            }
-        }
-
         private void OnValueChangedStart(object sender, EventArgs e)
         {
             if (_syncingDates)

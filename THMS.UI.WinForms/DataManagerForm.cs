@@ -37,9 +37,13 @@ namespace THMS.UI.WinForms
             control.BringToFront();
         }
 
-        private void OnClickEvSegmentType(object sender, EventArgs e)
+        private void OnClickHomeCircuitAttribution(object sender, EventArgs e)
         {
+            var control = new HomeCircuitAttributionManagerControl(_energyStore) { Dock = DockStyle.Fill };
+            _currentControl = control;
 
+            panelHost.Controls.Add(control);
+            control.BringToFront();
         }
 
         private void OnClickEvChargeSessionType(object sender, EventArgs e)

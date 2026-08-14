@@ -33,6 +33,12 @@ namespace THMS.Data.Stores.SqliteStores
             string type) =>
             _table.GetLatestByType(conn, type);
 
+        public (Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles)? GetLatestByTypeAndVehicle(
+            SqliteConnection conn,
+            string type,
+            Guid vehicleId) =>
+            _table.GetLatestByTypeAndVehicle(conn, type, vehicleId);
+
         public decimal GetMilesDrivenInPeriod(
             SqliteConnection conn,
             Guid vehicleId,

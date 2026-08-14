@@ -34,6 +34,7 @@ namespace THMS.Data.Stores
         IEnumerable<EvChargeSession> GetEvChargeSessions(Guid vehicleId, DateTime start, DateTime end);
         /// <summary>Most recent session by <see cref="EvChargeSession.EndTime"/>, or null if none.</summary>
         EvChargeSession? GetLatestEvChargeSession();
+        EvChargeSession? GetLatestEvChargeSession(Guid vehicleId);
         void DeleteEvChargeSession(Guid sessionId);
 
         // ---------------------------------------------------------

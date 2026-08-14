@@ -6,14 +6,14 @@ using THMS.Domain.Energy;
 
 namespace THMS.Data.Stores.SqlTables
 {
-    public class SolarVendorIntervalsTable
+    public class SolarProductionReadingsTable
     {
         public void InitializeSchema(SqliteConnection conn)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText =
             @"
-            CREATE TABLE IF NOT EXISTS SolarVendorIntervals (
+            CREATE TABLE IF NOT EXISTS SolarProductionReadings (
                 Id TEXT PRIMARY KEY,
                 Timestamp TEXT NOT NULL,
                 EnergyProducedWh INTEGER NOT NULL,
@@ -23,16 +23,16 @@ namespace THMS.Data.Stores.SqlTables
                 StoredInBatteriesWh INTEGER NOT NULL,
                 DischargedFromBatteriesWh INTEGER NOT NULL
             );
-            CREATE UNIQUE INDEX IF NOT EXISTS IX_SolarVendorIntervals_Timestamp
-                ON SolarVendorIntervals (Timestamp);
+            CREATE UNIQUE INDEX IF NOT EXISTS IX_SolarProductionReadings_Timestamp
+                ON SolarProductionReadings (Timestamp);
             ";
             cmd.ExecuteNonQuery();
         }
 
-        public void Upsert(SqliteConnection conn, SolarVendorInterval interval)
+        public void Upsert(SqliteConnection conn, SolarProductionInterval interval)
         {
             using var cmd = new SqliteCommand(@"
-                INSERT INTO SolarVendorIntervals
+                INSERT INTO SolarProductionReadings
                 (Id, Timestamp, EnergyProducedWh, EnergyConsumedWh,
                  ExportedToGridWh, ImportedFromGridWh,
                  StoredInBatteriesWh, DischargedFromBatteriesWh)
@@ -60,13 +60,13 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
-        public IEnumerable<SolarVendorInterval> GetRange(SqliteConnection conn, DateTime start, DateTime end)
+        public IEnumerable<SolarProductionInterval> GetRange(SqliteConnection conn, DateTime start, DateTime end)
         {
             using var cmd = new SqliteCommand(@"
                 SELECT Id, Timestamp, EnergyProducedWh, EnergyConsumedWh,
                        ExportedToGridWh, ImportedFromGridWh,
                        StoredInBatteriesWh, DischargedFromBatteriesWh
-                FROM SolarVendorIntervals
+                FROM SolarProductionReadings
                 WHERE Timestamp >= @Start AND Timestamp <= @End
                 ORDER BY Timestamp;", conn);
 
@@ -79,13 +79,13 @@ namespace THMS.Data.Stores.SqlTables
                 yield return Read(reader);
         }
 
-        public SolarVendorInterval? GetLatest(SqliteConnection conn)
+        public SolarProductionInterval? GetLatest(SqliteConnection conn)
         {
             using var cmd = new SqliteCommand(@"
                 SELECT Id, Timestamp, EnergyProducedWh, EnergyConsumedWh,
                        ExportedToGridWh, ImportedFromGridWh,
                        StoredInBatteriesWh, DischargedFromBatteriesWh
-                FROM SolarVendorIntervals
+                FROM SolarProductionReadings
                 ORDER BY Timestamp DESC
                 LIMIT 1;", conn);
 
@@ -93,9 +93,9 @@ namespace THMS.Data.Stores.SqlTables
             return reader.Read() ? Read(reader) : null;
         }
 
-        private static SolarVendorInterval Read(SqliteDataReader reader)
+        private static SolarProductionInterval Read(SqliteDataReader reader)
         {
-            return new SolarVendorInterval
+            return new SolarProductionInterval
             {
                 Id = Guid.Parse(reader.GetString(0)),
                 Timestamp = reader.GetDateTime(1),
