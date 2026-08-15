@@ -51,12 +51,12 @@ namespace THMS.Logic.Transportation
             DateTime end)
         {
             // 1. Get enriched EV charging sessions
-            var sessions = _vehicleStore.GetEvChargeSessions(vehicle.Id, start, end)
+            var sessions = _vehicleStore.GetBaseEvChargeSessions(vehicle.Id, start, end)
                 .ToList();
 
             // 2. Split home vs commercial
-            var homeSessions = sessions.Where(s => s.IsHomeCharge).ToList();
-            var commercialSessions = sessions.Where(s => !s.IsHomeCharge).ToList();
+            var homeSessions = sessions.Where(s => s is HomeEvChargeSession).Select(s => s as HomeEvChargeSession).ToList();
+            var commercialSessions = sessions.Where(s => s is CommercialEvChargeSession).Select(s => s as CommercialEvChargeSession).ToList();
 
             // 3. Home charging cost attribution
             var homeCost = ComputeHomeChargeCost(homeSessions, start, end);
@@ -128,7 +128,7 @@ namespace THMS.Logic.Transportation
         // ---------------------------------------------------------
 
         private decimal ComputeHomeChargeCost(
-            IEnumerable<EvChargeSession> homeSessions,
+            IEnumerable<HomeEvChargeSession> homeSessions,
             DateTime start,
             DateTime end)
         {
@@ -145,7 +145,7 @@ namespace THMS.Logic.Transportation
             var avgCostPerKwh = costPerKwh.Average();
 
             // 4. Compute total kWh added
-            var totalKwh = homeSessions.Sum(s => s.KwhAdded);
+            var totalKwh = homeSessions.Sum(s => s.KwhDrawn ?? 0);
 
             // 5. Cost = kWh * avg cost per kWh
             return totalKwh * avgCostPerKwh;
@@ -155,7 +155,7 @@ namespace THMS.Logic.Transportation
         // EV MILES
         // ---------------------------------------------------------
 
-        private decimal ComputeEvMiles(IEnumerable<EvChargeSession> sessions)
+        private decimal ComputeEvMiles(IEnumerable<BaseEvChargeSession> sessions)
         {
             decimal miles = 0;
 
@@ -173,7 +173,7 @@ namespace THMS.Logic.Transportation
             return miles;
         }
 
-        private decimal GetOdometer(EvChargeSession session)
+        private decimal GetOdometer(BaseEvChargeSession session)
         {
             decimal odometer = session.OdometerMiles;
             return odometer;

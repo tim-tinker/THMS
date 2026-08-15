@@ -42,7 +42,7 @@ namespace THMS.Data.Stores.SqliteStores
 
             var results = new List<IceMileageRecord>();
 
-            foreach (var (id, vId, date, odo, _) in baseRows)
+            foreach (var (id, vId, date, odo, _, vehicleName) in baseRows)
             {
                 var derived = _iceMileageTable.GetById(conn, id);
                 if (derived == null) continue;
@@ -53,6 +53,7 @@ namespace THMS.Data.Stores.SqliteStores
                 {
                     Id = id,
                     VehicleId = vId,
+                    VehicleName = vehicleName,
                     EndTime = date,
                     OdometerMiles = odo,
                     GallonsAdded = gallonsAdded,

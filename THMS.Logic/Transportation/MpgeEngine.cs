@@ -32,8 +32,8 @@ namespace THMS.Logic.Transportation
             // 1. Get EV mileage records (only those with odometer)
             // ---------------------------------------------------------
             var evMileage = _vehicleStore
-                .GetEvChargeSessions(vehicleId, start, end)
-                .OrderBy(r => r.StartTime)
+                .GetIceMileageRecords(vehicleId, start, end)
+                .OrderBy(r => r.EndTime)
                 .ToList();
 
             if (evMileage.Count < 2)

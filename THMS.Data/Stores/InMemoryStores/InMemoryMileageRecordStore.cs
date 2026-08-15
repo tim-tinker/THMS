@@ -37,7 +37,7 @@ namespace THMS.Data.Stores.InMemoryStores
                 .Where(r => r.VehicleId == vehicleId && r.EndTime >= start && r.EndTime <= end);
 
             var evRecords = _items
-                .OfType<EvChargeSession>()
+                .OfType<BaseEvChargeSession>()
                 .Where(r => r.VehicleId == vehicleId
                             && r.StartTime >= start
                             && r.EndTime <= end

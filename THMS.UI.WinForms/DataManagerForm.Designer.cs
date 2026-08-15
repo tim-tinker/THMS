@@ -71,29 +71,33 @@
             // 
             _menuSolarType.Name = "_menuSolarType";
             _menuSolarType.Size = new Size(315, 40);
+            _menuSolarType.Tag = "Solar";
             _menuSolarType.Text = "Solar";
-            _menuSolarType.Click += OnClickSolarType;
+            _menuSolarType.Click += OnClickTypeMenuItem;
             // 
             // _menuHomeCircuitType
             // 
             _menuHomeCircuitType.Name = "_menuHomeCircuitType";
             _menuHomeCircuitType.Size = new Size(315, 40);
+            _menuHomeCircuitType.Tag = "Circuit";
             _menuHomeCircuitType.Text = "Home Circuit";
-            _menuHomeCircuitType.Click += OnClickHomeCircuitType;
+            _menuHomeCircuitType.Click += OnClickTypeMenuItem;
             // 
             // _menuHomeCircuitAttribution
             // 
             _menuHomeCircuitAttribution.Name = "_menuHomeCircuitAttribution";
             _menuHomeCircuitAttribution.Size = new Size(315, 40);
+            _menuHomeCircuitAttribution.Tag = "Attribution";
             _menuHomeCircuitAttribution.Text = "Circuit Attribution";
-            _menuHomeCircuitAttribution.Click += OnClickHomeCircuitAttribution;
+            _menuHomeCircuitAttribution.Click += OnClickTypeMenuItem;
             // 
             // _menuEvChargeSessionType
             // 
             _menuEvChargeSessionType.Name = "_menuEvChargeSessionType";
             _menuEvChargeSessionType.Size = new Size(315, 40);
+            _menuEvChargeSessionType.Tag = "Session";
             _menuEvChargeSessionType.Text = "EV Charge Session";
-            _menuEvChargeSessionType.Click += OnClickEvChargeSessionType;
+            _menuEvChargeSessionType.Click += OnClickTypeMenuItem;
             // 
             // viewToolStripMenuItem
             // 

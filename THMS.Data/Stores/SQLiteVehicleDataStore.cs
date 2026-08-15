@@ -11,14 +11,18 @@ namespace THMS.Data.Stores.SQLite
         private readonly SqliteMileageRecordStore _mileageStore = new();
         private readonly SqliteVehicleStore _vehicleStore = new();
         private readonly SqliteIceMileageStore _iceMileageStore;
-        private readonly SqliteEvChargeSessionStore _evChargeSessionStore;
+        private readonly SqliteBaseEvChargeSessionStore _baseEvStore;
+        private readonly SqliteCommercialEvChargeSessionStore _commercialEvStore = new();
+        private readonly SqliteHomeEvChargeSessionStore _homeEvStore = new();
+        private readonly SqliteHomeEvChargeAttributionStore _attribStore = new();
+        private readonly SqliteHomeEvChargeBillingStore _billingStore = new();
         private readonly SqliteMaintenanceInvoiceStore _maintenanceStore = new();
 
         public SQLiteVehicleDataStore(string connectionString)
         {
             _connectionString = connectionString;
             _iceMileageStore = new SqliteIceMileageStore(_mileageStore);
-            _evChargeSessionStore = new SqliteEvChargeSessionStore(_mileageStore);
+            _baseEvStore = new SqliteBaseEvChargeSessionStore(_mileageStore);
 
             using var conn = OpenConnection();
             InitializeSchema(conn);
@@ -36,7 +40,11 @@ namespace THMS.Data.Stores.SQLite
             _vehicleStore.InitializeSchema(conn);
             _mileageStore.InitializeSchema(conn);
             _iceMileageStore.InitializeSchema(conn);
-            _evChargeSessionStore.InitializeSchema(conn);
+            _baseEvStore.InitializeSchema(conn);
+            _commercialEvStore.InitializeSchema(conn);
+            _homeEvStore.InitializeSchema(conn);
+            _attribStore.InitializeSchema(conn);
+            _billingStore.InitializeSchema(conn);
             _maintenanceStore.InitializeSchema(conn);
         }
 
@@ -95,43 +103,117 @@ namespace THMS.Data.Stores.SQLite
         }
 
         // ---------------------------------------------------------
-        // EV CHARGING SESSIONS
+        // BASE EV CHARGE SESSIONS
         // ---------------------------------------------------------
 
-        public void UpsertEvChargeSession(EvChargeSession session)
+        public void UpsertBaseEvChargeSession(BaseEvChargeSession session)
         {
             using var conn = OpenConnection();
-            _evChargeSessionStore.Upsert(conn, session);
+            _baseEvStore.Upsert(conn, session);
         }
 
-        public EvChargeSession? GetEvChargeSession(Guid sessionId)
+        public BaseEvChargeSession? GetBaseEvChargeSession(Guid sessionId)
         {
             using var conn = OpenConnection();
-            return _evChargeSessionStore.Get(conn, sessionId);
+            return _baseEvStore.Get(conn, sessionId);
         }
 
-        public IEnumerable<EvChargeSession> GetEvChargeSessions(Guid vehicleId, DateTime start, DateTime end)
+        public IEnumerable<BaseEvChargeSession> GetBaseEvChargeSessions(Guid vehicleId, DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _evChargeSessionStore.GetRange(conn, vehicleId, start, end).ToList();
+            return _baseEvStore.GetRange(conn, vehicleId, start, end).ToList();
         }
 
-        public EvChargeSession? GetLatestEvChargeSession()
+        public BaseEvChargeSession? GetLatestBaseEvChargeSession(Guid vehicleId)
         {
             using var conn = OpenConnection();
-            return _evChargeSessionStore.GetLatest(conn);
+            return _baseEvStore.GetLatest(conn, vehicleId);
         }
 
-        public EvChargeSession? GetLatestEvChargeSession(Guid vehicleId)
+        public void DeleteBaseEvChargeSession(Guid sessionId)
         {
             using var conn = OpenConnection();
-            return _evChargeSessionStore.GetLatest(conn, vehicleId);
+            _commercialEvStore.Delete(conn, sessionId);
+            _attribStore.Delete(conn, sessionId);
+            _billingStore.Delete(conn, sessionId);
+            _homeEvStore.Delete(conn, sessionId);
+            _baseEvStore.Delete(conn, sessionId);
         }
 
-        public void DeleteEvChargeSession(Guid sessionId)
+        // ---------------------------------------------------------
+        // COMMERCIAL EV CHARGE SESSIONS
+        // ---------------------------------------------------------
+
+        public void UpsertCommercialEvChargeSession(CommercialEvChargeSession session)
         {
             using var conn = OpenConnection();
-            _evChargeSessionStore.Delete(conn, sessionId);
+            _commercialEvStore.Upsert(conn, session);
+        }
+
+        public CommercialEvChargeSession? GetCommercialEvChargeSession(Guid sessionId)
+        {
+            using var conn = OpenConnection();
+            var commercial = _commercialEvStore.Get(conn, sessionId);
+            if (commercial == null)
+                return null;
+
+            ApplyBaseFields(commercial, _baseEvStore.Get(conn, sessionId));
+            return commercial;
+        }
+
+        // ---------------------------------------------------------
+        // HOME EV CHARGE SESSIONS
+        // ---------------------------------------------------------
+
+        public void UpsertHomeEvChargeSession(HomeEvChargeSession session)
+        {
+            using var conn = OpenConnection();
+            _homeEvStore.Upsert(conn, session);
+        }
+
+        public HomeEvChargeSession? GetHomeEvChargeSession(Guid sessionId)
+        {
+            using var conn = OpenConnection();
+            var home = _homeEvStore.Get(conn, sessionId);
+            if (home == null)
+                return null;
+
+            ApplyBaseFields(home, _baseEvStore.Get(conn, sessionId));
+            home.Attribution = _attribStore.Get(conn, sessionId);
+            home.Billing = _billingStore.Get(conn, sessionId);
+            return home;
+        }
+
+        // ---------------------------------------------------------
+        // HOME EV CHARGE ATTRIBUTION
+        // ---------------------------------------------------------
+
+        public void UpsertHomeEvChargeAttribution(Guid sessionId, HomeEvChargeAttribution attribution)
+        {
+            using var conn = OpenConnection();
+            _attribStore.Upsert(conn, sessionId, attribution);
+        }
+
+        public HomeEvChargeAttribution? GetHomeEvChargeAttribution(Guid sessionId)
+        {
+            using var conn = OpenConnection();
+            return _attribStore.Get(conn, sessionId);
+        }
+
+        // ---------------------------------------------------------
+        // HOME EV CHARGE BILLING
+        // ---------------------------------------------------------
+
+        public void UpsertHomeEvChargeBilling(Guid sessionId, HomeEvChargeBilling billing)
+        {
+            using var conn = OpenConnection();
+            _billingStore.Upsert(conn, sessionId, billing);
+        }
+
+        public HomeEvChargeBilling? GetHomeEvChargeBilling(Guid sessionId)
+        {
+            using var conn = OpenConnection();
+            return _billingStore.Get(conn, sessionId);
         }
 
         // ---------------------------------------------------------
@@ -154,6 +236,23 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             return _maintenanceStore.GetTotalCost(conn, vehicleId, start, end);
+        }
+
+        private static void ApplyBaseFields(BaseEvChargeSession target, BaseEvChargeSession? source)
+        {
+            if (source == null)
+                return;
+
+            target.VehicleId = source.VehicleId;
+            target.VehicleName = source.VehicleName;
+            target.EndTime = source.EndTime;
+            target.OdometerMiles = source.OdometerMiles;
+            target.LastOdometer = source.LastOdometer;
+            target.LastSoc = source.LastSoc;
+            target.StartTime = source.StartTime;
+            target.StartSoc = source.StartSoc;
+            target.EndSoc = source.EndSoc;
+            target.KwhAdded = source.KwhAdded;
         }
     }
 }

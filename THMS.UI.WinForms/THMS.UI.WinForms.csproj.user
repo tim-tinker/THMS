@@ -13,6 +13,9 @@
     <Compile Update="Controls\EnergyMetricsTableControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Update="Controls\EvChargeSessionManagerControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Update="Controls\HomeCircuitManagerControl.cs">
       <SubType>UserControl</SubType>
     </Compile>

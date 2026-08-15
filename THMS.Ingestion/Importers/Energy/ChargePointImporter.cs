@@ -17,7 +17,7 @@ namespace THMS.Ingestion.Importers.Energy
             FinanceStore = financeStore;
         }
 
-        protected override IEnumerable<EvChargeSession> ReadChargeSessions(string filePath)
+        protected override IEnumerable<CommercialEvChargeSession> ReadChargeSessions(string filePath)
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
@@ -44,12 +44,12 @@ namespace THMS.Ingestion.Importers.Energy
                 var totalKwh = decimal.Parse(kwhString, CultureInfo.InvariantCulture);
                 var totalCost = decimal.Parse(costString, CultureInfo.InvariantCulture);
 
-                var evChargeSession = new EvChargeSession
+                var evChargeSession = new CommercialEvChargeSession
                 {
                     Id = Guid.NewGuid(),
                     StartTime = startTime,
                     EndTime = endTime,
-                    KwhAdded = totalKwh,          // kWh, not Wh
+                    KwhDrawn = totalKwh,          // kWh, not Wh
                     SessionCost = totalCost,     // ChargePoint always provides cost
                 };
 

@@ -60,7 +60,7 @@ namespace THMS.Logic.ViewModels.Transportation
 
         public VehicleBase? Vehicle { get; private set; }
         public decimal Mileage { get; private set; } = 0m;
-        public BindingList<EvChargeSession> ChargeSessions { get; } = new();
+        public BindingList<BaseEvChargeSession> ChargeSessions { get; } = new();
         public IReadOnlyCollection<IceMileageRecord> FuelReceipts { get; private set; } = Array.Empty<IceMileageRecord>();
         public IReadOnlyCollection<MaintenanceInvoiceRecord> MaintenanceInvoices { get; private set; } = Array.Empty<MaintenanceInvoiceRecord>();
 
@@ -70,17 +70,17 @@ namespace THMS.Logic.ViewModels.Transportation
             Mileage = VehicleStore.GetMilesDrivenInPeriod(VehicleId, StartTime, EndTime);
 
             ChargeSessions.Clear();
-            foreach (var session in VehicleStore.GetEvChargeSessions(VehicleId, StartTime, EndTime))
+            foreach (var session in VehicleStore.GetBaseEvChargeSessions(VehicleId, StartTime, EndTime))
                 ChargeSessions.Add(session);
 
             FuelReceipts = VehicleStore.GetIceMileageRecords(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
             MaintenanceInvoices = VehicleStore.GetMaintenanceInvoices(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
         }
 
-        public EvChargeSession? GetLatestChargeSession()
+        public BaseEvChargeSession? GetLatestChargeSession()
         {
             return VehicleStore
-                .GetEvChargeSessions(VehicleId, DateTime.MinValue, DateTime.MaxValue)
+                .GetBaseEvChargeSessions(VehicleId, DateTime.MinValue, DateTime.MaxValue)
                 .OrderBy(s => s.StartTime)
                 .LastOrDefault();
         }
@@ -89,7 +89,7 @@ namespace THMS.Logic.ViewModels.Transportation
         /// Inserts or replaces a session in the bound list when it falls inside the
         /// current date filter. Outside the filter, an existing row is removed.
         /// </summary>
-        public void UpsertChargeSession(EvChargeSession session)
+        public void UpsertChargeSession(BaseEvChargeSession session)
         {
             var index = IndexOfSession(session.Id);
             var inRange = session.StartTime >= StartTime && session.StartTime <= EndTime;

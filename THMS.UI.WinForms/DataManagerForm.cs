@@ -6,12 +6,25 @@ namespace THMS.UI.WinForms
     public partial class DataManagerForm : BaseEmbeddedForm
     {
         private readonly IEnergyDataStore _energyStore;
+        private readonly IVehicleDataStore _vehicleStore;
         private IDataManagerControl? _currentControl;
 
-        public DataManagerForm(IEnergyDataStore energyStore)
+        private Dictionary<string, Control> _controls = [];
+
+        public DataManagerForm(IEnergyDataStore energyStore, IVehicleDataStore vehicleStore)
         {
-            _energyStore = energyStore;
             InitializeComponent();
+            _energyStore = energyStore;
+            _vehicleStore = vehicleStore;
+            CreateControlDictionary();
+        }
+
+        private void CreateControlDictionary()
+        {
+            _controls["Solar"] = new SolarIntervalManagerControl(_energyStore) { Dock = DockStyle.Fill };
+            _controls["Circuit"] = new HomeCircuitManagerControl(_energyStore) { Dock = DockStyle.Fill };
+            _controls["Attribution"] = new HomeCircuitAttributionManagerControl(_energyStore) { Dock = DockStyle.Fill };
+            _controls["Session"] = new EvChargeSessionManagerControl(_vehicleStore, _energyStore) { Dock = DockStyle.Fill };
         }
 
         private void OnClickClose(object sender, EventArgs e)
@@ -19,36 +32,25 @@ namespace THMS.UI.WinForms
             Close();
         }
 
-        private void OnClickSolarType(object sender, EventArgs e)
+        private void ClearControls()
         {
-            var control = new SolarIntervalManagerControl(_energyStore) { Dock = DockStyle.Fill };
-            _currentControl = control;
+            panelHost.Controls.Remove(_currentControl as Control);
+            _currentControl = null;
+        }
+
+        private void OnClickTypeMenuItem(object sender, EventArgs e)
+        {
+            var menuItem = sender as ToolStripMenuItem;
+            var controlName = menuItem?.Tag.ToString();
+            if (string.IsNullOrEmpty(controlName)) return;
+
+            ClearControls();
+
+            var control = _controls[controlName];
+            _currentControl = control as IDataManagerControl;
 
             panelHost.Controls.Add(control);
             control.BringToFront();
-        }
-
-        private void OnClickHomeCircuitType(object sender, EventArgs e)
-        {
-            var control = new HomeCircuitManagerControl(_energyStore) { Dock = DockStyle.Fill };
-            _currentControl = control;
-
-            panelHost.Controls.Add(control);
-            control.BringToFront();
-        }
-
-        private void OnClickHomeCircuitAttribution(object sender, EventArgs e)
-        {
-            var control = new HomeCircuitAttributionManagerControl(_energyStore) { Dock = DockStyle.Fill };
-            _currentControl = control;
-
-            panelHost.Controls.Add(control);
-            control.BringToFront();
-        }
-
-        private void OnClickEvChargeSessionType(object sender, EventArgs e)
-        {
-
         }
 
         private void OnClickViewMonth(object sender, EventArgs e)

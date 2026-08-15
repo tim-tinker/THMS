@@ -26,16 +26,37 @@ namespace THMS.Data.Stores
         decimal GetMilesDrivenInPeriod(Guid vehicleId, DateTime start, DateTime end);
 
         // ---------------------------------------------------------
-        // EV CHARGING SESSIONS (vehicle‑assigned)
+        // BASE EV CHARGE SESSIONS (common fields)
         // ---------------------------------------------------------
-        /// <summary>Upsert key: <see cref="EvChargeSession.Id"/>.</summary>
-        void UpsertEvChargeSession(EvChargeSession session);
-        EvChargeSession? GetEvChargeSession(Guid sessionId);
-        IEnumerable<EvChargeSession> GetEvChargeSessions(Guid vehicleId, DateTime start, DateTime end);
-        /// <summary>Most recent session by <see cref="EvChargeSession.EndTime"/>, or null if none.</summary>
-        EvChargeSession? GetLatestEvChargeSession();
-        EvChargeSession? GetLatestEvChargeSession(Guid vehicleId);
-        void DeleteEvChargeSession(Guid sessionId);
+        void UpsertBaseEvChargeSession(BaseEvChargeSession session);
+        BaseEvChargeSession? GetBaseEvChargeSession(Guid sessionId);
+        IEnumerable<BaseEvChargeSession> GetBaseEvChargeSessions(Guid vehicleId, DateTime start, DateTime end);
+        BaseEvChargeSession? GetLatestBaseEvChargeSession(Guid vehicleId);
+        void DeleteBaseEvChargeSession(Guid sessionId);
+
+        // ---------------------------------------------------------
+        // COMMERCIAL EV CHARGE SESSIONS (complete at creation)
+        // ---------------------------------------------------------
+        void UpsertCommercialEvChargeSession(CommercialEvChargeSession session);
+        CommercialEvChargeSession? GetCommercialEvChargeSession(Guid sessionId);
+
+        // ---------------------------------------------------------
+        // HOME EV CHARGE SESSIONS (incrementally completed)
+        // ---------------------------------------------------------
+        void UpsertHomeEvChargeSession(HomeEvChargeSession session);
+        HomeEvChargeSession? GetHomeEvChargeSession(Guid sessionId);
+
+        // ---------------------------------------------------------
+        // HOME EV CHARGE ATTRIBUTION (solar + circuit data)
+        // ---------------------------------------------------------
+        void UpsertHomeEvChargeAttribution(Guid sessionId, HomeEvChargeAttribution attribution);
+        HomeEvChargeAttribution? GetHomeEvChargeAttribution(Guid sessionId);
+
+        // ---------------------------------------------------------
+        // HOME EV CHARGE BILLING (utility bill data)
+        // ---------------------------------------------------------
+        void UpsertHomeEvChargeBilling(Guid sessionId, HomeEvChargeBilling billing);
+        HomeEvChargeBilling? GetHomeEvChargeBilling(Guid sessionId);
 
         // ---------------------------------------------------------
         // MAINTENANCE

@@ -1,4 +1,5 @@
 ﻿using THMS.Data.Stores;
+using THMS.Domain.Transportation;
 using THMS.Domain.Transportation.Analytics;
 
 namespace THMS.Logic.Transportation
@@ -28,7 +29,7 @@ namespace THMS.Logic.Transportation
             var milesDriven = _store.GetMilesDrivenInPeriod(vehicleId, start, end);
 
             // Charge cost (commercial)
-            var chargingCost = _store.GetEvChargeSessions(vehicleId, start, end).Sum(c => c.SessionCost);
+            var chargingCost = _store.GetBaseEvChargeSessions(vehicleId, start, end).Where(s => s is CommercialEvChargeSession).Select(s => s as CommercialEvChargeSession).Sum(c => c.SessionCost);
 
             // Fuel cost (ICE)
             var fuelCost = _store.GetIceMileageRecords(vehicleId, start, end).Sum(r => r.FuelCost);
@@ -76,8 +77,13 @@ namespace THMS.Logic.Transportation
             decimal milesDriven = _store.GetMilesDrivenInPeriod(vehicleId, start, end);
             if (milesDriven > 0)
             {
-                decimal chargingCost =
-                    _store.GetEvChargeSessions(vehicleId, start, end).Sum(c => c.SessionCost);
+                decimal commercialChargingCost =
+                    _store.GetBaseEvChargeSessions(vehicleId, start, end).Select(s => s as CommercialEvChargeSession).Sum(c => c?.SessionCost ?? 0);
+
+                decimal homeChargingCost =
+                    _store.GetBaseEvChargeSessions(vehicleId, start, end).Select(s => s as HomeEvChargeSession).Sum(c => c?.Billing?.SessionCost ?? 0);
+
+                decimal chargingCost = commercialChargingCost + homeChargingCost;
 
                 decimal fuelCost =
                     _store.GetIceMileageRecords(vehicleId, start, end).Sum(r => r.FuelCost);

@@ -23,10 +23,10 @@ namespace THMS.Ingestion.Importers.Energy
 
             foreach (var chargeSession in ReadChargeSessions(filePath))
             {
-                VehicleStore.UpsertEvChargeSession(chargeSession);
+                VehicleStore.UpsertCommercialEvChargeSession(chargeSession);
             }
         }
 
-        protected abstract IEnumerable<EvChargeSession> ReadChargeSessions(string filePath);
+        protected abstract IEnumerable<CommercialEvChargeSession> ReadChargeSessions(string filePath);
    }
 }

@@ -22,10 +22,12 @@
             gridVehicles = new DataGridView();
             btnOk = new Button();
             btnCancel = new Button();
-
+            NameColumn = new DataGridViewTextBoxColumn();
+            MakeColumn = new DataGridViewTextBoxColumn();
+            ModelColumn = new DataGridViewTextBoxColumn();
+            YearColumn = new DataGridViewTextBoxColumn();
             ((System.ComponentModel.ISupportInitialize)gridVehicles).BeginInit();
             SuspendLayout();
-
             // 
             // gridVehicles
             // 
@@ -33,6 +35,7 @@
             gridVehicles.AllowUserToDeleteRows = false;
             gridVehicles.AllowUserToResizeRows = false;
             gridVehicles.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            gridVehicles.Columns.AddRange(new DataGridViewColumn[] { NameColumn, MakeColumn, ModelColumn, YearColumn });
             gridVehicles.Dock = DockStyle.Top;
             gridVehicles.Location = new Point(0, 0);
             gridVehicles.Margin = new Padding(4);
@@ -43,7 +46,6 @@
             gridVehicles.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             gridVehicles.Size = new Size(600, 350);
             gridVehicles.TabIndex = 0;
-
             // 
             // btnOk
             // 
@@ -56,7 +58,6 @@
             btnOk.Text = "OK";
             btnOk.UseVisualStyleBackColor = true;
             btnOk.Click += OnClickOk;
-
             // 
             // btnCancel
             // 
@@ -69,7 +70,38 @@
             btnCancel.Text = "Cancel";
             btnCancel.UseVisualStyleBackColor = true;
             btnCancel.Click += OnClickCancel;
-
+            // 
+            // NameColumn
+            // 
+            NameColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            NameColumn.DataPropertyName = "Name";
+            NameColumn.HeaderText = "Name";
+            NameColumn.MinimumWidth = 9;
+            NameColumn.Name = "NameColumn";
+            // 
+            // MakeColumn
+            // 
+            MakeColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            MakeColumn.DataPropertyName = "Make";
+            MakeColumn.HeaderText = "Make";
+            MakeColumn.MinimumWidth = 9;
+            MakeColumn.Name = "MakeColumn";
+            // 
+            // ModelColumn
+            // 
+            ModelColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            ModelColumn.DataPropertyName = "Model";
+            ModelColumn.HeaderText = "Model";
+            ModelColumn.MinimumWidth = 9;
+            ModelColumn.Name = "ModelColumn";
+            // 
+            // YearColumn
+            // 
+            YearColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            YearColumn.DataPropertyName = "Year";
+            YearColumn.HeaderText = "Year";
+            YearColumn.MinimumWidth = 9;
+            YearColumn.Name = "YearColumn";
             // 
             // VehicleSelectionForm
             // 
@@ -83,11 +115,15 @@
             Name = "VehicleSelectionForm";
             StartPosition = FormStartPosition.CenterParent;
             Text = "Select Vehicle";
-
             ((System.ComponentModel.ISupportInitialize)gridVehicles).EndInit();
             ResumeLayout(false);
         }
 
         #endregion
+
+        private DataGridViewTextBoxColumn NameColumn;
+        private DataGridViewTextBoxColumn MakeColumn;
+        private DataGridViewTextBoxColumn ModelColumn;
+        private DataGridViewTextBoxColumn YearColumn;
     }
 }

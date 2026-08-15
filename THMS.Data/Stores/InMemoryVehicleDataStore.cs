@@ -7,15 +7,30 @@ namespace THMS.Data.Stores
     {
         private readonly InMemoryVehicleStore _vehicleStore = new();
         private readonly InMemoryMileageRecordStore _mileageStore = new();
+
+        // New EV session stores
+        private readonly InMemoryBaseEvChargeSessionStore _baseEvStore;
+        private readonly InMemoryCommercialEvChargeSessionStore _commercialEvStore;
+        private readonly InMemoryHomeEvChargeSessionStore _homeEvStore;
+        private readonly InMemoryHomeEvChargeAttributionStore _attribStore;
+        private readonly InMemoryHomeEvChargeBillingStore _billingStore;
+
+        // Existing ICE + maintenance stores
         private readonly InMemoryIceMileageStore _iceMileageStore;
-        private readonly InMemoryEvChargeSessionStore _evChargeSessionStore;
         private readonly InMemoryMaintenanceInvoiceStore _maintenanceStore = new();
 
         public InMemoryVehicleDataStore()
         {
             _iceMileageStore = new InMemoryIceMileageStore(_mileageStore);
-            _evChargeSessionStore = new InMemoryEvChargeSessionStore(_mileageStore);
 
+            // NEW EV stores
+            _baseEvStore = new InMemoryBaseEvChargeSessionStore(_mileageStore);
+            _commercialEvStore = new InMemoryCommercialEvChargeSessionStore();
+            _homeEvStore = new InMemoryHomeEvChargeSessionStore();
+            _attribStore = new InMemoryHomeEvChargeAttributionStore();
+            _billingStore = new InMemoryHomeEvChargeBillingStore();
+
+            // Seed vehicles
             _vehicleStore.Upsert(new VehicleEv
             {
                 Id = Guid.NewGuid(),
@@ -52,7 +67,8 @@ namespace THMS.Data.Stores
         // ICE MILEAGE
         // ---------------------------------------------------------
 
-        public void UpsertIceMileageRecord(IceMileageRecord record) => _iceMileageStore.Upsert(record);
+        public void UpsertIceMileageRecord(IceMileageRecord record) =>
+            _iceMileageStore.Upsert(record);
 
         public IceMileageRecord? GetEarliestIceMileageRecord(Guid vehicleId) =>
             _iceMileageStore.GetEarliest(vehicleId);
@@ -68,23 +84,63 @@ namespace THMS.Data.Stores
             _mileageStore.GetMilesDrivenInPeriod(vehicleId, start, end);
 
         // ---------------------------------------------------------
-        // EV CHARGING SESSIONS
+        // BASE EV CHARGE SESSIONS
         // ---------------------------------------------------------
 
-        public void UpsertEvChargeSession(EvChargeSession session) => _evChargeSessionStore.Upsert(session);
+        public void UpsertBaseEvChargeSession(BaseEvChargeSession session) =>
+            _baseEvStore.Upsert(session);
 
-        public EvChargeSession? GetEvChargeSession(Guid sessionId) => _evChargeSessionStore.Get(sessionId);
+        public BaseEvChargeSession? GetBaseEvChargeSession(Guid sessionId) =>
+            _baseEvStore.Get(sessionId);
 
-        public IEnumerable<EvChargeSession> GetEvChargeSessions(Guid vehicleId, DateTime start, DateTime end) =>
-            _evChargeSessionStore.GetRange(vehicleId, start, end);
+        public IEnumerable<BaseEvChargeSession> GetBaseEvChargeSessions(Guid vehicleId, DateTime start, DateTime end) =>
+            _baseEvStore.GetRange(vehicleId, start, end);
 
-        public EvChargeSession? GetLatestEvChargeSession() =>
-            _evChargeSessionStore.GetLatest();
+        public BaseEvChargeSession? GetLatestBaseEvChargeSession(Guid vehicleId) =>
+            _baseEvStore.GetLatest(vehicleId);
 
-        public EvChargeSession? GetLatestEvChargeSession(Guid vehicleId) =>
-            _evChargeSessionStore.GetLatest(vehicleId);
+        public void DeleteBaseEvChargeSession(Guid sessionId) =>
+            _baseEvStore.Delete(sessionId);
 
-        public void DeleteEvChargeSession(Guid sessionId) => _evChargeSessionStore.Delete(sessionId);
+        // ---------------------------------------------------------
+        // COMMERCIAL EV CHARGE SESSIONS
+        // ---------------------------------------------------------
+
+        public void UpsertCommercialEvChargeSession(CommercialEvChargeSession session) =>
+            _commercialEvStore.Upsert(session);
+
+        public CommercialEvChargeSession? GetCommercialEvChargeSession(Guid sessionId) =>
+            _commercialEvStore.Get(sessionId);
+
+        // ---------------------------------------------------------
+        // HOME EV CHARGE SESSIONS
+        // ---------------------------------------------------------
+
+        public void UpsertHomeEvChargeSession(HomeEvChargeSession session) =>
+            _homeEvStore.Upsert(session);
+
+        public HomeEvChargeSession? GetHomeEvChargeSession(Guid sessionId) =>
+            _homeEvStore.Get(sessionId);
+
+        // ---------------------------------------------------------
+        // HOME EV CHARGE ATTRIBUTION
+        // ---------------------------------------------------------
+
+        public void UpsertHomeEvChargeAttribution(Guid sessionId, HomeEvChargeAttribution attribution) =>
+            _attribStore.Upsert(sessionId, attribution);
+
+        public HomeEvChargeAttribution? GetHomeEvChargeAttribution(Guid sessionId) =>
+            _attribStore.Get(sessionId);
+
+        // ---------------------------------------------------------
+        // HOME EV CHARGE BILLING
+        // ---------------------------------------------------------
+
+        public void UpsertHomeEvChargeBilling(Guid sessionId, HomeEvChargeBilling billing) =>
+            _billingStore.Upsert(sessionId, billing);
+
+        public HomeEvChargeBilling? GetHomeEvChargeBilling(Guid sessionId) =>
+            _billingStore.Get(sessionId);
 
         // ---------------------------------------------------------
         // MAINTENANCE

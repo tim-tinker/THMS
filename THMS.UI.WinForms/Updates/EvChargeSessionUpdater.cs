@@ -7,13 +7,15 @@ namespace THMS.UI.WinForms.Updates
     public class EvChargeSessionUpdater : IDataSourceUpdater
     {
         private readonly IVehicleDataStore _vehicleStore;
+        private readonly IEnergyDataStore _energyStore;
 
         public IDataSourceStatus Status { get; private set; }
 
-        public EvChargeSessionUpdater(IVehicleDataStore energyStore)
+        public EvChargeSessionUpdater(IVehicleDataStore vehicleStore, IEnergyDataStore energyStore)
         {
-            _vehicleStore = energyStore;
-            Status = new EvChargeSessionDataSourceStatus(energyStore);
+            _vehicleStore = vehicleStore;
+            _energyStore = energyStore;
+            Status = new EvChargeSessionDataSourceStatus(vehicleStore);
         }
 
         public void UpdateDataSource()
@@ -31,7 +33,7 @@ namespace THMS.UI.WinForms.Updates
             if (vehicle == null)
                 return;
 
-            using var form = new EvChargeSessionForm(_vehicleStore, vehicle);
+            using var form = new EvChargeSessionForm(_vehicleStore, vehicle, _energyStore);
             form.ShowDialog();
         }
     }

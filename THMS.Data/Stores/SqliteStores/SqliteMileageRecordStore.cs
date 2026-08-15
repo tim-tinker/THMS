@@ -19,21 +19,21 @@ namespace THMS.Data.Stores.SqliteStores
         public void Delete(SqliteConnection conn, Guid id) =>
             _table.Delete(conn, id);
 
-        public (Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string Type)? GetById(
+        public (Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string Type, string VehicleName)? GetById(
             SqliteConnection conn,
             Guid id) =>
             _table.GetById(conn, id);
 
-        public IEnumerable<(Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string Type)>
+        public IEnumerable<(Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string Type, string VehicleName)>
             GetRange(SqliteConnection conn, Guid vehicleId, DateTime start, DateTime end) =>
             _table.GetRange(conn, vehicleId, start, end);
 
-        public (Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles)? GetLatestByType(
+        public (Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string VehicleName)? GetLatestByType(
             SqliteConnection conn,
             string type) =>
             _table.GetLatestByType(conn, type);
 
-        public (Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles)? GetLatestByTypeAndVehicle(
+        public (Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string VehicleName)? GetLatestByTypeAndVehicle(
             SqliteConnection conn,
             string type,
             Guid vehicleId) =>

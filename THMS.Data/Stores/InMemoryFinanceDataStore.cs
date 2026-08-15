@@ -9,7 +9,7 @@ namespace THMS.Data.Stores
     {
         private readonly InMemoryElectricUtilityBillStore _utilityBills = new();
         private readonly InMemoryGasPurchaseStore _gasPurchases = new();
-        private readonly InMemoryEvChargeSessionCostStore _evChargeSessionCosts = new();
+        private readonly InMemoryCommercialEvChargeSessionStore _evChargeSessionCosts = new();
 
         public InMemoryFinanceDataStore()
         {
@@ -71,7 +71,7 @@ namespace THMS.Data.Stores
         // INCOMPLETE COST RECORDS
         // ---------------------------------------------------------
 
-        public IEnumerable<EvChargeSession> GetEvChargeSessionsWithMissingCost() =>
+        public IEnumerable<BaseEvChargeSession> GetEvChargeSessionsWithMissingCost() =>
             _evChargeSessionCosts.GetWithMissingCost();
 
         public IEnumerable<GasPurchase> GetGasPurchasesWithMissingCost() =>

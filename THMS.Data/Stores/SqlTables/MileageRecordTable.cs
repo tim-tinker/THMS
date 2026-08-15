@@ -12,11 +12,16 @@ namespace THMS.Data.Stores.SqlTables
             CREATE TABLE IF NOT EXISTS MileageRecords (
                 Id TEXT PRIMARY KEY,
                 VehicleId TEXT NOT NULL,
+                VehicleName TEXT,
                 EndTime TEXT NOT NULL,
                 OdometerMiles REAL NOT NULL,
                 Type TEXT NOT NULL
             );";
             cmd.ExecuteNonQuery();
+
+            using var alter = conn.CreateCommand();
+            alter.CommandText = "ALTER TABLE MileageRecords ADD COLUMN IF NOT EXISTS VehicleName TEXT;";
+            alter.ExecuteNonQuery();
         }
 
         public void Upsert(SqliteConnection conn, MileageRecordBase record, string type)
@@ -24,17 +29,19 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
             INSERT INTO MileageRecords
-            (Id, VehicleId, EndTime, OdometerMiles, Type)
+            (Id, VehicleId, VehicleName, EndTime, OdometerMiles, Type)
             VALUES
-            (@Id, @VehicleId, @EndTime, @OdometerMiles, @Type)
+            (@Id, @VehicleId, @VehicleName, @EndTime, @OdometerMiles, @Type)
             ON CONFLICT(Id) DO UPDATE SET
                 VehicleId = excluded.VehicleId,
+                VehicleName = excluded.VehicleName,
                 EndTime = excluded.EndTime,
                 OdometerMiles = excluded.OdometerMiles,
                 Type = excluded.Type;";
 
             cmd.Parameters.AddWithValue("@Id", record.Id.ToString());
             cmd.Parameters.AddWithValue("@VehicleId", record.VehicleId.ToString());
+            cmd.Parameters.AddWithValue("@VehicleName", (object?)record.VehicleName ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@EndTime", record.EndTime);
             cmd.Parameters.AddWithValue("@OdometerMiles", record.OdometerMiles);
             cmd.Parameters.AddWithValue("@Type", type);
@@ -42,12 +49,12 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
-        public IEnumerable<(Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string Type)>
+        public IEnumerable<(Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string Type, string VehicleName)>
             GetRange(SqliteConnection conn, Guid vehicleId, DateTime start, DateTime end)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-            SELECT Id, VehicleId, EndTime, OdometerMiles, Type
+            SELECT Id, VehicleId, EndTime, OdometerMiles, Type, VehicleName
             FROM MileageRecords
             WHERE VehicleId = @VehicleId AND EndTime >= @Start AND EndTime <= @End
             ORDER BY EndTime;";
@@ -63,17 +70,18 @@ namespace THMS.Data.Stores.SqlTables
                     Guid.Parse(reader.GetString(1)),
                     reader.GetDateTime(2),
                     (decimal)(double)reader.GetDouble(3),
-                    reader.GetString(4)
+                    reader.GetString(4),
+                    ReadString(reader, 5)
                 );
             }
         }
 
-        public (Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string Type)?
+        public (Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string Type, string VehicleName)?
             GetById(SqliteConnection conn, Guid id)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-            SELECT VehicleId, EndTime, OdometerMiles, Type
+            SELECT VehicleId, EndTime, OdometerMiles, Type, VehicleName
             FROM MileageRecords
             WHERE Id = @Id;";
             cmd.Parameters.AddWithValue("@Id", id.ToString());
@@ -86,16 +94,17 @@ namespace THMS.Data.Stores.SqlTables
                 Guid.Parse(reader.GetString(0)),
                 reader.GetDateTime(1),
                 (decimal)(double)reader.GetDouble(2),
-                reader.GetString(3)
+                reader.GetString(3),
+                ReadString(reader, 4)
             );
         }
 
-        public (Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles)?
+        public (Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string VehicleName)?
             GetLatestByType(SqliteConnection conn, string type)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-            SELECT Id, VehicleId, EndTime, OdometerMiles
+            SELECT Id, VehicleId, EndTime, OdometerMiles, VehicleName
             FROM MileageRecords
             WHERE Type = @Type
             ORDER BY EndTime DESC
@@ -110,16 +119,17 @@ namespace THMS.Data.Stores.SqlTables
                 Guid.Parse(reader.GetString(0)),
                 Guid.Parse(reader.GetString(1)),
                 reader.GetDateTime(2),
-                (decimal)(double)reader.GetDouble(3)
+                (decimal)(double)reader.GetDouble(3),
+                ReadString(reader, 4)
             );
         }
 
-        public (Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles)?
+        public (Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string VehicleName)?
             GetLatestByTypeAndVehicle(SqliteConnection conn, string type, Guid vehicleId)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-            SELECT Id, VehicleId, EndTime, OdometerMiles
+            SELECT Id, VehicleId, EndTime, OdometerMiles, VehicleName
             FROM MileageRecords
             WHERE Type = @Type AND VehicleId = @VehicleId
             ORDER BY EndTime DESC
@@ -135,7 +145,8 @@ namespace THMS.Data.Stores.SqlTables
                 Guid.Parse(reader.GetString(0)),
                 Guid.Parse(reader.GetString(1)),
                 reader.GetDateTime(2),
-                (decimal)(double)reader.GetDouble(3)
+                (decimal)(double)reader.GetDouble(3),
+                ReadString(reader, 4)
             );
         }
 
@@ -148,6 +159,7 @@ namespace THMS.Data.Stores.SqlTables
         UPDATE MileageRecords
         SET
             VehicleId = @VehicleId,
+            VehicleName = @VehicleName,
             OdometerMiles = @OdometerMiles,
             EndTime = @EndTime
         WHERE Id = @Id;
@@ -155,11 +167,15 @@ namespace THMS.Data.Stores.SqlTables
 
             cmd.Parameters.AddWithValue("@Id", record.Id.ToString());
             cmd.Parameters.AddWithValue("@VehicleId", record.VehicleId.ToString());
+            cmd.Parameters.AddWithValue("@VehicleName", (object?)record.VehicleName ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@OdometerMiles", record.OdometerMiles);
             cmd.Parameters.AddWithValue("@EndTime", record.EndTime);
 
             cmd.ExecuteNonQuery();
         }
+
+        private static string ReadString(SqliteDataReader reader, int ordinal) =>
+            reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
 
         // ---------------------------------------------------------
         // DELETE

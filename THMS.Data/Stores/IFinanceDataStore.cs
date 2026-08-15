@@ -35,7 +35,7 @@ namespace THMS.Data.Stores
         // INCOMPLETE COST RECORDS (USER CORRECTION WORKFLOW)
         // ---------------------------------------------------------
 
-        IEnumerable<EvChargeSession> GetEvChargeSessionsWithMissingCost();
+        IEnumerable<BaseEvChargeSession> GetEvChargeSessionsWithMissingCost();
 
         IEnumerable<GasPurchase> GetGasPurchasesWithMissingCost();
 

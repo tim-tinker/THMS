@@ -14,18 +14,18 @@ namespace THMS.UI.WinForms
         private bool _loadingControls;
 
         /// <summary>Session written on Save; null if the dialog was cancelled.</summary>
-        public EvChargeSession? SavedSession { get; private set; }
+        public BaseEvChargeSession? SavedSession { get; private set; }
 
         public EvChargeSessionForm()
         {
             InitializeComponent();
         }
 
-        public EvChargeSessionForm(IVehicleDataStore vehicleStore, VehicleEv vehicle)
+        public EvChargeSessionForm(IVehicleDataStore vehicleStore, VehicleEv vehicle, IEnergyDataStore energyStore)
             : this()
         {
             Vehicle = vehicle;
-            _orchestrator = new EvChargeSessionOrchestrator(vehicleStore) { VehicleId = vehicle.Id };
+            _orchestrator = new EvChargeSessionOrchestrator(vehicleStore, energyStore) { VehicleId = vehicle.Id };
         }
 
         private void OnLoadForm(object sender, EventArgs e)
@@ -36,6 +36,8 @@ namespace THMS.UI.WinForms
 
             _numLastOdometer.Value = lastSession.OdometerMiles;
             _numLastSoc.Value = lastSession.EndSoc;
+            _numOdometer.Value = lastSession.OdometerMiles;
+            _numStartSoc.Value = lastSession.EndSoc;
             _dateStart.Value = DateTime.Now;
             _timeStart.Value = DateTime.Now;
             _dateEnd.Value = DateTime.Now;
@@ -84,22 +86,43 @@ namespace THMS.UI.WinForms
 
         private void OnClickSave(object sender, EventArgs e)
         {
-            var session = new EvChargeSession
+            BaseEvChargeSession session;
+            if (_checkHomeCharger.Checked)
             {
-                Id = Guid.NewGuid(),
-                VehicleId = Vehicle.Id,
-                LastOdometer = _numLastOdometer.Value,
-                LastSoc = _numLastSoc.Value,
-                OdometerMiles = _numOdometer.Value,
-                StartTime = Combine(_dateStart.Value, _timeStart.Value),
-                EndTime = Combine(_dateEnd.Value, _timeEnd.Value),
-                StartSoc = _numStartSoc.Value,
-                EndSoc = _numEndSoc.Value,
-                BatteryKwhAdded = _numBatteryKwhAdded.Value,
-                IsHomeCharge = _checkHomeCharger.Checked,
-                KwhAdded = _numKwhAdded.Value,
-                SessionCost = _numSessionCost.Value
-            };
+                session = new HomeEvChargeSession
+                {
+                    Id = Guid.NewGuid(),
+                    VehicleId = Vehicle.Id,
+                    VehicleName = Vehicle.Name,
+                    LastOdometer = _numLastOdometer.Value,
+                    LastSoc = _numLastSoc.Value,
+                    OdometerMiles = _numOdometer.Value,
+                    StartTime = Combine(_dateStart.Value, _timeStart.Value),
+                    EndTime = Combine(_dateEnd.Value, _timeEnd.Value),
+                    StartSoc = _numStartSoc.Value,
+                    EndSoc = _numEndSoc.Value,
+                    KwhAdded = _numBatteryKwhAdded.Value,
+                };
+            }
+            else
+            {
+                session = new CommercialEvChargeSession
+                {
+                    Id = Guid.NewGuid(),
+                    VehicleId = Vehicle.Id,
+                    VehicleName = Vehicle.Name,
+                    LastOdometer = _numLastOdometer.Value,
+                    LastSoc = _numLastSoc.Value,
+                    OdometerMiles = _numOdometer.Value,
+                    StartTime = Combine(_dateStart.Value, _timeStart.Value),
+                    EndTime = Combine(_dateEnd.Value, _timeEnd.Value),
+                    StartSoc = _numStartSoc.Value,
+                    EndSoc = _numEndSoc.Value,
+                    KwhAdded = _numBatteryKwhAdded.Value,
+                    KwhDrawn = _numKwhAdded.Value,
+                    SessionCost = _numSessionCost.Value
+                };
+            }
 
             if (ValidateSession(session))
             {
@@ -109,7 +132,7 @@ namespace THMS.UI.WinForms
             }
         }
 
-        private bool ValidateSession(EvChargeSession session)
+        private bool ValidateSession(BaseEvChargeSession session)
         {
             var isValid = true;
             if (session.EndTime < session.StartTime)
@@ -120,11 +143,6 @@ namespace THMS.UI.WinForms
             else if (session.LastOdometer > session.OdometerMiles)
             {
                 MessageBox.Show("Odometer must not be less than last odometer.");
-                isValid = false;
-            }
-            else if (!session.IsHomeCharge && 0 < session.KwhAdded)
-            {
-                MessageBox.Show("No energy is recorded for commercial charge sesson.");
                 isValid = false;
             }
 

@@ -17,7 +17,7 @@ namespace THMS.Logic.DataCenter
 
         public void QueryStatus()
         {
-            var lastReading = _vehicleStore.GetLatestEvChargeSession();
+            var lastReading = _vehicleStore.GetLatestBaseEvChargeSession();
 
             LastRetrieval = lastReading?.EndTime;
         }

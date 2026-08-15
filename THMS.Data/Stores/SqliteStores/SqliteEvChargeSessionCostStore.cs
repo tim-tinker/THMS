@@ -4,15 +4,14 @@ using THMS.Domain.Transportation;
 namespace THMS.Data.Stores.SqliteStores
 {
     /// <summary>
-    /// Cost-focused access to EvChargeSessions (owned by vehicle schema).
-    /// Uses SessionCost to match <see cref="SqlTables.EvChargeSessionTable"/>.
+    /// Cost-focused access for commercial EV sessions missing a vendor cost.
     /// </summary>
     public class SqliteEvChargeSessionCostStore
     {
         public void UpdateCost(SqliteConnection conn, Guid sessionId, decimal cost)
         {
             using var cmd = new SqliteCommand(@"
-                UPDATE EvChargeSessions
+                UPDATE CommercialEvChargeSessions
                 SET SessionCost = @Cost
                 WHERE Id = @Id;", conn);
 
@@ -21,27 +20,29 @@ namespace THMS.Data.Stores.SqliteStores
             cmd.ExecuteNonQuery();
         }
 
-        public IEnumerable<EvChargeSession> GetWithMissingCost(SqliteConnection conn)
+        public IEnumerable<CommercialEvChargeSession> GetWithMissingCost(SqliteConnection conn)
         {
             using var cmd = new SqliteCommand(@"
-                SELECT Id, StartTime, EndTime, KwhAdded, IsHomeCharge, SessionCost
-                FROM EvChargeSessions
-                WHERE SessionCost = 0
-                ORDER BY StartTime;", conn);
+                SELECT c.Id, c.KwhDrawn, c.SessionCost,
+                       b.StartTime, m.EndTime
+                FROM CommercialEvChargeSessions c
+                LEFT JOIN BaseEvChargeSessions b ON b.Id = c.Id
+                LEFT JOIN MileageRecords m ON m.Id = c.Id
+                WHERE c.SessionCost = 0
+                ORDER BY b.StartTime;", conn);
 
             using var reader = cmd.ExecuteReader();
-            var list = new List<EvChargeSession>();
+            var list = new List<CommercialEvChargeSession>();
 
             while (reader.Read())
             {
-                list.Add(new EvChargeSession
+                list.Add(new CommercialEvChargeSession
                 {
                     Id = Guid.Parse(reader.GetString(0)),
-                    StartTime = reader.GetDateTime(1),
-                    EndTime = reader.GetDateTime(2),
-                    KwhAdded = reader.GetDecimal(3),
-                    IsHomeCharge = reader.GetInt32(4) != 0,
-                    SessionCost = reader.GetDecimal(5)
+                    KwhDrawn = (decimal)(double)reader.GetDouble(1),
+                    SessionCost = (decimal)(double)reader.GetDouble(2),
+                    StartTime = reader.IsDBNull(3) ? default : reader.GetDateTime(3),
+                    EndTime = reader.IsDBNull(4) ? default : reader.GetDateTime(4)
                 });
             }
 

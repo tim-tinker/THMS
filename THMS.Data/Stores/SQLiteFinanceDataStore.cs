@@ -70,7 +70,7 @@ namespace THMS.Data.Stores.SQLite
         // INCOMPLETE COST RECORDS
         // ---------------------------------------------------------
 
-        public IEnumerable<EvChargeSession> GetEvChargeSessionsWithMissingCost()
+        public IEnumerable<BaseEvChargeSession> GetEvChargeSessionsWithMissingCost()
         {
             using var conn = OpenConnection();
             return _evChargeSessionCosts.GetWithMissingCost(conn).ToList();

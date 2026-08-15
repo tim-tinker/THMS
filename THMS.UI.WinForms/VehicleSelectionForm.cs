@@ -12,6 +12,8 @@ namespace THMS.UI.WinForms
         public VehicleSelectionForm(IEnumerable<VehicleBase> vehicles)
         {
             InitializeComponent();
+
+            gridVehicles.AutoGenerateColumns = false;
             gridVehicles.DataSource = vehicles;
         }
 
