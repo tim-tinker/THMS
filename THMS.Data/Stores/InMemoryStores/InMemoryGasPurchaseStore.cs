@@ -23,19 +23,5 @@ namespace THMS.Data.Stores.InMemoryStores
                             g.Date <= end)
                 .OrderBy(g => g.Date);
         }
-
-        public IEnumerable<GasPurchase> GetWithMissingCost()
-        {
-            return _items
-                .Where(g => g.FuelCost == 0)
-                .OrderBy(g => g.Date);
-        }
-
-        public void UpdateCost(Guid purchaseId, decimal cost)
-        {
-            var purchase = _items.FirstOrDefault(g => g.Id == purchaseId);
-            if (purchase != null)
-                purchase.FuelCost = cost;
-        }
     }
 }

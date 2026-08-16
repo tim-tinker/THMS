@@ -96,6 +96,9 @@ namespace THMS.Data.Stores
         public IEnumerable<BaseEvChargeSession> GetBaseEvChargeSessions(Guid vehicleId, DateTime start, DateTime end) =>
             _baseEvStore.GetRange(vehicleId, start, end);
 
+        public BaseEvChargeSession? GetLatestBaseEvChargeSession() =>
+            _baseEvStore.GetLatest();
+
         public BaseEvChargeSession? GetLatestBaseEvChargeSession(Guid vehicleId) =>
             _baseEvStore.GetLatest(vehicleId);
 

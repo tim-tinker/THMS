@@ -31,6 +31,8 @@ namespace THMS.Data.Stores
         void UpsertBaseEvChargeSession(BaseEvChargeSession session);
         BaseEvChargeSession? GetBaseEvChargeSession(Guid sessionId);
         IEnumerable<BaseEvChargeSession> GetBaseEvChargeSessions(Guid vehicleId, DateTime start, DateTime end);
+        /// <summary>Most recent session by <see cref="BaseEvChargeSession.EndTime"/> across all vehicles, or null if none.</summary>
+        BaseEvChargeSession? GetLatestBaseEvChargeSession();
         BaseEvChargeSession? GetLatestBaseEvChargeSession(Guid vehicleId);
         void DeleteBaseEvChargeSession(Guid sessionId);
 

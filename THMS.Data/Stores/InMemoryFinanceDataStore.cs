@@ -9,41 +9,24 @@ namespace THMS.Data.Stores
     {
         private readonly InMemoryElectricUtilityBillStore _utilityBills = new();
         private readonly InMemoryGasPurchaseStore _gasPurchases = new();
-        private readonly InMemoryCommercialEvChargeSessionStore _evChargeSessionCosts = new();
 
         public InMemoryFinanceDataStore()
         {
             UpsertElectricUtilityBill(new ElectricUtilityBill
             {
                 Id = Guid.NewGuid(),
-                StartDate = DateTime.Today.AddMonths(-1).AddDays(-5),
-                EndDate = DateTime.Today.AddMonths(-1).AddDays(25),
-                GridImportCost = 85.00m,
-                GridExportCredit = 12.50m,
-                DeliveryCharges = 22.00m,
-                FixedCharges = 10.00m,
-                TaxesAndFees = 8.75m,
-                TotalKwh = 650
-            });
-
-            UpsertGasPurchase(new GasPurchase
-            {
-                Id = Guid.NewGuid(),
-                VehicleId = Guid.Empty,
-                Date = DateTime.Today.AddDays(-7),
-                Gallons = 11.2m,
-                FuelCost = 34.80m,
-                Station = "Shell"
-            });
-
-            UpsertGasPurchase(new GasPurchase
-            {
-                Id = Guid.NewGuid(),
-                VehicleId = Guid.Empty,
-                Date = DateTime.Today.AddDays(-2),
-                Gallons = 12.0m,
-                FuelCost = 38.10m,
-                Station = "Chevron"
+                BillingDate = DateTime.Parse("07/18/2026"),
+                StartDate = DateTime.Parse("06/17/2026"),
+                EndDate = DateTime.Parse("07/17/2026"),
+                KwhUsage = 1244,
+                DaysInCycle = 30,
+                BaseCharge = 9.95m,
+                EnergyChargeRate = 0.114997m,
+                EnergyCharge = 143.06m,
+                ExportKwh = 702,
+                ExportCreditRate = 0.064997m,
+                ExportCredit = 45.63m,
+                DeliveryCharge = 65.94m
             });
         }
 
@@ -54,8 +37,17 @@ namespace THMS.Data.Stores
         public void UpsertElectricUtilityBill(ElectricUtilityBill bill) =>
             _utilityBills.Upsert(bill);
 
+        public ElectricUtilityBill? GetElectricUtilityBill(Guid billId) =>
+            _utilityBills.Get(billId);
+
+        public ElectricUtilityBill? GetElectricUtilityBillForDate(DateTime date) =>
+            _utilityBills.GetForDate(date);
+
         public IEnumerable<ElectricUtilityBill> GetElectricUtilityBills(DateTime start, DateTime end) =>
             _utilityBills.GetRange(start, end);
+
+        public ElectricUtilityBill? GetLatestElectricUtilityBill() =>
+            _utilityBills.GetLatest();
 
         // ---------------------------------------------------------
         // GAS PURCHASES
@@ -67,24 +59,5 @@ namespace THMS.Data.Stores
         public IEnumerable<GasPurchase> GetGasPurchases(Guid vehicleId, DateTime start, DateTime end) =>
             _gasPurchases.GetRange(vehicleId, start, end);
 
-        // ---------------------------------------------------------
-        // INCOMPLETE COST RECORDS
-        // ---------------------------------------------------------
-
-        public IEnumerable<BaseEvChargeSession> GetEvChargeSessionsWithMissingCost() =>
-            _evChargeSessionCosts.GetWithMissingCost();
-
-        public IEnumerable<GasPurchase> GetGasPurchasesWithMissingCost() =>
-            _gasPurchases.GetWithMissingCost();
-
-        // ---------------------------------------------------------
-        // COST UPDATES
-        // ---------------------------------------------------------
-
-        public void UpdateEvChargeSessionCost(Guid sessionId, decimal cost) =>
-            _evChargeSessionCosts.UpdateCost(sessionId, cost);
-
-        public void UpdateGasPurchaseCost(Guid purchaseId, decimal cost) =>
-            _gasPurchases.UpdateCost(purchaseId, cost);
     }
 }

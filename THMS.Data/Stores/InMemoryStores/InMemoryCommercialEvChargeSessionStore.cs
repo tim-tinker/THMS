@@ -16,16 +16,5 @@ namespace THMS.Data.Stores.InMemoryStores
             _items.TryGetValue(sessionId, out var session);
             return session;
         }
-
-        public IEnumerable<CommercialEvChargeSession> GetWithMissingCost() =>
-            _items.Values
-                .Where(s => s.SessionCost == 0)
-                .OrderBy(s => s.StartTime);
-
-        public void UpdateCost(Guid sessionId, decimal cost)
-        {
-            if (_items.TryGetValue(sessionId, out var session))
-                session.SessionCost = cost;
-        }
     }
 }

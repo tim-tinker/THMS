@@ -48,7 +48,7 @@ namespace THMS.Logic.Finance
 
                     SolarAvoidedCost = summary.SolarAvoidedCost,
                     BatteryValue = summary.BatteryValue,
-                    GridExportCredit = billing?.GridExportCredit ?? 0,
+                    GridExportCredit = billing?.ExportCredit ?? 0,
 
                     LoanPayment = loan?.PaymentAmount ?? 0,
                     LoanInterestPaid = loan?.InterestPaid ?? 0,

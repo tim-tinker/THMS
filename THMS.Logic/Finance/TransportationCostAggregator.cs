@@ -139,7 +139,7 @@ namespace THMS.Logic.Transportation
 
             // 2. Compute cost per kWh for each bill
             var costPerKwh = bills.Select(b =>
-                b.TotalCost / (b.TotalKwh == 0 ? 1 : b.TotalKwh)).ToList();
+                b.TotalCost / (b.KwhUsage == 0 ? 1 : b.KwhUsage)).ToList();
 
             // 3. Compute average cost per kWh
             var avgCostPerKwh = costPerKwh.Average();

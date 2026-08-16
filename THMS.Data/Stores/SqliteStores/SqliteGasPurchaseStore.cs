@@ -19,11 +19,5 @@ namespace THMS.Data.Stores.SqliteStores
             DateTime start,
             DateTime end) =>
             _table.GetRange(conn, vehicleId, start, end);
-
-        public IEnumerable<GasPurchase> GetWithMissingCost(SqliteConnection conn) =>
-            _table.GetWithMissingCost(conn);
-
-        public void UpdateCost(SqliteConnection conn, Guid purchaseId, decimal cost) =>
-            _table.UpdateCost(conn, purchaseId, cost);
     }
 }

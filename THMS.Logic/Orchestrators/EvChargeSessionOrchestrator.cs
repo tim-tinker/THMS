@@ -8,18 +8,18 @@ namespace THMS.Logic.Orchestrators
     {
         private readonly IVehicleDataStore _vehicleStore;
         private readonly IEnergyDataStore _energyStore;
-        //private readonly IUtilityBillingStore _billingStore;
+        private readonly IFinanceDataStore _financeStore;
 
         public Guid VehicleId { get; set; }
 
         public EvChargeSessionOrchestrator(
             IVehicleDataStore vehicleStore,
-            IEnergyDataStore energyStore)
-            //IUtilityBillingStore billingStore)
+            IEnergyDataStore energyStore,
+            IFinanceDataStore financeStore)
         {
             _vehicleStore = vehicleStore;
             _energyStore = energyStore;
-            //_billingStore = billingStore;
+            _financeStore = financeStore;
         }
 
         // ---------------------------------------------------------
@@ -31,13 +31,7 @@ namespace THMS.Logic.Orchestrators
             if (VehicleId != Guid.Empty)
                 return _vehicleStore.GetLatestBaseEvChargeSession(VehicleId);
 
-            var latest = _vehicleStore.GetAllVehicles()
-                .Select(v => _vehicleStore.GetLatestBaseEvChargeSession(v.Id))
-                .Where(s => s != null)
-                .OrderByDescending(s => s!.EndTime)
-                .FirstOrDefault();
-
-            return latest;
+            return _vehicleStore.GetLatestBaseEvChargeSession();
         }
 
         // ---------------------------------------------------------
@@ -103,7 +97,10 @@ namespace THMS.Logic.Orchestrators
                         break;
 
                     case HomeEvChargeSession home:
-                        CompleteHomeSession(home);
+                        if (home.Attribution is null || home.Billing is null)
+                        {
+                            CompleteHomeSession(home); 
+                        }
                         yield return home;
                         break;
 
@@ -121,13 +118,37 @@ namespace THMS.Logic.Orchestrators
         {
             // 1. Load existing attribution (if any)
             var existingAttrib = _vehicleStore.GetHomeEvChargeAttribution(session.Id);
-            if (existingAttrib != null)
+            if (existingAttrib is not null)
             {
                 session.Attribution = existingAttrib;
-                return;
+            }
+            else
+            {
+                ComputeAndStoreAttribution(session);
             }
 
-            // 2. Compute attribution using your engine
+            // IMPORTANT:
+            // Re-check attribution AFTER attempting to compute it.
+            if (session.Attribution is not null)
+            {
+                // 2. Load existing billing (if any)
+                var existingBilling = _vehicleStore.GetHomeEvChargeBilling(session.Id);
+                if (existingBilling is not null)
+                {
+                    session.Billing = existingBilling;
+                }
+                else if (session.Attribution is not null)
+                {
+                    ComputeAndStoreBilling(session);
+                }
+            }
+        }
+
+        // ---------------------------------------------------------
+        // ENERGY ATTRIBUTION
+        // ---------------------------------------------------------
+        private void ComputeAndStoreAttribution(HomeEvChargeSession session)
+        {
             var engine = new HomeCircuitAttributionEngine(_energyStore);
             engine.Compute(session.StartTime, session.EndTime);
 
@@ -142,9 +163,45 @@ namespace THMS.Logic.Orchestrators
             };
 
             session.Attribution = attrib;
-
-            // 3. Persist attribution
             _vehicleStore.UpsertHomeEvChargeAttribution(session.Id, attrib);
+        }
+
+        // ---------------------------------------------------------
+        // BILLING ATTRIBUTION
+        // ---------------------------------------------------------
+        private void ComputeAndStoreBilling(HomeEvChargeSession session)
+        {
+            var bill = _financeStore.GetElectricUtilityBillForDate(session.StartTime);
+            if (bill == null)
+                return;
+
+            // EV-specific cost attribution:
+            // ✔ EnergyChargeRate applies to GridKwh
+            // ✔ DeliveryCharge is proportional to usage
+            // ✘ BaseCharge excluded
+            // ✘ ExportCredit excluded
+
+            var gridKwh = session.Attribution!.GridKwh;
+
+            var energyCost = gridKwh * bill.EnergyChargeRate;
+
+            var deliveryCost =
+                bill.KwhUsage > 0
+                    ? gridKwh * (bill.DeliveryCharge / bill.KwhUsage)
+                    : 0m;
+
+            var billing = new HomeEvChargeBilling
+            {
+                BillingCycleId = bill.Id,
+                EnergyChargeRate = bill.EnergyChargeRate,
+                DeliveryChargeRate = bill.KwhUsage > 0
+                    ? bill.DeliveryCharge / bill.KwhUsage
+                    : 0m,
+                SessionCost = energyCost + deliveryCost
+            };
+
+            session.Billing = billing;
+            _vehicleStore.UpsertHomeEvChargeBilling(session.Id, billing);
         }
     }
 }

@@ -1,6 +1,5 @@
 ﻿using Microsoft.Data.Sqlite;
 using THMS.Data.Stores.SqliteStores;
-using THMS.Domain.Finance;
 using THMS.Domain.Finance.Billing;
 using THMS.Domain.Transportation;
 
@@ -12,7 +11,6 @@ namespace THMS.Data.Stores.SQLite
 
         private readonly SqliteElectricUtilityBillStore _utilityBills = new();
         private readonly SqliteGasPurchaseStore _gasPurchases = new();
-        private readonly SqliteEvChargeSessionCostStore _evChargeSessionCosts = new();
 
         public SQLiteFinanceDataStore(string databasePath)
         {
@@ -44,10 +42,28 @@ namespace THMS.Data.Stores.SQLite
             _utilityBills.Upsert(conn, bill);
         }
 
+        public ElectricUtilityBill? GetElectricUtilityBill(Guid billId)
+        {
+            using var conn = OpenConnection();
+            return _utilityBills.Get(conn, billId);
+        }
+
+        public ElectricUtilityBill? GetElectricUtilityBillForDate(DateTime date)
+        {
+            using var conn = OpenConnection();
+            return _utilityBills.GetForDate(conn, date);
+        }
+
         public IEnumerable<ElectricUtilityBill> GetElectricUtilityBills(DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
             return _utilityBills.GetRange(conn, start, end).ToList();
+        }
+
+        public ElectricUtilityBill? GetLatestElectricUtilityBill()
+        {
+            using var conn = OpenConnection();
+            return _utilityBills.GetLatest(conn);
         }
 
         // ---------------------------------------------------------
@@ -64,38 +80,6 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             return _gasPurchases.GetRange(conn, vehicleId, start, end).ToList();
-        }
-
-        // ---------------------------------------------------------
-        // INCOMPLETE COST RECORDS
-        // ---------------------------------------------------------
-
-        public IEnumerable<BaseEvChargeSession> GetEvChargeSessionsWithMissingCost()
-        {
-            using var conn = OpenConnection();
-            return _evChargeSessionCosts.GetWithMissingCost(conn).ToList();
-        }
-
-        public IEnumerable<GasPurchase> GetGasPurchasesWithMissingCost()
-        {
-            using var conn = OpenConnection();
-            return _gasPurchases.GetWithMissingCost(conn).ToList();
-        }
-
-        // ---------------------------------------------------------
-        // COST UPDATES
-        // ---------------------------------------------------------
-
-        public void UpdateEvChargeSessionCost(Guid sessionId, decimal cost)
-        {
-            using var conn = OpenConnection();
-            _evChargeSessionCosts.UpdateCost(conn, sessionId, cost);
-        }
-
-        public void UpdateGasPurchaseCost(Guid purchaseId, decimal cost)
-        {
-            using var conn = OpenConnection();
-            _gasPurchases.UpdateCost(conn, purchaseId, cost);
         }
     }
 }

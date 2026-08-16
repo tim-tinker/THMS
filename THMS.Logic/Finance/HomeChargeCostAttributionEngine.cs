@@ -86,12 +86,7 @@ namespace THMS.Logic.Finance
             // -----------------------------------------
             // 5. Compute total bill cost
             // -----------------------------------------
-            decimal totalBillCost =
-                bill.GridImportCost +
-                bill.DeliveryCharges +
-                bill.FixedCharges +
-                bill.TaxesAndFees -
-                bill.GridExportCredit;
+            decimal totalBillCost = bill.TotalCost;
 
             // -----------------------------------------
             // 6. Compute EV share of grid usage

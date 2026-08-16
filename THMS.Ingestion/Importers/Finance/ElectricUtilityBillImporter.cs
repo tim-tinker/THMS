@@ -29,11 +29,11 @@ namespace THMS.Ingestion.Importers.Finance
                     Id = Guid.NewGuid(),
                     StartDate = csv.GetField<DateTime>("Start"),
                     EndDate = csv.GetField<DateTime>("End"),
-                    GridImportCost = csv.GetField<decimal>("Grid Import Cost"),
-                    GridExportCredit = csv.GetField<decimal>("Grid Export Credit"),
-                    FixedCharges = csv.GetField<decimal>("Fixed Charges"),
-                    DeliveryCharges = csv.GetField<decimal>("Delivery Charges"),
-                    TaxesAndFees = csv.GetField<decimal>("Taxes and Fees")
+                    // Legacy CSV column names mapped onto the redesigned bill model.
+                    EnergyCharge = csv.GetField<decimal>("Grid Import Cost"),
+                    ExportCredit = csv.GetField<decimal>("Grid Export Credit"),
+                    BaseCharge = csv.GetField<decimal>("Fixed Charges"),
+                    DeliveryCharge = csv.GetField<decimal>("Delivery Charges")
                 };
 
                 _store.UpsertElectricUtilityBill(interval);

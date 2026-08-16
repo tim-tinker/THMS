@@ -13,10 +13,19 @@ namespace THMS.Data.Stores.SqliteStores
         public void Upsert(SqliteConnection conn, ElectricUtilityBill bill) =>
             _table.Upsert(conn, bill);
 
+        public ElectricUtilityBill? Get(SqliteConnection conn, Guid billId) =>
+            _table.GetById(conn, billId);
+
+        public ElectricUtilityBill? GetForDate(SqliteConnection conn, DateTime date) =>
+            _table.GetForDate(conn, date);
+
         public IEnumerable<ElectricUtilityBill> GetRange(
             SqliteConnection conn,
             DateTime start,
             DateTime end) =>
             _table.GetRange(conn, start, end);
+
+        public ElectricUtilityBill? GetLatest(SqliteConnection conn) =>
+            _table.GetLatest(conn);
     }
 }

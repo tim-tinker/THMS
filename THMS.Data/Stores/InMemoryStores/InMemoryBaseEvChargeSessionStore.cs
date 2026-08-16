@@ -47,6 +47,9 @@ namespace THMS.Data.Stores.InMemoryStores
                 s.StartTime <= end)
             .OrderBy(s => s.StartTime);
 
+        public BaseEvChargeSession? GetLatest() =>
+            _items.OrderByDescending(s => s.EndTime).FirstOrDefault();
+
         public BaseEvChargeSession? GetLatest(Guid vehicleId) =>
             _items.Where(s => s.VehicleId == vehicleId)
                   .OrderByDescending(s => s.EndTime)

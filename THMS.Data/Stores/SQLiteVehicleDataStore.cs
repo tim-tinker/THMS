@@ -124,6 +124,12 @@ namespace THMS.Data.Stores.SQLite
             return _baseEvStore.GetRange(conn, vehicleId, start, end).ToList();
         }
 
+        public BaseEvChargeSession? GetLatestBaseEvChargeSession()
+        {
+            using var conn = OpenConnection();
+            return _baseEvStore.GetLatest(conn);
+        }
+
         public BaseEvChargeSession? GetLatestBaseEvChargeSession(Guid vehicleId)
         {
             using var conn = OpenConnection();

@@ -40,9 +40,22 @@ namespace THMS.Data.Stores.SqliteStores
             DateTime end) =>
             _table.GetByVehicleAndStartRange(conn, vehicleId, start, end);
 
+        public BaseEvChargeSession? GetLatest(SqliteConnection conn)
+        {
+            var mileage = _mileageStore.GetLatestByType(conn, "Ev");
+            return LoadFromMileage(conn, mileage);
+        }
+
         public BaseEvChargeSession? GetLatest(SqliteConnection conn, Guid vehicleId)
         {
             var mileage = _mileageStore.GetLatestByTypeAndVehicle(conn, "Ev", vehicleId);
+            return LoadFromMileage(conn, mileage);
+        }
+
+        private BaseEvChargeSession? LoadFromMileage(
+            SqliteConnection conn,
+            (Guid Id, Guid VehicleId, DateTime EndTime, decimal OdometerMiles, string VehicleName)? mileage)
+        {
             if (mileage is null)
                 return null;
 

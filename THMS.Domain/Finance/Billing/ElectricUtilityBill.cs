@@ -12,6 +12,11 @@
         public Guid Id { get; set; }
 
         /// <summary>
+        /// As-of date for the electric bill
+        /// </summary>
+        public DateTime BillingDate { get; set; }
+
+        /// <summary>
         /// First day of the billing cycle.
         /// </summary>
         public DateTime StartDate { get; set; }
@@ -22,44 +27,58 @@
         public DateTime EndDate { get; set; }
 
         /// <summary>
-        /// Total cost for grid-imported energy.
+        /// Number of kWh used in the month
         /// </summary>
-        public decimal GridImportCost { get; set; }
+        public int KwhUsage { get; set; }
 
         /// <summary>
-        /// Total credit for grid-exported energy (solar buyback).
+        /// Number of days covered by the bill
         /// </summary>
-        public decimal GridExportCredit { get; set; }
+        public int DaysInCycle { get; set; }
 
         /// <summary>
-        /// Delivery charges for the billing cycle.
+        /// Utility base charge
         /// </summary>
-        public decimal DeliveryCharges { get; set; }
+        public decimal BaseCharge { get; set; }
 
         /// <summary>
-        /// Fixed monthly charges (service fees, meter fees, etc.).
+        /// $/kWh charged by utility
         /// </summary>
-        public decimal FixedCharges { get; set; }
+        public decimal EnergyChargeRate { get; set; }
 
         /// <summary>
-        /// Taxes and fees applied to the bill.
+        /// Charge by utility for kWh usage
         /// </summary>
-        public decimal TaxesAndFees { get; set; }
+        public decimal EnergyCharge { get; set; }
 
         /// <summary>
-        /// Total kWh usage for the billing cycle (as listed on the bill).
+        /// kWh exported to grid
         /// </summary>
-        public decimal TotalKwh { get; set; }
+        public decimal ExportKwh { get; set; }
+
+        /// <summary>
+        /// $/kWh credited by utility for exported energy
+        /// </summary>
+        public decimal ExportCreditRate { get; set; }
+
+        /// <summary>
+        /// Credit from utility for kWh exported
+        /// </summary>
+        public decimal ExportCredit { get; set; }
+
+        /// <summary>
+        /// Delivery charge for kWh used
+        /// </summary>
+        public decimal DeliveryCharge { get; set; }
 
         /// <summary>
         /// Total cost for the billing cycle:
-        /// GridImportCost + DeliveryCharges + FixedCharges + TaxesAndFees - GridExportCredit.
+        /// BaseCharge + EnergyCharge - ExportCredit + DeliveryCharge
         /// </summary>
         public decimal TotalCost =>
-            GridImportCost
-            + DeliveryCharges
-            + FixedCharges
-            + TaxesAndFees
-            - GridExportCredit;
+            BaseCharge
+            + EnergyCharge
+            - ExportCredit
+            + DeliveryCharge;
     }
 }

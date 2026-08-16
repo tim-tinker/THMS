@@ -64,29 +64,6 @@ namespace THMS.Data.Stores.SqlTables
             return ReadAll(cmd);
         }
 
-        public IEnumerable<GasPurchase> GetWithMissingCost(SqliteConnection conn)
-        {
-            using var cmd = new SqliteCommand(@"
-                SELECT Id, VehicleId, Date, Gallons, FuelCost, Station
-                FROM GasPurchases
-                WHERE FuelCost = 0
-                ORDER BY Date;", conn);
-
-            return ReadAll(cmd);
-        }
-
-        public void UpdateCost(SqliteConnection conn, Guid purchaseId, decimal cost)
-        {
-            using var cmd = new SqliteCommand(@"
-                UPDATE GasPurchases
-                SET FuelCost = @Cost
-                WHERE Id = @Id;", conn);
-
-            cmd.Parameters.AddWithValue("@Id", purchaseId.ToString());
-            cmd.Parameters.AddWithValue("@Cost", cost);
-            cmd.ExecuteNonQuery();
-        }
-
         private static IEnumerable<GasPurchase> ReadAll(SqliteCommand cmd)
         {
             using var reader = cmd.ExecuteReader();
