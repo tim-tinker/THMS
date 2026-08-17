@@ -11,12 +11,12 @@ namespace THMS.UI.WinForms.Controls
 
         private BindingList<BaseEvChargeSession> _sessions;
 
-        public EvChargeSessionManagerControl(IVehicleDataStore vehicleStore, IEnergyDataStore energyStore)
+        public EvChargeSessionManagerControl(IVehicleDataStore vehicleStore, IEnergyDataStore energyStore, IFinanceDataStore financeStore)
         {
             InitializeComponent();
 
             _gridSessions.AutoGenerateColumns = false;
-            _orchestrator = new EvChargeSessionOrchestrator(vehicleStore, energyStore);
+            _orchestrator = new EvChargeSessionOrchestrator(vehicleStore, energyStore, financeStore);
         }
 
         // ---------------------------------------------------------

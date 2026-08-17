@@ -12,12 +12,13 @@ namespace THMS.Data.Stores.SqlTables
             @"
             CREATE TABLE IF NOT EXISTS HomeEvChargeBillings (
                 SessionId TEXT PRIMARY KEY,
-                SessionCost REAL NOT NULL,
-                GridRate REAL NOT NULL,
-                BillingCycleId TEXT NOT NULL
+                SessionCost REAL NOT NULL
             );
             ";
             cmd.ExecuteNonQuery();
+
+            DropColumnIfExists(conn, "GridRate");
+            DropColumnIfExists(conn, "BillingCycleId");
         }
 
         public void Upsert(SqliteConnection conn, Guid sessionId, HomeEvChargeBilling billing)
@@ -25,18 +26,14 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText =
             @"
-            INSERT INTO HomeEvChargeBillings (SessionId, SessionCost, GridRate, BillingCycleId)
-            VALUES (@SessionId, @SessionCost, @GridRate, @BillingCycleId)
+            INSERT INTO HomeEvChargeBillings (SessionId, SessionCost)
+            VALUES (@SessionId, @SessionCost)
             ON CONFLICT(SessionId) DO UPDATE SET
-                SessionCost = excluded.SessionCost,
-                GridRate = excluded.GridRate,
-                BillingCycleId = excluded.BillingCycleId;
+                SessionCost = excluded.SessionCost;
             ";
 
             cmd.Parameters.AddWithValue("@SessionId", sessionId.ToString());
             cmd.Parameters.AddWithValue("@SessionCost", billing.SessionCost);
-            cmd.Parameters.AddWithValue("@GridRate", billing.GridRate);
-            cmd.Parameters.AddWithValue("@BillingCycleId", billing.BillingCycleId.ToString());
             cmd.ExecuteNonQuery();
         }
 
@@ -45,7 +42,7 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText =
             @"
-            SELECT SessionCost, GridRate, BillingCycleId
+            SELECT SessionCost
             FROM HomeEvChargeBillings
             WHERE SessionId = @SessionId;
             ";
@@ -57,9 +54,7 @@ namespace THMS.Data.Stores.SqlTables
 
             return new HomeEvChargeBilling
             {
-                SessionCost = (decimal)(double)reader.GetDouble(0),
-                GridRate = (decimal)(double)reader.GetDouble(1),
-                BillingCycleId = Guid.Parse(reader.GetString(2))
+                SessionCost = (decimal)(double)reader.GetDouble(0)
             };
         }
 
@@ -69,6 +64,20 @@ namespace THMS.Data.Stores.SqlTables
             cmd.CommandText = "DELETE FROM HomeEvChargeBillings WHERE SessionId = @SessionId;";
             cmd.Parameters.AddWithValue("@SessionId", sessionId.ToString());
             cmd.ExecuteNonQuery();
+        }
+
+        private static void DropColumnIfExists(SqliteConnection conn, string columnName)
+        {
+            try
+            {
+                using var alter = conn.CreateCommand();
+                alter.CommandText = $"ALTER TABLE HomeEvChargeBillings DROP COLUMN {columnName};";
+                alter.ExecuteNonQuery();
+            }
+            catch (SqliteException)
+            {
+                // Column already absent on new databases.
+            }
         }
     }
 }

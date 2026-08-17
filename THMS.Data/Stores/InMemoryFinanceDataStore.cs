@@ -8,6 +8,7 @@ namespace THMS.Data.Stores
     public class InMemoryFinanceDataStore : IFinanceDataStore
     {
         private readonly InMemoryElectricUtilityBillStore _utilityBills = new();
+        private readonly InMemoryElectricContractStore _electricContracts = new();
         private readonly InMemoryGasPurchaseStore _gasPurchases = new();
 
         public InMemoryFinanceDataStore()
@@ -59,5 +60,23 @@ namespace THMS.Data.Stores
         public IEnumerable<GasPurchase> GetGasPurchases(Guid vehicleId, DateTime start, DateTime end) =>
             _gasPurchases.GetRange(vehicleId, start, end);
 
+        // ---------------------------------------------------------
+        // ELECTRIC CONTRACTS
+        // ---------------------------------------------------------
+
+        public void UpsertElectricContract(ElectricContract contract) =>
+            _electricContracts.Upsert(contract);
+
+        public ElectricContract? GetElectricContract(Guid contractId) =>
+            _electricContracts.Get(contractId);
+
+        public ElectricContract? GetElectricContractForDate(DateTime date) =>
+            _electricContracts.GetForDate(date);
+
+        public IEnumerable<ElectricContract> GetElectricContracts(DateTime start, DateTime end) =>
+            _electricContracts.GetRange(start, end);
+
+        public ElectricContract? GetLatestElectricContract() =>
+            _electricContracts.GetLatest();
     }
 }

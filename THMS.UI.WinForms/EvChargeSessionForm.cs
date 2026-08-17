@@ -2,7 +2,6 @@
 using THMS.Data.Stores;
 using THMS.Domain.Transportation;
 using THMS.Logic.Orchestrators;
-using THMS.Logic.ViewModels.Transportation;
 
 namespace THMS.UI.WinForms
 {
@@ -21,11 +20,11 @@ namespace THMS.UI.WinForms
             InitializeComponent();
         }
 
-        public EvChargeSessionForm(IVehicleDataStore vehicleStore, VehicleEv vehicle, IEnergyDataStore energyStore)
+        public EvChargeSessionForm(IVehicleDataStore vehicleStore, VehicleEv vehicle, IEnergyDataStore energyStore, IFinanceDataStore financeStore)
             : this()
         {
             Vehicle = vehicle;
-            _orchestrator = new EvChargeSessionOrchestrator(vehicleStore, energyStore) { VehicleId = vehicle.Id };
+            _orchestrator = new EvChargeSessionOrchestrator(vehicleStore, energyStore, financeStore) { VehicleId = vehicle.Id };
         }
 
         private void OnLoadForm(object sender, EventArgs e)

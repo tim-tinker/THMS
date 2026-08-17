@@ -8,13 +8,15 @@ namespace THMS.UI.WinForms.Updates
     {
         private readonly IVehicleDataStore _vehicleStore;
         private readonly IEnergyDataStore _energyStore;
+        private readonly IFinanceDataStore _financeStore;
 
         public IDataSourceStatus Status { get; private set; }
 
-        public EvChargeSessionUpdater(IVehicleDataStore vehicleStore, IEnergyDataStore energyStore)
+        public EvChargeSessionUpdater(IVehicleDataStore vehicleStore, IEnergyDataStore energyStore, IFinanceDataStore financeStore)
         {
             _vehicleStore = vehicleStore;
             _energyStore = energyStore;
+            _financeStore = financeStore;
             Status = new EvChargeSessionDataSourceStatus(vehicleStore);
         }
 
@@ -33,7 +35,7 @@ namespace THMS.UI.WinForms.Updates
             if (vehicle == null)
                 return;
 
-            using var form = new EvChargeSessionForm(_vehicleStore, vehicle, _energyStore);
+            using var form = new EvChargeSessionForm(_vehicleStore, vehicle, _energyStore, _financeStore);
             form.ShowDialog();
         }
     }

@@ -171,33 +171,20 @@ namespace THMS.Logic.Orchestrators
         // ---------------------------------------------------------
         private void ComputeAndStoreBilling(HomeEvChargeSession session)
         {
-            var bill = _financeStore.GetElectricUtilityBillForDate(session.StartTime);
-            if (bill == null)
+            var contract = _financeStore.GetElectricContractForDate(session.StartTime);
+            if (contract == null)
                 return;
-
-            // EV-specific cost attribution:
-            // ✔ EnergyChargeRate applies to GridKwh
-            // ✔ DeliveryCharge is proportional to usage
-            // ✘ BaseCharge excluded
-            // ✘ ExportCredit excluded
 
             var gridKwh = session.Attribution!.GridKwh;
 
-            var energyCost = gridKwh * bill.EnergyChargeRate;
+            var energyCost = gridKwh * contract.EnergyChargeRate;
+            var deliveryCost = gridKwh * contract.DeliveryChargeRate;
 
-            var deliveryCost =
-                bill.KwhUsage > 0
-                    ? gridKwh * (bill.DeliveryCharge / bill.KwhUsage)
-                    : 0m;
+            var sessionCost = energyCost + deliveryCost;
 
             var billing = new HomeEvChargeBilling
             {
-                BillingCycleId = bill.Id,
-                EnergyChargeRate = bill.EnergyChargeRate,
-                DeliveryChargeRate = bill.KwhUsage > 0
-                    ? bill.DeliveryCharge / bill.KwhUsage
-                    : 0m,
-                SessionCost = energyCost + deliveryCost
+                SessionCost = sessionCost
             };
 
             session.Billing = billing;

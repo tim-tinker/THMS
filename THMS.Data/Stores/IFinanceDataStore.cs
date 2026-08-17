@@ -1,4 +1,5 @@
-﻿using THMS.Domain.Finance.Billing;
+﻿using THMS.Domain.Finance;
+using THMS.Domain.Finance.Billing;
 using THMS.Domain.Transportation;
 
 namespace THMS.Data.Stores
@@ -40,5 +41,36 @@ namespace THMS.Data.Stores
             Guid vehicleId,
             DateTime start,
             DateTime end);
+
+        // ---------------------------------------------------------
+        // ELECTRIC CONTRACTS
+        // ---------------------------------------------------------
+
+        /// <summary>
+        /// Upsert key: <see cref="ElectricContract.Id"/>.
+        /// </summary>
+        void UpsertElectricContract(ElectricContract contract);
+
+        /// <summary>
+        /// Get a contract by its unique identifier.
+        /// </summary>
+        ElectricContract? GetElectricContract(Guid contractId);
+
+        /// <summary>
+        /// Get the contract whose date range covers the specified date.
+        /// Example: session.StartTime falls between contract.StartDate and contract.EndDate.
+        /// </summary>
+        ElectricContract? GetElectricContractForDate(DateTime date);
+
+        /// <summary>
+        /// Get all contracts whose date ranges overlap the given range.
+        /// </summary>
+        IEnumerable<ElectricContract> GetElectricContracts(DateTime start, DateTime end);
+
+        /// <summary>
+        /// Most recent contract by <see cref="ElectricContract.StartDate"/>, or null if none.
+        /// </summary>
+        ElectricContract? GetLatestElectricContract();
+
     }
 }

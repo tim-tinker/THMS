@@ -7,15 +7,17 @@ namespace THMS.UI.WinForms
     {
         private readonly IEnergyDataStore _energyStore;
         private readonly IVehicleDataStore _vehicleStore;
+        private readonly IFinanceDataStore _financeStore;
         private IDataManagerControl? _currentControl;
 
         private Dictionary<string, Control> _controls = [];
 
-        public DataManagerForm(IEnergyDataStore energyStore, IVehicleDataStore vehicleStore)
+        public DataManagerForm(IEnergyDataStore energyStore, IVehicleDataStore vehicleStore, IFinanceDataStore financeStore)
         {
             InitializeComponent();
             _energyStore = energyStore;
             _vehicleStore = vehicleStore;
+            _financeStore = financeStore;
             CreateControlDictionary();
         }
 
@@ -24,7 +26,7 @@ namespace THMS.UI.WinForms
             _controls["Solar"] = new SolarIntervalManagerControl(_energyStore) { Dock = DockStyle.Fill };
             _controls["Circuit"] = new HomeCircuitManagerControl(_energyStore) { Dock = DockStyle.Fill };
             _controls["Attribution"] = new HomeCircuitAttributionManagerControl(_energyStore) { Dock = DockStyle.Fill };
-            _controls["Session"] = new EvChargeSessionManagerControl(_vehicleStore, _energyStore) { Dock = DockStyle.Fill };
+            _controls["Session"] = new EvChargeSessionManagerControl(_vehicleStore, _energyStore, _financeStore) { Dock = DockStyle.Fill };
         }
 
         private void OnClickClose(object sender, EventArgs e)
