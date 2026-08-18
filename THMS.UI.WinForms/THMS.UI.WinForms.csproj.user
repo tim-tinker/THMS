@@ -10,6 +10,9 @@
     <Compile Update="ChargeCostEntryForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Controls\ElectricContractManagerControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Update="Controls\EnergyMetricsTableControl.cs">
       <SubType>UserControl</SubType>
     </Compile>

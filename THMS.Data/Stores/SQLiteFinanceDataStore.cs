@@ -12,7 +12,6 @@ namespace THMS.Data.Stores.SQLite
 
         private readonly SqliteElectricUtilityBillStore _utilityBills = new();
         private readonly SqliteElectricContractStore _electricContracts = new();
-        private readonly SqliteGasPurchaseStore _gasPurchases = new();
 
         public SQLiteFinanceDataStore(string databasePath)
         {
@@ -32,7 +31,6 @@ namespace THMS.Data.Stores.SQLite
         {
             _utilityBills.InitializeSchema(conn);
             _electricContracts.InitializeSchema(conn);
-            _gasPurchases.InitializeSchema(conn);
         }
 
         // ---------------------------------------------------------
@@ -67,22 +65,6 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             return _utilityBills.GetLatest(conn);
-        }
-
-        // ---------------------------------------------------------
-        // GAS PURCHASES
-        // ---------------------------------------------------------
-
-        public void UpsertGasPurchase(GasPurchase purchase)
-        {
-            using var conn = OpenConnection();
-            _gasPurchases.Upsert(conn, purchase);
-        }
-
-        public IEnumerable<GasPurchase> GetGasPurchases(Guid vehicleId, DateTime start, DateTime end)
-        {
-            using var conn = OpenConnection();
-            return _gasPurchases.GetRange(conn, vehicleId, start, end).ToList();
         }
 
         // ---------------------------------------------------------

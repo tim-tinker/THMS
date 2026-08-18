@@ -11,7 +11,7 @@ namespace THMS.UI.WinForms
 {
     public partial class ElectricContractDataEntryForm : Form
     {
-        public ElectricContract Contract { get; private set; }
+        public ElectricContract? Contract { get; private set; }
 
         public ElectricContractDataEntryForm()
         {
@@ -21,6 +21,7 @@ namespace THMS.UI.WinForms
         private void OnClickCancel(object sender, EventArgs e)
         {
             Contract = null;
+            DialogResult = DialogResult.Cancel;
             Close();
         }
 
@@ -28,6 +29,7 @@ namespace THMS.UI.WinForms
         {
             Contract = new ElectricContract
             {
+                Id = Guid.NewGuid(),
                 Name = _textName.Text,
                 StartDate = _dateStart.Value,
                 EndDate = _dateEnd.Value,
@@ -37,6 +39,7 @@ namespace THMS.UI.WinForms
                 DeliveryChargeRate = _numDeliveryRate.Value,
                 ExportCreditRate = _numSolarCreditRate.Value
             };
+            DialogResult = DialogResult.OK;
             Close();
         }
     }

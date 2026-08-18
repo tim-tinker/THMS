@@ -1,35 +1,30 @@
 ﻿using THMS.Data.Stores;
 using THMS.Domain.Transportation;
 using THMS.Logic.DataCenter;
+using THMS.Logic.Orchestrators;
 
 namespace THMS.UI.WinForms.Updates
 {
     public class ElectricContractUpdater : IDataSourceUpdater
     {
-        private readonly IVehicleDataStore _vehicleStore;
-        private readonly IEnergyDataStore _energyStore;
-        private readonly IFinanceDataStore _financeStore;
+        private readonly ElectricContractOrchestrator _orchestrator;
 
         public IDataSourceStatus Status { get; private set; }
 
-        public ElectricContractUpdater(IVehicleDataStore vehicleStore, IEnergyDataStore energyStore, IFinanceDataStore financeStore)
+        public ElectricContractUpdater(IFinanceDataStore financeStore)
         {
-            _vehicleStore = vehicleStore;
-            _energyStore = energyStore;
-            _financeStore = financeStore;
             Status = new ElectricContractDataSourceStatus(financeStore);
+            _orchestrator = new ElectricContractOrchestrator(financeStore);
         }
 
         public void UpdateDataSource()
         {
             using var dataEntryForm = new ElectricContractDataEntryForm();
 
-            if (dataEntryForm.ShowDialog() != DialogResult.OK)
-                return;
-
-            var contract = dataEntryForm.Contract;
-            if (contract == null)
-                return;
+            if (DialogResult.OK == dataEntryForm.ShowDialog() && dataEntryForm.Contract is not null)
+            {
+                _orchestrator.Save(dataEntryForm.Contract);
+            }
         }
     }
 }

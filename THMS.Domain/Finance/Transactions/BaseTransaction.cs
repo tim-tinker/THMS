@@ -1,0 +1,12 @@
+﻿namespace THMS.Domain.Finance.Transactions
+{
+    public class BaseTransaction : BaseDomainModel
+    {
+        public DateTime Date { get; set; }
+        public string? Description { get; set; }
+        public decimal Amount { get; set; }
+
+        public string? Category { get; set; }
+
+    }
+}

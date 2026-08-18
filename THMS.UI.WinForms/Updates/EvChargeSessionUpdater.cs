@@ -1,6 +1,7 @@
 ﻿using THMS.Data.Stores;
 using THMS.Domain.Transportation;
 using THMS.Logic.DataCenter;
+using THMS.Logic.Orchestrators;
 
 namespace THMS.UI.WinForms.Updates
 {
@@ -10,6 +11,8 @@ namespace THMS.UI.WinForms.Updates
         private readonly IEnergyDataStore _energyStore;
         private readonly IFinanceDataStore _financeStore;
 
+        private readonly EvChargeSessionOrchestrator _orchestrator;
+
         public IDataSourceStatus Status { get; private set; }
 
         public EvChargeSessionUpdater(IVehicleDataStore vehicleStore, IEnergyDataStore energyStore, IFinanceDataStore financeStore)
@@ -18,6 +21,7 @@ namespace THMS.UI.WinForms.Updates
             _energyStore = energyStore;
             _financeStore = financeStore;
             Status = new EvChargeSessionDataSourceStatus(vehicleStore);
+            _orchestrator = new EvChargeSessionOrchestrator(vehicleStore, energyStore, financeStore);
         }
 
         public void UpdateDataSource()
@@ -36,7 +40,10 @@ namespace THMS.UI.WinForms.Updates
                 return;
 
             using var form = new EvChargeSessionForm(_vehicleStore, vehicle, _energyStore, _financeStore);
-            form.ShowDialog();
+            if (DialogResult.OK == form.ShowDialog() && form.SavedSession is not null)
+            {
+                _orchestrator.Save(form.SavedSession);
+            }
         }
     }
 }

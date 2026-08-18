@@ -31,18 +31,6 @@ namespace THMS.Data.Stores
         ElectricUtilityBill? GetLatestElectricUtilityBill();
 
         // ---------------------------------------------------------
-        // GAS PURCHASES (ICE VEHICLES)
-        // ---------------------------------------------------------
-
-        /// <summary>Upsert key: <see cref="GasPurchase.Id"/>.</summary>
-        void UpsertGasPurchase(GasPurchase purchase);
-
-        IEnumerable<GasPurchase> GetGasPurchases(
-            Guid vehicleId,
-            DateTime start,
-            DateTime end);
-
-        // ---------------------------------------------------------
         // ELECTRIC CONTRACTS
         // ---------------------------------------------------------
 

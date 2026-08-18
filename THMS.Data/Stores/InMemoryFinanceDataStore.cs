@@ -9,7 +9,6 @@ namespace THMS.Data.Stores
     {
         private readonly InMemoryElectricUtilityBillStore _utilityBills = new();
         private readonly InMemoryElectricContractStore _electricContracts = new();
-        private readonly InMemoryGasPurchaseStore _gasPurchases = new();
 
         public InMemoryFinanceDataStore()
         {
@@ -49,16 +48,6 @@ namespace THMS.Data.Stores
 
         public ElectricUtilityBill? GetLatestElectricUtilityBill() =>
             _utilityBills.GetLatest();
-
-        // ---------------------------------------------------------
-        // GAS PURCHASES
-        // ---------------------------------------------------------
-
-        public void UpsertGasPurchase(GasPurchase purchase) =>
-            _gasPurchases.Upsert(purchase);
-
-        public IEnumerable<GasPurchase> GetGasPurchases(Guid vehicleId, DateTime start, DateTime end) =>
-            _gasPurchases.GetRange(vehicleId, start, end);
 
         // ---------------------------------------------------------
         // ELECTRIC CONTRACTS

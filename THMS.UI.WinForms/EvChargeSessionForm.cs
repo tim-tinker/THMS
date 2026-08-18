@@ -125,7 +125,7 @@ namespace THMS.UI.WinForms
 
             if (ValidateSession(session))
             {
-                _orchestrator.Save(session);
+                SavedSession = session;
                 DialogResult = DialogResult.OK;
                 Close();
             }

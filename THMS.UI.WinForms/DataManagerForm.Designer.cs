@@ -24,6 +24,7 @@
             _menuHomeCircuitType = new ToolStripMenuItem();
             _menuHomeCircuitAttribution = new ToolStripMenuItem();
             _menuEvChargeSessionType = new ToolStripMenuItem();
+            electricContractsToolStripMenuItem = new ToolStripMenuItem();
             viewToolStripMenuItem = new ToolStripMenuItem();
             _menuViewMonth = new ToolStripMenuItem();
             _menuViewYear = new ToolStripMenuItem();
@@ -62,7 +63,7 @@
             // 
             // dataTypeToolStripMenuItem
             // 
-            dataTypeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { _menuSolarType, _menuHomeCircuitType, _menuHomeCircuitAttribution, _menuEvChargeSessionType });
+            dataTypeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { _menuSolarType, _menuHomeCircuitType, _menuHomeCircuitAttribution, _menuEvChargeSessionType, electricContractsToolStripMenuItem });
             dataTypeToolStripMenuItem.Name = "dataTypeToolStripMenuItem";
             dataTypeToolStripMenuItem.Size = new Size(124, 34);
             dataTypeToolStripMenuItem.Text = "Data Type";
@@ -98,6 +99,14 @@
             _menuEvChargeSessionType.Tag = "Session";
             _menuEvChargeSessionType.Text = "EV Charge Session";
             _menuEvChargeSessionType.Click += OnClickTypeMenuItem;
+            // 
+            // electricContractsToolStripMenuItem
+            // 
+            electricContractsToolStripMenuItem.Name = "electricContractsToolStripMenuItem";
+            electricContractsToolStripMenuItem.Size = new Size(315, 40);
+            electricContractsToolStripMenuItem.Tag = "ElectricContract";
+            electricContractsToolStripMenuItem.Text = "Electric Contracts";
+            electricContractsToolStripMenuItem.Click += OnClickTypeMenuItem;
             // 
             // viewToolStripMenuItem
             // 
@@ -203,5 +212,6 @@
         private ToolStripMenuItem addToolStripMenuItem;
         private ToolStripMenuItem editToolStripMenuItem1;
         private ToolStripMenuItem deleteToolStripMenuItem;
+        private ToolStripMenuItem electricContractsToolStripMenuItem;
     }
 }

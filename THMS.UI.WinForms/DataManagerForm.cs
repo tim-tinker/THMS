@@ -27,6 +27,7 @@ namespace THMS.UI.WinForms
             _controls["Circuit"] = new HomeCircuitManagerControl(_energyStore) { Dock = DockStyle.Fill };
             _controls["Attribution"] = new HomeCircuitAttributionManagerControl(_energyStore) { Dock = DockStyle.Fill };
             _controls["Session"] = new EvChargeSessionManagerControl(_vehicleStore, _energyStore, _financeStore) { Dock = DockStyle.Fill };
+            _controls["ElectricContract"] = new ElectricContractManagerControl(_financeStore) { Dock = DockStyle.Fill };
         }
 
         private void OnClickClose(object sender, EventArgs e)
