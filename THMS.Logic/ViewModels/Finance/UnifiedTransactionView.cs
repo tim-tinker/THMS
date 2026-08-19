@@ -1,4 +1,4 @@
-﻿namespace THMS.Domain.Finance.Transactions
+﻿namespace THMS.Logic.ViewModels.Finance
 {
     public class UnifiedTransactionView
     {
@@ -11,5 +11,7 @@
 
         public string? Category { get; set; }
         public string Type { get; set; } // Posted, Future, RecurringRule, Transfer, FutureTransfer
+
+        public decimal? ForecastBalance { get; set; }
     }
 }

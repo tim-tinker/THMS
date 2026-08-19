@@ -25,6 +25,9 @@
     <Compile Update="Controls\SolarIntervalManagerControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Update="Controls\TransactionManagerControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Update="Controls\VcrControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
