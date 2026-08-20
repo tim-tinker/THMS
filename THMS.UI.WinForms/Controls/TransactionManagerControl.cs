@@ -39,10 +39,11 @@ namespace THMS.UI.WinForms.Controls
             masterGrid.AutoGenerateColumns = false;
             detailGrid.AutoGenerateColumns = false;
 
-            masterGrid.SelectionChanged += MasterGrid_SelectionChanged;
-
             detailGrid.DataSource = _transactionsSource;
             masterGrid.DataSource = _accountsSource;
+
+            _accountsSource.CurrentChanged += OnCurrentAccountChanged;
+            _transactionsSource.ListChanged += OnTransactionsListChanged;
         }
 
         // ------------------------------------------------------------
@@ -58,16 +59,9 @@ namespace THMS.UI.WinForms.Controls
         // ------------------------------------------------------------
         // When an account is selected → load transactions
         // ------------------------------------------------------------
-        private void MasterGrid_SelectionChanged(object? sender, EventArgs e)
+        private void OnCurrentAccountChanged(object? sender, EventArgs e)
         {
-            if (masterGrid.SelectedRows.Count == 0)
-                return;
-
-            var account = masterGrid.SelectedRows[0].DataBoundItem as Account;
-            if (account == null)
-                return;
-
-            LoadTransactionsForAccount(account.Id);
+            RefreshCurrentAccount();
         }
 
         // ------------------------------------------------------------
@@ -94,9 +88,6 @@ namespace THMS.UI.WinForms.Controls
 
             // Default sort by date
             SortByDateAscending();
-
-            // Compute forecast balances
-            ComputeForecastBalances(unified, accountId);
         }
 
         // ------------------------------------------------------------
@@ -111,6 +102,16 @@ namespace THMS.UI.WinForms.Controls
         {
             foreach (var item in list)
                 item.ForecastBalance = null;
+        }
+
+        private void OnTransactionsListChanged(object? sender, ListChangedEventArgs e)
+        {
+            var account = _accountsSource.Current as UnifiedAccountView;
+            if (account == null) return;
+
+            // Recompute forecast using the current unified list
+            var unified = _transactionsSource.List.Cast<UnifiedTransactionView>().ToList();
+            ComputeForecastBalances(unified, account.Id);
         }
 
         // ------------------------------------------------------------
@@ -187,12 +188,8 @@ namespace THMS.UI.WinForms.Controls
         // ------------------------------------------------------------
         public void RefreshCurrentAccount()
         {
-            if (masterGrid.SelectedRows.Count == 0)
-                return;
-
-            var account = masterGrid.SelectedRows[0].DataBoundItem as Account;
-            if (account == null)
-                return;
+            var account = _accountsSource.Current as UnifiedAccountView;
+            if (account == null) return;
 
             LoadTransactionsForAccount(account.Id);
         }

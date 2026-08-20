@@ -7,6 +7,7 @@ namespace THMS.Data.Stores.SqliteStores
     public class SqliteAccountStore
     {
         private readonly AccountTable _accountTable = new();
+        private readonly ExternalAccountLinksTable _externalLinkTable = new();
         private readonly BankAccountTable _bankAccountTable = new();
         private readonly CreditAccountTable _creditAccountTable = new();
         private readonly LoanAccountTable _loanAccountTable = new();
@@ -17,6 +18,7 @@ namespace THMS.Data.Stores.SqliteStores
         public void InitializeSchema(SqliteConnection conn)
         {
             _accountTable.InitializeSchema(conn);
+            _externalLinkTable.InitializeSchema(conn);
             _bankAccountTable.InitializeSchema(conn);
             _creditAccountTable.InitializeSchema(conn);
             _loanAccountTable.InitializeSchema(conn);
@@ -28,6 +30,7 @@ namespace THMS.Data.Stores.SqliteStores
         public void Upsert(SqliteConnection conn, Account account)
         {
             _accountTable.Upsert(conn, account);
+            UpsertExternalLink(conn, account);
 
             switch (account)
             {
@@ -61,131 +64,30 @@ namespace THMS.Data.Stores.SqliteStores
                 return null;
 
             var (name, institution, accountNumber, type, balanceAsOf, classType) = baseInfo.Value;
+            var externalLink = _externalLinkTable.Get(conn, id);
 
-            switch (classType)
+            Account? account = classType switch
             {
-                case nameof(BankAccount):
-                {
-                    var details = _bankAccountTable.Get(conn, id);
-                    if (details == null)
-                        return null;
+                nameof(BankAccount) => LoadBank(conn, id),
+                nameof(CreditAccount) => LoadCredit(conn, id),
+                nameof(LoanAccount) => LoadLoan(conn, id),
+                nameof(MortgageAccount) => LoadMortgage(conn, id),
+                nameof(InvestmentAccount) => LoadInvestment(conn, id),
+                nameof(InternalAccount) => LoadInternal(conn, id),
+                _ => null
+            };
 
-                    return new BankAccount
-                    {
-                        Id = id,
-                        Name = name,
-                        Institution = institution,
-                        AccountNumber = accountNumber,
-                        Type = type,
-                        BalanceAsOf = balanceAsOf,
-                        PostedBalance = details.Value.PostedBalance,
-                        OverdraftLimit = details.Value.OverdraftLimit
-                    };
-                }
+            if (account == null)
+                return null;
 
-                case nameof(CreditAccount):
-                {
-                    var details = _creditAccountTable.Get(conn, id);
-                    if (details == null)
-                        return null;
-
-                    return new CreditAccount
-                    {
-                        Id = id,
-                        Name = name,
-                        Institution = institution,
-                        AccountNumber = accountNumber,
-                        Type = type,
-                        BalanceAsOf = balanceAsOf,
-                        CreditLimit = details.Value.CreditLimit,
-                        APR = details.Value.APR,
-                        StatementDate = details.Value.StatementDate,
-                        DueDate = details.Value.DueDate,
-                        PostedBalance = details.Value.PostedBalance
-                    };
-                }
-
-                case nameof(LoanAccount):
-                {
-                    var details = _loanAccountTable.Get(conn, id);
-                    if (details == null)
-                        return null;
-
-                    return new LoanAccount
-                    {
-                        Id = id,
-                        Name = name,
-                        Institution = institution,
-                        AccountNumber = accountNumber,
-                        Type = type,
-                        BalanceAsOf = balanceAsOf,
-                        Principal = details.Value.Principal,
-                        InterestRate = details.Value.InterestRate,
-                        NextPaymentDate = details.Value.NextPaymentDate
-                    };
-                }
-
-                case nameof(MortgageAccount):
-                {
-                    var details = _mortgageAccountTable.Get(conn, id);
-                    if (details == null)
-                        return null;
-
-                    return new MortgageAccount
-                    {
-                        Id = id,
-                        Name = name,
-                        Institution = institution,
-                        AccountNumber = accountNumber,
-                        Type = type,
-                        BalanceAsOf = balanceAsOf,
-                        Principal = details.Value.Principal,
-                        InterestRate = details.Value.InterestRate,
-                        TermMonths = details.Value.TermMonths,
-                        NextPaymentDate = details.Value.NextPaymentDate
-                    };
-                }
-
-                case nameof(InvestmentAccount):
-                {
-                    var details = _investmentAccountTable.Get(conn, id);
-                    if (details == null)
-                        return null;
-
-                    return new InvestmentAccount
-                    {
-                        Id = id,
-                        Name = name,
-                        Institution = institution,
-                        AccountNumber = accountNumber,
-                        Type = type,
-                        BalanceAsOf = balanceAsOf,
-                        CashBalance = details.Value.CashBalance,
-                        MarketValue = details.Value.MarketValue
-                    };
-                }
-
-                case nameof(InternalAccount):
-                {
-                    var purpose = _internalAccountTable.GetPurpose(conn, id);
-                    if (purpose == null)
-                        return null;
-
-                    return new InternalAccount
-                    {
-                        Id = id,
-                        Name = name,
-                        Institution = institution,
-                        AccountNumber = accountNumber,
-                        Type = type,
-                        BalanceAsOf = balanceAsOf,
-                        Purpose = purpose
-                    };
-                }
-
-                default:
-                    return null;
-            }
+            account.Id = id;
+            account.Name = name;
+            account.Institution = institution;
+            account.AccountNumber = accountNumber;
+            account.Type = type;
+            account.BalanceAsOf = balanceAsOf;
+            account.ExternalLink = externalLink;
+            return account;
         }
 
         public IEnumerable<Account> GetAll(SqliteConnection conn)
@@ -196,6 +98,97 @@ namespace THMS.Data.Stores.SqliteStores
                 if (account != null)
                     yield return account;
             }
+        }
+
+        private void UpsertExternalLink(SqliteConnection conn, Account account)
+        {
+            if (account.ExternalLink is null)
+                _externalLinkTable.Delete(conn, account.Id);
+            else
+                _externalLinkTable.Upsert(conn, account.Id, account.ExternalLink);
+        }
+
+        private BankAccount? LoadBank(SqliteConnection conn, Guid id)
+        {
+            var details = _bankAccountTable.Get(conn, id);
+            if (details == null)
+                return null;
+
+            return new BankAccount
+            {
+                PostedBalance = details.Value.PostedBalance,
+                OverdraftLimit = details.Value.OverdraftLimit
+            };
+        }
+
+        private CreditAccount? LoadCredit(SqliteConnection conn, Guid id)
+        {
+            var details = _creditAccountTable.Get(conn, id);
+            if (details == null)
+                return null;
+
+            return new CreditAccount
+            {
+                CreditLimit = details.Value.CreditLimit,
+                APR = details.Value.APR,
+                StatementDate = details.Value.StatementDate,
+                DueDate = details.Value.DueDate,
+                PostedBalance = details.Value.PostedBalance
+            };
+        }
+
+        private LoanAccount? LoadLoan(SqliteConnection conn, Guid id)
+        {
+            var details = _loanAccountTable.Get(conn, id);
+            if (details == null)
+                return null;
+
+            return new LoanAccount
+            {
+                Principal = details.Value.Principal,
+                InterestRate = details.Value.InterestRate,
+                NextPaymentDate = details.Value.NextPaymentDate
+            };
+        }
+
+        private MortgageAccount? LoadMortgage(SqliteConnection conn, Guid id)
+        {
+            var details = _mortgageAccountTable.Get(conn, id);
+            if (details == null)
+                return null;
+
+            return new MortgageAccount
+            {
+                Principal = details.Value.Principal,
+                InterestRate = details.Value.InterestRate,
+                TermMonths = details.Value.TermMonths,
+                NextPaymentDate = details.Value.NextPaymentDate
+            };
+        }
+
+        private InvestmentAccount? LoadInvestment(SqliteConnection conn, Guid id)
+        {
+            var details = _investmentAccountTable.Get(conn, id);
+            if (details == null)
+                return null;
+
+            return new InvestmentAccount
+            {
+                CashBalance = details.Value.CashBalance,
+                MarketValue = details.Value.MarketValue
+            };
+        }
+
+        private InternalAccount? LoadInternal(SqliteConnection conn, Guid id)
+        {
+            var purpose = _internalAccountTable.GetPurpose(conn, id);
+            if (purpose == null)
+                return null;
+
+            return new InternalAccount
+            {
+                Purpose = purpose
+            };
         }
     }
 }

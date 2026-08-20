@@ -7,5 +7,7 @@
         public string AccountNumber { get; set; }
         public AccountType Type { get; set; }
         public DateTime? BalanceAsOf { get; set; }
+
+        public ExternalAccountLink? ExternalLink { get; set; }
     }
 }
