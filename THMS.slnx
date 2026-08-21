@@ -6,6 +6,7 @@
   </Configurations>
   <Project Path="THMS.Data/THMS.Data.csproj" />
   <Project Path="THMS.Domain/THMS.Domain.csproj" />
+  <Project Path="THMS.External/THMS.External.csproj" Id="0f2e9772-a396-4acb-841a-4b9fd4be2e8e" />
   <Project Path="THMS.Ingestion/THMS.Ingestion.csproj" />
   <Project Path="THMS.Logic/THMS.Logic.csproj" />
   <Project Path="THMS.Reporting.Excel/THMS.Reporting.Excel.csproj" />
