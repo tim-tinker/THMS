@@ -1,6 +1,9 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using THMS.Data.Stores;
+using THMS.External.Plaid;
 using THMS.Logic.Energy;
+using THMS.Logic.Orchestrators;
 using THMS.UI.WinForms.Navigation;
 using THMS.UI.WinForms.Updates;
 
@@ -27,6 +30,9 @@ internal static class Program
         services.AddSingleton<IFinanceDataStore, InMemoryFinanceDataStore>();
         services.AddSingleton<IEnergyDataStore, InMemoryEnergyDataStore>();
 
+        // Orchestrators
+        services.AddSingleton<RegisterUpdateOrchestrator>();
+
         // Dashboard forms — created once, hosted inside MainForm
         services.AddSingleton<TransportationDashboardForm>();
         services.AddSingleton<EnergyDashboardForm>();
@@ -46,6 +52,30 @@ internal static class Program
         services.AddSingleton<IDataSourceUpdater, HomeCircuitAttributionUpdater>();
         services.AddSingleton<IDataSourceUpdater, EvChargeSessionUpdater>();
         services.AddSingleton<IDataSourceUpdater, ElectricContractUpdater>();
+
+        // client for Plaid aggregator
+        services.AddSingleton<PlaidClient>(sp =>
+        {
+            var config = sp.GetRequiredService<IConfiguration>();
+
+            var baseUrl = config["Plaid:Environment"] switch
+            {
+                "Sandbox" => "https://sandbox.plaid.com",
+                "Development" => "https://development.plaid.com",
+                "Production" => "https://production.plaid.com",
+                _ => "https://sandbox.plaid.com"
+            };
+
+            return new PlaidClient(
+                new HttpClient(),
+                new PlaidClientOptions
+                {
+                    ClientId = config["Plaid:ClientId"],
+                    Secret = config["Plaid:Secret"],
+                    BaseUrl = baseUrl
+                });
+        });
+
 
         // Later, switch implementations without touching forms:
         // services.AddSingleton<IVehicleDataStore, SQLiteVehicleDataStore>();

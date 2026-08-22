@@ -39,6 +39,23 @@ namespace THMS.Data.Stores.InMemoryStores
                 .OrderBy(t => t.Date);
         }
 
+        public void ReplacePostedTransaction(PostedTransaction replacement)
+        {
+            // 1. Find existing transaction by Id
+            var existing = _posted
+                .FirstOrDefault(t => t.Id == replacement.Id);
+
+            if (existing is null)
+                throw new InvalidOperationException(
+                    $"Posted transaction {replacement.Id} not found.");
+
+            // 2. Remove the old transaction
+            _posted.Remove(existing);
+
+            // 3. Insert the replacement
+            _posted.Add(replacement);
+        }
+
         // ------------------------------------------------------------
         // Posted Transfer Transactions
         // ------------------------------------------------------------

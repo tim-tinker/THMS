@@ -29,6 +29,8 @@ namespace THMS.Data.Stores
         public IEnumerable<PostedTransaction> GetPostedTransactions(DateTime start, DateTime end) =>
             _store.GetPostedByDateRange(start, end);
 
+        public void ReplacePostedTransaction(PostedTransaction replacement) => _store.ReplacePostedTransaction(replacement);
+
         // ------------------------------------------------------------
         // Posted Transfer Transactions
         // ------------------------------------------------------------

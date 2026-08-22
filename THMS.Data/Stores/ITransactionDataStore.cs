@@ -9,6 +9,7 @@ namespace THMS.Data.Stores
         // ------------------------------------------------------------
         void AddPostedTransaction(PostedTransaction transaction);
         void UpdatePostedTransaction(PostedTransaction transaction);
+        void ReplacePostedTransaction(PostedTransaction replacement);
         void DeletePostedTransaction(Guid id);
 
         PostedTransaction? GetPostedTransaction(Guid id);

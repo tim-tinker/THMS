@@ -39,6 +39,26 @@ namespace THMS.Data.Stores.SQLite
             _store.Posted.Update(conn, transaction);
         }
 
+        public void ReplacePostedTransaction(PostedTransaction replacement)
+        {
+            using var conn = OpenConnection();
+            using var tx = conn.BeginTransaction();
+
+            var existing = _store.Posted.GetById(conn, replacement.Id);
+            if (existing is null)
+                throw new InvalidOperationException(
+                    $"Posted transaction {replacement.Id} not found.");
+
+            _store.Posted.Delete(conn, replacement.Id);
+
+            if (replacement is PostedTransferTransaction transfer)
+                _store.PostedTransfers.Add(conn, transfer);
+            else
+                _store.Posted.Add(conn, replacement);
+
+            tx.Commit();
+        }
+
         public void DeletePostedTransaction(Guid id)
         {
             using var conn = OpenConnection();

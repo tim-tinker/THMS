@@ -2,5 +2,6 @@
 {
     public class PostedTransaction : BaseSingleAccountTransaction
     {
+        public string? PlaidCategory { get; set; }
     }
 }
