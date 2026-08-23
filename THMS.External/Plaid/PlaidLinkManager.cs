@@ -6,9 +6,9 @@ namespace THMS.External.Plaid
 {
     public class PlaidLinkManager
     {
-        private readonly PlaidClient _client;
+        private readonly PlaidServiceClient _client;
 
-        public PlaidLinkManager(PlaidClient client)
+        public PlaidLinkManager(PlaidServiceClient client)
         {
             _client = client;
         }

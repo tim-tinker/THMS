@@ -10,7 +10,7 @@ namespace THMS.Logic.Orchestrators
         private readonly IAccountDataStore _accountStore;
 
         public AccountSyncOrchestrator(
-            PlaidClient plaidClient,
+            PlaidServiceClient plaidClient,
             IAccountDataStore accountStore)
         {
             _accountFetcher = new PlaidAccountFetcher(plaidClient);

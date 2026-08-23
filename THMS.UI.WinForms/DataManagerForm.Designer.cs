@@ -20,11 +20,6 @@
             panelHost = new Panel();
             menuStrip1 = new MenuStrip();
             dataTypeToolStripMenuItem = new ToolStripMenuItem();
-            _menuSolarType = new ToolStripMenuItem();
-            _menuHomeCircuitType = new ToolStripMenuItem();
-            _menuHomeCircuitAttribution = new ToolStripMenuItem();
-            _menuEvChargeSessionType = new ToolStripMenuItem();
-            electricContractsToolStripMenuItem = new ToolStripMenuItem();
             viewToolStripMenuItem = new ToolStripMenuItem();
             _menuViewMonth = new ToolStripMenuItem();
             _menuViewYear = new ToolStripMenuItem();
@@ -63,50 +58,9 @@
             // 
             // dataTypeToolStripMenuItem
             // 
-            dataTypeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { _menuSolarType, _menuHomeCircuitType, _menuHomeCircuitAttribution, _menuEvChargeSessionType, electricContractsToolStripMenuItem });
             dataTypeToolStripMenuItem.Name = "dataTypeToolStripMenuItem";
             dataTypeToolStripMenuItem.Size = new Size(124, 34);
             dataTypeToolStripMenuItem.Text = "Data Type";
-            // 
-            // _menuSolarType
-            // 
-            _menuSolarType.Name = "_menuSolarType";
-            _menuSolarType.Size = new Size(315, 40);
-            _menuSolarType.Tag = "Solar";
-            _menuSolarType.Text = "Solar";
-            _menuSolarType.Click += OnClickTypeMenuItem;
-            // 
-            // _menuHomeCircuitType
-            // 
-            _menuHomeCircuitType.Name = "_menuHomeCircuitType";
-            _menuHomeCircuitType.Size = new Size(315, 40);
-            _menuHomeCircuitType.Tag = "Circuit";
-            _menuHomeCircuitType.Text = "Home Circuit";
-            _menuHomeCircuitType.Click += OnClickTypeMenuItem;
-            // 
-            // _menuHomeCircuitAttribution
-            // 
-            _menuHomeCircuitAttribution.Name = "_menuHomeCircuitAttribution";
-            _menuHomeCircuitAttribution.Size = new Size(315, 40);
-            _menuHomeCircuitAttribution.Tag = "Attribution";
-            _menuHomeCircuitAttribution.Text = "Circuit Attribution";
-            _menuHomeCircuitAttribution.Click += OnClickTypeMenuItem;
-            // 
-            // _menuEvChargeSessionType
-            // 
-            _menuEvChargeSessionType.Name = "_menuEvChargeSessionType";
-            _menuEvChargeSessionType.Size = new Size(315, 40);
-            _menuEvChargeSessionType.Tag = "Session";
-            _menuEvChargeSessionType.Text = "EV Charge Session";
-            _menuEvChargeSessionType.Click += OnClickTypeMenuItem;
-            // 
-            // electricContractsToolStripMenuItem
-            // 
-            electricContractsToolStripMenuItem.Name = "electricContractsToolStripMenuItem";
-            electricContractsToolStripMenuItem.Size = new Size(315, 40);
-            electricContractsToolStripMenuItem.Tag = "ElectricContract";
-            electricContractsToolStripMenuItem.Text = "Electric Contracts";
-            electricContractsToolStripMenuItem.Click += OnClickTypeMenuItem;
             // 
             // viewToolStripMenuItem
             // 
@@ -200,10 +154,6 @@
 
         private MenuStrip menuStrip1;
         private ToolStripMenuItem dataTypeToolStripMenuItem;
-        private ToolStripMenuItem _menuSolarType;
-        private ToolStripMenuItem _menuHomeCircuitType;
-        private ToolStripMenuItem _menuHomeCircuitAttribution;
-        private ToolStripMenuItem _menuEvChargeSessionType;
         private ToolStripMenuItem viewToolStripMenuItem;
         private ToolStripMenuItem _menuViewMonth;
         private ToolStripMenuItem _menuViewYear;
@@ -212,6 +162,5 @@
         private ToolStripMenuItem addToolStripMenuItem;
         private ToolStripMenuItem editToolStripMenuItem1;
         private ToolStripMenuItem deleteToolStripMenuItem;
-        private ToolStripMenuItem electricContractsToolStripMenuItem;
     }
 }

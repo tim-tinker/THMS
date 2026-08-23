@@ -4,9 +4,9 @@ namespace THMS.External.Plaid
 {
     public class PlaidTransactionFetcher
     {
-        private readonly PlaidClient _client;
+        private readonly PlaidServiceClient _client;
 
-        public PlaidTransactionFetcher(PlaidClient client)
+        public PlaidTransactionFetcher(PlaidServiceClient client)
         {
             _client = client;
         }

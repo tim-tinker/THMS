@@ -1,12 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Windows.Forms;
+﻿using System.ComponentModel;
 
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
-using THMS.Domain.Finance.Transactions;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.UI.WinForms.Controls

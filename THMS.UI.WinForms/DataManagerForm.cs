@@ -8,31 +8,40 @@ namespace THMS.UI.WinForms
         private readonly IEnergyDataStore _energyStore;
         private readonly IVehicleDataStore _vehicleStore;
         private readonly IFinanceDataStore _financeStore;
+        private readonly IAccountDataStore _accountStore;
+        private readonly ITransactionDataStore _transactionStore;
         private IDataManagerControl? _currentControl;
 
         private Dictionary<string, Control> _controls = [];
 
-        public DataManagerForm(IEnergyDataStore energyStore, IVehicleDataStore vehicleStore, IFinanceDataStore financeStore)
+        public DataManagerForm(IEnergyDataStore energyStore, IVehicleDataStore vehicleStore, IFinanceDataStore financeStore, 
+            IAccountDataStore accountStore, ITransactionDataStore transactionStore)
         {
             InitializeComponent();
             _energyStore = energyStore;
             _vehicleStore = vehicleStore;
             _financeStore = financeStore;
+            _accountStore = accountStore;
+            _transactionStore = transactionStore;
             CreateControlDictionary();
         }
 
         private void CreateControlDictionary()
         {
-            _controls["Solar"] = new SolarIntervalManagerControl(_energyStore) { Dock = DockStyle.Fill };
-            _controls["Circuit"] = new HomeCircuitManagerControl(_energyStore) { Dock = DockStyle.Fill };
-            _controls["Attribution"] = new HomeCircuitAttributionManagerControl(_energyStore) { Dock = DockStyle.Fill };
-            _controls["Session"] = new EvChargeSessionManagerControl(_vehicleStore, _energyStore, _financeStore) { Dock = DockStyle.Fill };
-            _controls["ElectricContract"] = new ElectricContractManagerControl(_financeStore) { Dock = DockStyle.Fill };
+            AddControl(new SolarIntervalManagerControl(_energyStore), "Solar");
+            AddControl(new HomeCircuitManagerControl(_energyStore), "Home Circuit");
+            AddControl(new HomeCircuitAttributionManagerControl(_energyStore), "Circuit Attribution");
+            AddControl(new EvChargeSessionManagerControl(_vehicleStore, _energyStore, _financeStore), "EV Charge Session");
+            AddControl(new ElectricContractManagerControl(_financeStore), "Electric Contracts");
+            AddControl(new TransactionManagerControl(_transactionStore, _accountStore), "Accounts and Transactions");
         }
 
-        private void OnClickClose(object sender, EventArgs e)
+        private void AddControl(UserControl control, string label)
         {
-            Close();
+            control.Dock = DockStyle.Fill;
+            _controls[label] = control;
+            var menuItem = dataTypeToolStripMenuItem.DropDownItems.Add(label);
+            menuItem.Click += OnClickTypeMenuItem;
         }
 
         private void ClearControls()
@@ -44,12 +53,12 @@ namespace THMS.UI.WinForms
         private void OnClickTypeMenuItem(object sender, EventArgs e)
         {
             var menuItem = sender as ToolStripMenuItem;
-            var controlName = menuItem?.Tag.ToString();
-            if (string.IsNullOrEmpty(controlName)) return;
+            var menuLabel = menuItem?.Text;
+            if (string.IsNullOrEmpty(menuLabel)) return;
 
             ClearControls();
 
-            var control = _controls[controlName];
+            var control = _controls[menuLabel];
             _currentControl = control as IDataManagerControl;
 
             panelHost.Controls.Add(control);
@@ -84,6 +93,11 @@ namespace THMS.UI.WinForms
         private void OnClickEditDeleteAction(object sender, EventArgs e)
         {
 
+        }
+
+        private void OnClickClose(object sender, EventArgs e)
+        {
+            Close();
         }
     }
 }

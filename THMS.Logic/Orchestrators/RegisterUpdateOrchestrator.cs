@@ -13,7 +13,7 @@ namespace THMS.Logic.Orchestrators
         public RegisterUpdateOrchestrator(
             IAccountDataStore accountStore,
             ITransactionDataStore txStore,
-            PlaidClient plaidClient)   // or PlaidClient directly
+            PlaidServiceClient plaidClient)
         {
             // Build orchestrators
             _accountSync = new AccountSyncOrchestrator(plaidClient, accountStore);

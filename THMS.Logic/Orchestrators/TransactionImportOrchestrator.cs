@@ -12,7 +12,7 @@ namespace THMS.Logic.Orchestrators
         private double _dateWindowSize = 3; // use three because of weekends
 
         public TransactionImportOrchestrator(
-            PlaidClient plaidClient,
+            PlaidServiceClient plaidClient,
             ITransactionDataStore txStore)
         {
             _transactionFetcher = new PlaidTransactionFetcher(plaidClient);

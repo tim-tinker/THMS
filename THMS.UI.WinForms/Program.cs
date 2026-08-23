@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using THMS.Configuration;
 using THMS.Data.Stores;
 using THMS.External.Plaid;
 using THMS.Logic.Energy;
@@ -29,6 +30,11 @@ internal static class Program
         services.AddSingleton<IVehicleDataStore, InMemoryVehicleDataStore>();
         services.AddSingleton<IFinanceDataStore, InMemoryFinanceDataStore>();
         services.AddSingleton<IEnergyDataStore, InMemoryEnergyDataStore>();
+        services.AddSingleton<IAccountDataStore, InMemoryAccountDataStore>();
+        services.AddSingleton<ITransactionDataStore, InMemoryTransactionDataStore>();
+
+        // Later, switch implementations without touching forms:
+        // services.AddSingleton<IVehicleDataStore, SQLiteVehicleDataStore>();
 
         // Orchestrators
         services.AddSingleton<RegisterUpdateOrchestrator>();
@@ -54,31 +60,17 @@ internal static class Program
         services.AddSingleton<IDataSourceUpdater, ElectricContractUpdater>();
 
         // client for Plaid aggregator
-        services.AddSingleton<PlaidClient>(sp =>
+        services.AddSingleton<PlaidServiceClient>(sp =>
         {
-            var config = sp.GetRequiredService<IConfiguration>();
-
-            var baseUrl = config["Plaid:Environment"] switch
+            return AppConfig.Instance.PlaidEnvironment switch
             {
-                "Sandbox" => "https://sandbox.plaid.com",
-                "Development" => "https://development.plaid.com",
-                "Production" => "https://production.plaid.com",
-                _ => "https://sandbox.plaid.com"
+                "Sandbox" => new PlaidSandboxServiceClient(),
+                "Development" => new PlaidDevelopmentServiceClient(),
+                "Production" => new PlaidProductionServiceClient(),
+                _ => new PlaidSandboxServiceClient()
             };
-
-            return new PlaidClient(
-                new HttpClient(),
-                new PlaidClientOptions
-                {
-                    ClientId = config["Plaid:ClientId"],
-                    Secret = config["Plaid:Secret"],
-                    BaseUrl = baseUrl
-                });
         });
 
-
-        // Later, switch implementations without touching forms:
-        // services.AddSingleton<IVehicleDataStore, SQLiteVehicleDataStore>();
 
         return services.BuildServiceProvider();
     }
