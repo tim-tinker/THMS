@@ -10,6 +10,12 @@
     <Compile Update="ChargeCostEntryForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Controls\AccountEditForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\AccountUpdaterControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Update="Controls\ElectricContractManagerControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -26,6 +32,9 @@
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\TransactionManagerControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\TransactionUpdaterControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\VcrControl.cs">
@@ -47,6 +56,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="FinanceDashboardForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="FinanceDataCenterForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="ImporterForm.cs">

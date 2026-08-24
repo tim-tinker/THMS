@@ -55,5 +55,13 @@ namespace THMS.Data.Stores.SqlTables
                 reader.GetDateTime(2)
             );
         }
+
+        public void Delete(SqliteConnection conn, Guid id)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM LoanAccounts WHERE AccountId = @AccountId;";
+            cmd.Parameters.AddWithValue("@AccountId", id.ToString());
+            cmd.ExecuteNonQuery();
+        }
     }
 }

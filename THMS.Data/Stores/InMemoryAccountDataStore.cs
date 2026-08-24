@@ -15,5 +15,8 @@ namespace THMS.Data.Stores
 
         public IEnumerable<Account> GetAllAccounts() =>
             _accountStore.GetAll();
+
+        public void DeleteAccount(Guid id) =>
+            _accountStore.Delete(id);
     }
 }

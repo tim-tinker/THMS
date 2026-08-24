@@ -45,8 +45,9 @@ internal static class Program
         services.AddSingleton<FinanceDashboardForm>();
         services.AddSingleton<VehicleListDashboardForm>();
         services.AddSingleton<SettingsDashboardForm>();
-        services.AddSingleton<DataCenterForm>();
         services.AddSingleton<DataManagerForm>();
+        services.AddSingleton<DataCenterForm>();
+        services.AddSingleton<FinanceDataCenterForm>();
 
         services.AddSingleton<EnergyAggregationService>();
         services.AddSingleton<NavigationService>();

@@ -40,5 +40,13 @@ namespace THMS.Data.Stores.SQLite
             using var conn = OpenConnection();
             return _accountStore.GetAll(conn).ToList();
         }
+
+        public void DeleteAccount(Guid id)
+        {
+            using var conn = OpenConnection();
+            using var tx = conn.BeginTransaction();
+            _accountStore.Delete(conn, id);
+            tx.Commit();
+        }
     }
 }

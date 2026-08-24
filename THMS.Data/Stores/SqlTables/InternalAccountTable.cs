@@ -42,5 +42,13 @@ namespace THMS.Data.Stores.SqlTables
             using var reader = cmd.ExecuteReader();
             return reader.Read() ? reader.GetString(0) : null;
         }
+
+        public void Delete(SqliteConnection conn, Guid id)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM InternalAccounts WHERE AccountId = @AccountId;";
+            cmd.Parameters.AddWithValue("@AccountId", id.ToString());
+            cmd.ExecuteNonQuery();
+        }
     }
 }

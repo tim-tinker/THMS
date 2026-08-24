@@ -4,6 +4,8 @@ namespace THMS.UI
 {
     public partial class MainForm : Form
     {
+        private const int NavButtonHeight = 40;
+
         private readonly Dictionary<string, BaseDashboardForm> _dashboards = [];
         private readonly Dictionary<string, BaseEmbeddedForm> _embeddedForms = [];
 
@@ -18,32 +20,107 @@ namespace THMS.UI
             EnergyDashboardForm energyDashboard,
             FinanceDashboardForm financeDashboard,
             VehicleListDashboardForm vehicleListDashboard,
+            DataManagerForm dataManagerForm,
             DataCenterForm dataCenterForm,
-            DataManagerForm dataManagerForm
-            ) 
+            FinanceDataCenterForm financeDataCenterForm
+            )
             : this()
         {
-            _dashboards["Transportation"] = transportationDashboard;
-            _dashboards["Energy"] = energyDashboard;
-            _dashboards["Finance"] = financeDashboard;
-            _dashboards["Vehicles"] = vehicleListDashboard;
-            _embeddedForms["Data Center"] = dataCenterForm;
-            _embeddedForms["Data Manager"] = dataManagerForm;
+            AddSectionLabel("Dashboards");
+            AddDashboard("Transportation", transportationDashboard);
+            AddDashboard("Energy", energyDashboard);
+            AddDashboard("Finance", financeDashboard);
+            AddDashboard("Vehicles", vehicleListDashboard);
 
-            foreach (var form in _dashboards.Values)
-            {
-                form.ConfigureAsEmbeddedDashboard();
-                form.Visible = false;
-                dashboardHostPanel.Controls.Add(form);
-                form.InitializeDashboard();
-            }
+            AddSectionLabel("Data Management");
+            AddEmbeddedForm("Data Manager", dataManagerForm);
+            AddEmbeddedForm("Data Center", dataCenterForm);
+            AddEmbeddedForm("Finance Data Center", financeDataCenterForm);
+        }
 
-            foreach (var form in _embeddedForms.Values)
+        private void AddSectionLabel(string text)
+        {
+            var isFirst = navigationPanel.Controls.Count == 0;
+            var label = new Label
             {
-                form.ConfigureAsEmbeddedForm();
-                form.Visible=false;
-                dashboardHostPanel.Controls.Add(form);
+                Text = text,
+                AutoSize = true,
+                Font = new Font(Font, FontStyle.Bold),
+                Margin = new Padding(0, isFirst ? 0 : 16, 0, 8),
+            };
+            navigationPanel.Controls.Add(label);
+        }
+
+        private void AddDashboard(string label, BaseDashboardForm dashboardForm)
+        {
+            _dashboards[label] = dashboardForm;
+            dashboardForm.ConfigureAsEmbeddedDashboard();
+            dashboardForm.InitializeDashboard();
+
+            var button = CreateNavButton(label);
+            button.Click += OnClickNavigateToDashboard;
+            ConfigureChildForm(dashboardForm);
+        }
+
+        private void AddEmbeddedForm(string label, BaseEmbeddedForm embeddedForm)
+        {
+            _embeddedForms[label] = embeddedForm;
+            embeddedForm.ConfigureAsEmbeddedForm();
+
+            var button = CreateNavButton(label);
+            button.Click += OnClickNavigateToEmbedded;
+            ConfigureChildForm(embeddedForm);
+        }
+
+        private Button CreateNavButton(string label)
+        {
+            var button = new Button
+            {
+                Text = label,
+                Height = NavButtonHeight,
+                Width = GetNavButtonWidth(),
+                Margin = new Padding(0, 0, 0, 8),
+                UseVisualStyleBackColor = true,
+            };
+            navigationPanel.Controls.Add(button);
+            return button;
+        }
+
+        private int GetNavButtonWidth()
+        {
+            return Math.Max(50, navigationPanel.ClientSize.Width - navigationPanel.Padding.Horizontal);
+        }
+
+        private void OnNavigationPanelResize(object? sender, EventArgs e)
+        {
+            var width = GetNavButtonWidth();
+            foreach (Control control in navigationPanel.Controls)
+            {
+                if (control is Button)
+                {
+                    control.Width = width;
+                }
             }
+        }
+
+        private void ConfigureChildForm(Form form)
+        {
+            form.Visible = false;
+            dashboardHostPanel.Controls.Add(form);
+        }
+
+        private void OnClickNavigateToDashboard(object? sender, EventArgs e)
+        {
+            if (sender is not Button button) return;
+
+            ShowModule(button.Text);
+        }
+
+        private void OnClickNavigateToEmbedded(object? sender, EventArgs e)
+        {
+            if (sender is not Button button) return;
+
+            ShowFormInMainPanel(button.Text);
         }
 
         private void ShowModule(string moduleName)
@@ -55,6 +132,14 @@ namespace THMS.UI
             dashboard.RefreshDashboard();
         }
 
+        private void ShowFormInMainPanel(string formName)
+        {
+            HideAllEmbeddedForms();
+
+            var dashboard = _embeddedForms[formName];
+            dashboard.Visible = true;
+        }
+
         private void HideAllEmbeddedForms()
         {
             foreach (var form in _dashboards.Values)
@@ -62,48 +147,10 @@ namespace THMS.UI
                 form.Visible = false;
             }
 
-            foreach(var form in _embeddedForms.Values)
+            foreach (var form in _embeddedForms.Values)
             {
                 form.Visible = false;
             }
-        }
-
-        private void btnTransportation_Click(object sender, EventArgs e)
-        {
-            ShowModule("Transportation");
-        }
-
-        private void btnEnergy_Click(object sender, EventArgs e)
-        {
-            ShowModule("Energy");
-        }
-
-        private void btnFinance_Click(object sender, EventArgs e)
-        {
-            ShowModule("Finance");
-        }
-
-        private void OnClickVehicles(object sender, EventArgs e)
-        {
-            ShowModule("Vehicles");
-        }
-
-        private void OnClickDataCenter(object sender, EventArgs e)
-        {
-            ShowFormInMainPanel("Data Center");
-        }
-
-        private void OnClickDataManager(object sender, EventArgs e)
-        {
-            ShowFormInMainPanel("Data Manager");
-        }
-
-        private void ShowFormInMainPanel(string formName)
-        {
-            HideAllEmbeddedForms();
-
-            var dashboard = _embeddedForms[formName];
-            dashboard.Visible = true;
         }
     }
 }

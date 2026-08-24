@@ -20,5 +20,8 @@ namespace THMS.Data.Stores.InMemoryStores
 
         public IEnumerable<Account> GetAll() =>
             _items.OrderBy(a => a.Name);
+
+        public void Delete(Guid id) =>
+            _items.RemoveAll(a => a.Id == id);
     }
 }

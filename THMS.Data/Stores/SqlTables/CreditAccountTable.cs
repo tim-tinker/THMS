@@ -66,5 +66,13 @@ namespace THMS.Data.Stores.SqlTables
                 (decimal)(double)reader.GetDouble(4)
             );
         }
+
+        public void Delete(SqliteConnection conn, Guid id)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM CreditAccounts WHERE AccountId = @AccountId;";
+            cmd.Parameters.AddWithValue("@AccountId", id.ToString());
+            cmd.ExecuteNonQuery();
+        }
     }
 }

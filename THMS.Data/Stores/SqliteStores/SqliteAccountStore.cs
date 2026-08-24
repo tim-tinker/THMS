@@ -100,6 +100,18 @@ namespace THMS.Data.Stores.SqliteStores
             }
         }
 
+        public void Delete(SqliteConnection conn, Guid id)
+        {
+            _externalLinkTable.Delete(conn, id);
+            _bankAccountTable.Delete(conn, id);
+            _creditAccountTable.Delete(conn, id);
+            _loanAccountTable.Delete(conn, id);
+            _mortgageAccountTable.Delete(conn, id);
+            _investmentAccountTable.Delete(conn, id);
+            _internalAccountTable.Delete(conn, id);
+            _accountTable.Delete(conn, id);
+        }
+
         private void UpsertExternalLink(SqliteConnection conn, Account account)
         {
             if (account.ExternalLink is null)

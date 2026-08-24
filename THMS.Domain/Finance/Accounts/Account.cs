@@ -9,5 +9,6 @@
         public DateTime? BalanceAsOf { get; set; }
 
         public ExternalAccountLink? ExternalLink { get; set; }
+        public string WebsiteUrl { get; set; }
     }
 }

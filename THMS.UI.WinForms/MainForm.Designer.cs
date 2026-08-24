@@ -3,10 +3,8 @@ namespace THMS.UI
     partial class MainForm
     {
         private System.ComponentModel.IContainer components = null;
-        private System.Windows.Forms.Panel navigationPanel;
-        private System.Windows.Forms.Button _btnFinance;
-        private System.Windows.Forms.Button _btnVehicles;
-        private System.Windows.Forms.Panel dashboardHostPanel;
+        private FlowLayoutPanel navigationPanel;
+        private Panel dashboardHostPanel;
 
         protected override void Dispose(bool disposing)
         {
@@ -21,100 +19,33 @@ namespace THMS.UI
 
         private void InitializeComponent()
         {
-            navigationPanel = new Panel();
-            _btnDataCenter = new Button();
-            _btnFinance = new Button();
-            _btnTransportation = new Button();
-            _btnEnergy = new Button();
-            _btnVehicles = new Button();
+            navigationPanel = new FlowLayoutPanel();
             dashboardHostPanel = new Panel();
-            btnDataManager = new Button();
             navigationPanel.SuspendLayout();
             SuspendLayout();
             // 
             // navigationPanel
             // 
+            navigationPanel.AutoScroll = true;
             navigationPanel.BackColor = Color.LightGray;
-            navigationPanel.Controls.Add(btnDataManager);
-            navigationPanel.Controls.Add(_btnDataCenter);
-            navigationPanel.Controls.Add(_btnFinance);
-            navigationPanel.Controls.Add(_btnTransportation);
-            navigationPanel.Controls.Add(_btnEnergy);
-            navigationPanel.Controls.Add(_btnVehicles);
             navigationPanel.Dock = DockStyle.Left;
+            navigationPanel.FlowDirection = FlowDirection.TopDown;
             navigationPanel.Location = new Point(0, 0);
             navigationPanel.Name = "navigationPanel";
-            navigationPanel.Size = new Size(180, 999);
+            navigationPanel.Padding = new Padding(12);
+            navigationPanel.Size = new Size(291, 999);
             navigationPanel.TabIndex = 1;
-            // 
-            // _btnDataCenter
-            // 
-            _btnDataCenter.Location = new Point(10, 208);
-            _btnDataCenter.Name = "_btnDataCenter";
-            _btnDataCenter.Size = new Size(160, 40);
-            _btnDataCenter.TabIndex = 0;
-            _btnDataCenter.Text = "Data Center";
-            _btnDataCenter.UseVisualStyleBackColor = true;
-            _btnDataCenter.Click += OnClickDataCenter;
-            // 
-            // _btnFinance
-            // 
-            _btnFinance.Location = new Point(10, 20);
-            _btnFinance.Name = "_btnFinance";
-            _btnFinance.Size = new Size(160, 40);
-            _btnFinance.TabIndex = 0;
-            _btnFinance.Text = "Finance";
-            _btnFinance.UseVisualStyleBackColor = true;
-            _btnFinance.Click += btnFinance_Click;
-            // 
-            // _btnTransportation
-            // 
-            _btnTransportation.Location = new Point(10, 162);
-            _btnTransportation.Name = "_btnTransportation";
-            _btnTransportation.Size = new Size(160, 40);
-            _btnTransportation.TabIndex = 1;
-            _btnTransportation.Text = "Transportation";
-            _btnTransportation.UseVisualStyleBackColor = true;
-            _btnTransportation.Click += btnTransportation_Click;
-            // 
-            // _btnEnergy
-            // 
-            _btnEnergy.Location = new Point(10, 116);
-            _btnEnergy.Name = "_btnEnergy";
-            _btnEnergy.Size = new Size(160, 40);
-            _btnEnergy.TabIndex = 1;
-            _btnEnergy.Text = "Energy";
-            _btnEnergy.UseVisualStyleBackColor = true;
-            _btnEnergy.Click += btnEnergy_Click;
-            // 
-            // _btnVehicles
-            // 
-            _btnVehicles.Location = new Point(10, 70);
-            _btnVehicles.Name = "_btnVehicles";
-            _btnVehicles.Size = new Size(160, 40);
-            _btnVehicles.TabIndex = 1;
-            _btnVehicles.Text = "Vehicles";
-            _btnVehicles.UseVisualStyleBackColor = true;
-            _btnVehicles.Click += OnClickVehicles;
+            navigationPanel.WrapContents = false;
+            navigationPanel.Resize += OnNavigationPanelResize;
             // 
             // dashboardHostPanel
             // 
             dashboardHostPanel.BackColor = Color.White;
             dashboardHostPanel.Dock = DockStyle.Fill;
-            dashboardHostPanel.Location = new Point(180, 0);
+            dashboardHostPanel.Location = new Point(291, 0);
             dashboardHostPanel.Name = "dashboardHostPanel";
-            dashboardHostPanel.Size = new Size(1433, 999);
+            dashboardHostPanel.Size = new Size(1322, 999);
             dashboardHostPanel.TabIndex = 0;
-            // 
-            // btnDataManager
-            // 
-            btnDataManager.Location = new Point(10, 254);
-            btnDataManager.Name = "btnDataManager";
-            btnDataManager.Size = new Size(160, 40);
-            btnDataManager.TabIndex = 0;
-            btnDataManager.Text = "Data Manager";
-            btnDataManager.UseVisualStyleBackColor = true;
-            btnDataManager.Click += OnClickDataManager;
             // 
             // MainForm
             // 
@@ -129,10 +60,5 @@ namespace THMS.UI
         }
 
         #endregion
-
-        private Button _btnTransportation;
-        private Button _btnEnergy;
-        private Button _btnDataCenter;
-        private Button btnDataManager;
     }
 }
