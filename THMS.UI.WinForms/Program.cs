@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using THMS.Configuration;
 using THMS.Data.Stores;
+using THMS.External;
 using THMS.External.Plaid;
 using THMS.Logic.Energy;
 using THMS.Logic.Orchestrators;
@@ -71,6 +72,7 @@ internal static class Program
                 _ => new PlaidSandboxServiceClient()
             };
         });
+        services.AddSingleton<IExternalTransactionFetcher, PlaidTransactionFetcher>();
 
 
         return services.BuildServiceProvider();

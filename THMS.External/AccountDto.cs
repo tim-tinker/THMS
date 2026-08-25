@@ -1,11 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace THMS.External.Plaid
+﻿namespace THMS.External
 {
-    public class PlaidAccountDto
+    public class AccountDto
     {
+        // Existing fields
         public string PlaidAccountId { get; set; } = "";
         public string Name { get; set; } = "";
         public string Mask { get; set; } = "";
@@ -14,5 +11,11 @@ namespace THMS.External.Plaid
         public decimal? Available { get; set; }
         public decimal? Current { get; set; }
         public decimal? Limit { get; set; }
+
+        // ExternalLink-derived fields
+        public string Provider { get; set; } = "";
+        public string ItemId { get; set; } = "";
+        public string AccessToken { get; set; } = "";
+        public string InstitutionId { get; set; } = "";
     }
 }

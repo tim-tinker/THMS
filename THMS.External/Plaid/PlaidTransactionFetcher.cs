@@ -2,7 +2,7 @@
 
 namespace THMS.External.Plaid
 {
-    public class PlaidTransactionFetcher
+    public class PlaidTransactionFetcher : IExternalTransactionFetcher
     {
         private readonly PlaidServiceClient _client;
 
@@ -11,14 +11,14 @@ namespace THMS.External.Plaid
             _client = client;
         }
 
-        public virtual async Task<List<PlaidTransactionDto>> FetchTransactionsAsync(
-            string accessToken,
+        public virtual async Task<List<TransactionDto>> FetchTransactionsAsync(
+            AccountDto account,
             DateTime start,
             DateTime end)
         {
             var response = await _client.Raw.TransactionsGetAsync(new TransactionsGetRequest
             {
-                AccessToken = accessToken,
+                AccessToken = account.AccessToken,
                 StartDate = DateOnly.FromDateTime(start),
                 EndDate = DateOnly.FromDateTime(end)
             });

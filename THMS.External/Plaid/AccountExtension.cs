@@ -4,9 +4,9 @@ namespace THMS.External.Plaid
 {
     public static class AccountExtension
     {
-        public static PlaidAccountDto ToDto(this Account account)
+        public static AccountDto ToDto(this Account account)
         {
-            return new PlaidAccountDto
+            return new AccountDto
             {
                 PlaidAccountId = account.AccountId ?? "",
                 Name = account.Name ?? "",

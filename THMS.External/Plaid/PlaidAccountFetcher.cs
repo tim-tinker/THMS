@@ -11,7 +11,7 @@ namespace THMS.External.Plaid
             _client = client;
         }
 
-        public virtual async Task<List<PlaidAccountDto>> FetchAccountsAsync(string accessToken)
+        public virtual async Task<List<AccountDto>> FetchAccountsAsync(string accessToken)
         {
             var response = await _client.Raw.AccountsGetAsync(new AccountsGetRequest
             {

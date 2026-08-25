@@ -4,9 +4,9 @@ namespace THMS.External.Plaid
 {
     public static class TransactionExtension
     {
-        public static PlaidTransactionDto ToDto(this Transaction tx)
+        public static TransactionDto ToDto(this Transaction tx)
         {
-            return new PlaidTransactionDto
+            return new TransactionDto
             {
                 TransactionId = tx.TransactionId ?? "",
                 AccountId = tx.AccountId ?? "",

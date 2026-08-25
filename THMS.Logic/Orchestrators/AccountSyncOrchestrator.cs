@@ -1,5 +1,6 @@
 ﻿using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
+using THMS.External;
 using THMS.External.Plaid;
 
 namespace THMS.Logic.Orchestrators
@@ -64,7 +65,7 @@ namespace THMS.Logic.Orchestrators
             };
         }
 
-        private void UpdateBalances(Account account, PlaidAccountDto plaid)
+        private void UpdateBalances(Account account, AccountDto plaid)
         {
             switch (account)
             {
@@ -83,7 +84,7 @@ namespace THMS.Logic.Orchestrators
             }
         }
 
-        private void UpdateMetadata(Account account, PlaidAccountDto plaid)
+        private void UpdateMetadata(Account account, AccountDto plaid)
         {
             account.AccountNumber = plaid.Mask;
             account.Institution = plaid.Name;

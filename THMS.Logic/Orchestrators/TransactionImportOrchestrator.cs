@@ -1,6 +1,7 @@
 ﻿using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
+using THMS.External;
 using THMS.External.Plaid;
 
 namespace THMS.Logic.Orchestrators
@@ -56,7 +57,7 @@ namespace THMS.Logic.Orchestrators
             };
         }
 
-        private PostedTransaction MapPosted(PlaidTransactionDto dto, Guid accountId)
+        private PostedTransaction MapPosted(TransactionDto dto, Guid accountId)
         {
             return new PostedTransaction
             {

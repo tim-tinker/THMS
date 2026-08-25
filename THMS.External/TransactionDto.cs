@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace THMS.External.Plaid
+namespace THMS.External
 {
-    public class PlaidTransactionDto
+    public class TransactionDto
     {
         public string TransactionId { get; set; } = "";
         public string AccountId { get; set; } = "";
