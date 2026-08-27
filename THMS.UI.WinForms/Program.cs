@@ -61,20 +61,6 @@ internal static class Program
         services.AddSingleton<IDataSourceUpdater, EvChargeSessionUpdater>();
         services.AddSingleton<IDataSourceUpdater, ElectricContractUpdater>();
 
-        // client for Plaid aggregator
-        services.AddSingleton<PlaidServiceClient>(sp =>
-        {
-            return AppConfig.Instance.PlaidEnvironment switch
-            {
-                "Sandbox" => new PlaidSandboxServiceClient(),
-                "Development" => new PlaidDevelopmentServiceClient(),
-                "Production" => new PlaidProductionServiceClient(),
-                _ => new PlaidSandboxServiceClient()
-            };
-        });
-        services.AddSingleton<IExternalTransactionFetcher, PlaidTransactionFetcher>();
-
-
         return services.BuildServiceProvider();
     }
 }

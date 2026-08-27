@@ -1,6 +1,5 @@
 ﻿using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
-using THMS.External.Plaid;
 
 namespace THMS.Logic.Orchestrators
 {
@@ -12,12 +11,11 @@ namespace THMS.Logic.Orchestrators
 
         public RegisterUpdateOrchestrator(
             IAccountDataStore accountStore,
-            ITransactionDataStore txStore,
-            PlaidServiceClient plaidClient)
+            ITransactionDataStore txStore)
         {
             // Build orchestrators
-            _accountSync = new AccountSyncOrchestrator(plaidClient, accountStore);
-            _importer = new TransactionImportOrchestrator(plaidClient, txStore);
+            _accountSync = new AccountSyncOrchestrator(accountStore);
+            _importer = new TransactionImportOrchestrator(txStore);
             _txOrchestrator = new TransactionOrchestrator(txStore);
         }
         public async Task UpdateAccountAsync(Account account)

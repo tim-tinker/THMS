@@ -5,7 +5,6 @@ using THMS.Data.Stores;
 using THMS.Domain.Finance;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
-using THMS.External.Plaid;
 
 namespace THMS.Logic.Orchestrators
 {
@@ -33,7 +32,7 @@ namespace THMS.Logic.Orchestrators
             _categorizer = new Categorizer();
             _forecastGenerator = new ForecastGenerator();
             _rollOffEngine = new RollOffEngine();
-            _accesor = new ExternalTransactionAccess();
+            _accessor = new ExternalTransactionAccess();
         }
 
         public UpdaterResult RunFullUpdate()

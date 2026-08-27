@@ -2,21 +2,20 @@
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.External;
-using THMS.External.Plaid;
 
 namespace THMS.Logic.Orchestrators
 {
     public class TransactionImportOrchestrator
     {
-        private readonly PlaidTransactionFetcher _transactionFetcher;
+        private readonly IExternalTransactionFetcher _transactionFetcher;
         private readonly ITransactionDataStore _txStore;
         private double _dateWindowSize = 3; // use three because of weekends
 
         public TransactionImportOrchestrator(
-            PlaidServiceClient plaidClient,
             ITransactionDataStore txStore)
         {
-            _transactionFetcher = new PlaidTransactionFetcher(plaidClient);
+            var externalFactory = new ExternalFetcherFactory();
+            _transactionFetcher = externalFactory.GetTransactionFetcher();
             _txStore = txStore;
         }
 

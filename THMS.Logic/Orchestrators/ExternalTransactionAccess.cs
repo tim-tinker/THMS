@@ -1,6 +1,5 @@
 ﻿using THMS.Domain.Finance.Transactions;
 using THMS.Domain.Finance.Accounts;
-using THMS.External.Plaid;
 using THMS.External;
 using THMS.Logic.Mapping;
 
@@ -10,9 +9,10 @@ namespace THMS.Logic.Orchestrators
     {
         private readonly IExternalTransactionFetcher _fetcher;
 
-        public ExternalTransactionAccess(IExternalTransactionFetcher fetcher)
+        public ExternalTransactionAccess()
         {
-            _fetcher = fetcher;
+            var factory = new ExternalFetcherFactory();
+            _fetcher = factory.GetTransactionFetcher();
         }
 
         public async Task<List<PostedTransaction>> FetchPostedTransactionsAsync(

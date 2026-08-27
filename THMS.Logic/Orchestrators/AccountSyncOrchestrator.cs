@@ -1,20 +1,19 @@
 ﻿using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.External;
-using THMS.External.Plaid;
 
 namespace THMS.Logic.Orchestrators
 {
     public class AccountSyncOrchestrator
     {
-        private readonly PlaidAccountFetcher _accountFetcher;
+        private readonly IExternalAccountFetcher _accountFetcher;
         private readonly IAccountDataStore _accountStore;
 
         public AccountSyncOrchestrator(
-            PlaidServiceClient plaidClient,
             IAccountDataStore accountStore)
         {
-            _accountFetcher = new PlaidAccountFetcher(plaidClient);
+            var externalFactory = new ExternalFetcherFactory();
+            _accountFetcher = externalFactory.GetAccountFetcher();
             _accountStore = accountStore;
         }
 
