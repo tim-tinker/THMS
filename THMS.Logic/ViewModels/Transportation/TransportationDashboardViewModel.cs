@@ -10,9 +10,9 @@ namespace THMS.Logic.ViewModels.Transportation
         private readonly IVehicleDataStore _store;
         private readonly TransportationAnalyticsEngine _engine;
 
-        public TransportationDashboardViewModel(IVehicleDataStore store)
+        public TransportationDashboardViewModel()
         {
-            _store = store;
+            _store = new DataStoreFactory().GetVehicleStore();
             _engine = new TransportationAnalyticsEngine(_store);
 
             Vehicles = _store.GetAllVehicles().ToList();

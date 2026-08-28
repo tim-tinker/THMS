@@ -1,23 +1,22 @@
-﻿using THMS.Data.Stores;
-using THMS.Domain.Finance.Accounts;
+﻿using THMS.Domain.Finance.Accounts;
+using THMS.Logic.Orchestrators.Finance;
 
 namespace THMS.UI.WinForms.Controls
 {
     public partial class AccountUpdaterControl : UserControl
     {
-        private readonly IAccountDataStore _accountStore;
+        private readonly AccountOrchestrator _accountOrchestrator = new();
 
-        public AccountUpdaterControl(IAccountDataStore accountStore)
+        public AccountUpdaterControl()
         {
             InitializeComponent();
-            _accountStore = accountStore;
 
             LoadAccounts();
         }
 
         private void LoadAccounts()
         {
-            var accounts = _accountStore.GetAllAccounts();
+            var accounts = _accountOrchestrator.GetAllAccounts();
             gridAccounts.DataSource = accounts;
         }
 
@@ -26,7 +25,7 @@ namespace THMS.UI.WinForms.Controls
             var dlg = new AccountEditForm(null);
             if (dlg.ShowDialog() == DialogResult.OK)
             {
-                _accountStore.UpsertAccount(dlg.Account);
+                _accountOrchestrator.Save(dlg.Account);
                 LoadAccounts();
             }
         }
@@ -43,7 +42,7 @@ namespace THMS.UI.WinForms.Controls
             var dlg = new AccountEditForm(acct);
             if (dlg.ShowDialog() == DialogResult.OK)
             {
-                _accountStore.UpsertAccount(dlg.Account);
+                _accountOrchestrator.Save(dlg.Account);
                 LoadAccounts();
             }
         }
@@ -65,7 +64,7 @@ namespace THMS.UI.WinForms.Controls
 
             if (confirm == DialogResult.Yes)
             {
-                _accountStore.DeleteAccount(acct.Id);
+                _accountOrchestrator.Delete(acct.Id);
                 LoadAccounts();
             }
         }

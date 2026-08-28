@@ -12,9 +12,9 @@ namespace THMS.Logic.DataCenter
 
         public bool IsReadyForUpdate {  get; private set; }
 
-        public HomeCircuitAttributionDataSourceStatus(IEnergyDataStore energyStore)
+        public HomeCircuitAttributionDataSourceStatus()
         {
-            _energyStore = energyStore;
+            _energyStore = new DataStoreFactory().GetEnergyStore();
         }
 
         public void QueryStatus()

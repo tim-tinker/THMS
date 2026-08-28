@@ -15,27 +15,18 @@ namespace THMS.UI
             InitializeComponent();
         }
 
-        public MainForm(
-            TransportationDashboardForm transportationDashboard,
-            EnergyDashboardForm energyDashboard,
-            FinanceDashboardForm financeDashboard,
-            VehicleListDashboardForm vehicleListDashboard,
-            DataManagerForm dataManagerForm,
-            DataCenterForm dataCenterForm,
-            FinanceDataCenterForm financeDataCenterForm
-            )
-            : this()
+        public void LoadModules()
         {
             AddSectionLabel("Dashboards");
-            AddDashboard("Transportation", transportationDashboard);
-            AddDashboard("Energy", energyDashboard);
-            AddDashboard("Finance", financeDashboard);
-            AddDashboard("Vehicles", vehicleListDashboard);
+            AddDashboard("Transportation", new TransportationDashboardForm());
+            AddDashboard("Energy", new EnergyDashboardForm());
+            AddDashboard("Finance", new FinanceDashboardForm());
+            AddDashboard("Vehicles", new VehicleListDashboardForm());
 
             AddSectionLabel("Data Management");
-            AddEmbeddedForm("Data Manager", dataManagerForm);
-            AddEmbeddedForm("Data Center", dataCenterForm);
-            AddEmbeddedForm("Finance Data Center", financeDataCenterForm);
+            AddEmbeddedForm("Data Manager", new DataManagerForm());
+            AddEmbeddedForm("Data Center", new DataCenterForm());
+            AddEmbeddedForm("Finance Data Center", new FinanceDataCenterForm());
         }
 
         private void AddSectionLabel(string text)

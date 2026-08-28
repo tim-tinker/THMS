@@ -37,7 +37,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\THMS.Configuration\THMS.Configuration.csproj" />
-    <ProjectReference Include="..\THMS.Data\THMS.Data.csproj" />
     <ProjectReference Include="..\THMS.Domain\THMS.Domain.csproj" />
     <ProjectReference Include="..\THMS.Logic\THMS.Logic.csproj" />
     <ProjectReference Include="..\THMS.UI.Common\THMS.UI.Common.csproj" />

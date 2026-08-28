@@ -5,11 +5,12 @@ namespace THMS.Logic.Orchestrators.Finance
 {
     public class AccountOrchestrator
     {
+        private readonly DataStoreFactory _storeFactory = new();
         private readonly IAccountDataStore _accountStore;
 
-        public AccountOrchestrator(IAccountDataStore accountStore)
+        public AccountOrchestrator()
         {
-            _accountStore = accountStore;
+            _accountStore = _storeFactory.GetAccountStore();
         }
 
         // ------------------------------------------------------------
@@ -21,6 +22,11 @@ namespace THMS.Logic.Orchestrators.Finance
             Normalize(account);
 
             _accountStore.UpsertAccount(account);
+        }
+
+        public void Delete(Guid accountId)
+        {
+            _accountStore.DeleteAccount(accountId);
         }
 
         // ------------------------------------------------------------

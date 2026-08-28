@@ -1,5 +1,4 @@
-﻿using THMS.Data.Stores;
-using THMS.Domain.Transportation;
+﻿using THMS.Domain.Transportation;
 using THMS.Logic.DataCenter;
 using THMS.Logic.Orchestrators;
 
@@ -7,28 +6,13 @@ namespace THMS.UI.WinForms.Updates
 {
     public class EvChargeSessionUpdater : IDataSourceUpdater
     {
-        private readonly IVehicleDataStore _vehicleStore;
-        private readonly IEnergyDataStore _energyStore;
-        private readonly IFinanceDataStore _financeStore;
+        private readonly EvChargeSessionOrchestrator _orchestrator = new();
 
-        private readonly EvChargeSessionOrchestrator _orchestrator;
-
-        public IDataSourceStatus Status { get; private set; }
-
-        public EvChargeSessionUpdater(IVehicleDataStore vehicleStore, IEnergyDataStore energyStore, IFinanceDataStore financeStore)
-        {
-            _vehicleStore = vehicleStore;
-            _energyStore = energyStore;
-            _financeStore = financeStore;
-            Status = new EvChargeSessionDataSourceStatus(vehicleStore);
-            _orchestrator = new EvChargeSessionOrchestrator(vehicleStore, energyStore, financeStore);
-        }
+        public IDataSourceStatus Status { get; private set; } = new EvChargeSessionDataSourceStatus();
 
         public void UpdateDataSource()
         {
-            var vehicles = _vehicleStore.GetAllVehicles()
-                .OfType<VehicleEv>()        // or VehicleIce, or any T
-                .ToList();
+            var vehicles = _orchestrator.GetEvVehicles().ToList();
 
             using var selectForm = new VehicleSelectionForm(vehicles);
 
@@ -39,7 +23,7 @@ namespace THMS.UI.WinForms.Updates
             if (vehicle == null)
                 return;
 
-            using var form = new EvChargeSessionForm(_vehicleStore, vehicle, _energyStore, _financeStore);
+            using var form = new EvChargeSessionForm(vehicle);
             if (DialogResult.OK == form.ShowDialog() && form.SavedSession is not null)
             {
                 _orchestrator.Save(form.SavedSession);

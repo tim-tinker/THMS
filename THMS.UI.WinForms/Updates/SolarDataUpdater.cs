@@ -1,25 +1,13 @@
-﻿using System.Windows.Forms.Design;
-using THMS.Data.Stores;
-using THMS.Ingestion.Importers.Energy;
-using THMS.Logic.DataCenter;
-using THMS.Logic.Energy;
+﻿using THMS.Logic.DataCenter;
 using THMS.Logic.Orchestrators;
 
 namespace THMS.UI.WinForms.Updates
 {
     public class SolarDataUpdater : IDataSourceUpdater
     {
-        private readonly IEnergyDataStore _energyStore;
-        private readonly SolarIntervalOrchestrator _intervalOrchestrator;
+        private readonly SolarIntervalOrchestrator _intervalOrchestrator = new();
 
-        public IDataSourceStatus Status { get; private set; }
-
-        public SolarDataUpdater(IEnergyDataStore energyStore)
-        {
-            _energyStore = energyStore;
-            _intervalOrchestrator = new SolarIntervalOrchestrator(energyStore);
-            Status = new SolarDataSourceStatus(energyStore);
-        }
+        public IDataSourceStatus Status { get; private set; } = new SolarDataSourceStatus();
 
         public void UpdateDataSource()
         {

@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel;
-using THMS.Data.Stores;
 using THMS.Domain.Energy;
 using THMS.Logic.Orchestrators;
 
@@ -7,17 +6,13 @@ namespace THMS.UI.WinForms.Controls
 {
     public partial class HomeCircuitManagerControl : UserControl, IDataManagerControl
     {
-        private readonly IEnergyDataStore _energyStore;
-        private readonly HomeCircuitReadingOrchestrator _orchestrator;
+        private readonly HomeCircuitReadingOrchestrator _orchestrator = new();
         private BindingList<HomeCircuitReading> _readings;
 
-        public HomeCircuitManagerControl(IEnergyDataStore energyStore)
+        public HomeCircuitManagerControl()
         {
             InitializeComponent();
             gridHomeCircuit.AutoGenerateColumns = false;
-
-            _energyStore = energyStore;
-            _orchestrator = new HomeCircuitReadingOrchestrator(energyStore);
         }
 
         // ---------------------------------------------------------

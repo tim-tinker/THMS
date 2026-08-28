@@ -1,5 +1,4 @@
-﻿using THMS.Data.Stores;
-using THMS.Domain.Finance.Accounts;
+﻿using THMS.Domain.Finance.Accounts;
 
 namespace THMS.Logic.Orchestrators
 {
@@ -9,14 +8,11 @@ namespace THMS.Logic.Orchestrators
         private readonly TransactionImportOrchestrator _importer;
         private readonly TransactionOrchestrator _txOrchestrator;
 
-        public RegisterUpdateOrchestrator(
-            IAccountDataStore accountStore,
-            ITransactionDataStore txStore)
+        public RegisterUpdateOrchestrator()
         {
-            // Build orchestrators
-            _accountSync = new AccountSyncOrchestrator(accountStore);
-            _importer = new TransactionImportOrchestrator(txStore);
-            _txOrchestrator = new TransactionOrchestrator(txStore);
+            _accountSync = new AccountSyncOrchestrator();
+            _importer = new TransactionImportOrchestrator();
+            _txOrchestrator = new TransactionOrchestrator();
         }
         public async Task UpdateAccountAsync(Account account)
         {

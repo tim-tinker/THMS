@@ -40,8 +40,7 @@ public class NavigationService
 
     public void Navigate<TView>() where TView : Control
     {
-        var view = Program.Services.GetService(typeof(TView)) as Control
-            ?? Activator.CreateInstance<TView>();
+        var view = Activator.CreateInstance<TView>();
         Navigate(view);
     }
 }

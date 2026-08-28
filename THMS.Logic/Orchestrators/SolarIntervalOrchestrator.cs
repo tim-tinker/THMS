@@ -8,6 +8,7 @@ namespace THMS.Logic.Orchestrators
 {
     public class SolarIntervalOrchestrator : BaseOrchestrator
     {
+        private readonly DataStoreFactory _storeFactory = new();
         private readonly IEnergyDataStore _energyStore;
 
         public DateTime StartDate { get; private set; } = DateTime.MinValue;
@@ -15,9 +16,9 @@ namespace THMS.Logic.Orchestrators
         public int IntervalCount { get; private set; }
         public string ErrorMessage { get; private set; }
 
-        public SolarIntervalOrchestrator(IEnergyDataStore energyStore)
+        public SolarIntervalOrchestrator()
         {
-            _energyStore = energyStore;
+            _energyStore = _storeFactory.GetEnergyStore();
         }
 
         public void Update(string filePath)

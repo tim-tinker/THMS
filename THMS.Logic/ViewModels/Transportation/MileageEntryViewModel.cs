@@ -7,9 +7,9 @@ namespace THMS.Logic.ViewModels.Transportation
     {
         private readonly IVehicleDataStore _store;
 
-        public MileageEntryViewModel(IVehicleDataStore store, Guid vehicleId)
+        public MileageEntryViewModel(Guid vehicleId)
         {
-            _store = store;
+            _store = new DataStoreFactory().GetVehicleStore();
             VehicleId = vehicleId;
         }
 

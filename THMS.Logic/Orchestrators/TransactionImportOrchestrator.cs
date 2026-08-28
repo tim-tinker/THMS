@@ -2,6 +2,7 @@
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.External;
+using THMS.Logic.Mapping;
 
 namespace THMS.Logic.Orchestrators
 {
@@ -11,12 +12,11 @@ namespace THMS.Logic.Orchestrators
         private readonly ITransactionDataStore _txStore;
         private double _dateWindowSize = 3; // use three because of weekends
 
-        public TransactionImportOrchestrator(
-            ITransactionDataStore txStore)
+        public TransactionImportOrchestrator()
         {
             var externalFactory = new ExternalFetcherFactory();
             _transactionFetcher = externalFactory.GetTransactionFetcher();
-            _txStore = txStore;
+            _txStore = new DataStoreFactory().GetTransactionStore();
         }
 
         public async Task<TransactionImportResult> ImportAsync(Account account)
@@ -24,11 +24,11 @@ namespace THMS.Logic.Orchestrators
             if (account.ExternalLink is null)
                 throw new InvalidOperationException("Account is not linked to Plaid.");
 
-            var link = account.ExternalLink;
+            var accountDto = account.ToDto();
 
             // 1. Fetch Plaid transactions
             var plaidTxs = await _transactionFetcher.FetchTransactionsAsync(
-                link.AccessToken,
+                accountDto,
                 DateTime.UtcNow.AddDays(-30),
                 DateTime.UtcNow);
 

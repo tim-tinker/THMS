@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Windows.Forms;
-using THMS.Data.Stores;
 using THMS.Logic.DataCenter;
-using THMS.Logic.ViewModels;
 using THMS.UI.WinForms.Updates;
 
 namespace THMS.UI.WinForms
@@ -13,15 +11,18 @@ namespace THMS.UI.WinForms
 
         private readonly Dictionary<string, IDataSourceUpdater> _dataSourceUpdaters = [];
 
-        public DataCenterForm(
-            IEnergyDataStore energyStore,
-            IFinanceDataStore financeStore,
-            IVehicleDataStore vehicleStore,
-            IEnumerable<IDataSourceUpdater> updaters)
+        public DataCenterForm()
         {
             InitializeComponent();
 
-            ConfigureDataSources(updaters.ToArray());
+            ConfigureDataSources(
+            [
+                new SolarDataUpdater(),
+                new HomeCircuitUpdater(),
+                new HomeCircuitAttributionUpdater(),
+                new EvChargeSessionUpdater(),
+                new ElectricContractUpdater()
+            ]);
         }
 
         private void OnLoadForm(object sender, EventArgs e)

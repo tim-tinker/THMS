@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Configuration;
-using System.Text;
 
 namespace THMS.Configuration
 {
@@ -9,6 +8,10 @@ namespace THMS.Configuration
             new(() => new AppConfig());
 
         public static AppConfig Instance => _instance.Value;
+
+        public string Environment { get; }
+
+        public string SQLiteDataBase { get; }
 
         public ISecretProvider Secrets { get; }
 
@@ -27,6 +30,10 @@ namespace THMS.Configuration
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                 .AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: true)
                 .Build();
+
+            Environment = config["App:Environment"] ?? "Development";
+
+            SQLiteDataBase = config["SQLite:DataBasePath"] ?? string.Empty;
 
             PlaidClientId = config["Plaid:ClientId"]!;
             PlaidEnvironment = config["Plaid:Environment"] ?? "Sandbox";

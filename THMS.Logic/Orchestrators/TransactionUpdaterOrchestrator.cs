@@ -10,8 +10,9 @@ namespace THMS.Logic.Orchestrators
 {
     public class TransactionUpdaterOrchestrator
     {
-        private readonly ITransactionDataStore _transactionStore;
+        private readonly DataStoreFactory _storeFactory = new();
         private readonly IAccountDataStore _accountStore;
+        private readonly ITransactionDataStore _transactionStore;
 
         private readonly ExternalTransactionAccess _accessor;
         private readonly TransferDetector _transferDetector;
@@ -20,12 +21,10 @@ namespace THMS.Logic.Orchestrators
         private readonly ForecastGenerator _forecastGenerator;
         private readonly RollOffEngine _rollOffEngine;
 
-        public TransactionUpdaterOrchestrator(
-            ITransactionDataStore transactionStore,
-            IAccountDataStore accountStore)
+        public TransactionUpdaterOrchestrator()
         {
-            _transactionStore = transactionStore;
-            _accountStore = accountStore;
+            _transactionStore = _storeFactory.GetTransactionStore(); ;
+            _accountStore = _storeFactory.GetAccountStore(); ;
 
             _transferDetector = new TransferDetector();
             _recurringDetector = new RecurringDetector();
@@ -35,7 +34,7 @@ namespace THMS.Logic.Orchestrators
             _accessor = new ExternalTransactionAccess();
         }
 
-        public UpdaterResult RunFullUpdate()
+        public async Task<UpdaterResult> RunFullUpdateAsync()
         {
             var result = new UpdaterResult();
 
@@ -43,7 +42,7 @@ namespace THMS.Logic.Orchestrators
             var accounts = _accountStore.GetAllAccounts().ToList();
 
             // 2. Fetch posted transactions
-            var posted = FetchAllPosted(accounts);
+            var posted = await FetchAllPostedAsync(accounts);
             result.TransactionsImported = posted.Count;
 
             // 3. Normalize posted
@@ -87,13 +86,13 @@ namespace THMS.Logic.Orchestrators
             return result;
         }
 
-        private List<PostedTransaction> FetchAllPosted(List<Account> accounts)
+        private async Task<List<PostedTransaction>> FetchAllPostedAsync(List<Account> accounts)
         {
             var posted = new List<PostedTransaction>();
 
             foreach (var acct in accounts)
             {
-                var acctPosted = _accessor.FetchPostedTransactions(acct);
+                var acctPosted = await _accessor.FetchPostedTransactionsAsync(acct, DateTime.Today.AddMonths(-3), DateTime.Today);
                 posted.AddRange(acctPosted);
             }
 

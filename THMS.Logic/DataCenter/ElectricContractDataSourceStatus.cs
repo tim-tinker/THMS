@@ -12,9 +12,9 @@ namespace THMS.Logic.DataCenter
 
         public bool IsReadyForUpdate { get; private set; }
 
-        public ElectricContractDataSourceStatus(IFinanceDataStore financeStore)
+        public ElectricContractDataSourceStatus()
         {
-            _financeStore = financeStore;
+            _financeStore = new DataStoreFactory().GetFinanceStore();
         }
 
         public void QueryStatus()

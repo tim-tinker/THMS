@@ -1,29 +1,17 @@
-﻿using THMS.Data.Stores;
-using THMS.Logic.ViewModels;
+﻿using THMS.Logic.ViewModels;
 
 namespace THMS.Logic.DataCenter
 {
     public class DataAvailabilityService
     {
-        private readonly IEnergyDataStore _energyStore;
-        private readonly IFinanceDataStore _financeStore;
-        private readonly IVehicleDataStore _vehicleStore;
-
         private List<IDataSourceStatus> _dataSourceStatuses = [];
 
-        public DataAvailabilityService(
-            IEnergyDataStore energyStore,
-            IFinanceDataStore financeStore,
-            IVehicleDataStore vehicleStore)
+        public DataAvailabilityService()
         {
-            _energyStore = energyStore;
-            _financeStore = financeStore;
-            _vehicleStore = vehicleStore;
-
-            _dataSourceStatuses.Add(new SolarDataSourceStatus(_energyStore));
-            _dataSourceStatuses.Add(new HomeCircuitReadingDataSourceStatus(_energyStore));
-            _dataSourceStatuses.Add(new EvChargeSessionDataSourceStatus(_vehicleStore));
-            _dataSourceStatuses.Add(new HomeCircuitAttributionDataSourceStatus(_energyStore));
+            _dataSourceStatuses.Add(new SolarDataSourceStatus());
+            _dataSourceStatuses.Add(new HomeCircuitReadingDataSourceStatus());
+            _dataSourceStatuses.Add(new EvChargeSessionDataSourceStatus());
+            _dataSourceStatuses.Add(new HomeCircuitAttributionDataSourceStatus());
         }
 
         public DataCenterViewModel GetAvailability()

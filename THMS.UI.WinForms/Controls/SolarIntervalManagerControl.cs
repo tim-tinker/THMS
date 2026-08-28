@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel;
-using THMS.Data.Stores;
 using THMS.Domain.Energy;
 using THMS.Logic.Orchestrators;
 
@@ -7,17 +6,13 @@ namespace THMS.UI.WinForms.Controls
 {
     public partial class SolarIntervalManagerControl : UserControl, IDataManagerControl
     {
-        private readonly IEnergyDataStore _energyStore;
-        private readonly SolarIntervalOrchestrator _orchestrator;
+        private readonly SolarIntervalOrchestrator _orchestrator = new();
         private BindingList<SolarProductionInterval> _intervals;
 
-        public SolarIntervalManagerControl(IEnergyDataStore energyStore)
+        public SolarIntervalManagerControl()
         {
             InitializeComponent();
             gridSolarIntervals.AutoGenerateColumns = false;
-
-            _energyStore = energyStore;
-            _orchestrator = new SolarIntervalOrchestrator(energyStore);
         }
 
         // ---------------------------------------------------------

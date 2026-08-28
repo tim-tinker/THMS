@@ -1,26 +1,22 @@
 ﻿using System.ComponentModel;
 
-using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
+using THMS.Logic.Orchestrators;
+using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.UI.WinForms.Controls
 {
     public partial class TransactionManagerControl : UserControl
     {
-        private readonly ITransactionDataStore _txStore;
-        private readonly IAccountDataStore _accountStore;
+        private readonly AccountOrchestrator _accountOrchestrator = new();
+        private readonly TransactionOrchestrator _txOrchestrator = new();
 
         private BindingSource _accountsSource = new BindingSource();
         private BindingSource _transactionsSource = new BindingSource();
 
-        public TransactionManagerControl(
-            ITransactionDataStore txStore,
-            IAccountDataStore accountStore)
+        public TransactionManagerControl()
         {
-            _txStore = txStore;
-            _accountStore = accountStore;
-
             InitializeComponent();
             InitializeGrids();
             LoadAccounts();
@@ -46,7 +42,7 @@ namespace THMS.UI.WinForms.Controls
         // ------------------------------------------------------------
         private void LoadAccounts()
         {
-            var accounts = _accountStore.GetAllAccounts().ToList();
+            var accounts = _accountOrchestrator.GetAllAccounts().ToList();
             var unified = UnifiedAccountViewBuilder.Build(accounts);
             _accountsSource.DataSource = unified;
         }
@@ -64,20 +60,15 @@ namespace THMS.UI.WinForms.Controls
         // ------------------------------------------------------------
         private void LoadTransactionsForAccount(Guid accountId)
         {
-            var posted = _txStore.GetPostedTransactions(accountId);
-            var postedTransfers = _txStore.GetPostedTransferTransactions(accountId);
-            var futureSingles = _txStore.GetFutureSingleTransactions(accountId);
-            var futureTransfers = _txStore.GetFutureTransferTransactions(accountId);
-            var recurringSingles = _txStore.GetRecurringSingleRules(accountId);
-            var recurringTransfers = _txStore.GetRecurringTransferRules(accountId);
+            var txs = _txOrchestrator.GetTransactionsForAccount(accountId);
 
             var unified = UnifiedTransactionViewBuilder.Build(
-                posted,
-                postedTransfers,
-                futureSingles,
-                futureTransfers,
-                recurringSingles,
-                recurringTransfers);
+                txs.Posted,
+                txs.PostedTransfers,
+                txs.FutureSingles,
+                txs.FutureTransfers,
+                txs.RecurringSingles,
+                txs.RecurringTransfers);
 
             _transactionsSource.DataSource = unified;
 
@@ -114,7 +105,7 @@ namespace THMS.UI.WinForms.Controls
         // ------------------------------------------------------------
         private void ComputeForecastBalances(List<UnifiedTransactionView> unified, Guid accountId)
         {
-            var account = _accountStore.GetAccount(accountId);
+            var account = _accountOrchestrator.GetAccount(accountId);
 
             // Must be sorted by date and a valid account type
             if (CanComputeForecast(account))

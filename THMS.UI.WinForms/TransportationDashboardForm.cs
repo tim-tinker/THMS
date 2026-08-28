@@ -1,4 +1,3 @@
-using THMS.Data.Stores;
 using THMS.Domain.Transportation;
 using THMS.Logic.ViewModels.Transportation;
 
@@ -6,26 +5,16 @@ namespace THMS.UI.WinForms
 {
     public partial class TransportationDashboardForm : BaseDashboardForm
     {
-        private readonly IVehicleDataStore? _vehicleDataStore;
         private TransportationDashboardViewModel ViewModel { get; set; } = null!;
 
-        /// <summary>Designer only.</summary>
         public TransportationDashboardForm()
         {
             InitializeComponent();
         }
 
-        public TransportationDashboardForm(IVehicleDataStore vehicleDataStore) : this()
-        {
-            _vehicleDataStore = vehicleDataStore;
-        }
-
         public override void InitializeDashboard()
         {
-            if (_vehicleDataStore is null)
-                throw new InvalidOperationException("IVehicleDataStore was not provided. Resolve this form from DI at runtime.");
-
-            ViewModel = new TransportationDashboardViewModel(_vehicleDataStore);
+            ViewModel = new TransportationDashboardViewModel();
             BindControlsToViewModel();
             ViewModel.Initialize();
             RefreshDashboard();

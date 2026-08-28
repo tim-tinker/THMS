@@ -1,13 +1,9 @@
-﻿using THMS.Data.Stores;
-using THMS.Logic.ViewModels;
+﻿using THMS.Logic.ViewModels;
 
 namespace THMS.UI.WinForms
 {
     public partial class VehicleListDashboardForm : BaseDashboardForm
     {
-        private readonly IVehicleDataStore? _vehicleDataStore;
-        private readonly IFinanceDataStore? _financeDataStore;
-        private readonly IEnergyDataStore? _energyDataStore;
         private VehicleListViewModel ViewModel { get; set; } = null!;
 
         protected VehicleListItemViewModel? SelectedVehicle =>
@@ -15,29 +11,14 @@ namespace THMS.UI.WinForms
                 ? vehicleGrid.SelectedRows[0].DataBoundItem as VehicleListItemViewModel
                 : null;
 
-        /// <summary>Designer only.</summary>
         public VehicleListDashboardForm()
         {
             InitializeComponent();
         }
 
-        public VehicleListDashboardForm(
-            IVehicleDataStore vehicleDataStore,
-            IFinanceDataStore financeDataStore,
-            IEnergyDataStore energyDataStore) : this()
-        {
-            _vehicleDataStore = vehicleDataStore;
-            _financeDataStore = financeDataStore;
-            _energyDataStore = energyDataStore;
-        }
-
         public override void InitializeDashboard()
         {
-            if (_vehicleDataStore is null || _financeDataStore is null || _energyDataStore is null)
-                throw new InvalidOperationException("Data stores were not provided. Resolve this form from DI at runtime.");
-
             ViewModel = new VehicleListViewModel();
-            ViewModel.SetStores(_vehicleDataStore, _financeDataStore, _energyDataStore);
             ViewModel.Initialize();
             vehicleGrid.DataSource = ViewModel.Vehicles;
             RefreshDashboard();
@@ -60,10 +41,7 @@ namespace THMS.UI.WinForms
         {
             if (SelectedVehicle != null)
             {
-                var form = new VehicleDetailForm(
-                    _vehicleDataStore,
-                    _energyDataStore,
-                    SelectedVehicle.VehicleId);
+                var form = new VehicleDetailForm(SelectedVehicle.VehicleId);
 
                 form.ShowDialog(this);
 

@@ -1,5 +1,3 @@
-using System;
-using THMS.Data.Stores;
 using THMS.Domain.Energy;
 using THMS.Logic.Energy;
 
@@ -31,11 +29,9 @@ namespace THMS.Logic.ViewModels.Energy
         // ---------------------------------------------------------
         // Constructor
         // ---------------------------------------------------------
-        public EnergyDashboardViewModel() { }
-
-        public void SetStores(IEnergyDataStore energyStore)
+        public EnergyDashboardViewModel()
         {
-            _service = new EnergyAggregationService(energyStore);
+            _service = new EnergyAggregationService();
         }
 
         public void Refresh()

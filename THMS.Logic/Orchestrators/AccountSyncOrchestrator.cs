@@ -6,15 +6,16 @@ namespace THMS.Logic.Orchestrators
 {
     public class AccountSyncOrchestrator
     {
+        private readonly ExternalFetcherFactory _externalFactory = new();
+        private readonly DataStoreFactory _dataStoreFactory = new();
+
         private readonly IExternalAccountFetcher _accountFetcher;
         private readonly IAccountDataStore _accountStore;
 
-        public AccountSyncOrchestrator(
-            IAccountDataStore accountStore)
+        public AccountSyncOrchestrator()
         {
-            var externalFactory = new ExternalFetcherFactory();
-            _accountFetcher = externalFactory.GetAccountFetcher();
-            _accountStore = accountStore;
+            _accountFetcher = _externalFactory.GetAccountFetcher();
+            _accountStore = _dataStoreFactory.GetAccountStore();
         }
 
         public async Task<AccountSyncResult> SyncAsync(Account account)

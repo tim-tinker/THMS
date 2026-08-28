@@ -1,18 +1,12 @@
-﻿using THMS.Data.Stores;
-using THMS.Logic.DataCenter;
+﻿using THMS.Logic.DataCenter;
 using THMS.Logic.Orchestrators;
 
 namespace THMS.UI.WinForms.Updates
 {
     public class HomeCircuitUpdater : IDataSourceUpdater
     {
-        private readonly IEnergyDataStore _energyStore;
-        public IDataSourceStatus Status { get; private set; }
-        public HomeCircuitUpdater(IEnergyDataStore energyStore)
-        {
-            _energyStore = energyStore;
-            Status = new HomeCircuitReadingDataSourceStatus(energyStore);
-        }
+        public IDataSourceStatus Status { get; private set; } = new HomeCircuitReadingDataSourceStatus();
+
         public void UpdateDataSource()
         {
             using var dialog = new OpenFileDialog();
@@ -21,7 +15,7 @@ namespace THMS.UI.WinForms.Updates
             if (dialog.ShowDialog() != DialogResult.OK)
                 return;
 
-            var orchestrator = new HomeCircuitReadingOrchestrator(_energyStore);
+            var orchestrator = new HomeCircuitReadingOrchestrator();
             orchestrator.Update(dialog.FileName);
         }
     }

@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel;
-using THMS.Data.Stores;
 using THMS.Domain.Transportation;
 using THMS.Logic.Orchestrators;
 
@@ -7,16 +6,15 @@ namespace THMS.UI.WinForms.Controls
 {
     public partial class EvChargeSessionManagerControl : UserControl, IDataManagerControl
     {
-        private readonly EvChargeSessionOrchestrator _orchestrator;
+        private readonly EvChargeSessionOrchestrator _orchestrator = new();
 
         private BindingList<BaseEvChargeSession> _sessions;
 
-        public EvChargeSessionManagerControl(IVehicleDataStore vehicleStore, IEnergyDataStore energyStore, IFinanceDataStore financeStore)
+        public EvChargeSessionManagerControl()
         {
             InitializeComponent();
 
             _gridSessions.AutoGenerateColumns = false;
-            _orchestrator = new EvChargeSessionOrchestrator(vehicleStore, energyStore, financeStore);
         }
 
         // ---------------------------------------------------------

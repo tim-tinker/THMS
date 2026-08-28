@@ -5,11 +5,28 @@ namespace THMS.Logic.Orchestrators
 {
     public class TransactionOrchestrator
     {
+        private readonly DataStoreFactory _storeFactory = new();
         private readonly ITransactionDataStore _store;
 
-        public TransactionOrchestrator(ITransactionDataStore store)
+        public TransactionOrchestrator()
         {
-            _store = store;
+            _store = _storeFactory.GetTransactionStore();
+        }
+
+        // ------------------------------------------------------------
+        // Retrieve all ledger items for an account
+        // ------------------------------------------------------------
+        public AccountTransactions GetTransactionsForAccount(Guid accountId)
+        {
+            return new AccountTransactions
+            {
+                Posted = _store.GetPostedTransactions(accountId),
+                PostedTransfers = _store.GetPostedTransferTransactions(accountId),
+                FutureSingles = _store.GetFutureSingleTransactions(accountId),
+                FutureTransfers = _store.GetFutureTransferTransactions(accountId),
+                RecurringSingles = _store.GetRecurringSingleRules(accountId),
+                RecurringTransfers = _store.GetRecurringTransferRules(accountId)
+            };
         }
 
         // ------------------------------------------------------------
@@ -227,5 +244,15 @@ namespace THMS.Logic.Orchestrators
             foreach (var f in realizedTransfers)
                 _store.DeleteFutureTransferTransaction(f.Id);
         }
+    }
+
+    public class AccountTransactions
+    {
+        public IEnumerable<PostedTransaction> Posted { get; init; } = [];
+        public IEnumerable<PostedTransferTransaction> PostedTransfers { get; init; } = [];
+        public IEnumerable<FutureSingleTransaction> FutureSingles { get; init; } = [];
+        public IEnumerable<FutureTransferTransaction> FutureTransfers { get; init; } = [];
+        public IEnumerable<RecurringSingleTransactionRule> RecurringSingles { get; init; } = [];
+        public IEnumerable<RecurringTransferRule> RecurringTransfers { get; init; } = [];
     }
 }

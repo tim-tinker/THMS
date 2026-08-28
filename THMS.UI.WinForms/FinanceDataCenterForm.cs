@@ -1,35 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
-using THMS.Data.Stores;
 using THMS.UI.WinForms.Controls;
 
 namespace THMS.UI.WinForms
 {
     public partial class FinanceDataCenterForm : BaseEmbeddedForm
     {
-        private readonly IAccountDataStore _accountStore;
-        private readonly ITransactionDataStore _transactionStore;
-
         private Control? _currentControl;
         private readonly Dictionary<string, Control> _controls = new();
 
-        public FinanceDataCenterForm(
-            IAccountDataStore accountStore,
-            ITransactionDataStore transactionStore)
+        public FinanceDataCenterForm()
         {
             InitializeComponent();
-
-            _accountStore = accountStore;
-            _transactionStore = transactionStore;
-
             CreateControlDictionary();
         }
 
         private void CreateControlDictionary()
         {
-            AddControl(new AccountUpdaterControl(_accountStore), "Accounts");
-            AddControl(new TransactionUpdaterControl(_transactionStore, _accountStore), "Transactions");
+            AddControl(new AccountUpdaterControl(), "Accounts");
+            AddControl(new TransactionUpdaterControl(), "Transactions");
         }
 
         private void AddControl(UserControl control, string label)

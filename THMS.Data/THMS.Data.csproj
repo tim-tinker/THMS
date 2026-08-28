@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\THMS.Configuration\THMS.Configuration.csproj" />
     <ProjectReference Include="..\THMS.Domain\THMS.Domain.csproj" />
   </ItemGroup>
 

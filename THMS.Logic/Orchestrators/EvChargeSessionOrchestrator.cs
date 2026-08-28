@@ -6,21 +6,22 @@ namespace THMS.Logic.Orchestrators
 {
     public class EvChargeSessionOrchestrator : BaseOrchestrator
     {
+        private readonly DataStoreFactory _storeFactory = new();
         private readonly IVehicleDataStore _vehicleStore;
         private readonly IEnergyDataStore _energyStore;
         private readonly IFinanceDataStore _financeStore;
 
         public Guid VehicleId { get; set; }
 
-        public EvChargeSessionOrchestrator(
-            IVehicleDataStore vehicleStore,
-            IEnergyDataStore energyStore,
-            IFinanceDataStore financeStore)
+        public EvChargeSessionOrchestrator()
         {
-            _vehicleStore = vehicleStore;
-            _energyStore = energyStore;
-            _financeStore = financeStore;
+            _vehicleStore = _storeFactory.GetVehicleStore();
+            _energyStore = _storeFactory.GetEnergyStore();
+            _financeStore = _storeFactory.GetFinanceStore();
         }
+
+        public IEnumerable<VehicleEv> GetEvVehicles() =>
+            _vehicleStore.GetAllVehicles().OfType<VehicleEv>();
 
         // ---------------------------------------------------------
         // LATEST SESSION

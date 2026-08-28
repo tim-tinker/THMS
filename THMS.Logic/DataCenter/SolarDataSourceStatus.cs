@@ -12,9 +12,9 @@ namespace THMS.Logic.DataCenter
 
         public DateTime? LastRetrieval { get; private set; }
 
-        public SolarDataSourceStatus(IEnergyDataStore energyStore)
+        public SolarDataSourceStatus()
         {
-            _energyStore = energyStore;
+            _energyStore = new DataStoreFactory().GetEnergyStore();
         }
 
         public void QueryStatus()

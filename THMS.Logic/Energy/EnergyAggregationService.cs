@@ -12,9 +12,9 @@ namespace THMS.Logic.Energy
     {
         private readonly IEnergyDataStore _store;
 
-        public EnergyAggregationService(IEnergyDataStore store)
+        public EnergyAggregationService()
         {
-            _store = store;
+            _store = new DataStoreFactory().GetEnergyStore();
         }
 
         // ---------------------------------------------------------

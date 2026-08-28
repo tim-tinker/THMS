@@ -7,23 +7,20 @@ namespace THMS.Logic.ViewModels
 {
     public class VehicleListViewModel : BaseDashboardViewModel
     {
-        private IVehicleDataStore _vehicleStore = null!;
-        private IFinanceDataStore _financeStore = null!;
-        private TransportationCostAggregator _aggregator = null!;
+        private readonly IVehicleDataStore _vehicleStore;
+        private readonly IFinanceDataStore _financeStore;
+        private readonly TransportationCostAggregator _aggregator;
 
         public BindingList<VehicleListItemViewModel> Vehicles { get; } = new();
 
         public DateTime PeriodStart { get; set; }
         public DateTime PeriodEnd { get; set; }
 
-        public void SetStores(
-            IVehicleDataStore vehicleStore,
-            IFinanceDataStore financeStore,
-            IEnergyDataStore energyStore)
+        public VehicleListViewModel()
         {
-            _vehicleStore = vehicleStore;
-            _financeStore = financeStore;
-            _aggregator = new TransportationCostAggregator(vehicleStore, financeStore);
+            _vehicleStore = new DataStoreFactory().GetVehicleStore();
+            _financeStore = new DataStoreFactory().GetFinanceStore();
+            _aggregator = new TransportationCostAggregator(_vehicleStore, _financeStore);
         }
 
         public override void Initialize()
@@ -43,11 +40,6 @@ namespace THMS.Logic.ViewModels
 
         private void Load()
         {
-            if (_vehicleStore == null || _financeStore == null || _aggregator == null)
-            {
-                throw new InvalidOperationException("Stores and aggregator must be set before loading data.");
-            }
-
             Vehicles.Clear();
 
             var allVehicles = _vehicleStore.GetAllVehicles();

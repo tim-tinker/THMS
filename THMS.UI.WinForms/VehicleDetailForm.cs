@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.Windows.Forms;
-using THMS.Data.Stores;
 using THMS.Domain.Transportation;
 using THMS.Logic.ViewModels.Transportation;
 
@@ -20,10 +19,10 @@ namespace THMS.UI.WinForms
             _splitFuelMaintenance.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         }
 
-        public VehicleDetailForm(IVehicleDataStore vehicleStore, IEnergyDataStore energyStore, Guid vehicleId)
+        public VehicleDetailForm(Guid vehicleId)
             : this()
         {
-            _vm = new VehicleDetailViewModel(vehicleStore, energyStore, vehicleId) ?? throw new ArgumentOutOfRangeException(nameof(vehicleId));
+            _vm = new VehicleDetailViewModel(vehicleId) ?? throw new ArgumentOutOfRangeException(nameof(vehicleId));
         }
 
         private void OnLoad(object sender, EventArgs e)

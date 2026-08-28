@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel;
-using THMS.Data.Stores;
 using THMS.Domain.Finance;
 using THMS.Logic.Orchestrators;
 
@@ -7,8 +6,7 @@ namespace THMS.UI.WinForms.Controls
 {
     public partial class ElectricContractManagerControl : UserControl, IDataManagerControl
     {
-        private IFinanceDataStore _financeStore;
-        private ElectricContractOrchestrator _orchestrator;
+        private readonly ElectricContractOrchestrator _orchestrator = new();
         private string _currentPeriod;
         private BindingList<ElectricContract> _contracts;
 
@@ -16,13 +14,6 @@ namespace THMS.UI.WinForms.Controls
         {
             InitializeComponent();
             _gridContracts.AutoGenerateColumns = false;
-        }
-
-        public ElectricContractManagerControl(IFinanceDataStore financeStore)
-            : this()
-        {
-            _financeStore = financeStore;
-            _orchestrator = new ElectricContractOrchestrator(financeStore);
         }
 
         // ---------------------------------------------------------

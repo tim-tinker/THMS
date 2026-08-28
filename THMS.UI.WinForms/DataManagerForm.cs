@@ -1,39 +1,27 @@
-﻿using THMS.Data.Stores;
-using THMS.UI.WinForms.Controls;
+﻿using THMS.UI.WinForms.Controls;
 
 namespace THMS.UI.WinForms
 {
     public partial class DataManagerForm : BaseEmbeddedForm
     {
-        private readonly IEnergyDataStore _energyStore;
-        private readonly IVehicleDataStore _vehicleStore;
-        private readonly IFinanceDataStore _financeStore;
-        private readonly IAccountDataStore _accountStore;
-        private readonly ITransactionDataStore _transactionStore;
         private IDataManagerControl? _currentControl;
 
         private Dictionary<string, Control> _controls = [];
 
-        public DataManagerForm(IEnergyDataStore energyStore, IVehicleDataStore vehicleStore, IFinanceDataStore financeStore, 
-            IAccountDataStore accountStore, ITransactionDataStore transactionStore)
+        public DataManagerForm()
         {
             InitializeComponent();
-            _energyStore = energyStore;
-            _vehicleStore = vehicleStore;
-            _financeStore = financeStore;
-            _accountStore = accountStore;
-            _transactionStore = transactionStore;
             CreateControlDictionary();
         }
 
         private void CreateControlDictionary()
         {
-            AddControl(new SolarIntervalManagerControl(_energyStore), "Solar");
-            AddControl(new HomeCircuitManagerControl(_energyStore), "Home Circuit");
-            AddControl(new HomeCircuitAttributionManagerControl(_energyStore), "Circuit Attribution");
-            AddControl(new EvChargeSessionManagerControl(_vehicleStore, _energyStore, _financeStore), "EV Charge Session");
-            AddControl(new ElectricContractManagerControl(_financeStore), "Electric Contracts");
-            AddControl(new TransactionManagerControl(_transactionStore, _accountStore), "Accounts and Transactions");
+            AddControl(new SolarIntervalManagerControl(), "Solar");
+            AddControl(new HomeCircuitManagerControl(), "Home Circuit");
+            AddControl(new HomeCircuitAttributionManagerControl(), "Circuit Attribution");
+            AddControl(new EvChargeSessionManagerControl(), "EV Charge Session");
+            AddControl(new ElectricContractManagerControl(), "Electric Contracts");
+            AddControl(new TransactionManagerControl(), "Accounts and Transactions");
         }
 
         private void AddControl(UserControl control, string label)

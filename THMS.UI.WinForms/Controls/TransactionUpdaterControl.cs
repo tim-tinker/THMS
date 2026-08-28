@@ -1,21 +1,13 @@
-﻿using THMS.Data.Stores;
-using THMS.Logic.Orchestrators;
+﻿using THMS.Logic.Orchestrators;
 
 namespace THMS.UI.WinForms.Controls
 {
     public partial class TransactionUpdaterControl : UserControl
     {
-        private readonly ITransactionDataStore _transactionStore;
-        private readonly IAccountDataStore _accountStore;
 
-        public TransactionUpdaterControl(
-            ITransactionDataStore transactionStore,
-            IAccountDataStore accountStore)
+        public TransactionUpdaterControl()
         {
             InitializeComponent();
-
-            _transactionStore = transactionStore;
-            _accountStore = accountStore;
         }
 
         private void OnRunUpdate(object sender, EventArgs e)
@@ -25,7 +17,7 @@ namespace THMS.UI.WinForms.Controls
 
             try
             {
-                var orchestrator = new TransactionUpdaterOrchestrator(_transactionStore, _accountStore);
+                var orchestrator = new TransactionUpdaterOrchestrator();
                 var result = orchestrator.RunFullUpdate();
 
                 txtSummary.Text =

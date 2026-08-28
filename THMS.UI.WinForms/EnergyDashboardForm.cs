@@ -1,10 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Windows.Forms;
-using Microsoft.Extensions.DependencyInjection;
-using THMS.Data.Stores;
-using THMS.Ingestion.Importers.Energy;
-using THMS.Logic.Energy;
 using THMS.Logic.ViewModels.Energy;
 using THMS.UI.WinForms.Charts;
 using THMS.UI.WinForms.Controls;
@@ -13,8 +9,6 @@ namespace THMS.UI.WinForms
 {
     public partial class EnergyDashboardForm : BaseDashboardForm
     {
-        private readonly IEnergyDataStore? _energyDataStore;
-
         private EnergyDashboardViewModel _vm { get; set; } = null!;
         private bool _initialized;
         private bool _loading;
@@ -23,12 +17,6 @@ namespace THMS.UI.WinForms
         {
             InitializeComponent();
             InitializeDynamicLayout();
-        }
-
-        public EnergyDashboardForm(IEnergyDataStore energyDataStore)
-            : this()
-        {
-            _energyDataStore = energyDataStore ?? throw new ArgumentNullException(nameof(energyDataStore));
         }
 
         private void InitializeDynamicLayout()
@@ -153,11 +141,7 @@ namespace THMS.UI.WinForms
         {
             if (_initialized) return;
 
-            if (_energyDataStore is null)
-                throw new InvalidOperationException("Data stores were not provided. Resolve this form from DI at runtime.");
-
             _vm = new EnergyDashboardViewModel();
-            _vm.SetStores(_energyDataStore);
             RefreshDashboard();
 
             _initialized = true;

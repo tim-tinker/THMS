@@ -7,6 +7,7 @@ namespace THMS.Logic.Orchestrators
 {
     public class HomeCircuitReadingOrchestrator : BaseOrchestrator
     {
+        private readonly DataStoreFactory _storeFactory = new();
         private readonly IEnergyDataStore _energyStore;
 
         public DateTime StartDate { get; private set; } = DateTime.MinValue;
@@ -14,9 +15,9 @@ namespace THMS.Logic.Orchestrators
         public int ReadingCount { get; private set; }
         public string ErrorMessage { get; private set; }
 
-        public HomeCircuitReadingOrchestrator(IEnergyDataStore energyStore)
+        public HomeCircuitReadingOrchestrator()
         {
-            _energyStore = energyStore;
+            _energyStore = _storeFactory.GetEnergyStore();
         }
 
         public void Update(string filePath)
