@@ -1,15 +1,15 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using THMS.Domain.Finance.Transactions;
+﻿using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Logic.Orchestrators
 {
     public class TransferDetector
     {
-        public List<PostedTransferTransaction> DetectTransfers(List<PostedTransaction> posted)
-        {
-            var results = new List<PostedTransferTransaction>();
+        public List<PostedTransferTransaction> Detected { get; } = [];
 
+        public List<PostedTransaction> Matched { get; } = [];
+
+        public void DetectTransfers(List<PostedTransaction> posted)
+        {
             // same-date, same-amount, opposite sign heuristic
             var groups = posted.GroupBy(t => t.Date);
 
@@ -23,20 +23,23 @@ namespace THMS.Logic.Orchestrators
                     {
                         if (p.Amount == -n.Amount)
                         {
-                            results.Add(new PostedTransferTransaction(
+                            // add detected transactions
+                            Detected.Add(new PostedTransferTransaction(
                                 p,
                                 n.Id,
                                 TransferDirection.Incoming));
 
-                            results.Add(new PostedTransferTransaction(
+                            Detected.Add(new PostedTransferTransaction(
                                 n,
                                 p.Id,
                                 TransferDirection.Outgoing));
+
+                            // add matched transactions
+                            Matched.Add(p);
+                            Matched.Add(n);
                         }
                     }
             }
-
-            return results;
         }
     }
 }

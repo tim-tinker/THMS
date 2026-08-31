@@ -19,7 +19,6 @@ namespace THMS.Logic.Orchestrators
         private readonly RecurringDetector _recurringDetector;
         private readonly Categorizer _categorizer;
         private readonly ForecastGenerator _forecastGenerator;
-        private readonly RollOffEngine _rollOffEngine;
 
         public TransactionUpdaterOrchestrator()
         {
@@ -30,7 +29,6 @@ namespace THMS.Logic.Orchestrators
             _recurringDetector = new RecurringDetector();
             _categorizer = new Categorizer();
             _forecastGenerator = new ForecastGenerator();
-            _rollOffEngine = new RollOffEngine();
             _accessor = new ExternalTransactionAccess();
         }
 
@@ -48,35 +46,58 @@ namespace THMS.Logic.Orchestrators
             // 3. Normalize posted
             NormalizePosted(posted);
 
-            // 4. Save posted
-            _transactionStore.SavePostedTransactions(posted);
-
-            // 5. Detect transfers
-            var transfers = _transferDetector.DetectTransfers(posted);
-            _transactionStore.SavePostedTransfers(transfers);
-            result.TransfersDetected = transfers.Count;
-
-            // 6. Detect recurring rules
-            var recurringSingles = _recurringDetector.DetectRecurringSingles(posted);
-            var recurringTransfers = _recurringDetector.DetectRecurringTransfers(posted);
-            _transactionStore.SaveRecurringRules(recurringSingles, recurringTransfers);
-            result.RecurringRulesUpdated = recurringSingles.Count + recurringTransfers.Count;
-
-            // 7. Categorize posted
+            // 4. Categorize posted
             _categorizer.ApplyCategories(posted);
-            _transactionStore.UpdateCategories(posted);
+            foreach (var item in posted)
+            {
+                _transactionStore.UpdatePostedTransaction(item);
+            }
+
+            // 5. Save posted
+            foreach (var item in posted)
+            {
+                _transactionStore.AddPostedTransaction(item);
+            }
+
+            // 6. Detect transfers
+            _transferDetector.DetectTransfers(posted);
+            foreach (var item in _transferDetector.Detected)
+            {
+                _transactionStore.AddPostedTransferTransaction(item);
+            }
+            foreach (var item in _transferDetector.Matched)
+            {
+                _transactionStore.DeletePostedTransaction(item.Id);
+            }
+            result.TransfersDetected = _transferDetector.Detected.Count;
+
+            // 7. Detect recurring rules
+            var recurringSingles = _recurringDetector.DetectRecurringSingles(posted);
+            foreach (var item in recurringSingles)
+            {
+                _transactionStore.AddRecurringSingleRule(item);
+            }
+            var recurringTransfers = _recurringDetector.DetectRecurringTransfers(posted);
+            foreach (var item in recurringTransfers)
+            {
+                _transactionStore.AddRecurringTransferRule(item);
+            }
+            result.RecurringRulesUpdated = recurringSingles.Count + recurringTransfers.Count;
 
             // 8. Forecast future transactions
             var futureSingles = _forecastGenerator.GenerateFutureSingles(recurringSingles);
+            foreach (var item in futureSingles) 
+            {
+                _transactionStore.AddFutureSingleTransaction(item);
+            }
             var futureTransfers = _forecastGenerator.GenerateFutureTransfers(recurringTransfers);
-            _transactionStore.SaveFutureTransactions(futureSingles, futureTransfers);
+            foreach (var item in futureTransfers)
+            {
+                _transactionStore.AddFutureTransferTransaction(item);
+            }
             result.ForecastUpdated = true;
 
             // 9. Roll-off realized future items
-            var rollOffDone = _rollOffEngine.RollOffRealized(
-                posted,
-                futureSingles,
-                futureTransfers);
 
             result.RollOffCompleted = rollOffDone;
 
