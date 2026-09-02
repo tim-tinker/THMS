@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using THMS.Data.Stores;
 using THMS.Domain.Finance;
-using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Logic.Orchestrators
@@ -14,120 +13,131 @@ namespace THMS.Logic.Orchestrators
         private readonly IAccountDataStore _accountStore;
         private readonly ITransactionDataStore _transactionStore;
 
-        private readonly ExternalTransactionAccess _accessor;
         private readonly TransferDetector _transferDetector;
         private readonly RecurringDetector _recurringDetector;
-        private readonly Categorizer _categorizer;
         private readonly ForecastGenerator _forecastGenerator;
+        private readonly FutureReconciler _futureReconciler;
 
         public TransactionUpdaterOrchestrator()
         {
-            _transactionStore = _storeFactory.GetTransactionStore(); ;
-            _accountStore = _storeFactory.GetAccountStore(); ;
+            _transactionStore = _storeFactory.GetTransactionStore();
+            _accountStore = _storeFactory.GetAccountStore();
 
             _transferDetector = new TransferDetector();
             _recurringDetector = new RecurringDetector();
-            _categorizer = new Categorizer();
             _forecastGenerator = new ForecastGenerator();
-            _accessor = new ExternalTransactionAccess();
+            _futureReconciler = new FutureReconciler();
         }
 
-        public async Task<UpdaterResult> RunFullUpdateAsync()
+        public UpdaterResult RunLedgerUpdate()
         {
             var result = new UpdaterResult();
 
-            // 1. Load accounts
             var accounts = _accountStore.GetAllAccounts().ToList();
-
-            // 2. Fetch posted transactions
-            var posted = await FetchAllPostedAsync(accounts);
-            result.TransactionsImported = posted.Count;
-
-            // 3. Normalize posted
-            NormalizePosted(posted);
-
-            // 4. Categorize posted
-            _categorizer.ApplyCategories(posted);
-            foreach (var item in posted)
-            {
-                _transactionStore.UpdatePostedTransaction(item);
-            }
-
-            // 5. Save posted
-            foreach (var item in posted)
-            {
-                _transactionStore.AddPostedTransaction(item);
-            }
-
-            // 6. Detect transfers
-            _transferDetector.DetectTransfers(posted);
-            foreach (var item in _transferDetector.Detected)
-            {
-                _transactionStore.AddPostedTransferTransaction(item);
-            }
-            foreach (var item in _transferDetector.Matched)
-            {
-                _transactionStore.DeletePostedTransaction(item.Id);
-            }
-            result.TransfersDetected = _transferDetector.Detected.Count;
-
-            // 7. Detect recurring rules
-            var recurringSingles = _recurringDetector.DetectRecurringSingles(posted);
-            foreach (var item in recurringSingles)
-            {
-                _transactionStore.AddRecurringSingleRule(item);
-            }
-            var recurringTransfers = _recurringDetector.DetectRecurringTransfers(posted);
-            foreach (var item in recurringTransfers)
-            {
-                _transactionStore.AddRecurringTransferRule(item);
-            }
-            result.RecurringRulesUpdated = recurringSingles.Count + recurringTransfers.Count;
-
-            // 8. Forecast future transactions
-            var futureSingles = _forecastGenerator.GenerateFutureSingles(recurringSingles);
-            foreach (var item in futureSingles) 
-            {
-                _transactionStore.AddFutureSingleTransaction(item);
-            }
-            var futureTransfers = _forecastGenerator.GenerateFutureTransfers(recurringTransfers);
-            foreach (var item in futureTransfers)
-            {
-                _transactionStore.AddFutureTransferTransaction(item);
-            }
-            result.ForecastUpdated = true;
-
-            // 9. Roll-off realized future items
-
-            result.RollOffCompleted = rollOffDone;
-
-            // 10. Accounts updated count
             result.AccountsUpdated = accounts.Count;
 
+            foreach (var account in accounts)
+            {
+                // ------------------------------------------------------------
+                // 1. Load historical ledger
+                // ------------------------------------------------------------
+                var posted = _transactionStore.GetPostedTransactions(account.Id).ToList();
+                var postedTransfers = _transactionStore.GetPostedTransferTransactions(account.Id).ToList();
+
+                var existingSingleRules = _transactionStore.GetRecurringSingleRules(account.Id).ToList();
+                var existingTransferRules = _transactionStore.GetRecurringTransferRules(account.Id).ToList();
+
+                // ------------------------------------------------------------
+                // 2. Detect transfers (historical ledger only)
+                // ------------------------------------------------------------
+                _transferDetector.DetectTransfers(posted);
+
+                foreach (var t in _transferDetector.Detected)
+                    _transactionStore.AddPostedTransferTransaction(t);
+
+                foreach (var m in _transferDetector.Matched)
+                    _transactionStore.DeletePostedTransaction(m.Id);
+
+                result.TransfersDetected += _transferDetector.Detected.Count;
+
+                // Reload transfers after detection
+                postedTransfers = _transactionStore.GetPostedTransferTransactions(account.Id).ToList();
+
+                // ------------------------------------------------------------
+                // 3. Detect recurring rules (historical ledger only)
+                // ------------------------------------------------------------
+                var newSingleRules =
+                    _recurringDetector.DetectRecurringSingles(
+                        posted,
+                        existingSingleRules);
+
+                var newTransferRules =
+                    _recurringDetector.DetectRecurringTransfers(
+                        postedTransfers,
+                        existingTransferRules);
+
+                result.RecurringRulesUpdated += newSingleRules.Count + newTransferRules.Count;
+
+                // ------------------------------------------------------------
+                // 4. Merge existing + new rules
+                // ------------------------------------------------------------
+                var mergedSingleRules = existingSingleRules.Concat(newSingleRules).ToList();
+                var mergedTransferRules = existingTransferRules.Concat(newTransferRules).ToList();
+
+                // ------------------------------------------------------------
+                // 5. Forecast future transactions (updates NextOccurrence)
+                // ------------------------------------------------------------
+                var futureSingles = _forecastGenerator.GenerateFutureSingles(mergedSingleRules);
+                var futureTransfers = _forecastGenerator.GenerateFutureTransfers(mergedTransferRules);
+
+                foreach (var f in futureSingles)
+                    _transactionStore.AddFutureSingleTransaction(f);
+
+                foreach (var f in futureTransfers)
+                    _transactionStore.AddFutureTransferTransaction(f);
+
+                result.ForecastUpdated = true;
+
+                // ------------------------------------------------------------
+                // 6. Upsert ALL recurring rules (NextOccurrence updated)
+                // ------------------------------------------------------------
+                foreach (var r in mergedSingleRules)
+                    _transactionStore.UpdateRecurringSingleRule(r);
+
+                foreach (var r in mergedTransferRules)
+                    _transactionStore.UpdateRecurringTransferRule(r);
+
+                // ------------------------------------------------------------
+                // 7. Reconcile future transactions
+                // ------------------------------------------------------------
+                var allPosted = _transactionStore.GetPostedTransactions(account.Id).ToList();
+                var allPostedTransfers = _transactionStore.GetPostedTransferTransactions(account.Id).ToList();
+
+                var allFutureSingles = _transactionStore.GetFutureSingleTransactions(account.Id).ToList();
+                var allFutureTransfers = _transactionStore.GetFutureTransferTransactions(account.Id).ToList();
+
+                _futureReconciler.ReconcileSingles(allPosted, allFutureSingles);
+                _futureReconciler.ReconcileTransfers(allPostedTransfers, allFutureTransfers);
+
+                foreach (var f in _futureReconciler.MatchedSingles)
+                    _transactionStore.UpdateFutureSingleTransaction(f);
+
+                foreach (var f in _futureReconciler.MatchedTransfers)
+                    _transactionStore.UpdateFutureTransferTransaction(f);
+
+                // ------------------------------------------------------------
+                // 8. Roll-off realized future items
+                // ------------------------------------------------------------
+                foreach (var f in allFutureSingles.Where(f => f.IsRealized))
+                    _transactionStore.DeleteFutureSingleTransaction(f.Id);
+
+                foreach (var f in allFutureTransfers.Where(f => f.IsRealized))
+                    _transactionStore.DeleteFutureTransferTransaction(f.Id);
+
+                result.RollOffCompleted = true;
+            }
+
             return result;
-        }
-
-        private async Task<List<PostedTransaction>> FetchAllPostedAsync(List<Account> accounts)
-        {
-            var posted = new List<PostedTransaction>();
-
-            foreach (var acct in accounts)
-            {
-                var acctPosted = await _accessor.FetchPostedTransactionsAsync(acct, DateTime.Today.AddMonths(-3), DateTime.Today);
-                posted.AddRange(acctPosted);
-            }
-
-            return posted;
-        }
-
-        private void NormalizePosted(List<PostedTransaction> posted)
-        {
-            foreach (var p in posted)
-            {
-                p.Description = p.Description?.Trim() ?? "";
-                p.Amount = Math.Round(p.Amount, 2);
-                p.Date = p.Date.Date;
-            }
         }
     }
 }

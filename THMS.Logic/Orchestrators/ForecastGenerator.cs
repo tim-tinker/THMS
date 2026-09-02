@@ -4,9 +4,6 @@ namespace THMS.Logic.Orchestrators
 {
     public class ForecastGenerator
     {
-        // ------------------------------------------------------------
-        // Generate future singles from recurring single rules
-        // ------------------------------------------------------------
         public List<FutureSingleTransaction> GenerateFutureSingles(
             IEnumerable<RecurringSingleTransactionRule> rules)
         {
@@ -15,8 +12,6 @@ namespace THMS.Logic.Orchestrators
             foreach (var rule in rules.Where(r => r.IsActive))
             {
                 var next = rule.NextOccurrence;
-
-                // simple 3-month forecast
                 var end = DateTime.Today.AddMonths(3);
 
                 while (next <= end && (rule.EndDate == null || next <= rule.EndDate.Value))
@@ -41,15 +36,13 @@ namespace THMS.Logic.Orchestrators
                     next = next.AddFrequency(rule.Frequency);
                 }
 
+                // IMPORTANT: update rule
                 rule.NextOccurrence = next;
             }
 
             return results;
         }
 
-        // ------------------------------------------------------------
-        // Generate future transfers from recurring transfer rules
-        // ------------------------------------------------------------
         public List<FutureTransferTransaction> GenerateFutureTransfers(
             IEnumerable<RecurringTransferRule> rules)
         {
@@ -83,6 +76,7 @@ namespace THMS.Logic.Orchestrators
                     next = next.AddFrequency(rule.Frequency);
                 }
 
+                // IMPORTANT: update rule
                 rule.NextOccurrence = next;
             }
 
