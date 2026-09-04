@@ -15,6 +15,7 @@ namespace THMS.Data.Stores
         PostedTransaction? GetPostedTransaction(Guid id);
         IEnumerable<PostedTransaction> GetPostedTransactions(Guid accountId);
         IEnumerable<PostedTransaction> GetPostedTransactions(DateTime start, DateTime end);
+        DateTime? GetLatestPostedTransactionDate(Guid accountId);
 
 
         // ------------------------------------------------------------
@@ -27,6 +28,7 @@ namespace THMS.Data.Stores
         PostedTransferTransaction? GetPostedTransferTransaction(Guid id);
         IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(Guid accountId);
         IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(DateTime start, DateTime end);
+        DateTime? GetLatestPostedTransferTransactionDate(Guid accountId);
 
 
         // ------------------------------------------------------------

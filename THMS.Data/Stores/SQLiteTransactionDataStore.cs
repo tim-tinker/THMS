@@ -83,6 +83,12 @@ namespace THMS.Data.Stores.SQLite
             return _store.Posted.GetByDateRange(conn, start, end).ToList();
         }
 
+        public DateTime? GetLatestPostedTransactionDate(Guid accountId)
+        {
+            using var conn = OpenConnection();
+            return _store.Posted.GetLatest(conn, accountId)?.Date;
+        }
+
         // ------------------------------------------------------------
         // Posted Transfer Transactions
         // ------------------------------------------------------------
@@ -121,6 +127,12 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             return _store.PostedTransfers.GetByDateRange(conn, start, end).ToList();
+        }
+
+        public DateTime? GetLatestPostedTransferTransactionDate(Guid accountId)
+        {
+            using var conn = OpenConnection();
+            return _store.PostedTransfers.GetLatest(conn, accountId)?.Date;
         }
 
         // ------------------------------------------------------------

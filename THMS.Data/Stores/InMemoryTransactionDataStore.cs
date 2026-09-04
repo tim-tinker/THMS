@@ -29,6 +29,9 @@ namespace THMS.Data.Stores
         public IEnumerable<PostedTransaction> GetPostedTransactions(DateTime start, DateTime end) =>
             _store.GetPostedByDateRange(start, end);
 
+        public DateTime? GetLatestPostedTransactionDate(Guid accountId) =>
+            _store.GetLatestPosted(accountId)?.Date;
+
         public void ReplacePostedTransaction(PostedTransaction replacement) => _store.ReplacePostedTransaction(replacement);
 
         // ------------------------------------------------------------
@@ -52,6 +55,9 @@ namespace THMS.Data.Stores
 
         public IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(DateTime start, DateTime end) =>
             _store.GetPostedTransfersByDateRange(start, end);
+
+        public DateTime? GetLatestPostedTransferTransactionDate(Guid accountId) =>
+            _store.GetLatestPostedTransfer(accountId)?.Date;
 
         // ------------------------------------------------------------
         // Future Single Transactions

@@ -87,6 +87,19 @@ namespace THMS.Data.Stores.SqlTables
             return ReadAll(cmd);
         }
 
+        public PostedTransaction? GetLatest(SqliteConnection conn, Guid accountId)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = SelectColumns + @"
+                FROM PostedTransactions
+                WHERE AccountId = @AccountId
+                ORDER BY Date DESC
+                LIMIT 1;";
+            cmd.Parameters.AddWithValue("@AccountId", accountId.ToString());
+            using var reader = cmd.ExecuteReader();
+            return reader.Read() ? Read(reader) : null;
+        }
+
         public IEnumerable<PostedTransaction> GetUnmatchedByAccount(SqliteConnection conn, Guid accountId)
         {
             using var cmd = conn.CreateCommand();

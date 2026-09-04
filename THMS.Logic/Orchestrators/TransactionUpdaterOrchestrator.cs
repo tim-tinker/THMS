@@ -18,6 +18,10 @@ namespace THMS.Logic.Orchestrators
         private readonly ForecastGenerator _forecastGenerator;
         private readonly FutureReconciler _futureReconciler;
 
+        private const int RecurrenceMonths = 13;
+        private const int TransferLookbackDays = 3;
+        private const int InactiveGraceDays = 30;
+
         public TransactionUpdaterOrchestrator()
         {
             _transactionStore = _storeFactory.GetTransactionStore();
@@ -36,21 +40,42 @@ namespace THMS.Logic.Orchestrators
             var accounts = _accountStore.GetAllAccounts().ToList();
             result.AccountsUpdated = accounts.Count;
 
+            // ------------------------------------------------------------
+            // 1. Determine active accounts for transfer detection
+            // ------------------------------------------------------------
+            var activeAccounts = new List<(Guid AccountId, DateTime LatestTransfer, DateTime LatestPosted)>();
+
             foreach (var account in accounts)
             {
-                // ------------------------------------------------------------
-                // 1. Load historical ledger
-                // ------------------------------------------------------------
-                var posted = _transactionStore.GetPostedTransactions(account.Id).ToList();
-                var postedTransfers = _transactionStore.GetPostedTransferTransactions(account.Id).ToList();
+                var latestPosted = _transactionStore.GetLatestPostedTransactionDate(account.Id);
+                var latestTransfer = _transactionStore.GetLatestPostedTransferTransactionDate(account.Id);
 
-                var existingSingleRules = _transactionStore.GetRecurringSingleRules(account.Id).ToList();
-                var existingTransferRules = _transactionStore.GetRecurringTransferRules(account.Id).ToList();
+                if (latestPosted is null || latestTransfer is null)
+                    continue;
+
+                // Active if latest posted is within grace period of latest transfer
+                if (latestPosted.Value >= latestTransfer.Value.AddDays(-InactiveGraceDays))
+                {
+                    activeAccounts.Add((account.Id, latestTransfer.Value, latestPosted.Value));
+                }
+            }
+
+            // If no active accounts, skip transfer detection entirely
+            if (activeAccounts.Any())
+            {
+                var earliestLatestTransfer = activeAccounts.Min(a => a.LatestTransfer);
+                var transferStart = earliestLatestTransfer.AddDays(-TransferLookbackDays);
+                var transferEnd = activeAccounts.Max(a => a.LatestPosted);
 
                 // ------------------------------------------------------------
-                // 2. Detect transfers (historical ledger only)
+                // 2. Load posted transactions across ALL accounts for transfer detection
                 // ------------------------------------------------------------
-                _transferDetector.DetectTransfers(posted);
+                var recentPosted = _transactionStore.GetPostedTransactions(transferStart, transferEnd).ToList();
+
+                // ------------------------------------------------------------
+                // 3. Detect transfers globally
+                // ------------------------------------------------------------
+                _transferDetector.DetectTransfers(recentPosted);
 
                 foreach (var t in _transferDetector.Detected)
                     _transactionStore.AddPostedTransferTransaction(t);
@@ -58,35 +83,38 @@ namespace THMS.Logic.Orchestrators
                 foreach (var m in _transferDetector.Matched)
                     _transactionStore.DeletePostedTransaction(m.Id);
 
-                result.TransfersDetected += _transferDetector.Detected.Count;
+                result.TransfersDetected = _transferDetector.Detected.Count;
+            }
 
-                // Reload transfers after detection
-                postedTransfers = _transactionStore.GetPostedTransferTransactions(account.Id).ToList();
+            // ------------------------------------------------------------
+            // 4. Per-account recurrence detection, forecasting, reconciliation
+            // ------------------------------------------------------------
+            foreach (var account in accounts)
+            {
+                var latestPostedDate = _transactionStore.GetLatestPostedTransactionDate(account.Id);
+                if (latestPostedDate is null)
+                    continue;
 
-                // ------------------------------------------------------------
-                // 3. Detect recurring rules (historical ledger only)
-                // ------------------------------------------------------------
-                var newSingleRules =
-                    _recurringDetector.DetectRecurringSingles(
-                        posted,
-                        existingSingleRules);
+                var recurrenceStart = latestPostedDate.Value.AddMonths(-RecurrenceMonths);
 
-                var newTransferRules =
-                    _recurringDetector.DetectRecurringTransfers(
-                        postedTransfers,
-                        existingTransferRules);
+                // Load windowed ledger
+                var posted = _transactionStore.GetPostedTransactions(recurrenceStart, latestPostedDate.Value).ToList();
+                var postedTransfers = _transactionStore.GetPostedTransferTransactions(recurrenceStart, latestPostedDate.Value).ToList();
+
+                var existingSingleRules = _transactionStore.GetRecurringSingleRules(account.Id).ToList();
+                var existingTransferRules = _transactionStore.GetRecurringTransferRules(account.Id).ToList();
+
+                // Detect recurring rules
+                var newSingleRules = _recurringDetector.DetectRecurringSingles(posted, existingSingleRules);
+                var newTransferRules = _recurringDetector.DetectRecurringTransfers(postedTransfers, existingTransferRules);
 
                 result.RecurringRulesUpdated += newSingleRules.Count + newTransferRules.Count;
 
-                // ------------------------------------------------------------
-                // 4. Merge existing + new rules
-                // ------------------------------------------------------------
+                // Merge rules
                 var mergedSingleRules = existingSingleRules.Concat(newSingleRules).ToList();
                 var mergedTransferRules = existingTransferRules.Concat(newTransferRules).ToList();
 
-                // ------------------------------------------------------------
-                // 5. Forecast future transactions (updates NextOccurrence)
-                // ------------------------------------------------------------
+                // Forecast future transactions
                 var futureSingles = _forecastGenerator.GenerateFutureSingles(mergedSingleRules);
                 var futureTransfers = _forecastGenerator.GenerateFutureTransfers(mergedTransferRules);
 
@@ -98,26 +126,22 @@ namespace THMS.Logic.Orchestrators
 
                 result.ForecastUpdated = true;
 
-                // ------------------------------------------------------------
-                // 6. Upsert ALL recurring rules (NextOccurrence updated)
-                // ------------------------------------------------------------
+                // Persist updated rules (NextOccurrence updated)
                 foreach (var r in mergedSingleRules)
                     _transactionStore.UpdateRecurringSingleRule(r);
 
                 foreach (var r in mergedTransferRules)
                     _transactionStore.UpdateRecurringTransferRule(r);
 
-                // ------------------------------------------------------------
-                // 7. Reconcile future transactions
-                // ------------------------------------------------------------
-                var allPosted = _transactionStore.GetPostedTransactions(account.Id).ToList();
-                var allPostedTransfers = _transactionStore.GetPostedTransferTransactions(account.Id).ToList();
+                // Reconcile future transactions
+                var allPostedNow = _transactionStore.GetPostedTransactions(account.Id).ToList();
+                var allPostedTransfersNow = _transactionStore.GetPostedTransferTransactions(account.Id).ToList();
 
                 var allFutureSingles = _transactionStore.GetFutureSingleTransactions(account.Id).ToList();
                 var allFutureTransfers = _transactionStore.GetFutureTransferTransactions(account.Id).ToList();
 
-                _futureReconciler.ReconcileSingles(allPosted, allFutureSingles);
-                _futureReconciler.ReconcileTransfers(allPostedTransfers, allFutureTransfers);
+                _futureReconciler.ReconcileSingles(allPostedNow, allFutureSingles);
+                _futureReconciler.ReconcileTransfers(allPostedTransfersNow, allFutureTransfers);
 
                 foreach (var f in _futureReconciler.MatchedSingles)
                     _transactionStore.UpdateFutureSingleTransaction(f);
@@ -125,9 +149,7 @@ namespace THMS.Logic.Orchestrators
                 foreach (var f in _futureReconciler.MatchedTransfers)
                     _transactionStore.UpdateFutureTransferTransaction(f);
 
-                // ------------------------------------------------------------
-                // 8. Roll-off realized future items
-                // ------------------------------------------------------------
+                // Roll-off realized future items
                 foreach (var f in allFutureSingles.Where(f => f.IsRealized))
                     _transactionStore.DeleteFutureSingleTransaction(f.Id);
 

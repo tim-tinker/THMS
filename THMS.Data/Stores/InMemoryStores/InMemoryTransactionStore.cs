@@ -27,6 +27,12 @@ namespace THMS.Data.Stores.InMemoryStores
         public IEnumerable<PostedTransaction> GetPostedByDateRange(DateTime start, DateTime end) =>
             _posted.Where(t => InRange(t.Date, start, end)).OrderBy(t => t.Date);
 
+        public PostedTransaction? GetLatestPosted(Guid accountId) =>
+            _posted
+                .Where(t => t.AccountId == accountId)
+                .OrderByDescending(t => t.Date)
+                .FirstOrDefault();
+
         public IEnumerable<PostedTransaction> GetUnmatchedPosted(Guid accountId)
         {
             var matchedIds = _postedTransfers
@@ -70,6 +76,12 @@ namespace THMS.Data.Stores.InMemoryStores
 
         public IEnumerable<PostedTransferTransaction> GetPostedTransfersByDateRange(DateTime start, DateTime end) =>
             _postedTransfers.Where(t => InRange(t.Date, start, end)).OrderBy(t => t.Date);
+
+        public PostedTransferTransaction? GetLatestPostedTransfer(Guid accountId) =>
+            _postedTransfers
+                .Where(t => t.AccountId == accountId)
+                .OrderByDescending(t => t.Date)
+                .FirstOrDefault();
 
         public IEnumerable<PostedTransferTransaction> GetUnmatchedPostedTransfers(Guid accountId) =>
             _postedTransfers

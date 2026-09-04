@@ -18,7 +18,7 @@ namespace THMS.UI.WinForms.Controls
             try
             {
                 var orchestrator = new TransactionUpdaterOrchestrator();
-                var result = orchestrator.RunFullUpdate();
+                var result = orchestrator.RunLedgerUpdate();
 
                 txtSummary.Text =
                     $"Accounts Updated: {result.AccountsUpdated}\r\n" +
