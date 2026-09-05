@@ -284,6 +284,22 @@ namespace THMS.Data.Stores.SQLite
         }
 
         // ------------------------------------------------------------
+        // Expense Budget Rules
+        // ------------------------------------------------------------
+
+        public void UpsertExpenseBudgetRule(ExpenseBudgetRule? rule)
+        {
+            using var conn = OpenConnection();
+            _store.ExpenseBudgetRules.Upsert(conn, rule);
+        }
+
+        public IEnumerable<ExpenseBudgetRule> GetExpenseBudgetRules(Guid accountId)
+        {
+            using var conn = OpenConnection();
+            return _store.ExpenseBudgetRules.GetByAccount(conn, accountId).ToList();
+        }
+
+        // ------------------------------------------------------------
         // Categories
         // ------------------------------------------------------------
 

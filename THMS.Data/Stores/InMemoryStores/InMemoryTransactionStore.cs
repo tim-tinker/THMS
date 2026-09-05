@@ -10,6 +10,7 @@ namespace THMS.Data.Stores.InMemoryStores
         private readonly List<FutureTransferTransaction> _futureTransfers = new();
         private readonly List<RecurringSingleTransactionRule> _recurringSingles = new();
         private readonly List<RecurringTransferRule> _recurringTransfers = new();
+        private readonly List<ExpenseBudgetRule> _expenseBudgetRules = new();
         private readonly List<TransactionCategory> _categories = new();
 
         // ------------------------------------------------------------
@@ -163,6 +164,28 @@ namespace THMS.Data.Stores.InMemoryStores
 
         public IEnumerable<RecurringTransferRule> GetAllRecurringTransfers() =>
             _recurringTransfers.OrderBy(r => r.Date);
+
+        // ------------------------------------------------------------
+        // Expense Budget Rules
+        // ------------------------------------------------------------
+
+        public void UpsertExpenseBudget(ExpenseBudgetRule? rule)
+        {
+            if (rule is null)
+                return;
+
+            var index = _expenseBudgetRules.FindIndex(r =>
+                r.Id == rule.Id ||
+                (r.AccountId == rule.AccountId && r.Category == rule.Category));
+
+            if (index < 0)
+                _expenseBudgetRules.Add(rule);
+            else
+                _expenseBudgetRules[index] = rule;
+        }
+
+        public IEnumerable<ExpenseBudgetRule> GetExpenseBudgetsByAccount(Guid accountId) =>
+            _expenseBudgetRules.Where(r => r.AccountId == accountId);
 
         // ------------------------------------------------------------
         // Categories

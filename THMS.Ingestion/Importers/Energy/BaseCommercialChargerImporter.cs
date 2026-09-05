@@ -11,9 +11,9 @@ namespace THMS.Ingestion.Importers.Energy
 
         public void Import(string filePath)
         {
-            if (EnergyStore is null)
+            if (VehicleStore is null)
             {
-                throw new InvalidOperationException("IEnergyDataStore is not set. Cannot import data.");
+                throw new InvalidOperationException("IVehicleDataStore is not set. Cannot import data.");
             }
 
             if (FinanceStore is null)

@@ -5,4 +5,6 @@
 /.vs
 /*/obj
 /*/bin
+/coverage
+/TestResults
 /THMS.UI.WinForms/THMS.UI.WinForms.csproj.user

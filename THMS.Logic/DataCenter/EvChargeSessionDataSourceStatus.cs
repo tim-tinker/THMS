@@ -11,8 +11,13 @@ namespace THMS.Logic.DataCenter
         public DateTime? LastRetrieval { get; private set; }
 
         public EvChargeSessionDataSourceStatus()
+            : this(new DataStoreFactory().GetVehicleStore())
         {
-            _vehicleStore = new DataStoreFactory().GetVehicleStore();
+        }
+
+        public EvChargeSessionDataSourceStatus(IVehicleDataStore vehicleStore)
+        {
+            _vehicleStore = vehicleStore;
         }
 
         public void QueryStatus()

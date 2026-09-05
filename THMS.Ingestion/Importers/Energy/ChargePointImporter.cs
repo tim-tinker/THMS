@@ -28,6 +28,8 @@ namespace THMS.Ingestion.Importers.Energy
             using var reader = new StreamReader(filePath);
             using var csv = new CsvReader(reader, config);
 
+            csv.Read();
+            csv.ReadHeader();
             while (csv.Read())
             {
                 var startString = csv.GetField("Start");

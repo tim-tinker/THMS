@@ -35,13 +35,11 @@ namespace THMS.Logic.ViewModels.Finance
 
                     case InvestmentAccount inv:
                         view.Balance = inv.CashBalance;
-                        view.MarketValue = inv.MarketValue;
                         break;
 
                     case LoanAccount loan:
                         view.Balance = loan.Principal;
                         view.APR = loan.InterestRate;
-                        view.DueDate = loan.NextPaymentDate;
                         break;
 
                     case MortgageAccount mortgage:

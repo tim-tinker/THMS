@@ -41,8 +41,13 @@ namespace THMS.Logic.ViewModels.Transportation
         }
 
         public VehicleDetailViewModel(Guid vehicleId)
+            : this(vehicleId, new DataStoreFactory().GetVehicleStore())
         {
-            _vehicleStore = new DataStoreFactory().GetVehicleStore();
+        }
+
+        public VehicleDetailViewModel(Guid vehicleId, IVehicleDataStore vehicleStore)
+        {
+            _vehicleStore = vehicleStore;
             VehicleId = vehicleId;
 
             // Assign the backing fields so the range is complete before the first

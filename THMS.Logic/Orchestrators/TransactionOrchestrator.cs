@@ -5,12 +5,16 @@ namespace THMS.Logic.Orchestrators
 {
     public class TransactionOrchestrator
     {
-        private readonly DataStoreFactory _storeFactory = new();
         private readonly ITransactionDataStore _store;
 
         public TransactionOrchestrator()
+            : this(new DataStoreFactory().GetTransactionStore())
         {
-            _store = _storeFactory.GetTransactionStore();
+        }
+
+        public TransactionOrchestrator(ITransactionDataStore store)
+        {
+            _store = store;
         }
 
         // ------------------------------------------------------------

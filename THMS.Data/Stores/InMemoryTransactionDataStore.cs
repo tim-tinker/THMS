@@ -142,6 +142,16 @@ namespace THMS.Data.Stores
             _store.GetRecurringTransfersByAccount(accountId);
 
         // ------------------------------------------------------------
+        // Expense Budget Rules
+        // ------------------------------------------------------------
+
+        public void UpsertExpenseBudgetRule(ExpenseBudgetRule? rule) =>
+            _store.UpsertExpenseBudget(rule);
+
+        public IEnumerable<ExpenseBudgetRule> GetExpenseBudgetRules(Guid accountId) =>
+            _store.GetExpenseBudgetsByAccount(accountId);
+
+        // ------------------------------------------------------------
         // Categories
         // ------------------------------------------------------------
 

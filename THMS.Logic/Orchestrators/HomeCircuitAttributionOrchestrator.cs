@@ -6,12 +6,16 @@ namespace THMS.Logic.Orchestrators
 {
     public class HomeCircuitAttributionOrchestrator : BaseOrchestrator
     {
-        private readonly DataStoreFactory _storeFactory = new();
         private readonly IEnergyDataStore _energyStore;
 
         public HomeCircuitAttributionOrchestrator()
+            : this(new DataStoreFactory().GetEnergyStore())
         {
-            _energyStore = _storeFactory.GetEnergyStore();
+        }
+
+        public HomeCircuitAttributionOrchestrator(IEnergyDataStore energyStore)
+        {
+            _energyStore = energyStore;
         }
 
         public void Update()

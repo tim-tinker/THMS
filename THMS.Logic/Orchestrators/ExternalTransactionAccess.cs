@@ -10,9 +10,13 @@ namespace THMS.Logic.Orchestrators
         private readonly IExternalTransactionFetcher _fetcher;
 
         public ExternalTransactionAccess()
+            : this(new ExternalFetcherFactory().GetTransactionFetcher())
         {
-            var factory = new ExternalFetcherFactory();
-            _fetcher = factory.GetTransactionFetcher();
+        }
+
+        public ExternalTransactionAccess(IExternalTransactionFetcher fetcher)
+        {
+            _fetcher = fetcher;
         }
 
         public async Task<List<PostedTransaction>> FetchPostedTransactionsAsync(

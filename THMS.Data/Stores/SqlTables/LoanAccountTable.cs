@@ -13,34 +13,36 @@ namespace THMS.Data.Stores.SqlTables
                     AccountId TEXT PRIMARY KEY,
                     Principal REAL NOT NULL,
                     InterestRate REAL NOT NULL,
-                    NextPaymentDate TEXT NOT NULL
+                    TermMonths INTEGER NOT NULL
                 );";
             cmd.ExecuteNonQuery();
+
+            EnsureColumn(conn, "TermMonths", "INTEGER NOT NULL DEFAULT 0");
         }
 
         public void Upsert(SqliteConnection conn, LoanAccount account)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO LoanAccounts (AccountId, Principal, InterestRate, NextPaymentDate)
-                VALUES (@AccountId, @Principal, @InterestRate, @NextPaymentDate)
+                INSERT INTO LoanAccounts (AccountId, Principal, InterestRate, TermMonths)
+                VALUES (@AccountId, @Principal, @InterestRate, @TermMonths)
                 ON CONFLICT(AccountId) DO UPDATE SET
                     Principal = excluded.Principal,
                     InterestRate = excluded.InterestRate,
-                    NextPaymentDate = excluded.NextPaymentDate;";
+                    TermMonths = excluded.TermMonths;";
 
             cmd.Parameters.AddWithValue("@AccountId", account.Id.ToString());
             cmd.Parameters.AddWithValue("@Principal", account.Principal);
             cmd.Parameters.AddWithValue("@InterestRate", account.InterestRate);
-            cmd.Parameters.AddWithValue("@NextPaymentDate", account.NextPaymentDate);
+            cmd.Parameters.AddWithValue("@TermMonths", account.TermMonths);
             cmd.ExecuteNonQuery();
         }
 
-        public (decimal Principal, decimal InterestRate, DateTime NextPaymentDate)? Get(SqliteConnection conn, Guid id)
+        public (decimal Principal, decimal InterestRate, int TermMonths)? Get(SqliteConnection conn, Guid id)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT Principal, InterestRate, NextPaymentDate
+                SELECT Principal, InterestRate, TermMonths
                 FROM LoanAccounts
                 WHERE AccountId = @AccountId;";
             cmd.Parameters.AddWithValue("@AccountId", id.ToString());
@@ -52,7 +54,7 @@ namespace THMS.Data.Stores.SqlTables
             return (
                 (decimal)(double)reader.GetDouble(0),
                 (decimal)(double)reader.GetDouble(1),
-                reader.GetDateTime(2)
+                reader.GetInt32(2)
             );
         }
 
@@ -62,6 +64,13 @@ namespace THMS.Data.Stores.SqlTables
             cmd.CommandText = "DELETE FROM LoanAccounts WHERE AccountId = @AccountId;";
             cmd.Parameters.AddWithValue("@AccountId", id.ToString());
             cmd.ExecuteNonQuery();
+        }
+
+        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
+        {
+            using var alter = conn.CreateCommand();
+            alter.CommandText = $"ALTER TABLE LoanAccounts ADD COLUMN IF NOT EXISTS {columnName} {columnDef};";
+            alter.ExecuteNonQuery();
         }
     }
 }

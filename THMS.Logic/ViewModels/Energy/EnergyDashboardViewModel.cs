@@ -30,8 +30,13 @@ namespace THMS.Logic.ViewModels.Energy
         // Constructor
         // ---------------------------------------------------------
         public EnergyDashboardViewModel()
+            : this(new EnergyAggregationService())
         {
-            _service = new EnergyAggregationService();
+        }
+
+        public EnergyDashboardViewModel(EnergyAggregationService service)
+        {
+            _service = service;
         }
 
         public void Refresh()

@@ -13,7 +13,6 @@
         public decimal? Balance { get; set; }
         public decimal? BankCreditAvailable { get; set; }
         public decimal? CreditLimit { get; set; }
-        public decimal? MarketValue { get; set; }
         public decimal? APR { get; set; }
         public DateTime? DueDate { get; set; }
     }

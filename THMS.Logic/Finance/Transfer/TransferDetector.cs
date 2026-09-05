@@ -1,6 +1,6 @@
 ﻿using THMS.Domain.Finance.Transactions;
 
-namespace THMS.Logic.Orchestrators
+namespace THMS.Logic.Finance.Transfer
 {
     public class TransferDetector
     {

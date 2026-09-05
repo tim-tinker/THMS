@@ -13,8 +13,13 @@ namespace THMS.Logic.DataCenter
         public bool IsReadyForUpdate {  get; private set; }
 
         public HomeCircuitAttributionDataSourceStatus()
+            : this(new DataStoreFactory().GetEnergyStore())
         {
-            _energyStore = new DataStoreFactory().GetEnergyStore();
+        }
+
+        public HomeCircuitAttributionDataSourceStatus(IEnergyDataStore energyStore)
+        {
+            _energyStore = energyStore;
         }
 
         public void QueryStatus()

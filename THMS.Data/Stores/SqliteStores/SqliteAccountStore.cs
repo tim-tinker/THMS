@@ -159,7 +159,7 @@ namespace THMS.Data.Stores.SqliteStores
             {
                 Principal = details.Value.Principal,
                 InterestRate = details.Value.InterestRate,
-                NextPaymentDate = details.Value.NextPaymentDate
+                TermMonths = details.Value.TermMonths
             };
         }
 
@@ -180,14 +180,13 @@ namespace THMS.Data.Stores.SqliteStores
 
         private InvestmentAccount? LoadInvestment(SqliteConnection conn, Guid id)
         {
-            var details = _investmentAccountTable.Get(conn, id);
-            if (details == null)
+            var cashBalance = _investmentAccountTable.Get(conn, id);
+            if (cashBalance == null)
                 return null;
 
             return new InvestmentAccount
             {
-                CashBalance = details.Value.CashBalance,
-                MarketValue = details.Value.MarketValue
+                CashBalance = cashBalance.Value
             };
         }
 

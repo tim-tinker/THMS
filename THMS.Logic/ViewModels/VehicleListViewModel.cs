@@ -17,9 +17,16 @@ namespace THMS.Logic.ViewModels
         public DateTime PeriodEnd { get; set; }
 
         public VehicleListViewModel()
+            : this(
+                new DataStoreFactory().GetVehicleStore(),
+                new DataStoreFactory().GetFinanceStore())
         {
-            _vehicleStore = new DataStoreFactory().GetVehicleStore();
-            _financeStore = new DataStoreFactory().GetFinanceStore();
+        }
+
+        public VehicleListViewModel(IVehicleDataStore vehicleStore, IFinanceDataStore financeStore)
+        {
+            _vehicleStore = vehicleStore;
+            _financeStore = financeStore;
             _aggregator = new TransportationCostAggregator(_vehicleStore, _financeStore);
         }
 

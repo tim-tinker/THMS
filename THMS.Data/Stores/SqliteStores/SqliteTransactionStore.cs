@@ -12,6 +12,7 @@ namespace THMS.Data.Stores.SqliteStores
         private readonly FutureTransferTransactionsTable _futureTransfers = new();
         private readonly RecurringSingleTransactionRulesTable _recurringSingles = new();
         private readonly RecurringTransferRulesTable _recurringTransfers = new();
+        private readonly ExpenseBudgetRulesTable _expenseBudgetRules = new();
         private readonly TransactionCategoriesTable _categories = new();
 
         public void InitializeSchema(SqliteConnection conn)
@@ -22,6 +23,7 @@ namespace THMS.Data.Stores.SqliteStores
             _futureTransfers.InitializeSchema(conn);
             _recurringSingles.InitializeSchema(conn);
             _recurringTransfers.InitializeSchema(conn);
+            _expenseBudgetRules.InitializeSchema(conn);
             _categories.InitializeSchema(conn);
         }
 
@@ -31,6 +33,7 @@ namespace THMS.Data.Stores.SqliteStores
         public FutureTransferTransactionsTable FutureTransfers => _futureTransfers;
         public RecurringSingleTransactionRulesTable RecurringSingles => _recurringSingles;
         public RecurringTransferRulesTable RecurringTransfers => _recurringTransfers;
+        public ExpenseBudgetRulesTable ExpenseBudgetRules => _expenseBudgetRules;
         public TransactionCategoriesTable Categories => _categories;
     }
 }

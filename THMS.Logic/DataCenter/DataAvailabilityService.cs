@@ -7,11 +7,19 @@ namespace THMS.Logic.DataCenter
         private List<IDataSourceStatus> _dataSourceStatuses = [];
 
         public DataAvailabilityService()
+            : this(
+            [
+                new SolarDataSourceStatus(),
+                new HomeCircuitReadingDataSourceStatus(),
+                new EvChargeSessionDataSourceStatus(),
+                new HomeCircuitAttributionDataSourceStatus()
+            ])
         {
-            _dataSourceStatuses.Add(new SolarDataSourceStatus());
-            _dataSourceStatuses.Add(new HomeCircuitReadingDataSourceStatus());
-            _dataSourceStatuses.Add(new EvChargeSessionDataSourceStatus());
-            _dataSourceStatuses.Add(new HomeCircuitAttributionDataSourceStatus());
+        }
+
+        public DataAvailabilityService(IEnumerable<IDataSourceStatus> dataSourceStatuses)
+        {
+            _dataSourceStatuses = dataSourceStatuses.ToList();
         }
 
         public DataCenterViewModel GetAvailability()

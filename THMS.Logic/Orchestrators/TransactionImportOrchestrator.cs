@@ -13,10 +13,18 @@ namespace THMS.Logic.Orchestrators
         private double _dateWindowSize = 3; // use three because of weekends
 
         public TransactionImportOrchestrator()
+            : this(
+                new ExternalFetcherFactory().GetTransactionFetcher(),
+                new DataStoreFactory().GetTransactionStore())
         {
-            var externalFactory = new ExternalFetcherFactory();
-            _transactionFetcher = externalFactory.GetTransactionFetcher();
-            _txStore = new DataStoreFactory().GetTransactionStore();
+        }
+
+        public TransactionImportOrchestrator(
+            IExternalTransactionFetcher transactionFetcher,
+            ITransactionDataStore txStore)
+        {
+            _transactionFetcher = transactionFetcher;
+            _txStore = txStore;
         }
 
         public async Task<TransactionImportResult> ImportAsync(Account account)
@@ -216,25 +224,13 @@ namespace THMS.Logic.Orchestrators
 
         private string? GetCategoryByDescription(string description)
         {
-            string category = null;
+            if (!string.IsNullOrWhiteSpace(description) &&
+                description.Contains("STARBUCKS", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Coffee";
+            }
 
-            // 3. Try merchant-based rules (optional future feature)
-            //var merchantCategory = MerchantCategoryRules.TryGetCategory(description);
-            //if (merchantCategory is not null)
-            //{
-            //    category = merchantCategory;
-            //}
-            //else
-            //{
-            //    // 4. Try description-based rules (optional future feature)
-            //    var descriptionCategory = DescriptionCategoryRules.TryGetCategory(description);
-            //    if (descriptionCategory is not null)
-            //    {
-            //        category = descriptionCategory;
-            //    }
-            //}
-
-            return category;
+            return null;
         }
 
         public class TransactionImportResult

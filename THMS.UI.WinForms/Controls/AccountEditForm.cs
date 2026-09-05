@@ -66,7 +66,7 @@ namespace THMS.UI.WinForms.Controls
                 case LoanAccount loan:
                     numLoanPrincipal.Value = loan.Principal;
                     numLoanRate.Value = loan.InterestRate;
-                    dtLoanNext.Value = loan.NextPaymentDate;
+                    numLoanTerm.Value = loan.TermMonths;
                     break;
 
                 case MortgageAccount mortgage:
@@ -78,7 +78,6 @@ namespace THMS.UI.WinForms.Controls
 
                 case InvestmentAccount invest:
                     numInvestCash.Value = invest.CashBalance;
-                    numInvestMarket.Value = invest.MarketValue;
                     break;
 
                 case InternalAccount internalAcct:
@@ -114,7 +113,7 @@ namespace THMS.UI.WinForms.Controls
                 case LoanAccount loan:
                     loan.Principal = numLoanPrincipal.Value;
                     loan.InterestRate = numLoanRate.Value;
-                    loan.NextPaymentDate = dtLoanNext.Value;
+                    loan.TermMonths = (int)numLoanTerm.Value;
                     break;
 
                 case MortgageAccount mortgage:
@@ -126,7 +125,6 @@ namespace THMS.UI.WinForms.Controls
 
                 case InvestmentAccount invest:
                     invest.CashBalance = numInvestCash.Value;
-                    invest.MarketValue = numInvestMarket.Value;
                     break;
 
                 case InternalAccount internalAcct:
@@ -200,10 +198,7 @@ namespace THMS.UI.WinForms.Controls
                     StatementDate = DateTime.Today,
                     DueDate = DateTime.Today
                 },
-                "Loan" => new LoanAccount
-                {
-                    NextPaymentDate = DateTime.Today
-                },
+                "Loan" => new LoanAccount(),
                 "Mortgage" => new MortgageAccount
                 {
                     NextPaymentDate = DateTime.Today

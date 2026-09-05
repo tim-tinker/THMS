@@ -61,8 +61,8 @@
         private Label lblLoanRate;
         private NumericUpDown numLoanRate;
 
-        private Label lblLoanNext;
-        private DateTimePicker dtLoanNext;
+        private Label lblLoanTerm;
+        private NumericUpDown numLoanTerm;
 
         // Mortgage fields
         private Label lblMortPrincipal;
@@ -80,9 +80,6 @@
         // Investment fields
         private Label lblInvestCash;
         private NumericUpDown numInvestCash;
-
-        private Label lblInvestMarket;
-        private NumericUpDown numInvestMarket;
 
         // Internal fields
         private Label lblInternalPurpose;
@@ -129,7 +126,7 @@
             pnlCredit = new Panel { Left = 20, Top = 260, Width = 380, Height = 200 };
             pnlLoan = new Panel { Left = 20, Top = 260, Width = 380, Height = 120 };
             pnlMortgage = new Panel { Left = 20, Top = 260, Width = 380, Height = 160 };
-            pnlInvestment = new Panel { Left = 20, Top = 260, Width = 380, Height = 120 };
+            pnlInvestment = new Panel { Left = 20, Top = 260, Width = 380, Height = 80 };
             pnlInternal = new Panel { Left = 20, Top = 260, Width = 380, Height = 80 };
 
             // Bank panel
@@ -175,13 +172,13 @@
             lblLoanRate = new Label { Text = "Interest Rate (%):", Left = 10, Top = 50, Width = 120 };
             numLoanRate = new NumericUpDown { Left = 150, Top = 50, Width = 150, DecimalPlaces = 2, Maximum = 100 };
 
-            lblLoanNext = new Label { Text = "Next Payment:", Left = 10, Top = 90, Width = 120 };
-            dtLoanNext = new DateTimePicker { Left = 150, Top = 90, Width = 150, Format = DateTimePickerFormat.Short };
+            lblLoanTerm = new Label { Text = "Term (months):", Left = 10, Top = 90, Width = 120 };
+            numLoanTerm = new NumericUpDown { Left = 150, Top = 90, Width = 150, Maximum = 480 };
 
             pnlLoan.Controls.AddRange(new Control[] {
                 lblLoanPrincipal, numLoanPrincipal,
                 lblLoanRate, numLoanRate,
-                lblLoanNext, dtLoanNext
+                lblLoanTerm, numLoanTerm
             });
 
             // Mortgage panel
@@ -208,12 +205,8 @@
             lblInvestCash = new Label { Text = "Cash Balance:", Left = 10, Top = 10, Width = 120 };
             numInvestCash = new NumericUpDown { Left = 150, Top = 10, Width = 150, DecimalPlaces = 2, Maximum = 1000000 };
 
-            lblInvestMarket = new Label { Text = "Market Value:", Left = 10, Top = 50, Width = 120 };
-            numInvestMarket = new NumericUpDown { Left = 150, Top = 50, Width = 150, DecimalPlaces = 2, Maximum = 1000000 };
-
             pnlInvestment.Controls.AddRange(new Control[] {
-                lblInvestCash, numInvestCash,
-                lblInvestMarket, numInvestMarket
+                lblInvestCash, numInvestCash
             });
 
             // Internal panel

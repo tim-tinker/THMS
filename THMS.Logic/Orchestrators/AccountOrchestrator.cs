@@ -5,12 +5,16 @@ namespace THMS.Logic.Orchestrators.Finance
 {
     public class AccountOrchestrator
     {
-        private readonly DataStoreFactory _storeFactory = new();
         private readonly IAccountDataStore _accountStore;
 
         public AccountOrchestrator()
+            : this(new DataStoreFactory().GetAccountStore())
         {
-            _accountStore = _storeFactory.GetAccountStore();
+        }
+
+        public AccountOrchestrator(IAccountDataStore accountStore)
+        {
+            _accountStore = accountStore;
         }
 
         // ------------------------------------------------------------

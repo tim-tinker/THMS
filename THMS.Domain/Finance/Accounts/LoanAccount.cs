@@ -4,6 +4,6 @@
     {
         public decimal Principal { get; set; }
         public decimal InterestRate { get; set; }
-        public DateTime NextPaymentDate { get; set; }
+        public int TermMonths { get; set; }
     }
 }

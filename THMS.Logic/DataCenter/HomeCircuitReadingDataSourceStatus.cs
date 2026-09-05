@@ -15,8 +15,13 @@ namespace THMS.Logic.DataCenter
         public DateTime? LastRetrieval { get; private set; }
 
         public HomeCircuitReadingDataSourceStatus()
+            : this(new DataStoreFactory().GetEnergyStore())
         {
-            _energyStore = new DataStoreFactory().GetEnergyStore();
+        }
+
+        public HomeCircuitReadingDataSourceStatus(IEnergyDataStore energyStore)
+        {
+            _energyStore = energyStore;
         }
 
         public void QueryStatus()

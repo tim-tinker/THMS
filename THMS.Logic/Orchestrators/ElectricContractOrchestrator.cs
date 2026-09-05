@@ -6,12 +6,16 @@ namespace THMS.Logic.Orchestrators
 {
     public class ElectricContractOrchestrator : BaseOrchestrator
     {
-        private readonly DataStoreFactory _storeFactory = new();
         private readonly IFinanceDataStore _financeStore;
 
         public ElectricContractOrchestrator()
+            : this(new DataStoreFactory().GetFinanceStore())
         {
-            _financeStore = _storeFactory.GetFinanceStore();
+        }
+
+        public ElectricContractOrchestrator(IFinanceDataStore financeStore)
+        {
+            _financeStore = financeStore;
         }
 
         public void Save(ElectricContract contract)

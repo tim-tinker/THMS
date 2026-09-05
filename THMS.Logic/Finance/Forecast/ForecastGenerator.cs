@@ -1,6 +1,6 @@
 ﻿using THMS.Domain.Finance.Transactions;
 
-namespace THMS.Logic.Orchestrators
+namespace THMS.Logic.Finance.Forecast
 {
     public class ForecastGenerator
     {
@@ -81,6 +81,12 @@ namespace THMS.Logic.Orchestrators
             }
 
             return results;
+        }
+
+        public List<FutureSingleTransaction> GenerateExpenseBudgetForecast(
+            ExpenseBudgetRule rule)
+        {
+            return new ExpenseBudgetForecastGenerator().Generate(rule);
         }
     }
 }

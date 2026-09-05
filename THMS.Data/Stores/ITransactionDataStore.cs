@@ -1,4 +1,5 @@
-﻿using THMS.Domain.Finance.Transactions;
+﻿using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores
 {
@@ -75,6 +76,13 @@ namespace THMS.Data.Stores
 
         RecurringTransferRule? GetRecurringTransferRule(Guid id);
         IEnumerable<RecurringTransferRule> GetRecurringTransferRules(Guid accountId);
+
+
+        // ------------------------------------------------------------
+        // Expense Budget Rules
+        // ------------------------------------------------------------
+        void UpsertExpenseBudgetRule(ExpenseBudgetRule? rule);
+        IEnumerable<ExpenseBudgetRule> GetExpenseBudgetRules(Guid accountId);
 
 
         // ------------------------------------------------------------

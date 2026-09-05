@@ -29,7 +29,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Finance\Aggregation\" />
     <Folder Include="Home\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="THMS.Tests" />
   </ItemGroup>
 
 </Project>

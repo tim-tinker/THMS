@@ -26,7 +26,6 @@
             DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle7 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle8 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle9 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle10 = new DataGridViewCellStyle();
@@ -40,7 +39,6 @@
             AvailableColumn = new DataGridViewTextBoxColumn();
             AprColumn = new DataGridViewTextBoxColumn();
             CreditLimitColumn = new DataGridViewTextBoxColumn();
-            MarketValueColumn = new DataGridViewTextBoxColumn();
             detailGrid = new DataGridView();
             DateColumn = new DataGridViewTextBoxColumn();
             AmountColumn = new DataGridViewTextBoxColumn();
@@ -81,7 +79,7 @@
             masterGrid.AllowUserToResizeRows = false;
             masterGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             masterGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            masterGrid.Columns.AddRange(new DataGridViewColumn[] { NameColumn, AccountTypeColumn, AsOfDateColumn, BalanceColumn, DueDateColumn, AvailableColumn, AprColumn, CreditLimitColumn, MarketValueColumn });
+            masterGrid.Columns.AddRange(new DataGridViewColumn[] { NameColumn, AccountTypeColumn, AsOfDateColumn, BalanceColumn, DueDateColumn, AvailableColumn, AprColumn, CreditLimitColumn });
             masterGrid.Dock = DockStyle.Fill;
             masterGrid.Location = new Point(0, 0);
             masterGrid.MultiSelect = false;
@@ -185,18 +183,6 @@
             CreditLimitColumn.Name = "CreditLimitColumn";
             CreditLimitColumn.ReadOnly = true;
             CreditLimitColumn.Width = 148;
-            // 
-            // MarketValueColumn
-            // 
-            MarketValueColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            MarketValueColumn.DataPropertyName = "MarketValue";
-            dataGridViewCellStyle7.Format = "c2";
-            MarketValueColumn.DefaultCellStyle = dataGridViewCellStyle7;
-            MarketValueColumn.HeaderText = "Market Value";
-            MarketValueColumn.MinimumWidth = 9;
-            MarketValueColumn.Name = "MarketValueColumn";
-            MarketValueColumn.ReadOnly = true;
-            MarketValueColumn.Width = 161;
             // 
             // detailGrid
             // 
@@ -309,6 +295,5 @@
         private DataGridViewTextBoxColumn AvailableColumn;
         private DataGridViewTextBoxColumn AprColumn;
         private DataGridViewTextBoxColumn CreditLimitColumn;
-        private DataGridViewTextBoxColumn MarketValueColumn;
     }
 }

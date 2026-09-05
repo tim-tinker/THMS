@@ -9,10 +9,21 @@ namespace THMS.Logic.Orchestrators
         private readonly TransactionOrchestrator _txOrchestrator;
 
         public RegisterUpdateOrchestrator()
+            : this(
+                new AccountSyncOrchestrator(),
+                new TransactionImportOrchestrator(),
+                new TransactionOrchestrator())
         {
-            _accountSync = new AccountSyncOrchestrator();
-            _importer = new TransactionImportOrchestrator();
-            _txOrchestrator = new TransactionOrchestrator();
+        }
+
+        public RegisterUpdateOrchestrator(
+            AccountSyncOrchestrator accountSync,
+            TransactionImportOrchestrator importer,
+            TransactionOrchestrator txOrchestrator)
+        {
+            _accountSync = accountSync;
+            _importer = importer;
+            _txOrchestrator = txOrchestrator;
         }
         public async Task UpdateAccountAsync(Account account)
         {

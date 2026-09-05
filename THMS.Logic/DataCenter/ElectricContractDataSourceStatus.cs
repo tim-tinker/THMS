@@ -13,8 +13,13 @@ namespace THMS.Logic.DataCenter
         public bool IsReadyForUpdate { get; private set; }
 
         public ElectricContractDataSourceStatus()
+            : this(new DataStoreFactory().GetFinanceStore())
         {
-            _financeStore = new DataStoreFactory().GetFinanceStore();
+        }
+
+        public ElectricContractDataSourceStatus(IFinanceDataStore financeStore)
+        {
+            _financeStore = financeStore;
         }
 
         public void QueryStatus()

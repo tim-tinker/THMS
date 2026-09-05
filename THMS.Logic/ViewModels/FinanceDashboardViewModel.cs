@@ -8,8 +8,13 @@ namespace THMS.Logic.ViewModels.Finance
         private readonly IFinanceDataStore _store;
 
         public FinanceDashboardViewModel()
+            : this(new DataStoreFactory().GetFinanceStore())
         {
-            _store = new DataStoreFactory().GetFinanceStore();
+        }
+
+        public FinanceDashboardViewModel(IFinanceDataStore store)
+        {
+            _store = store;
         }
 
         public List<FinanceTransaction> Transactions { get; private set; } = new();

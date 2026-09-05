@@ -1,6 +1,6 @@
 ﻿using THMS.Domain.Finance.Loans;
 
-namespace THMS.Logic.Finance
+namespace THMS.Logic.Finance.Model
 {
     /// <summary>
     /// Generates an amortization schedule for a fixed-rate loan.
