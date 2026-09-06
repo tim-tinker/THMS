@@ -46,6 +46,19 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
+        public Guid? GetIdByName(SqliteConnection conn, string name)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"SELECT Id FROM Accounts WHERE Name = @Name LIMIT 1;";
+            cmd.Parameters.AddWithValue("@Name", name);
+
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read())
+                return null;
+
+            return Guid.Parse(reader.GetString(0));
+        }
+
         public (string Name, string Institution, string AccountNumber, AccountType Type, DateTime? BalanceAsOf, string ClassType)?
             GetBase(SqliteConnection conn, Guid id)
         {

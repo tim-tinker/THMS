@@ -44,11 +44,16 @@ namespace THMS.UI.WinForms
             var menuLabel = menuItem?.Text;
             if (string.IsNullOrEmpty(menuLabel)) return;
 
+            DisplayControl(menuLabel);
+        }
+
+        private void DisplayControl(string label)
+        {
+            if (!_controls.ContainsKey(label))
+                return;
             ClearControls();
-
-            var control = _controls[menuLabel];
+            var control = _controls[label];
             _currentControl = control as IDataManagerControl;
-
             panelHost.Controls.Add(control);
             control.BringToFront();
         }
@@ -86,6 +91,18 @@ namespace THMS.UI.WinForms
         private void OnClickClose(object sender, EventArgs e)
         {
             Close();
+        }
+
+
+        private void OnClickImportHistoricalData(object sender, EventArgs e)
+        {
+            using var dlg = new ImportDataForm();
+            if (dlg.ShowDialog() == DialogResult.OK)
+            {
+                // Refresh the TransactionManagerControl
+                //transactionManagerControl.RefreshCurrentAccount();
+                DisplayControl("Accounts and Transactions");
+            }
         }
     }
 }

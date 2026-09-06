@@ -57,6 +57,15 @@ namespace THMS.Data.Stores.SqliteStores
             }
         }
 
+        public Account? Get(SqliteConnection conn, string name)
+        {
+            var id = _accountTable.GetIdByName(conn, name);
+            if (id == null)
+                return null;
+
+            return Get(conn, id.Value);
+        }
+
         public Account? Get(SqliteConnection conn, Guid id)
         {
             var baseInfo = _accountTable.GetBase(conn, id);

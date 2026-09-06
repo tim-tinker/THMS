@@ -487,7 +487,7 @@ namespace THMS.Tests.Logic
                 CreditLimit = 500
             };
             orchestrator.Save(loc);
-            Assert.That(store.GetAccount(loc.Id)!.AccountNumber, Is.EqualTo("9900"));
+            Assert.That(store.GetAccount(loc.Name)!.AccountNumber, Is.EqualTo("9900"));
         }
 
         [Test]
@@ -499,39 +499,39 @@ namespace THMS.Tests.Logic
 
             var bank = Bank();
             store.UpsertAccount(bank);
-            orchestrator.UpdatePostedBalance(bank.Id, 99, asOf);
-            Assert.That(((BankAccount)store.GetAccount(bank.Id)!).PostedBalance, Is.EqualTo(99));
+            orchestrator.UpdatePostedBalance(bank.Name, 99, asOf);
+            Assert.That(((BankAccount)store.GetAccount(bank.Name)!).PostedBalance, Is.EqualTo(99));
 
             var credit = new CreditAccount { Name = "C", Institution = "I", AccountNumber = "1", Type = AccountType.CreditCard, CreditLimit = 1 };
             store.UpsertAccount(credit);
-            orchestrator.UpdatePostedBalance(credit.Id, 40, asOf);
-            Assert.That(((CreditAccount)store.GetAccount(credit.Id)!).PostedBalance, Is.EqualTo(40));
+            orchestrator.UpdatePostedBalance(credit.Name, 40, asOf);
+            Assert.That(((CreditAccount)store.GetAccount(credit.Name)!).PostedBalance, Is.EqualTo(40));
 
             var invest = new InvestmentAccount { Name = "I", Institution = "I", AccountNumber = "1" };
             store.UpsertAccount(invest);
-            orchestrator.UpdatePostedBalance(invest.Id, 70, asOf);
-            Assert.That(((InvestmentAccount)store.GetAccount(invest.Id)!).CashBalance, Is.EqualTo(70));
+            orchestrator.UpdatePostedBalance(invest.Name, 70, asOf);
+            Assert.That(((InvestmentAccount)store.GetAccount(invest.Name)!).CashBalance, Is.EqualTo(70));
 
             var loan = new LoanAccount { Name = "L", Institution = "I", AccountNumber = "1" };
             store.UpsertAccount(loan);
-            orchestrator.UpdatePostedBalance(loan.Id, 800, asOf);
-            Assert.That(((LoanAccount)store.GetAccount(loan.Id)!).Principal, Is.EqualTo(800));
+            orchestrator.UpdatePostedBalance(loan.Name, 800, asOf);
+            Assert.That(((LoanAccount)store.GetAccount(loan.Name)!).Principal, Is.EqualTo(800));
 
             var mortgage = new MortgageAccount { Name = "M", Institution = "I", AccountNumber = "1" };
             store.UpsertAccount(mortgage);
-            orchestrator.UpdatePostedBalance(mortgage.Id, 900, asOf);
-            Assert.That(((MortgageAccount)store.GetAccount(mortgage.Id)!).Principal, Is.EqualTo(900));
+            orchestrator.UpdatePostedBalance(mortgage.Name, 900, asOf);
+            Assert.That(((MortgageAccount)store.GetAccount(mortgage.Name)!).Principal, Is.EqualTo(900));
 
             var internalAcc = new InternalAccount { Name = "Int", Institution = "I", AccountNumber = "1" };
             store.UpsertAccount(internalAcc);
-            orchestrator.UpdatePostedBalance(internalAcc.Id, 1, asOf);
-            Assert.That(store.GetAccount(internalAcc.Id)!.BalanceAsOf, Is.EqualTo(asOf));
+            orchestrator.UpdatePostedBalance(internalAcc.Name, 1, asOf);
+            Assert.That(store.GetAccount(internalAcc.Name)!.BalanceAsOf, Is.EqualTo(asOf));
 
             var unknown = new UnknownAccount { Name = "U", Institution = "I", AccountNumber = "1" };
             store.UpsertAccount(unknown);
-            Assert.That(() => orchestrator.UpdatePostedBalance(unknown.Id, 1, asOf), Throws.InvalidOperationException);
+            Assert.That(() => orchestrator.UpdatePostedBalance(unknown.Name, 1, asOf), Throws.InvalidOperationException);
 
-            Assert.That(() => orchestrator.UpdatePostedBalance(Guid.NewGuid(), 1, asOf), Throws.InvalidOperationException);
+            Assert.That(() => orchestrator.UpdatePostedBalance("missing-account", 1, asOf), Throws.InvalidOperationException);
         }
 
         [Test]
@@ -542,10 +542,10 @@ namespace THMS.Tests.Logic
             var bank = Bank();
             orchestrator.Save(bank);
 
-            Assert.That(orchestrator.GetAccount(bank.Id), Is.Not.Null);
+            Assert.That(orchestrator.GetAccount(bank.Name), Is.Not.Null);
             Assert.That(orchestrator.GetAllAccounts().Count(), Is.EqualTo(1));
             orchestrator.Delete(bank.Id);
-            Assert.That(orchestrator.GetAccount(bank.Id), Is.Null);
+            Assert.That(orchestrator.GetAccount(bank.Name), Is.Null);
         }
     }
 

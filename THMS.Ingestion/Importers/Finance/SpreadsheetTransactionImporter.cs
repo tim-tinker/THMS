@@ -14,6 +14,12 @@ namespace THMS.Ingestion.Importers.Finance
         private readonly ITransactionDataStore _transactionStore;
         private readonly IAccountDataStore _accountStore;
 
+        public SpreadsheetTransactionImporter()
+            : this(new DataStoreFactory().GetTransactionStore(),
+                new DataStoreFactory().GetAccountStore())
+        {
+        }
+            
         public SpreadsheetTransactionImporter(
             ITransactionDataStore transactionStore,
             IAccountDataStore accountStore)
@@ -56,7 +62,7 @@ namespace THMS.Ingestion.Importers.Finance
                 if (string.IsNullOrWhiteSpace(accountName))
                     continue;
 
-                var account = _accountStore.GetAccountByName(accountName);
+                var account = _accountStore.GetAccount(accountName);
                 if (account is null)
                 {
                     Console.WriteLine(

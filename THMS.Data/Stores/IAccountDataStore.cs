@@ -7,8 +7,8 @@ namespace THMS.Data.Stores
         // Create or update an account
         void UpsertAccount(Account account);
 
-        // Retrieve a single account
-        Account? GetAccount(Guid id);
+        // Retrieve a single account by Name
+        Account? GetAccount(string name);
 
         // Retrieve all accounts
         IEnumerable<Account> GetAllAccounts();

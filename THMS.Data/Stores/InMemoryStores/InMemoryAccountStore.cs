@@ -15,8 +15,8 @@ namespace THMS.Data.Stores.InMemoryStores
                 _items[index] = account;
         }
 
-        public Account? Get(Guid id) =>
-            _items.FirstOrDefault(a => a.Id == id);
+        public Account? Get(string name) =>
+            _items.FirstOrDefault(a => a.Name == name);
 
         public IEnumerable<Account> GetAll() =>
             _items.OrderBy(a => a.Name);

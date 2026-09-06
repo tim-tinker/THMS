@@ -36,11 +36,11 @@ namespace THMS.Logic.Orchestrators.Finance
         // ------------------------------------------------------------
         // Update posted balance + BalanceAsOf after transaction import
         // ------------------------------------------------------------
-        public void UpdatePostedBalance(Guid accountId, decimal newPostedBalance, DateTime asOfDate)
+        public void UpdatePostedBalance(string accountName, decimal newPostedBalance, DateTime asOfDate)
         {
-            var account = _accountStore.GetAccount(accountId);
+            var account = _accountStore.GetAccount(accountName);
             if (account == null)
-                throw new InvalidOperationException($"Account {accountId} not found.");
+                throw new InvalidOperationException($"Account {accountName} not found.");
 
             switch (account)
             {
@@ -81,8 +81,8 @@ namespace THMS.Logic.Orchestrators.Finance
         // ------------------------------------------------------------
         // Retrieve helpers
         // ------------------------------------------------------------
-        public Account? GetAccount(Guid id) =>
-            _accountStore.GetAccount(id);
+        public Account? GetAccount(string name) =>
+            _accountStore.GetAccount(name);
 
         public IEnumerable<Account> GetAllAccounts() =>
             _accountStore.GetAllAccounts();

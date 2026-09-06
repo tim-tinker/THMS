@@ -97,15 +97,15 @@ namespace THMS.UI.WinForms.Controls
 
             // Recompute forecast using the current unified list
             var unified = _transactionsSource.List.Cast<UnifiedTransactionView>().ToList();
-            ComputeForecastBalances(unified, account.Id);
+            ComputeForecastBalances(unified, account.Name);
         }
 
         // ------------------------------------------------------------
         // Forecast Balance Computation
         // ------------------------------------------------------------
-        private void ComputeForecastBalances(List<UnifiedTransactionView> unified, Guid accountId)
+        private void ComputeForecastBalances(List<UnifiedTransactionView> unified, string accountName)
         {
-            var account = _accountOrchestrator.GetAccount(accountId);
+            var account = _accountOrchestrator.GetAccount(accountName);
 
             // Must be sorted by date and a valid account type
             if (CanComputeForecast(account))

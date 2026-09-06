@@ -61,6 +61,9 @@
     <Compile Update="FinanceDataCenterForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="ImportDataForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="ImporterForm.cs">
       <SubType>Form</SubType>
     </Compile>

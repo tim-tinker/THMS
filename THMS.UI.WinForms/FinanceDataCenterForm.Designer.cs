@@ -17,18 +17,19 @@
 
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FinanceDataCenterForm));
             toolStrip = new ToolStrip();
             dataTypeToolStripMenuItem = new ToolStripDropDownButton();
             panelHost = new Panel();
             btnClose = new Button();
+            toolStripButton1 = new ToolStripButton();
             toolStrip.SuspendLayout();
             SuspendLayout();
             // 
             // toolStrip
             // 
-            toolStrip.Dock = DockStyle.Top;
             toolStrip.ImageScalingSize = new Size(28, 28);
-            toolStrip.Items.AddRange(new ToolStripItem[] { dataTypeToolStripMenuItem });
+            toolStrip.Items.AddRange(new ToolStripItem[] { dataTypeToolStripMenuItem, toolStripButton1 });
             toolStrip.Location = new Point(0, 0);
             toolStrip.Name = "toolStrip";
             toolStrip.Size = new Size(876, 44);
@@ -43,9 +44,9 @@
             // panelHost
             // 
             panelHost.Dock = DockStyle.Fill;
-            panelHost.Location = new Point(0, 0);
+            panelHost.Location = new Point(0, 44);
             panelHost.Name = "panelHost";
-            panelHost.Size = new Size(876, 596);
+            panelHost.Size = new Size(876, 552);
             panelHost.TabIndex = 0;
             // 
             // btnClose
@@ -71,5 +72,7 @@
             ResumeLayout(false);
             PerformLayout();
         }
+
+        private ToolStripButton toolStripButton1;
     }
 }

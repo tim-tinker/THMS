@@ -1,9 +1,6 @@
 ﻿using ExcelDataReader;
-using System;
 using System.Globalization;
-using System.IO;
 using THMS.Data.Stores;
-using THMS.Domain.Finance;
 using THMS.Domain.Finance.Accounts;
 
 namespace THMS.Ingestion.Importers.Finance
@@ -11,6 +8,11 @@ namespace THMS.Ingestion.Importers.Finance
     public class SpreadsheetAccountImporter
     {
         private readonly IAccountDataStore _accountStore;
+
+        public SpreadsheetAccountImporter()
+            : this(new DataStoreFactory().GetAccountStore())
+        {
+        }
 
         public SpreadsheetAccountImporter(IAccountDataStore accountStore)
         {

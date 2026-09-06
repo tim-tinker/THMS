@@ -29,6 +29,7 @@
             editToolStripMenuItem1 = new ToolStripMenuItem();
             deleteToolStripMenuItem = new ToolStripMenuItem();
             btnClose = new Button();
+            _menuItemImport = new ToolStripMenuItem();
             panelHost.SuspendLayout();
             menuStrip1.SuspendLayout();
             SuspendLayout();
@@ -49,7 +50,7 @@
             // menuStrip1
             // 
             menuStrip1.ImageScalingSize = new Size(28, 28);
-            menuStrip1.Items.AddRange(new ToolStripItem[] { dataTypeToolStripMenuItem, viewToolStripMenuItem, editToolStripMenuItem });
+            menuStrip1.Items.AddRange(new ToolStripItem[] { dataTypeToolStripMenuItem, viewToolStripMenuItem, editToolStripMenuItem, _menuItemImport });
             menuStrip1.Location = new Point(12, 12);
             menuStrip1.Name = "menuStrip1";
             menuStrip1.Size = new Size(1294, 42);
@@ -130,6 +131,13 @@
             btnClose.UseVisualStyleBackColor = true;
             btnClose.Click += OnClickClose;
             // 
+            // _menuItemImport
+            // 
+            _menuItemImport.Name = "_menuItemImport";
+            _menuItemImport.Size = new Size(235, 34);
+            _menuItemImport.Text = "Import Historical Data";
+            _menuItemImport.Click += OnClickImportHistoricalData;
+            // 
             // DataManagerForm
             // 
             AutoScaleDimensions = new SizeF(12F, 30F);
@@ -162,5 +170,6 @@
         private ToolStripMenuItem addToolStripMenuItem;
         private ToolStripMenuItem editToolStripMenuItem1;
         private ToolStripMenuItem deleteToolStripMenuItem;
+        private ToolStripMenuItem _menuItemImport;
     }
 }

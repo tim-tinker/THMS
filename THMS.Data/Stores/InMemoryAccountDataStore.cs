@@ -10,8 +10,8 @@ namespace THMS.Data.Stores
         public void UpsertAccount(Account account) =>
             _accountStore.Upsert(account);
 
-        public Account? GetAccount(Guid id) =>
-            _accountStore.Get(id);
+        public Account? GetAccount(string name) =>
+            _accountStore.Get(name);
 
         public IEnumerable<Account> GetAllAccounts() =>
             _accountStore.GetAll();

@@ -29,10 +29,10 @@ namespace THMS.Data.Stores.SQLite
             _accountStore.Upsert(conn, account);
         }
 
-        public Account? GetAccount(Guid id)
+        public Account? GetAccount(string name)
         {
             using var conn = OpenConnection();
-            return _accountStore.Get(conn, id);
+            return _accountStore.Get(conn, name);
         }
 
         public IEnumerable<Account> GetAllAccounts()
