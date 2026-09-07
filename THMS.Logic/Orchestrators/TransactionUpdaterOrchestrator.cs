@@ -1,9 +1,10 @@
 ﻿using THMS.Data.Stores;
 using THMS.Domain.Finance;
+using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
-
 using THMS.Logic.Finance.Budget;
 using THMS.Logic.Finance.Forecast;
+using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Recurrence;
 using THMS.Logic.Finance.Transfer;
 
@@ -16,7 +17,6 @@ namespace THMS.Logic.Orchestrators
 
         private readonly TransferDetector _transferDetector = new();
         private readonly RecurringDetector _recurringDetector = new();
-        private readonly ForecastGenerator _forecastGenerator = new();
         private readonly FutureReconciler _futureReconciler = new();
 
         private readonly ExpenseBudgetDetector _expenseBudgetDetector = new();
@@ -47,9 +47,6 @@ namespace THMS.Logic.Orchestrators
             var accounts = _accountStore.GetAllAccounts().ToList();
             result.AccountsUpdated = accounts.Count;
 
-            // ------------------------------------------------------------
-            // 1. Determine active accounts for transfer detection
-            // ------------------------------------------------------------
             var activeAccounts = new List<(Guid AccountId, DateTime LatestTransfer, DateTime LatestPosted)>();
 
             foreach (var account in accounts)
@@ -66,9 +63,6 @@ namespace THMS.Logic.Orchestrators
                 }
             }
 
-            // ------------------------------------------------------------
-            // 2. Global transfer detection (active accounts only)
-            // ------------------------------------------------------------
             if (activeAccounts.Any())
             {
                 var earliestLatestTransfer = activeAccounts.Min(a => a.LatestTransfer);
@@ -88,10 +82,6 @@ namespace THMS.Logic.Orchestrators
                 result.TransfersDetected = _transferDetector.Detected.Count;
             }
 
-            // ------------------------------------------------------------
-            // 3. Per-account recurrence detection, budgeting,
-            //    forecasting, reconciliation, roll-off
-            // ------------------------------------------------------------
             foreach (var account in accounts)
             {
                 var latestPostedDate = _transactionStore.GetLatestPostedTransactionDate(account.Id);
@@ -108,21 +98,10 @@ namespace THMS.Logic.Orchestrators
 
                 var existingBudgetRules = _transactionStore.GetExpenseBudgetRules(account.Id).ToList();
 
-                // ------------------------------------------------------------
-                // 3a. Detect recurring rules
-                // ------------------------------------------------------------
                 var newSingleRules = _recurringDetector.DetectRecurringSingles(posted, existingSingleRules);
                 var newTransferRules = _recurringDetector.DetectRecurringTransfers(postedTransfers, existingTransferRules);
 
                 result.RecurringRulesUpdated += newSingleRules.Count + newTransferRules.Count;
-
-                var mergedSingleRules = existingSingleRules.Concat(newSingleRules).ToList();
-                var mergedTransferRules = existingTransferRules.Concat(newTransferRules).ToList();
-
-                // ------------------------------------------------------------
-                // 3b. Detect/update all expense budget rules (including utilities)
-                // ------------------------------------------------------------
-                var updatedBudgetRules = new List<ExpenseBudgetRule>();
 
                 foreach (var rule in existingBudgetRules)
                 {
@@ -132,73 +111,65 @@ namespace THMS.Logic.Orchestrators
                         rule,
                         rule.IncludedCategories);
 
-                    updatedBudgetRules.Add(updated);
                     _transactionStore.UpsertExpenseBudgetRule(updated);
                 }
 
-                // ------------------------------------------------------------
-                // 3c. Forecast future transactions
-                // ------------------------------------------------------------
-                var futureSingles = _forecastGenerator.GenerateFutureSingles(mergedSingleRules);
-                var futureTransfers = _forecastGenerator.GenerateFutureTransfers(mergedTransferRules);
+                foreach (var r in newSingleRules)
+                    _transactionStore.AddRecurringSingleRule(r);
 
-                var futureBudgets = updatedBudgetRules
-                    .SelectMany(r => _forecastGenerator.GenerateExpenseBudgetForecast(r))
-                    .ToList();
-
-                foreach (var f in futureSingles)
-                    _transactionStore.AddFutureSingleTransaction(f);
-
-                foreach (var f in futureTransfers)
-                    _transactionStore.AddFutureTransferTransaction(f);
-
-                foreach (var f in futureBudgets)
-                    _transactionStore.AddFutureSingleTransaction(f);
-
-                result.ForecastUpdated = true;
-
-                // ------------------------------------------------------------
-                // 3d. Persist updated rules
-                // ------------------------------------------------------------
-                foreach (var r in mergedSingleRules)
+                foreach (var r in existingSingleRules)
                     _transactionStore.UpdateRecurringSingleRule(r);
 
-                foreach (var r in mergedTransferRules)
+                foreach (var r in newTransferRules)
+                    _transactionStore.AddRecurringTransferRule(r);
+
+                foreach (var r in existingTransferRules)
                     _transactionStore.UpdateRecurringTransferRule(r);
 
-                // Budget rules already persisted above
-
-                // ------------------------------------------------------------
-                // 3e. Reconcile future transactions (with tolerance)
-                // ------------------------------------------------------------
                 var allPostedNow = _transactionStore.GetPostedTransactions(account.Id).ToList();
                 var allPostedTransfersNow = _transactionStore.GetPostedTransferTransactions(account.Id).ToList();
+                var allSingleRules = existingSingleRules.Concat(newSingleRules).ToList();
+                var allTransferRules = existingTransferRules.Concat(newTransferRules).ToList();
 
-                var allFutureSingles = _transactionStore.GetFutureSingleTransactions(account.Id).ToList();
-                var allFutureTransfers = _transactionStore.GetFutureTransferTransactions(account.Id).ToList();
+                _futureReconciler.ReconcileSingles(allPostedNow, allSingleRules, dayTolerance: 4);
+                _futureReconciler.ReconcileTransfers(allPostedTransfersNow, allTransferRules, dayTolerance: 4);
 
-                _futureReconciler.ReconcileSingles(allPostedNow, allFutureSingles, dayTolerance: 4);
-                _futureReconciler.ReconcileTransfers(allPostedTransfersNow, allFutureTransfers, dayTolerance: 4);
+                foreach (var r in _futureReconciler.MatchedSingleRules)
+                    _transactionStore.UpdateRecurringSingleRule(r);
 
-                foreach (var f in _futureReconciler.MatchedSingles)
-                    _transactionStore.UpdateFutureSingleTransaction(f);
+                foreach (var r in _futureReconciler.MatchedTransferRules)
+                    _transactionStore.UpdateRecurringTransferRule(r);
 
-                foreach (var f in _futureReconciler.MatchedTransfers)
-                    _transactionStore.UpdateFutureTransferTransaction(f);
-
-                // ------------------------------------------------------------
-                // 3f. Roll-off realized future items
-                // ------------------------------------------------------------
-                foreach (var f in allFutureSingles.Where(f => f.IsRealized))
+                foreach (var f in _transactionStore.GetFutureSingleTransactions(account.Id).Where(f => !f.IsUserCreated))
                     _transactionStore.DeleteFutureSingleTransaction(f.Id);
 
-                foreach (var f in allFutureTransfers.Where(f => f.IsRealized))
+                foreach (var f in _transactionStore.GetFutureTransferTransactions(account.Id).Where(f => !f.IsUserCreated))
                     _transactionStore.DeleteFutureTransferTransaction(f.Id);
 
+                RefreshPostedBalance(account, allPostedNow, allPostedTransfersNow);
+
+                result.ForecastUpdated = true;
                 result.RollOffCompleted = true;
             }
 
             return result;
+        }
+
+        private void RefreshPostedBalance(
+            Account account,
+            List<PostedTransaction> posted,
+            List<PostedTransferTransaction> postedTransfers)
+        {
+            if (account is not BankAccount and not CreditAccount)
+                return;
+
+            var postedBalance = PostedBalanceCalculator.Compute(
+                PostedBalanceCalculator.GetStartingBalance(account),
+                posted,
+                postedTransfers);
+
+            PostedBalanceCalculator.ApplyPostedBalance(account, postedBalance);
+            _accountStore.UpsertAccount(account);
         }
     }
 }

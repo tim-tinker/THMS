@@ -7,6 +7,7 @@ using THMS.Logic.Finance.Recurrence;
 using THMS.Logic.Finance.Transfer;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
+using THMS.Logic.ViewModels.Finance;
 using THMS.Tests.Logic.TestSupport;
 
 namespace THMS.Tests.Logic
@@ -180,7 +181,7 @@ namespace THMS.Tests.Logic
     public class ForecastGeneratorTests
     {
         [Test]
-        public void GenerateFutureSingles_SkipsInactive_AndUsesFinalPayment()
+        public void GenerateForecast_SkipsInactive_UsesFinalPayment_DoesNotMutateRules()
         {
             var accountId = Guid.NewGuid();
             var today = DateTime.Today;
@@ -213,26 +214,30 @@ namespace THMS.Tests.Logic
                 }
             };
 
-            var generator = new ForecastGenerator();
-            var futures = generator.GenerateFutureSingles(rules);
+            var originalNext = rules[1].NextOccurrence;
+            var futures = new ForecastGenerator().GenerateForecast(
+                accountId, today, today.AddMonths(3), rules, []);
+
             Assert.That(futures.Any(f => f.Amount == 3), Is.True);
             Assert.That(futures.Any(f => f.Amount == 8), Is.True);
-            Assert.That(futures.All(f => !f.IsRealized), Is.True);
-            Assert.That(rules[1].NextOccurrence, Is.GreaterThan(today));
+            Assert.That(futures.All(f => f.Type == UnifiedTransactionView.ForecastType), Is.True);
+            Assert.That(rules[1].NextOccurrence, Is.EqualTo(originalNext));
         }
 
         [Test]
-        public void GenerateFutureTransfers_HonorsEndDateAndInactive()
+        public void GenerateForecast_TransfersHonorEndDateAndInactive()
         {
             var today = DateTime.Today;
+            var from = Guid.NewGuid();
+            var to = Guid.NewGuid();
             var rules = new List<RecurringTransferRule>
             {
-                new() { IsActive = false, NextOccurrence = today, Amount = 1, Frequency = RecurrenceFrequency.Weekly },
+                new() { IsActive = false, NextOccurrence = today, Amount = 1, Frequency = RecurrenceFrequency.Weekly, FromAccountId = from },
                 new()
                 {
                     IsActive = true,
-                    FromAccountId = Guid.NewGuid(),
-                    ToAccountId = Guid.NewGuid(),
+                    FromAccountId = from,
+                    ToAccountId = to,
                     Amount = 25,
                     Frequency = RecurrenceFrequency.Monthly,
                     NextOccurrence = today,
@@ -242,8 +247,8 @@ namespace THMS.Tests.Logic
                 new()
                 {
                     IsActive = true,
-                    FromAccountId = Guid.NewGuid(),
-                    ToAccountId = Guid.NewGuid(),
+                    FromAccountId = from,
+                    ToAccountId = to,
                     Amount = 9,
                     Frequency = RecurrenceFrequency.Weekly,
                     NextOccurrence = today,
@@ -253,16 +258,43 @@ namespace THMS.Tests.Logic
                 }
             };
 
-            var futures = new ForecastGenerator().GenerateFutureTransfers(rules);
+            var futures = new ForecastGenerator().GenerateForecast(
+                from, today, today.AddMonths(3), [], rules);
             Assert.That(futures.Any(f => f.Amount == 25), Is.True);
             Assert.That(futures.Any(f => f.Amount == 2), Is.True);
+            Assert.That(futures.All(f => f.Type == UnifiedTransactionView.ForecastTransferType), Is.True);
         }
 
         [Test]
-        public void GenerateExpenseBudgetForecast_CreatesMonthlyFutures_AndAdvancesNextOccurrence()
+        public void GenerateForecast_ExpandsEachFrequencyWithinWindow()
+        {
+            var accountId = Guid.NewGuid();
+            var start = new DateTime(2026, 1, 5);
+            var rules = new List<RecurringSingleTransactionRule>
+            {
+                new() { IsActive = true, AccountId = accountId, Amount = 1, Frequency = RecurrenceFrequency.Weekly, NextOccurrence = start },
+                new() { IsActive = true, AccountId = accountId, Amount = 2, Frequency = RecurrenceFrequency.BiWeekly, NextOccurrence = start },
+                new() { IsActive = true, AccountId = accountId, Amount = 3, Frequency = RecurrenceFrequency.Monthly, NextOccurrence = start },
+                new() { IsActive = true, AccountId = accountId, Amount = 4, Frequency = RecurrenceFrequency.Quarterly, NextOccurrence = start },
+                new() { IsActive = true, AccountId = accountId, Amount = 5, Frequency = RecurrenceFrequency.Yearly, NextOccurrence = start }
+            };
+
+            var futures = new ForecastGenerator().GenerateForecast(
+                accountId, start, start.AddYears(1), rules, []);
+
+            Assert.That(futures.Count(f => f.Amount == 1), Is.EqualTo(53));
+            Assert.That(futures.Count(f => f.Amount == 2), Is.EqualTo(27));
+            Assert.That(futures.Count(f => f.Amount == 3), Is.EqualTo(13));
+            Assert.That(futures.Count(f => f.Amount == 4), Is.EqualTo(5));
+            Assert.That(futures.Count(f => f.Amount == 5), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void GenerateExpenseBudgetForecast_CreatesMonthlyViews_WithoutAdvancingNextOccurrence()
         {
             var accountId = Guid.NewGuid();
             var start = DateTime.Today.AddMonths(1);
+            var originalNext = start;
             var rule = new UtilityBudgetRule
             {
                 AccountId = accountId,
@@ -270,31 +302,32 @@ namespace THMS.Tests.Logic
                 NextOccurrence = start
             };
 
-            var futures = new ForecastGenerator().GenerateExpenseBudgetForecast(rule);
+            var futures = new ExpenseBudgetForecastGenerator().Generate(rule, DateTime.Today, DateTime.Today.AddMonths(3));
 
             Assert.That(futures, Is.Not.Empty);
             Assert.That(futures.All(f => f.AccountId == accountId), Is.True);
             Assert.That(futures.All(f => f.Amount == -42.5m), Is.True);
             Assert.That(futures.All(f => f.Category == "Utilities"), Is.True);
             Assert.That(futures.All(f => f.Description == "Utilities Budget"), Is.True);
-            Assert.That(futures.All(f => !f.IsRealized), Is.True);
+            Assert.That(futures.All(f => f.Type == UnifiedTransactionView.ForecastBudgetType), Is.True);
             Assert.That(futures.Select(f => f.Date), Is.Ordered);
-            Assert.That(rule.NextOccurrence, Is.EqualTo(futures.Last().Date.AddMonths(1)));
+            Assert.That(rule.NextOccurrence, Is.EqualTo(originalNext));
         }
 
         [Test]
         public void GenerateExpenseBudgetForecast_WhenNextIsPastHorizon_ReturnsEmpty()
         {
+            var originalNext = DateTime.Today.AddMonths(4);
             var rule = new UtilityBudgetRule
             {
                 AccountId = Guid.NewGuid(),
                 CurrentAverage = 10,
-                NextOccurrence = DateTime.Today.AddMonths(4)
+                NextOccurrence = originalNext
             };
 
-            var futures = new ForecastGenerator().GenerateExpenseBudgetForecast(rule);
+            var futures = new ExpenseBudgetForecastGenerator().Generate(rule, DateTime.Today, DateTime.Today.AddMonths(3));
             Assert.That(futures, Is.Empty);
-            Assert.That(rule.NextOccurrence, Is.EqualTo(DateTime.Today.AddMonths(4)));
+            Assert.That(rule.NextOccurrence, Is.EqualTo(originalNext));
         }
     }
 
@@ -382,59 +415,71 @@ namespace THMS.Tests.Logic
     public class FutureReconcilerTests
     {
         [Test]
-        public void ReconcileSingles_MatchesByAmountAndDate()
+        public void ReconcileSingles_UpdatesRuleNextAndLastOccurrence()
         {
+            var accountId = Guid.NewGuid();
             var postedId = Guid.NewGuid();
-            var future = new FutureSingleTransaction
+            var next = new DateTime(2026, 4, 4);
+            var rule = new RecurringSingleTransactionRule
             {
+                AccountId = accountId,
                 Amount = -20,
-                Date = new DateTime(2026, 4, 4, 15, 0, 0)
+                NextOccurrence = next,
+                Frequency = RecurrenceFrequency.Monthly,
+                Description = "Netflix",
+                Category = "Entertainment",
+                IsActive = true
             };
-            var already = new FutureSingleTransaction { IsRealized = true, Amount = -20, Date = new DateTime(2026, 4, 4) };
 
             var reconciler = new FutureReconciler();
             reconciler.ReconcileSingles(
                 [
-                    new PostedTransaction { Id = postedId, Amount = 20, Date = new DateTime(2026, 4, 4) }
+                    new PostedTransaction
+                    {
+                        Id = postedId,
+                        AccountId = accountId,
+                        Amount = -20,
+                        Date = next,
+                        Description = "Netflix Premium",
+                        Category = "Streaming"
+                    }
                 ],
-                [future, already]);
+                [rule]);
 
-            Assert.That(future.IsRealized, Is.True);
-            Assert.That(future.PostedTransactionId, Is.EqualTo(postedId));
-            Assert.That(reconciler.MatchedSingles, Has.Count.EqualTo(1));
+            Assert.That(rule.LastOccurrence, Is.EqualTo(next));
+            Assert.That(rule.NextOccurrence, Is.EqualTo(next.AddMonths(1)));
+            Assert.That(rule.Amount, Is.EqualTo(-20));
+            Assert.That(rule.Description, Is.EqualTo("Netflix Premium"));
+            Assert.That(rule.Category, Is.EqualTo("Streaming"));
+            Assert.That(reconciler.MatchedSingleRules, Has.Count.EqualTo(1));
         }
 
         [Test]
-        public void ReconcileTransfers_RequiresBothLegs()
+        public void ReconcileTransfers_UpdatesRuleFromMatchingPostedTransfer()
         {
             var from = Guid.NewGuid();
             var to = Guid.NewGuid();
             var date = new DateTime(2026, 5, 5);
-            var fromId = Guid.NewGuid();
-            var toId = Guid.NewGuid();
-            var future = new FutureTransferTransaction
+            var rule = new RecurringTransferRule
             {
                 FromAccountId = from,
                 ToAccountId = to,
                 Amount = 30,
-                Date = date
+                NextOccurrence = date,
+                Frequency = RecurrenceFrequency.Monthly,
+                IsActive = true
             };
 
             var reconciler = new FutureReconciler();
             reconciler.ReconcileTransfers(
-                [new PostedTransferTransaction { AccountId = from, Amount = 30, Date = date, Id = fromId }],
-                [future]);
-            Assert.That(future.IsRealized, Is.False);
-
-            reconciler.ReconcileTransfers(
                 [
-                    new PostedTransferTransaction { AccountId = from, Amount = 30, Date = date, Id = fromId },
-                    new PostedTransferTransaction { AccountId = to, Amount = -30, Date = date, Id = toId }
+                    new PostedTransferTransaction { AccountId = from, Amount = 30, Date = date, Id = Guid.NewGuid() }
                 ],
-                [future]);
-            Assert.That(future.IsRealized, Is.True);
-            Assert.That(future.PostedFromTransactionId, Is.EqualTo(fromId));
-            Assert.That(future.PostedToTransactionId, Is.EqualTo(toId));
+                [rule]);
+
+            Assert.That(rule.LastOccurrence, Is.EqualTo(date));
+            Assert.That(rule.NextOccurrence, Is.EqualTo(date.AddMonths(1)));
+            Assert.That(reconciler.MatchedTransferRules, Has.Count.EqualTo(1));
         }
     }
 
@@ -547,13 +592,46 @@ namespace THMS.Tests.Logic
             orchestrator.Delete(bank.Id);
             Assert.That(orchestrator.GetAccount(bank.Name), Is.Null);
         }
+
+        [Test]
+        public void AdjustStartingBalanceForPostedDelta_ShiftsBankAndCreditStartingBalance()
+        {
+            var store = new InMemoryAccountDataStore();
+            var orchestrator = new AccountOrchestrator(store);
+
+            var bank = Bank();
+            bank.StartingBalance = 40;
+            bank.PostedBalance = 50;
+            store.UpsertAccount(bank);
+
+            orchestrator.AdjustStartingBalanceForPostedDelta(bank.Id, 15);
+            var updatedBank = (BankAccount)store.GetAccount(bank.Name)!;
+            Assert.That(updatedBank.StartingBalance, Is.EqualTo(55));
+            Assert.That(updatedBank.PostedBalance, Is.EqualTo(65));
+
+            var credit = new CreditAccount
+            {
+                Name = "Card",
+                Institution = "Bank",
+                AccountNumber = "1",
+                Type = AccountType.CreditCard,
+                CreditLimit = 100,
+                StartingBalance = -20,
+                PostedBalance = -80
+            };
+            store.UpsertAccount(credit);
+            orchestrator.AdjustStartingBalanceForPostedDelta(credit.Id, -10);
+            var updatedCredit = (CreditAccount)store.GetAccount(credit.Name)!;
+            Assert.That(updatedCredit.StartingBalance, Is.EqualTo(-30));
+            Assert.That(updatedCredit.PostedBalance, Is.EqualTo(-90));
+        }
     }
 
     [TestFixture]
     public class TransactionOrchestratorTests
     {
         [Test]
-        public void GenerateAndReconcileAndRollOff()
+        public void GenerateForecastAndReconcileRules()
         {
             var store = new InMemoryTransactionDataStore();
             var orchestrator = new TransactionOrchestrator(store);
@@ -618,40 +696,32 @@ namespace THMS.Tests.Logic
                 Frequency = RecurrenceFrequency.Weekly
             });
 
-            orchestrator.GenerateFutureTransactions(accountId, start.AddMonths(1));
-            var ledger = orchestrator.GetTransactionsForAccount(accountId);
-            Assert.That(ledger.FutureSingles.Any(), Is.True);
-            Assert.That(ledger.FutureTransfers.Any(), Is.True);
+            var forecast = orchestrator.GenerateForecast(accountId, start, start.AddMonths(1));
+            Assert.That(forecast.Any(f => f.Type == UnifiedTransactionView.ForecastType), Is.True);
+            Assert.That(forecast.Any(f => f.Type == UnifiedTransactionView.ForecastTransferType), Is.True);
+            Assert.That(store.GetFutureSingleTransactions(accountId), Is.Empty);
+            Assert.That(store.GetFutureTransferTransactions(accountId), Is.Empty);
 
-            var futureSingle = store.GetFutureSingleTransactions(accountId).First(f => f.Amount == 10 || f.Amount == 2);
+            var monthly = store.GetRecurringSingleRules(accountId).First(r => r.Amount == 10);
             store.AddPostedTransaction(new PostedTransaction
             {
                 AccountId = accountId,
-                Amount = futureSingle.Amount,
-                Date = futureSingle.Date
+                Amount = monthly.Amount,
+                Date = monthly.NextOccurrence
             });
-            orchestrator.ReconcileFutureSingles(accountId);
-            Assert.That(store.GetFutureSingleTransaction(futureSingle.Id)!.IsRealized, Is.True);
+            orchestrator.ReconcileRules(accountId);
+            Assert.That(store.GetRecurringSingleRules(accountId).First(r => r.Amount == 10).LastOccurrence, Is.EqualTo(start));
+            Assert.That(store.GetRecurringSingleRules(accountId).First(r => r.Amount == 10).NextOccurrence, Is.EqualTo(start.AddMonths(1)));
 
-            var futureTransfer = store.GetFutureTransferTransactions(accountId).First();
+            var transferRule = store.GetRecurringTransferRules(accountId).First(r => r.Amount == 20);
             store.AddPostedTransferTransaction(new PostedTransferTransaction
             {
-                AccountId = futureTransfer.FromAccountId,
-                Amount = futureTransfer.Amount,
-                Date = futureTransfer.Date
+                AccountId = transferRule.FromAccountId,
+                Amount = transferRule.Amount,
+                Date = transferRule.NextOccurrence
             });
-            store.AddPostedTransferTransaction(new PostedTransferTransaction
-            {
-                AccountId = futureTransfer.ToAccountId,
-                Amount = -futureTransfer.Amount,
-                Date = futureTransfer.Date
-            });
-            orchestrator.ReconcileFutureTransfers(accountId);
-            Assert.That(store.GetFutureTransferTransaction(futureTransfer.Id)!.IsRealized, Is.True);
-
-            orchestrator.RollOffRealizedFutureTransactions(DateTime.Today.AddYears(1));
-            Assert.That(store.GetFutureSingleTransaction(futureSingle.Id), Is.Null);
-            Assert.That(store.GetFutureTransferTransaction(futureTransfer.Id), Is.Null);
+            orchestrator.ReconcileRules(accountId);
+            Assert.That(store.GetRecurringTransferRules(accountId).First(r => r.Amount == 20).LastOccurrence, Is.EqualTo(start));
         }
     }
 }

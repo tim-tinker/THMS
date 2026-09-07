@@ -33,20 +33,7 @@ namespace THMS.Logic.Orchestrators
             // 2. Import posted transactions
             await _importer.ImportAsync(account);
 
-            // 3. Reconcile future singles
-            _txOrchestrator.ReconcileFutureSingles(account.Id);
-
-            // 4. Reconcile future transfers
-            _txOrchestrator.ReconcileFutureTransfers(account.Id);
-
-            // 5. Generate new future transactions
-            _txOrchestrator.GenerateFutureTransactions(
-                account.Id,
-                forecastEnd: DateTime.UtcNow.AddMonths(3));
-
-            // 6. Roll off realized future transactions
-            _txOrchestrator.RollOffRealizedFutureTransactions(
-                cutoff: DateTime.UtcNow.AddMonths(-1));
+            _txOrchestrator.ReconcileRules(account.Id);
         }
     }
 }

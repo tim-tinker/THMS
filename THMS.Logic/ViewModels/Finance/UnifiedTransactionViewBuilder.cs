@@ -7,16 +7,11 @@ namespace THMS.Logic.ViewModels.Finance
         public static List<UnifiedTransactionView> Build(
             IEnumerable<PostedTransaction> posted,
             IEnumerable<PostedTransferTransaction> postedTransfers,
-            IEnumerable<FutureSingleTransaction> futureSingles,
-            IEnumerable<FutureTransferTransaction> futureTransfers,
-            IEnumerable<RecurringSingleTransactionRule> recurringSingles,
-            IEnumerable<RecurringTransferRule> recurringTransfers)
+            IEnumerable<FutureSingleTransaction>? userFutureSingles = null,
+            IEnumerable<FutureTransferTransaction>? userFutureTransfers = null)
         {
             var list = new List<UnifiedTransactionView>();
 
-            // ------------------------------------------------------------
-            // Posted (single-account)
-            // ------------------------------------------------------------
             foreach (var tx in posted)
             {
                 list.Add(new UnifiedTransactionView
@@ -27,14 +22,11 @@ namespace THMS.Logic.ViewModels.Finance
                     Description = tx.Description ?? "",
                     Amount = tx.Amount,
                     Category = tx.Category,
-                    Type = "Posted",
+                    Type = UnifiedTransactionView.PostedType,
                     ForecastBalance = null
                 });
             }
 
-            // ------------------------------------------------------------
-            // Posted Transfers (ledger-level)
-            // ------------------------------------------------------------
             foreach (var tx in postedTransfers)
             {
                 list.Add(new UnifiedTransactionView
@@ -45,16 +37,16 @@ namespace THMS.Logic.ViewModels.Finance
                     Description = tx.Description ?? "",
                     Amount = tx.Amount,
                     Category = tx.Category,
-                    Type = "PostedTransfer",
+                    Type = UnifiedTransactionView.PostedTransferType,
                     ForecastBalance = null
                 });
             }
 
-            // ------------------------------------------------------------
-            // Future Singles
-            // ------------------------------------------------------------
-            foreach (var tx in futureSingles)
+            foreach (var tx in userFutureSingles ?? [])
             {
+                if (!tx.IsUserCreated || tx.IsRealized)
+                    continue;
+
                 list.Add(new UnifiedTransactionView
                 {
                     Id = tx.Id,
@@ -63,66 +55,30 @@ namespace THMS.Logic.ViewModels.Finance
                     Description = tx.Description ?? "",
                     Amount = tx.Amount,
                     Category = tx.Category,
-                    Type = tx.IsRealized ? "Future (Realized)" : "Future",
+                    Type = UnifiedTransactionView.FutureType,
                     ForecastBalance = null
                 });
             }
 
-            // ------------------------------------------------------------
-            // Future Transfers
-            // ------------------------------------------------------------
-            foreach (var tx in futureTransfers)
+            foreach (var tx in userFutureTransfers ?? [])
             {
+                if (!tx.IsUserCreated || tx.IsRealized)
+                    continue;
+
                 list.Add(new UnifiedTransactionView
                 {
                     Id = tx.Id,
-                    AccountId = tx.FromAccountId, // UI shows per-account
+                    AccountId = tx.FromAccountId,
                     Date = tx.Date,
                     Description = tx.Description ?? "",
                     Amount = tx.Amount,
                     Category = tx.Category,
-                    Type = tx.IsRealized ? "FutureTransfer (Realized)" : "FutureTransfer",
+                    Type = UnifiedTransactionView.FutureTransferType,
                     ForecastBalance = null
                 });
             }
 
-            // ------------------------------------------------------------
-            // Recurring Rules (optional)
-            // ------------------------------------------------------------
-            foreach (var rule in recurringSingles)
-            {
-                list.Add(new UnifiedTransactionView
-                {
-                    Id = rule.Id,
-                    AccountId = rule.AccountId,
-                    Date = rule.NextOccurrence,
-                    Description = rule.Description ?? "",
-                    Amount = rule.Amount,
-                    Category = rule.Category,
-                    Type = "RecurringRule",
-                    ForecastBalance = null
-                });
-            }
-
-            foreach (var rule in recurringTransfers)
-            {
-                list.Add(new UnifiedTransactionView
-                {
-                    Id = rule.Id,
-                    AccountId = rule.FromAccountId,
-                    Date = rule.NextOccurrence,
-                    Description = rule.Description ?? "",
-                    Amount = rule.Amount,
-                    Category = rule.Category,
-                    Type = "RecurringTransferRule",
-                    ForecastBalance = null
-                });
-            }
-
-            // ------------------------------------------------------------
-            // Sort by date ascending (initial view)
-            // ------------------------------------------------------------
-            return list.OrderBy(t => t.Date).ToList();
+            return list.OrderBy(t => t.Date).ThenBy(t => t.Id).ToList();
         }
     }
 }

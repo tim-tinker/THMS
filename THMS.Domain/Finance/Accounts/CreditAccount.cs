@@ -2,6 +2,7 @@
 {
     public class CreditAccount : Account
     {
+        public decimal StartingBalance { get; set; }
         public decimal CreditLimit { get; set; }
         public decimal APR { get; set; }
         public DateTime StatementDate { get; set; }

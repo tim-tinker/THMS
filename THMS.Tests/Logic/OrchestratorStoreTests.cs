@@ -587,6 +587,92 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void RunLedgerUpdate_PersistsNewlyDetectedRecurringRules()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var txs = new InMemoryTransactionDataStore();
+            var orchestrator = new TransactionUpdaterOrchestrator(accounts, txs);
+
+            var account = new BankAccount { Name = "Checking", Institution = "Bank", AccountNumber = "1" };
+            accounts.UpsertAccount(account);
+
+            var date = DateTime.Today.AddDays(-2);
+            foreach (var i in Enumerable.Range(0, 3))
+            {
+                txs.AddPostedTransaction(new PostedTransaction
+                {
+                    AccountId = account.Id,
+                    Description = "Netflix",
+                    Amount = 15.99m,
+                    Date = date.AddDays(-21 + i * 7)
+                });
+            }
+
+            var other = new BankAccount { Name = "Savings", Institution = "Bank", AccountNumber = "2" };
+            accounts.UpsertAccount(other);
+            foreach (var i in Enumerable.Range(0, 3))
+            {
+                txs.AddPostedTransferTransaction(new PostedTransferTransaction
+                {
+                    AccountId = account.Id,
+                    Description = "Sweep",
+                    Amount = 50,
+                    Date = date.AddDays(-21 + i * 7)
+                });
+            }
+
+            var result = orchestrator.RunLedgerUpdate();
+            Assert.That(result.RecurringRulesUpdated, Is.EqualTo(2));
+
+            var singleRules = txs.GetRecurringSingleRules(account.Id).ToList();
+            Assert.That(singleRules, Has.Count.EqualTo(1));
+            Assert.That(singleRules[0].Description, Is.EqualTo("Netflix"));
+
+            var transferRules = txs.GetRecurringTransferRules(account.Id).ToList();
+            Assert.That(transferRules, Has.Count.EqualTo(1));
+            Assert.That(transferRules[0].Description, Is.EqualTo("Sweep"));
+        }
+
+        [Test]
+        public void RunLedgerUpdate_DoesNotUpdateRolledOffFuturesFromPriorAccount()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var txs = new InMemoryTransactionDataStore();
+            var orchestrator = new TransactionUpdaterOrchestrator(accounts, txs);
+
+            var checking = new BankAccount { Name = "Checking", Institution = "Bank", AccountNumber = "1" };
+            var savings = new BankAccount { Name = "Savings", Institution = "Bank", AccountNumber = "2" };
+            accounts.UpsertAccount(checking);
+            accounts.UpsertAccount(savings);
+
+            var date = DateTime.Today.AddDays(-2);
+            txs.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = checking.Id,
+                Description = "Netflix",
+                Amount = 15.99m,
+                Date = date.AddDays(-7)
+            });
+            txs.AddFutureSingleTransaction(new FutureSingleTransaction
+            {
+                AccountId = checking.Id,
+                Description = "Netflix",
+                Amount = 15.99m,
+                Date = date.AddDays(-7)
+            });
+            txs.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = savings.Id,
+                Description = "Interest",
+                Amount = 1.25m,
+                Date = date
+            });
+
+            Assert.That(() => orchestrator.RunLedgerUpdate(), Throws.Nothing);
+            Assert.That(txs.GetFutureSingleTransactions(checking.Id), Is.Empty);
+        }
+
+        [Test]
         public void RunLedgerUpdate_CreatesUtilityBudgetRuleAndForecast()
         {
             var accounts = new InMemoryAccountDataStore();
@@ -646,12 +732,7 @@ namespace THMS.Tests.Logic
             Assert.That(rule.Category, Is.EqualTo("Utilities"));
             Assert.That(rule, Is.TypeOf<UtilityBudgetRule>());
 
-            var budgetFutures = txs.GetFutureSingleTransactions(account.Id)
-                .Where(f => f.Description == "Utilities Budget")
-                .ToList();
-            Assert.That(budgetFutures, Is.Not.Empty);
-            Assert.That(budgetFutures.All(f => f.Amount == -22m), Is.True);
-            Assert.That(budgetFutures.All(f => f.Category == "Utilities"), Is.True);
+            Assert.That(txs.GetFutureSingleTransactions(account.Id), Is.Empty);
         }
 
         [Test]
@@ -685,7 +766,7 @@ namespace THMS.Tests.Logic
             var updated = txs.GetExpenseBudgetRules(account.Id).Single();
             Assert.That(updated.Id, Is.EqualTo(existingId));
             Assert.That(updated.CurrentAverage, Is.EqualTo(-48m));
-            Assert.That(updated.NextOccurrence, Is.GreaterThan(originalNext));
+            Assert.That(updated.NextOccurrence, Is.EqualTo(originalNext));
         }
     }
 

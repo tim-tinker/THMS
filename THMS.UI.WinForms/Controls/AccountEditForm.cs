@@ -51,6 +51,7 @@ namespace THMS.UI.WinForms.Controls
             switch (Account)
             {
                 case BankAccount bank:
+                    numBankStarting.Value = bank.StartingBalance;
                     numBankPosted.Value = bank.PostedBalance;
                     numBankOverdraft.Value = bank.OverdraftLimit;
                     break;
@@ -61,6 +62,7 @@ namespace THMS.UI.WinForms.Controls
                     dtCreditStatement.Value = credit.StatementDate;
                     dtCreditDue.Value = credit.DueDate;
                     numCreditPosted.Value = credit.PostedBalance;
+                    numCreditStarting.Value = credit.StartingBalance;
                     break;
 
                 case LoanAccount loan:
@@ -98,6 +100,7 @@ namespace THMS.UI.WinForms.Controls
             switch (Account)
             {
                 case BankAccount bank:
+                    bank.StartingBalance = numBankStarting.Value;
                     bank.PostedBalance = numBankPosted.Value;
                     bank.OverdraftLimit = numBankOverdraft.Value;
                     break;
@@ -108,6 +111,7 @@ namespace THMS.UI.WinForms.Controls
                     credit.StatementDate = dtCreditStatement.Value;
                     credit.DueDate = dtCreditDue.Value;
                     credit.PostedBalance = numCreditPosted.Value;
+                    credit.StartingBalance = numCreditStarting.Value;
                     break;
 
                 case LoanAccount loan:

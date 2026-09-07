@@ -25,8 +25,7 @@ namespace THMS.UI.WinForms.Controls
                     $"Transactions Imported: {result.TransactionsImported}\r\n" +
                     $"Transfers Detected: {result.TransfersDetected}\r\n" +
                     $"Recurring Rules Updated: {result.RecurringRulesUpdated}\r\n" +
-                    $"Forecast Updated: {result.ForecastUpdated}\r\n" +
-                    $"Roll-Off Completed: {result.RollOffCompleted}\r\n";
+                    $"Rules Reconciled: {result.ForecastUpdated}\r\n";
 
                 lblStatus.Text = "Update complete.";
             }

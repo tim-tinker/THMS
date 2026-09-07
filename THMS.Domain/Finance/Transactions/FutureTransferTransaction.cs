@@ -5,6 +5,7 @@
         public Guid FromAccountId { get; set; }
         public Guid ToAccountId { get; set; }
 
+        public bool IsUserCreated { get; set; }
         public bool IsRealized { get; set; }
         public Guid? PostedFromTransactionId { get; set; }
         public Guid? PostedToTransactionId { get; set; }

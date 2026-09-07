@@ -1,5 +1,6 @@
 ﻿using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
+using THMS.Logic.Finance.Model;
 
 namespace THMS.Logic.Orchestrators.Finance
 {
@@ -86,6 +87,22 @@ namespace THMS.Logic.Orchestrators.Finance
 
         public IEnumerable<Account> GetAllAccounts() =>
             _accountStore.GetAllAccounts();
+
+        public Account? GetAccount(Guid id) =>
+            _accountStore.GetAllAccounts().FirstOrDefault(a => a.Id == id);
+
+        public void AdjustStartingBalanceForPostedDelta(Guid accountId, decimal postedBalanceDelta)
+        {
+            if (postedBalanceDelta == 0)
+                return;
+
+            var account = GetAccount(accountId);
+            if (account == null)
+                throw new InvalidOperationException($"Account {accountId} not found.");
+
+            PostedBalanceCalculator.AdjustStartingBalance(account, postedBalanceDelta);
+            _accountStore.UpsertAccount(account);
+        }
 
         // ------------------------------------------------------------
         // Validation

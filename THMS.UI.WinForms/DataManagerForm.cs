@@ -5,6 +5,7 @@ namespace THMS.UI.WinForms
     public partial class DataManagerForm : BaseEmbeddedForm
     {
         private IDataManagerControl? _currentControl;
+        private readonly TransactionManagerControl _transactionManagerControl = new();
 
         private Dictionary<string, Control> _controls = [];
 
@@ -21,7 +22,7 @@ namespace THMS.UI.WinForms
             AddControl(new HomeCircuitAttributionManagerControl(), "Circuit Attribution");
             AddControl(new EvChargeSessionManagerControl(), "EV Charge Session");
             AddControl(new ElectricContractManagerControl(), "Electric Contracts");
-            AddControl(new TransactionManagerControl(), "Accounts and Transactions");
+            AddControl(_transactionManagerControl, "Accounts and Transactions");
         }
 
         private void AddControl(UserControl control, string label)
@@ -99,9 +100,8 @@ namespace THMS.UI.WinForms
             using var dlg = new ImportDataForm();
             if (dlg.ShowDialog() == DialogResult.OK)
             {
-                // Refresh the TransactionManagerControl
-                //transactionManagerControl.RefreshCurrentAccount();
                 DisplayControl("Accounts and Transactions");
+                _transactionManagerControl.RefreshAll();
             }
         }
     }

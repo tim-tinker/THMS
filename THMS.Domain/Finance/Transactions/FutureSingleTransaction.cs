@@ -2,6 +2,8 @@
 {
     public class FutureSingleTransaction : BaseSingleAccountTransaction
     {
+        public bool IsUserCreated { get; set; }
+
         // Whether this forecast has been realized by a posted transaction
         public bool IsRealized { get; set; }
 

@@ -137,6 +137,7 @@ namespace THMS.Data.Stores.SqliteStores
 
             return new BankAccount
             {
+                StartingBalance = details.Value.StartingBalance,
                 PostedBalance = details.Value.PostedBalance,
                 OverdraftLimit = details.Value.OverdraftLimit
             };
@@ -150,6 +151,7 @@ namespace THMS.Data.Stores.SqliteStores
 
             return new CreditAccount
             {
+                StartingBalance = details.Value.StartingBalance,
                 CreditLimit = details.Value.CreditLimit,
                 APR = details.Value.APR,
                 StatementDate = details.Value.StatementDate,

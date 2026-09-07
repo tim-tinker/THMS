@@ -11,6 +11,7 @@ namespace THMS.Data.Stores.SqlTables
             cmd.CommandText = @"
                 CREATE TABLE IF NOT EXISTS CreditAccounts (
                     AccountId TEXT PRIMARY KEY,
+                    StartingBalance REAL NOT NULL DEFAULT 0,
                     CreditLimit REAL NOT NULL,
                     APR REAL NOT NULL,
                     StatementDate TEXT NOT NULL,
@@ -18,6 +19,8 @@ namespace THMS.Data.Stores.SqlTables
                     PostedBalance REAL NOT NULL
                 );";
             cmd.ExecuteNonQuery();
+
+            EnsureColumn(conn, "StartingBalance", "REAL NOT NULL DEFAULT 0");
         }
 
         public void Upsert(SqliteConnection conn, CreditAccount account)
@@ -25,10 +28,11 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO CreditAccounts
-                (AccountId, CreditLimit, APR, StatementDate, DueDate, PostedBalance)
+                (AccountId, StartingBalance, CreditLimit, APR, StatementDate, DueDate, PostedBalance)
                 VALUES
-                (@AccountId, @CreditLimit, @APR, @StatementDate, @DueDate, @PostedBalance)
+                (@AccountId, @StartingBalance, @CreditLimit, @APR, @StatementDate, @DueDate, @PostedBalance)
                 ON CONFLICT(AccountId) DO UPDATE SET
+                    StartingBalance = excluded.StartingBalance,
                     CreditLimit = excluded.CreditLimit,
                     APR = excluded.APR,
                     StatementDate = excluded.StatementDate,
@@ -36,6 +40,7 @@ namespace THMS.Data.Stores.SqlTables
                     PostedBalance = excluded.PostedBalance;";
 
             cmd.Parameters.AddWithValue("@AccountId", account.Id.ToString());
+            cmd.Parameters.AddWithValue("@StartingBalance", account.StartingBalance);
             cmd.Parameters.AddWithValue("@CreditLimit", account.CreditLimit);
             cmd.Parameters.AddWithValue("@APR", account.APR);
             cmd.Parameters.AddWithValue("@StatementDate", account.StatementDate);
@@ -44,12 +49,12 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
-        public (decimal CreditLimit, decimal APR, DateTime StatementDate, DateTime DueDate, decimal PostedBalance)?
+        public (decimal StartingBalance, decimal CreditLimit, decimal APR, DateTime StatementDate, DateTime DueDate, decimal PostedBalance)?
             Get(SqliteConnection conn, Guid id)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT CreditLimit, APR, StatementDate, DueDate, PostedBalance
+                SELECT StartingBalance, CreditLimit, APR, StatementDate, DueDate, PostedBalance
                 FROM CreditAccounts
                 WHERE AccountId = @AccountId;";
             cmd.Parameters.AddWithValue("@AccountId", id.ToString());
@@ -61,9 +66,10 @@ namespace THMS.Data.Stores.SqlTables
             return (
                 (decimal)(double)reader.GetDouble(0),
                 (decimal)(double)reader.GetDouble(1),
-                reader.GetDateTime(2),
+                (decimal)(double)reader.GetDouble(2),
                 reader.GetDateTime(3),
-                (decimal)(double)reader.GetDouble(4)
+                reader.GetDateTime(4),
+                (decimal)(double)reader.GetDouble(5)
             );
         }
 
@@ -73,6 +79,13 @@ namespace THMS.Data.Stores.SqlTables
             cmd.CommandText = "DELETE FROM CreditAccounts WHERE AccountId = @AccountId;";
             cmd.Parameters.AddWithValue("@AccountId", id.ToString());
             cmd.ExecuteNonQuery();
+        }
+
+        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
+        {
+            using var alter = conn.CreateCommand();
+            alter.CommandText = $"ALTER TABLE CreditAccounts ADD COLUMN IF NOT EXISTS {columnName} {columnDef};";
+            alter.ExecuteNonQuery();
         }
     }
 }

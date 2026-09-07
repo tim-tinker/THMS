@@ -180,6 +180,12 @@ namespace THMS.Tests.Logic
             ]);
 
             Assert.That(views, Has.Count.EqualTo(6));
+            Assert.That(views[0].AccountType, Is.EqualTo("Bank"));
+            Assert.That(views[1].AccountType, Is.EqualTo("Credit"));
+            Assert.That(views[2].AccountType, Is.EqualTo("Investment"));
+            Assert.That(views[3].AccountType, Is.EqualTo("Loan"));
+            Assert.That(views[4].AccountType, Is.EqualTo("Mortgage"));
+            Assert.That(views[5].AccountType, Is.EqualTo("Internal"));
             Assert.That(views[0].BankCreditAvailable, Is.EqualTo(2));
             Assert.That(views[1].CreditLimit, Is.EqualTo(4));
             Assert.That(views[2].Balance, Is.EqualTo(5));
@@ -189,29 +195,27 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void UnifiedTransactionViewBuilder_IncludesAllSourcesAndSorts()
+        public void UnifiedTransactionViewBuilder_IncludesPostedAndUserFuturesAndSorts()
         {
             var account = Guid.NewGuid();
             var views = UnifiedTransactionViewBuilder.Build(
                 [new PostedTransaction { AccountId = account, Date = new DateTime(2026, 1, 5), Description = null, Amount = 1 }],
                 [new PostedTransferTransaction { AccountId = account, Date = new DateTime(2026, 1, 4), Description = "T", Amount = 2 }],
                 [
-                    new FutureSingleTransaction { AccountId = account, Date = new DateTime(2026, 1, 3), Amount = 3, IsRealized = false },
-                    new FutureSingleTransaction { AccountId = account, Date = new DateTime(2026, 1, 3).AddHours(1), Amount = 3.5m, IsRealized = true }
+                    new FutureSingleTransaction { AccountId = account, Date = new DateTime(2026, 1, 3), Amount = 3, IsUserCreated = true },
+                    new FutureSingleTransaction { AccountId = account, Date = new DateTime(2026, 1, 3).AddHours(1), Amount = 3.5m, IsUserCreated = false }
                 ],
                 [
-                    new FutureTransferTransaction { FromAccountId = account, Date = new DateTime(2026, 1, 2), Amount = 4, IsRealized = false },
-                    new FutureTransferTransaction { FromAccountId = account, Date = new DateTime(2026, 1, 2).AddHours(1), Amount = 4.5m, IsRealized = true }
-                ],
-                [new RecurringSingleTransactionRule { AccountId = account, NextOccurrence = new DateTime(2026, 1, 1), Amount = 5, Description = null }],
-                [new RecurringTransferRule { FromAccountId = account, NextOccurrence = new DateTime(2026, 1, 6), Amount = 6 }]);
+                    new FutureTransferTransaction { FromAccountId = account, Date = new DateTime(2026, 1, 2), Amount = 4, IsUserCreated = true },
+                    new FutureTransferTransaction { FromAccountId = account, Date = new DateTime(2026, 1, 2).AddHours(1), Amount = 4.5m, IsUserCreated = false }
+                ]);
 
-            Assert.That(views, Has.Count.EqualTo(8));
-            Assert.That(views.First().Type, Is.EqualTo("RecurringRule"));
-            Assert.That(views.Last().Type, Is.EqualTo("RecurringTransferRule"));
-            Assert.That(views.Any(v => v.Type == "Future (Realized)"), Is.True);
-            Assert.That(views.Any(v => v.Type == "FutureTransfer (Realized)"), Is.True);
-            Assert.That(views.First(v => v.Type == "Posted").Description, Is.EqualTo(""));
+            Assert.That(views, Has.Count.EqualTo(4));
+            Assert.That(views.First().Type, Is.EqualTo(UnifiedTransactionView.FutureTransferType));
+            Assert.That(views.Last().Type, Is.EqualTo(UnifiedTransactionView.PostedType));
+            Assert.That(views.Any(v => v.Type == UnifiedTransactionView.FutureType), Is.True);
+            Assert.That(views.First(v => v.Type == UnifiedTransactionView.PostedType).Description, Is.EqualTo(""));
+            Assert.That(views.All(v => v.Type is not "RecurringRule" and not "RecurringTransferRule"), Is.True);
         }
 
         [Test]

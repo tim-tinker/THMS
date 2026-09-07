@@ -16,7 +16,7 @@ namespace THMS.Logic.ViewModels.Finance
                     Name = acct.Name,
                     Institution = acct.Institution,
                     AccountNumber = acct.AccountNumber,
-                    AccountType = $"{acct.Type}",
+                    AccountType = Kind(acct),
                     AsOfDate = acct.BalanceAsOf
                 };
 
@@ -54,5 +54,16 @@ namespace THMS.Logic.ViewModels.Finance
 
             return list;
         }
+
+        private static string Kind(Account acct) => acct switch
+        {
+            BankAccount => "Bank",
+            CreditAccount => "Credit",
+            LoanAccount => "Loan",
+            MortgageAccount => "Mortgage",
+            InvestmentAccount => "Investment",
+            InternalAccount => "Internal",
+            _ => acct.Type.ToString()
+        };
     }
 }

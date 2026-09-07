@@ -17,9 +17,11 @@ namespace THMS.Data.Stores.SqlTables
                     Amount REAL NOT NULL,
                     Category TEXT,
                     IsRealized INTEGER NOT NULL,
-                    PostedTransactionId TEXT
+                    PostedTransactionId TEXT,
+                    IsUserCreated INTEGER NOT NULL DEFAULT 0
                 );";
             cmd.ExecuteNonQuery();
+            EnsureColumn(conn, "IsUserCreated", "INTEGER NOT NULL DEFAULT 0");
         }
 
         public void Add(SqliteConnection conn, FutureSingleTransaction transaction)
@@ -27,9 +29,9 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO FutureSingleTransactions
-                (Id, AccountId, Date, Description, Amount, Category, IsRealized, PostedTransactionId)
+                (Id, AccountId, Date, Description, Amount, Category, IsRealized, PostedTransactionId, IsUserCreated)
                 VALUES
-                (@Id, @AccountId, @Date, @Description, @Amount, @Category, @IsRealized, @PostedTransactionId);";
+                (@Id, @AccountId, @Date, @Description, @Amount, @Category, @IsRealized, @PostedTransactionId, @IsUserCreated);";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
         }
@@ -45,7 +47,8 @@ namespace THMS.Data.Stores.SqlTables
                     Amount = @Amount,
                     Category = @Category,
                     IsRealized = @IsRealized,
-                    PostedTransactionId = @PostedTransactionId
+                    PostedTransactionId = @PostedTransactionId,
+                    IsUserCreated = @IsUserCreated
                 WHERE Id = @Id;";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
@@ -110,7 +113,7 @@ namespace THMS.Data.Stores.SqlTables
         }
 
         private const string SelectColumns =
-            "SELECT Id, AccountId, Date, Description, Amount, Category, IsRealized, PostedTransactionId";
+            "SELECT Id, AccountId, Date, Description, Amount, Category, IsRealized, PostedTransactionId, IsUserCreated";
 
         private static void Bind(SqliteCommand cmd, FutureSingleTransaction transaction)
         {
@@ -126,6 +129,7 @@ namespace THMS.Data.Stores.SqlTables
                 transaction.PostedTransactionId.HasValue
                     ? transaction.PostedTransactionId.Value.ToString()
                     : DBNull.Value);
+            cmd.Parameters.AddWithValue("@IsUserCreated", transaction.IsUserCreated ? 1 : 0);
         }
 
         private static FutureSingleTransaction Read(SqliteDataReader reader)
@@ -139,7 +143,8 @@ namespace THMS.Data.Stores.SqlTables
                 Amount = (decimal)(double)reader.GetDouble(4),
                 Category = reader.IsDBNull(5) ? null : reader.GetString(5),
                 IsRealized = reader.GetInt32(6) == 1,
-                PostedTransactionId = reader.IsDBNull(7) ? null : Guid.Parse(reader.GetString(7))
+                PostedTransactionId = reader.IsDBNull(7) ? null : Guid.Parse(reader.GetString(7)),
+                IsUserCreated = reader.FieldCount > 8 && !reader.IsDBNull(8) && reader.GetInt32(8) == 1
             };
         }
 
@@ -150,6 +155,13 @@ namespace THMS.Data.Stores.SqlTables
             while (reader.Read())
                 list.Add(Read(reader));
             return list;
+        }
+
+        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
+        {
+            using var alter = conn.CreateCommand();
+            alter.CommandText = $"ALTER TABLE FutureSingleTransactions ADD COLUMN IF NOT EXISTS {columnName} {columnDef};";
+            alter.ExecuteNonQuery();
         }
     }
 }

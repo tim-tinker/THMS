@@ -47,6 +47,7 @@ namespace THMS.Logic.Finance.Recurrence
                     Description = g.Key,
                     Amount = avgAmount,
                     Frequency = freq.Value,
+                    LastOccurrence = ordered.Last().Date,
                     NextOccurrence = ordered.Last().Date.AddFrequency(freq.Value),
                     IsActive = true
                 });
@@ -96,6 +97,7 @@ namespace THMS.Logic.Finance.Recurrence
                     Description = g.Key,
                     Amount = avgAmount,
                     Frequency = freq.Value,
+                    LastOccurrence = ordered.Last().Date,
                     NextOccurrence = ordered.Last().Date.AddFrequency(freq.Value),
                     IsActive = true
                 });

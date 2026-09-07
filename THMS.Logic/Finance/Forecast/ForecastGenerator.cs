@@ -1,20 +1,49 @@
 ﻿using THMS.Domain.Finance.Transactions;
+using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Logic.Finance.Forecast
 {
     public class ForecastGenerator
     {
-        public List<FutureSingleTransaction> GenerateFutureSingles(
-            IEnumerable<RecurringSingleTransactionRule> rules)
+        private const int MaxOccurrencesPerRule = 500;
+
+        public List<UnifiedTransactionView> GenerateForecast(
+            Guid accountId,
+            DateTime from,
+            DateTime to,
+            IEnumerable<RecurringSingleTransactionRule> singleRules,
+            IEnumerable<RecurringTransferRule> transferRules,
+            IEnumerable<ExpenseBudgetRule>? budgetRules = null)
         {
-            var results = new List<FutureSingleTransaction>();
+            var results = new List<UnifiedTransactionView>();
 
-            foreach (var rule in rules.Where(r => r.IsActive))
+            foreach (var rule in singleRules.Where(r => r.IsActive && r.AccountId == accountId))
+                results.AddRange(ExpandSingleRule(rule, from, to));
+
+            foreach (var rule in transferRules.Where(r => r.IsActive &&
+                         (r.FromAccountId == accountId || r.ToAccountId == accountId)))
+                results.AddRange(ExpandTransferRule(rule, accountId, from, to));
+
+            if (budgetRules is not null)
             {
-                var next = rule.NextOccurrence;
-                var end = DateTime.Today.AddMonths(3);
+                foreach (var rule in budgetRules.Where(r => r.AccountId == accountId))
+                    results.AddRange(new ExpenseBudgetForecastGenerator().Generate(rule, from, to));
+            }
 
-                while (next <= end && (rule.EndDate == null || next <= rule.EndDate.Value))
+            return results.OrderBy(t => t.Date).ThenBy(t => t.Id).ToList();
+        }
+
+        private static IEnumerable<UnifiedTransactionView> ExpandSingleRule(
+            RecurringSingleTransactionRule rule,
+            DateTime from,
+            DateTime to)
+        {
+            var next = rule.NextOccurrence;
+            var count = 0;
+
+            while (next <= to && (rule.EndDate == null || next <= rule.EndDate.Value) && count < MaxOccurrencesPerRule)
+            {
+                if (next >= from)
                 {
                     var amount = rule.IsFinalPaymentDifferent &&
                                  rule.EndDate.HasValue &&
@@ -22,38 +51,36 @@ namespace THMS.Logic.Finance.Forecast
                         ? rule.FinalPaymentAmount ?? rule.Amount
                         : rule.Amount;
 
-                    results.Add(new FutureSingleTransaction
+                    yield return new UnifiedTransactionView
                     {
                         Id = Guid.NewGuid(),
                         AccountId = rule.AccountId,
                         Date = next,
+                        Description = rule.Description ?? "",
                         Amount = amount,
                         Category = rule.Category,
-                        Description = rule.Description,
-                        IsRealized = false
-                    });
-
-                    next = next.AddFrequency(rule.Frequency);
+                        Type = UnifiedTransactionView.ForecastType,
+                        ForecastBalance = null
+                    };
                 }
 
-                // IMPORTANT: update rule
-                rule.NextOccurrence = next;
+                next = next.AddFrequency(rule.Frequency);
+                count++;
             }
-
-            return results;
         }
 
-        public List<FutureTransferTransaction> GenerateFutureTransfers(
-            IEnumerable<RecurringTransferRule> rules)
+        private static IEnumerable<UnifiedTransactionView> ExpandTransferRule(
+            RecurringTransferRule rule,
+            Guid accountId,
+            DateTime from,
+            DateTime to)
         {
-            var results = new List<FutureTransferTransaction>();
+            var next = rule.NextOccurrence;
+            var count = 0;
 
-            foreach (var rule in rules.Where(r => r.IsActive))
+            while (next <= to && (rule.EndDate == null || next <= rule.EndDate.Value) && count < MaxOccurrencesPerRule)
             {
-                var next = rule.NextOccurrence;
-                var end = DateTime.Today.AddMonths(3);
-
-                while (next <= end && (rule.EndDate == null || next <= rule.EndDate.Value))
+                if (next >= from)
                 {
                     var amount = rule.IsFinalPaymentDifferent &&
                                  rule.EndDate.HasValue &&
@@ -61,32 +88,25 @@ namespace THMS.Logic.Finance.Forecast
                         ? rule.FinalPaymentAmount ?? rule.Amount
                         : rule.Amount;
 
-                    results.Add(new FutureTransferTransaction
+                    if (rule.FromAccountId != rule.ToAccountId && rule.ToAccountId == accountId)
+                        amount = -amount;
+
+                    yield return new UnifiedTransactionView
                     {
                         Id = Guid.NewGuid(),
-                        FromAccountId = rule.FromAccountId,
-                        ToAccountId = rule.ToAccountId,
+                        AccountId = accountId,
                         Date = next,
+                        Description = rule.Description ?? "",
                         Amount = amount,
                         Category = rule.Category,
-                        Description = rule.Description,
-                        IsRealized = false
-                    });
-
-                    next = next.AddFrequency(rule.Frequency);
+                        Type = UnifiedTransactionView.ForecastTransferType,
+                        ForecastBalance = null
+                    };
                 }
 
-                // IMPORTANT: update rule
-                rule.NextOccurrence = next;
+                next = next.AddFrequency(rule.Frequency);
+                count++;
             }
-
-            return results;
-        }
-
-        public List<FutureSingleTransaction> GenerateExpenseBudgetForecast(
-            ExpenseBudgetRule rule)
-        {
-            return new ExpenseBudgetForecastGenerator().Generate(rule);
         }
     }
 }

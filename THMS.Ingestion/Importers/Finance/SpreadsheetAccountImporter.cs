@@ -48,6 +48,7 @@ namespace THMS.Ingestion.Importers.Finance
 
                 var name = reader.GetString(0)?.Trim();
                 var type = reader.GetString(1)?.Trim();
+                var number = reader.GetString(2)?.Trim() ?? string.Empty;
 
                 if (string.IsNullOrWhiteSpace(name) ||
                     string.IsNullOrWhiteSpace(type))
@@ -58,29 +59,28 @@ namespace THMS.Ingestion.Importers.Finance
 
                 Account account = type switch
                 {
-                    "Bank" => new BankAccount(),
-                    "Credit" => new CreditAccount(),
-                    "Loan" => new LoanAccount(),
-                    "Mortgage" => new MortgageAccount(),
-                    "Investment" => new InvestmentAccount(),
-                    "Internal" => new InternalAccount(),
+                    "Bank" => new BankAccount { Type = AccountType.Checking },
+                    "Credit" => new CreditAccount { Type = AccountType.CreditCard },
+                    "Loan" => new LoanAccount { Type = AccountType.Loan },
+                    "Mortgage" => new MortgageAccount { Type = AccountType.Mortgage },
+                    "Investment" => new InvestmentAccount { Type = AccountType.Investment },
+                    "Internal" => new InternalAccount { Type = AccountType.Internal },
                     _ => throw new InvalidOperationException(
                         $"Unknown account type '{type}' at row {rowIndex}.")
                 };
 
                 account.Id = Guid.NewGuid();
                 account.Name = name;
+                account.Institution ??= string.Empty;
+                account.AccountNumber = number;
 
                 // Subtype-specific fields
                 switch (account)
                 {
                     case BankAccount bank:
-                        bank.AccountNumber = reader.GetString(2)?.Trim();
                         break;
 
                     case CreditAccount credit:
-                        credit.AccountNumber = reader.GetString(2)?.Trim();
-
                         if (decimal.TryParse(reader.GetValue(3)?.ToString(),
                             NumberStyles.Any, CultureInfo.InvariantCulture,
                             out var limit))

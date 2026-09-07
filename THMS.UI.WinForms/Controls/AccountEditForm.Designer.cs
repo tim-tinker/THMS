@@ -32,6 +32,9 @@
         private Panel pnlInternal;
 
         // Bank fields
+        private Label lblBankStarting;
+        private NumericUpDown numBankStarting;
+
         private Label lblBankPosted;
         private NumericUpDown numBankPosted;
 
@@ -53,6 +56,9 @@
 
         private Label lblCreditPosted;
         private NumericUpDown numCreditPosted;
+
+        private Label lblCreditStarting;
+        private NumericUpDown numCreditStarting;
 
         // Loan fields
         private Label lblLoanPrincipal;
@@ -122,21 +128,25 @@
             dtBalanceAsOf = new DateTimePicker { Left = 150, Top = 220, Width = 200, Format = DateTimePickerFormat.Short };
 
             // Panels start at 260
-            pnlBank = new Panel { Left = 20, Top = 260, Width = 380, Height = 120 };
-            pnlCredit = new Panel { Left = 20, Top = 260, Width = 380, Height = 200 };
+            pnlBank = new Panel { Left = 20, Top = 260, Width = 380, Height = 160 };
+            pnlCredit = new Panel { Left = 20, Top = 260, Width = 380, Height = 240 };
             pnlLoan = new Panel { Left = 20, Top = 260, Width = 380, Height = 120 };
             pnlMortgage = new Panel { Left = 20, Top = 260, Width = 380, Height = 160 };
             pnlInvestment = new Panel { Left = 20, Top = 260, Width = 380, Height = 80 };
             pnlInternal = new Panel { Left = 20, Top = 260, Width = 380, Height = 80 };
 
             // Bank panel
-            lblBankPosted = new Label { Text = "Posted Balance:", Left = 10, Top = 10, Width = 120 };
-            numBankPosted = new NumericUpDown { Left = 150, Top = 10, Width = 150, DecimalPlaces = 2, Maximum = 1000000 };
+            lblBankStarting = new Label { Text = "Starting Balance:", Left = 10, Top = 10, Width = 120 };
+            numBankStarting = new NumericUpDown { Left = 150, Top = 10, Width = 150, DecimalPlaces = 2, Minimum = -100000000, Maximum = 100000000 };
 
-            lblBankOverdraft = new Label { Text = "Overdraft Limit:", Left = 10, Top = 50, Width = 120 };
-            numBankOverdraft = new NumericUpDown { Left = 150, Top = 50, Width = 150, DecimalPlaces = 2, Maximum = 1000000 };
+            lblBankPosted = new Label { Text = "Posted Balance:", Left = 10, Top = 50, Width = 120 };
+            numBankPosted = new NumericUpDown { Left = 150, Top = 50, Width = 150, DecimalPlaces = 2, Minimum = -100000000, Maximum = 100000000 };
+
+            lblBankOverdraft = new Label { Text = "Overdraft Limit:", Left = 10, Top = 90, Width = 120 };
+            numBankOverdraft = new NumericUpDown { Left = 150, Top = 90, Width = 150, DecimalPlaces = 2, Maximum = 1000000 };
 
             pnlBank.Controls.AddRange(new Control[] {
+                lblBankStarting, numBankStarting,
                 lblBankPosted, numBankPosted,
                 lblBankOverdraft, numBankOverdraft
             });
@@ -155,14 +165,18 @@
             dtCreditDue = new DateTimePicker { Left = 150, Top = 130, Width = 150, Format = DateTimePickerFormat.Short };
 
             lblCreditPosted = new Label { Text = "Posted Balance:", Left = 10, Top = 170, Width = 120 };
-            numCreditPosted = new NumericUpDown { Left = 150, Top = 170, Width = 150, DecimalPlaces = 2, Maximum = 1000000 };
+            numCreditPosted = new NumericUpDown { Left = 150, Top = 170, Width = 150, DecimalPlaces = 2, Minimum = -100000000, Maximum = 100000000 };
+
+            lblCreditStarting = new Label { Text = "Starting Balance:", Left = 10, Top = 210, Width = 120 };
+            numCreditStarting = new NumericUpDown { Left = 150, Top = 210, Width = 150, DecimalPlaces = 2, Minimum = -100000000, Maximum = 100000000 };
 
             pnlCredit.Controls.AddRange(new Control[] {
                 lblCreditLimit, numCreditLimit,
                 lblCreditApr, numCreditApr,
                 lblCreditStatement, dtCreditStatement,
                 lblCreditDue, dtCreditDue,
-                lblCreditPosted, numCreditPosted
+                lblCreditPosted, numCreditPosted,
+                lblCreditStarting, numCreditStarting
             });
 
             // Loan panel
