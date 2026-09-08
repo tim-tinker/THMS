@@ -81,19 +81,40 @@ namespace THMS.Data.Stores
         // ------------------------------------------------------------
         // Expense Budget Rules
         // ------------------------------------------------------------
-        void UpsertExpenseBudgetRule(ExpenseBudgetRule? rule);
+        void AddExpenseBudgetRule(ExpenseBudgetRule rule);
+        void UpdateExpenseBudgetRule(ExpenseBudgetRule rule);
+        void DeleteExpenseBudgetRule(Guid ruleId);
+        ExpenseBudgetRule? GetExpenseBudgetRule(Guid ruleId);
         IEnumerable<ExpenseBudgetRule> GetExpenseBudgetRules(Guid accountId);
 
+        // ------------------------------------------------------------
+        // Expense Budget History
+        // ------------------------------------------------------------
+        void AddExpenseBudgetHistory(ExpenseBudgetHistory history);
+        void UpdateExpenseBudgetHistory(ExpenseBudgetHistory history);
+        ExpenseBudgetHistory? GetExpenseBudgetHistoryById(Guid historyId);
+        IEnumerable<ExpenseBudgetHistory> GetExpenseBudgetHistory(Guid budgetRuleId);
+        ExpenseBudgetHistory? GetActiveBudgetHistory(Guid budgetRuleId);
+        IEnumerable<ExpenseBudgetHistory> GetBudgetHistoryForPeriod(Guid budgetRuleId, DateTime periodStart, DateTime periodEnd);
+        void CloseBudgetHistory(Guid historyId);
+
 
         // ------------------------------------------------------------
-        // Categories
+        // Expense Categories
         // ------------------------------------------------------------
-        void AddCategory(TransactionCategory category);
-        void UpdateCategory(TransactionCategory category);
-        void DeleteCategory(Guid id);
-
-        TransactionCategory? GetCategory(Guid id);
-        IEnumerable<TransactionCategory> GetAllCategories();
+        void AddCategory(ExpenseCategory category);
+        void UpdateCategory(ExpenseCategory category);
+        void DeleteCategory(Guid categoryId);
+        void DeactivateCategory(Guid categoryId);
+        void MergeCategories(Guid keepCategoryId, Guid retireCategoryId);
+        ExpenseCategory? GetCategory(Guid categoryId);
+        IEnumerable<ExpenseCategory> GetAllCategories(bool includeInactive = false);
+        IEnumerable<ExpenseCategory> GetChildCategories(Guid parentCategoryId);
+        IEnumerable<ExpenseCategory> GetCategoryTree(bool includeInactive = true);
+        CategoryUsage CountCategoryUsage(Guid categoryId);
+        void EnsureDefaultCategories();
+        void UpsertAssignment(string normalizedDescription, Guid categoryId);
+        CategoryAssignment? GetAssignment(string normalizedDescription);
 
 
         // ------------------------------------------------------------
@@ -113,5 +134,6 @@ namespace THMS.Data.Stores
         IEnumerable<FutureTransferTransaction> GetAllFutureTransferTransactions();
         IEnumerable<RecurringSingleTransactionRule> GetAllRecurringSingleRules();
         IEnumerable<RecurringTransferRule> GetAllRecurringTransferRules();
+        IEnumerable<ExpenseBudgetRule> GetAllExpenseBudgetRules();
     }
 }

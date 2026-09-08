@@ -24,6 +24,7 @@ namespace THMS.Data.Stores.SqlTables
                 );";
             cmd.ExecuteNonQuery();
             EnsureColumn(conn, "IsUserCreated", "INTEGER NOT NULL DEFAULT 0");
+            SqliteCategoryColumns.EnsureCategoryId(conn, "FutureTransferTransactions");
         }
 
         public void Add(SqliteConnection conn, FutureTransferTransaction transaction)
@@ -31,10 +32,10 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO FutureTransferTransactions
-                (Id, Date, Description, Amount, Category, FromAccountId, ToAccountId,
+                (Id, Date, Description, Amount, Category, CategoryId, FromAccountId, ToAccountId,
                  IsRealized, PostedFromTransactionId, PostedToTransactionId, IsUserCreated)
                 VALUES
-                (@Id, @Date, @Description, @Amount, @Category, @FromAccountId, @ToAccountId,
+                (@Id, @Date, @Description, @Amount, @Category, @CategoryId, @FromAccountId, @ToAccountId,
                  @IsRealized, @PostedFromTransactionId, @PostedToTransactionId, @IsUserCreated);";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
@@ -49,6 +50,7 @@ namespace THMS.Data.Stores.SqlTables
                     Description = @Description,
                     Amount = @Amount,
                     Category = @Category,
+                    CategoryId = @CategoryId,
                     FromAccountId = @FromAccountId,
                     ToAccountId = @ToAccountId,
                     IsRealized = @IsRealized,
@@ -120,7 +122,7 @@ namespace THMS.Data.Stores.SqlTables
 
         private const string SelectColumns =
             @"SELECT Id, Date, Description, Amount, Category, FromAccountId, ToAccountId,
-                     IsRealized, PostedFromTransactionId, PostedToTransactionId, IsUserCreated";
+                     IsRealized, PostedFromTransactionId, PostedToTransactionId, IsUserCreated, CategoryId";
 
         private static void Bind(SqliteCommand cmd, FutureTransferTransaction transaction)
         {
@@ -129,6 +131,7 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@Description", (object?)transaction.Description ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@Amount", transaction.Amount);
             cmd.Parameters.AddWithValue("@Category", (object?)transaction.Category ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@CategoryId", SqliteCategoryColumns.BindId(transaction.CategoryId));
             cmd.Parameters.AddWithValue("@FromAccountId", transaction.FromAccountId.ToString());
             cmd.Parameters.AddWithValue("@ToAccountId", transaction.ToAccountId.ToString());
             cmd.Parameters.AddWithValue("@IsRealized", transaction.IsRealized ? 1 : 0);
@@ -159,7 +162,8 @@ namespace THMS.Data.Stores.SqlTables
                 IsRealized = reader.GetInt32(7) == 1,
                 PostedFromTransactionId = reader.IsDBNull(8) ? null : Guid.Parse(reader.GetString(8)),
                 PostedToTransactionId = reader.IsDBNull(9) ? null : Guid.Parse(reader.GetString(9)),
-                IsUserCreated = reader.FieldCount > 10 && !reader.IsDBNull(10) && reader.GetInt32(10) == 1
+                IsUserCreated = reader.FieldCount > 10 && !reader.IsDBNull(10) && reader.GetInt32(10) == 1,
+                CategoryId = SqliteCategoryColumns.ReadId(reader, 11)
             };
         }
 

@@ -22,10 +22,13 @@ namespace THMS.Data.Stores.SqlTables
                     EndDate TEXT,
                     IsActive INTEGER NOT NULL,
                     IsFinalPaymentDifferent INTEGER NOT NULL,
-                    FinalPaymentAmount REAL
+                    FinalPaymentAmount REAL,
+                    IsUserCreated INTEGER NOT NULL DEFAULT 0
                 );";
             cmd.ExecuteNonQuery();
             EnsureColumn(conn, "LastOccurrence", "TEXT");
+            EnsureColumn(conn, "IsUserCreated", "INTEGER NOT NULL DEFAULT 0");
+            SqliteCategoryColumns.EnsureCategoryId(conn, "RecurringTransferRules");
         }
 
         public void Add(SqliteConnection conn, RecurringTransferRule rule)
@@ -33,11 +36,11 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO RecurringTransferRules
-                (Id, Date, Description, Amount, Category, FromAccountId, ToAccountId,
-                 Frequency, LastOccurrence, EndDate, IsActive, IsFinalPaymentDifferent, FinalPaymentAmount)
+                (Id, Date, Description, Amount, Category, CategoryId, FromAccountId, ToAccountId,
+                 Frequency, LastOccurrence, EndDate, IsActive, IsFinalPaymentDifferent, FinalPaymentAmount, IsUserCreated)
                 VALUES
-                (@Id, @Date, @Description, @Amount, @Category, @FromAccountId, @ToAccountId,
-                 @Frequency, @LastOccurrence, @EndDate, @IsActive, @IsFinalPaymentDifferent, @FinalPaymentAmount);";
+                (@Id, @Date, @Description, @Amount, @Category, @CategoryId, @FromAccountId, @ToAccountId,
+                 @Frequency, @LastOccurrence, @EndDate, @IsActive, @IsFinalPaymentDifferent, @FinalPaymentAmount, @IsUserCreated);";
             Bind(cmd, rule);
             cmd.ExecuteNonQuery();
         }
@@ -51,6 +54,7 @@ namespace THMS.Data.Stores.SqlTables
                     Description = @Description,
                     Amount = @Amount,
                     Category = @Category,
+                    CategoryId = @CategoryId,
                     FromAccountId = @FromAccountId,
                     ToAccountId = @ToAccountId,
                     Frequency = @Frequency,
@@ -58,7 +62,8 @@ namespace THMS.Data.Stores.SqlTables
                     EndDate = @EndDate,
                     IsActive = @IsActive,
                     IsFinalPaymentDifferent = @IsFinalPaymentDifferent,
-                    FinalPaymentAmount = @FinalPaymentAmount
+                    FinalPaymentAmount = @FinalPaymentAmount,
+                    IsUserCreated = @IsUserCreated
                 WHERE Id = @Id;";
             Bind(cmd, rule);
             cmd.ExecuteNonQuery();
@@ -101,7 +106,7 @@ namespace THMS.Data.Stores.SqlTables
 
         private const string SelectColumns =
             @"SELECT Id, Date, Description, Amount, Category, FromAccountId, ToAccountId,
-                     Frequency, LastOccurrence, EndDate, IsActive, IsFinalPaymentDifferent, FinalPaymentAmount";
+                     Frequency, LastOccurrence, EndDate, IsActive, IsFinalPaymentDifferent, FinalPaymentAmount, IsUserCreated, CategoryId";
 
         private static void Bind(SqliteCommand cmd, RecurringTransferRule rule)
         {
@@ -110,6 +115,7 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@Description", (object?)rule.Description ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@Amount", rule.Amount);
             cmd.Parameters.AddWithValue("@Category", (object?)rule.Category ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@CategoryId", SqliteCategoryColumns.BindId(rule.CategoryId));
             cmd.Parameters.AddWithValue("@FromAccountId", rule.FromAccountId.ToString());
             cmd.Parameters.AddWithValue("@ToAccountId", rule.ToAccountId.ToString());
             cmd.Parameters.AddWithValue("@Frequency", rule.Frequency.ToString());
@@ -118,6 +124,7 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@IsActive", rule.IsActive ? 1 : 0);
             cmd.Parameters.AddWithValue("@IsFinalPaymentDifferent", rule.IsFinalPaymentDifferent ? 1 : 0);
             cmd.Parameters.AddWithValue("@FinalPaymentAmount", (object?)rule.FinalPaymentAmount ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@IsUserCreated", rule.IsUserCreated ? 1 : 0);
         }
 
         private static RecurringTransferRule Read(SqliteDataReader reader)
@@ -136,7 +143,9 @@ namespace THMS.Data.Stores.SqlTables
                 EndDate = reader.IsDBNull(9) ? null : reader.GetDateTime(9),
                 IsActive = reader.GetInt32(10) == 1,
                 IsFinalPaymentDifferent = reader.GetInt32(11) == 1,
-                FinalPaymentAmount = reader.IsDBNull(12) ? null : (decimal)(double)reader.GetDouble(12)
+                FinalPaymentAmount = reader.IsDBNull(12) ? null : (decimal)(double)reader.GetDouble(12),
+                IsUserCreated = reader.FieldCount > 13 && !reader.IsDBNull(13) && reader.GetInt32(13) == 1,
+                CategoryId = SqliteCategoryColumns.ReadId(reader, 14)
             };
         }
 

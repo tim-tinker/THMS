@@ -39,6 +39,9 @@ namespace THMS.Tests.Logic
             Assert.That(new DataAvailabilityService(), Is.Not.Null);
             Assert.That(new VehicleDetailViewModel(Guid.NewGuid()), Is.Not.Null);
             Assert.That(new RegisterUpdateOrchestrator(), Is.Not.Null);
+            Assert.That(new RecurringRuleOrchestrator(), Is.Not.Null);
+            Assert.That(new BudgetOrchestrator(), Is.Not.Null);
+            Assert.That(new CategoryOrchestrator(), Is.Not.Null);
             Assert.That(new AccountSyncOrchestrator(), Is.Not.Null);
             Assert.That(new TransactionImportOrchestrator(), Is.Not.Null);
             Assert.That(new ExternalTransactionAccess(), Is.Not.Null);

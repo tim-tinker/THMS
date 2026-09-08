@@ -41,14 +41,16 @@ namespace THMS.Ingestion.Importers.Finance
                 // 0 = Name
                 // 1 = Type
                 // 2 = Number
-                // 3 = CreditLimit
-                // 4 = APR
-                // 5 = Principal
-                // 6 = TermMonths
+                // 3 = URL
+                // 4 = CreditLimit
+                // 5 = APR
+                // 6 = Principal
+                // 7 = TermMonths
 
                 var name = reader.GetString(0)?.Trim();
                 var type = reader.GetString(1)?.Trim();
                 var number = reader.GetString(2)?.Trim() ?? string.Empty;
+                var url = reader.GetString(3)?.Trim() ?? string.Empty;
 
                 if (string.IsNullOrWhiteSpace(name) ||
                     string.IsNullOrWhiteSpace(type))
@@ -73,6 +75,7 @@ namespace THMS.Ingestion.Importers.Finance
                 account.Name = name;
                 account.Institution ??= string.Empty;
                 account.AccountNumber = number;
+                account.WebsiteUrl = url;
 
                 // Subtype-specific fields
                 switch (account)
@@ -81,34 +84,34 @@ namespace THMS.Ingestion.Importers.Finance
                         break;
 
                     case CreditAccount credit:
-                        if (decimal.TryParse(reader.GetValue(3)?.ToString(),
+                        if (decimal.TryParse(reader.GetValue(4)?.ToString(),
                             NumberStyles.Any, CultureInfo.InvariantCulture,
                             out var limit))
                             credit.CreditLimit = limit;
 
-                        if (decimal.TryParse(reader.GetValue(4)?.ToString(),
+                        if (decimal.TryParse(reader.GetValue(5)?.ToString(),
                             NumberStyles.Any, CultureInfo.InvariantCulture,
                             out var apr))
                             credit.APR = apr;
                         break;
 
                     case LoanAccount loan:
-                        if (decimal.TryParse(reader.GetValue(5)?.ToString(),
+                        if (decimal.TryParse(reader.GetValue(6)?.ToString(),
                             NumberStyles.Any, CultureInfo.InvariantCulture,
                             out var principal))
                             loan.Principal = principal;
 
-                        if (int.TryParse(reader.GetValue(6)?.ToString(), out var term))
+                        if (int.TryParse(reader.GetValue(7)?.ToString(), out var term))
                             loan.TermMonths = term;
                         break;
 
                     case MortgageAccount mortgage:
-                        if (decimal.TryParse(reader.GetValue(5)?.ToString(),
+                        if (decimal.TryParse(reader.GetValue(6)?.ToString(),
                             NumberStyles.Any, CultureInfo.InvariantCulture,
                             out var mPrincipal))
                             mortgage.Principal = mPrincipal;
 
-                        if (int.TryParse(reader.GetValue(6)?.ToString(), out var mTerm))
+                        if (int.TryParse(reader.GetValue(7)?.ToString(), out var mTerm))
                             mortgage.TermMonths = mTerm;
                         break;
 

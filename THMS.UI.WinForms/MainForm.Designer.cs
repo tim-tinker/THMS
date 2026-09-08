@@ -21,7 +21,6 @@ namespace THMS.UI
         {
             navigationPanel = new FlowLayoutPanel();
             dashboardHostPanel = new Panel();
-            navigationPanel.SuspendLayout();
             SuspendLayout();
             // 
             // navigationPanel
@@ -55,7 +54,7 @@ namespace THMS.UI
             Name = "MainForm";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "THMS Dashboard";
-            navigationPanel.ResumeLayout(false);
+            Load += OnLoad;
             ResumeLayout(false);
         }
 

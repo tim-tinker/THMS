@@ -22,6 +22,7 @@ namespace THMS.Logic.ViewModels.Finance
                     Description = tx.Description ?? "",
                     Amount = tx.Amount,
                     Category = tx.Category,
+                    CategoryId = tx.CategoryId,
                     Type = UnifiedTransactionView.PostedType,
                     ForecastBalance = null
                 });
@@ -37,6 +38,7 @@ namespace THMS.Logic.ViewModels.Finance
                     Description = tx.Description ?? "",
                     Amount = tx.Amount,
                     Category = tx.Category,
+                    CategoryId = tx.CategoryId,
                     Type = UnifiedTransactionView.PostedTransferType,
                     ForecastBalance = null
                 });
@@ -55,6 +57,7 @@ namespace THMS.Logic.ViewModels.Finance
                     Description = tx.Description ?? "",
                     Amount = tx.Amount,
                     Category = tx.Category,
+                    CategoryId = tx.CategoryId,
                     Type = UnifiedTransactionView.FutureType,
                     ForecastBalance = null
                 });
@@ -73,12 +76,54 @@ namespace THMS.Logic.ViewModels.Finance
                     Description = tx.Description ?? "",
                     Amount = tx.Amount,
                     Category = tx.Category,
+                    CategoryId = tx.CategoryId,
                     Type = UnifiedTransactionView.FutureTransferType,
                     ForecastBalance = null
                 });
             }
 
-            return list.OrderBy(t => t.Date).ThenBy(t => t.Id).ToList();
+            return UnifiedTransactionView.OrderForRunningBalance(list).ToList();
+        }
+
+        public static List<UnifiedTransactionView> BuildRecurringRules(
+            IEnumerable<RecurringSingleTransactionRule> singles,
+            IEnumerable<RecurringTransferRule> transfers)
+        {
+            var list = new List<UnifiedTransactionView>();
+
+            foreach (var rule in singles)
+            {
+                list.Add(new UnifiedTransactionView
+                {
+                    Id = rule.Id,
+                    AccountId = rule.AccountId,
+                    Date = rule.NextOccurrence,
+                    Description = rule.Description ?? "",
+                    Amount = rule.Amount,
+                    Category = rule.Category,
+                    CategoryId = rule.CategoryId,
+                    Type = UnifiedTransactionView.RecurringRuleType,
+                    ForecastBalance = null
+                });
+            }
+
+            foreach (var rule in transfers)
+            {
+                list.Add(new UnifiedTransactionView
+                {
+                    Id = rule.Id,
+                    AccountId = rule.FromAccountId,
+                    Date = rule.NextOccurrence,
+                    Description = rule.Description ?? "",
+                    Amount = rule.Amount,
+                    Category = rule.Category,
+                    CategoryId = rule.CategoryId,
+                    Type = UnifiedTransactionView.RecurringTransferRuleType,
+                    ForecastBalance = null
+                });
+            }
+
+            return UnifiedTransactionView.OrderForDisplay(list).ToList();
         }
     }
 }

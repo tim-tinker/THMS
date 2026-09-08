@@ -12,8 +12,7 @@ namespace THMS.Logic.Finance.Forecast
             DateTime from,
             DateTime to,
             IEnumerable<RecurringSingleTransactionRule> singleRules,
-            IEnumerable<RecurringTransferRule> transferRules,
-            IEnumerable<ExpenseBudgetRule>? budgetRules = null)
+            IEnumerable<RecurringTransferRule> transferRules)
         {
             var results = new List<UnifiedTransactionView>();
 
@@ -24,13 +23,7 @@ namespace THMS.Logic.Finance.Forecast
                          (r.FromAccountId == accountId || r.ToAccountId == accountId)))
                 results.AddRange(ExpandTransferRule(rule, accountId, from, to));
 
-            if (budgetRules is not null)
-            {
-                foreach (var rule in budgetRules.Where(r => r.AccountId == accountId))
-                    results.AddRange(new ExpenseBudgetForecastGenerator().Generate(rule, from, to));
-            }
-
-            return results.OrderBy(t => t.Date).ThenBy(t => t.Id).ToList();
+            return UnifiedTransactionView.OrderForRunningBalance(results).ToList();
         }
 
         private static IEnumerable<UnifiedTransactionView> ExpandSingleRule(
@@ -59,6 +52,7 @@ namespace THMS.Logic.Finance.Forecast
                         Description = rule.Description ?? "",
                         Amount = amount,
                         Category = rule.Category,
+                        CategoryId = rule.CategoryId,
                         Type = UnifiedTransactionView.ForecastType,
                         ForecastBalance = null
                     };
@@ -99,6 +93,7 @@ namespace THMS.Logic.Finance.Forecast
                         Description = rule.Description ?? "",
                         Amount = amount,
                         Category = rule.Category,
+                        CategoryId = rule.CategoryId,
                         Type = UnifiedTransactionView.ForecastTransferType,
                         ForecastBalance = null
                     };

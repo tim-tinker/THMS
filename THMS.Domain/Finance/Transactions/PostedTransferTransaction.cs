@@ -23,6 +23,7 @@
             this.Date = original.Date;
             this.Description = original.Description;
             this.Category = original.Category;
+            this.CategoryId = original.CategoryId;
 
             // Transfer-specific fields
             this.RelatedPostedTransactionId = relatedId;

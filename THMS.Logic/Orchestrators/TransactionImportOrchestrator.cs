@@ -10,6 +10,7 @@ namespace THMS.Logic.Orchestrators
     {
         private readonly IExternalTransactionFetcher _transactionFetcher;
         private readonly ITransactionDataStore _txStore;
+        private readonly Categorizer _categorizer;
         private double _dateWindowSize = 3; // use three because of weekends
 
         public TransactionImportOrchestrator()
@@ -25,6 +26,7 @@ namespace THMS.Logic.Orchestrators
         {
             _transactionFetcher = transactionFetcher;
             _txStore = txStore;
+            _categorizer = new Categorizer(txStore as ICategoryDataStore ?? new DataStoreFactory().GetCategoryStore());
         }
 
         public async Task<TransactionImportResult> ImportAsync(Account account)
@@ -49,7 +51,6 @@ namespace THMS.Logic.Orchestrators
             // 4. Detect transfers
             var transfers = DetectTransfers(posted);
 
-            // 5. Categorize
             Categorize(posted);
 
             // 6. Insert posted transactions
@@ -191,46 +192,7 @@ namespace THMS.Logic.Orchestrators
         private void Categorize(IEnumerable<PostedTransaction> txs)
         {
             foreach (var tx in txs)
-            {
-                Categorize(tx);
-            }
-        }
-
-        private void Categorize(PostedTransaction tx)
-        {
-            // 1. If user already assigned a category, do nothing
-            if (string.IsNullOrWhiteSpace(tx.Category))
-            {
-                // 2. If Plaid provided a category, use it
-                if (!string.IsNullOrWhiteSpace(tx.PlaidCategory))
-                {
-                    tx.Category = tx.PlaidCategory;
-                }
-                else
-                {
-                    var categoryByDescription = GetCategoryByDescription(tx.Description);
-                    if (categoryByDescription is not null)
-                    {
-                        tx.Category = categoryByDescription;
-                    }
-                    else
-                    {
-                        // 5. Default category (optional)
-                        tx.Category = "Uncategorized";
-                    }
-                }
-            }
-        }
-
-        private string? GetCategoryByDescription(string description)
-        {
-            if (!string.IsNullOrWhiteSpace(description) &&
-                description.Contains("STARBUCKS", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Coffee";
-            }
-
-            return null;
+                _categorizer.ApplySuggestion(tx);
         }
 
         public class TransactionImportResult

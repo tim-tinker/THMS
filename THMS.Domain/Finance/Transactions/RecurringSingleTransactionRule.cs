@@ -12,6 +12,7 @@
         public DateTime? LastOccurrence { get; set; }
         public DateTime? EndDate { get; set; }
         public bool IsActive { get; set; } = true;
+        public bool IsUserCreated { get; set; }
 
         // Optional loan-specific fields
         public bool IsFinalPaymentDifferent { get; set; }

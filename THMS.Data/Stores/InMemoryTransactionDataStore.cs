@@ -3,9 +3,14 @@ using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores
 {
-    public class InMemoryTransactionDataStore : ITransactionDataStore
+    public class InMemoryTransactionDataStore : ITransactionDataStore, ICategoryDataStore
     {
         private readonly InMemoryTransactionStore _store = new();
+
+        public InMemoryTransactionDataStore()
+        {
+            _store.EnsureDefaultCategories();
+        }
 
         // ------------------------------------------------------------
         // Posted Transactions
@@ -145,30 +150,90 @@ namespace THMS.Data.Stores
         // Expense Budget Rules
         // ------------------------------------------------------------
 
-        public void UpsertExpenseBudgetRule(ExpenseBudgetRule? rule) =>
-            _store.UpsertExpenseBudget(rule);
+        public void AddExpenseBudgetRule(ExpenseBudgetRule rule) =>
+            _store.AddExpenseBudget(rule);
+
+        public void UpdateExpenseBudgetRule(ExpenseBudgetRule rule) =>
+            _store.UpdateExpenseBudget(rule);
+
+        public void DeleteExpenseBudgetRule(Guid ruleId) =>
+            _store.DeleteExpenseBudget(ruleId);
+
+        public ExpenseBudgetRule? GetExpenseBudgetRule(Guid ruleId) =>
+            _store.GetExpenseBudget(ruleId);
 
         public IEnumerable<ExpenseBudgetRule> GetExpenseBudgetRules(Guid accountId) =>
             _store.GetExpenseBudgetsByAccount(accountId);
+
+        public void AddExpenseBudgetHistory(ExpenseBudgetHistory history) =>
+            _store.AddExpenseBudgetHistory(history);
+
+        public void UpdateExpenseBudgetHistory(ExpenseBudgetHistory history) =>
+            _store.UpdateExpenseBudgetHistory(history);
+
+        public ExpenseBudgetHistory? GetExpenseBudgetHistoryById(Guid historyId) =>
+            _store.GetExpenseBudgetHistoryById(historyId);
+
+        public IEnumerable<ExpenseBudgetHistory> GetExpenseBudgetHistory(Guid budgetRuleId) =>
+            _store.GetExpenseBudgetHistory(budgetRuleId);
+
+        public ExpenseBudgetHistory? GetActiveBudgetHistory(Guid budgetRuleId) =>
+            _store.GetActiveBudgetHistory(budgetRuleId);
+
+        public IEnumerable<ExpenseBudgetHistory> GetBudgetHistoryForPeriod(
+            Guid budgetRuleId,
+            DateTime periodStart,
+            DateTime periodEnd) =>
+            _store.GetBudgetHistoryForPeriod(budgetRuleId, periodStart, periodEnd);
+
+        public void CloseBudgetHistory(Guid historyId) =>
+            _store.CloseBudgetHistory(historyId);
 
         // ------------------------------------------------------------
         // Categories
         // ------------------------------------------------------------
 
-        public void AddCategory(TransactionCategory category) =>
+        public void AddCategory(ExpenseCategory category) =>
             _store.AddCategory(category);
 
-        public void UpdateCategory(TransactionCategory category) =>
+        public void UpdateCategory(ExpenseCategory category) =>
             _store.UpdateCategory(category);
 
-        public void DeleteCategory(Guid id) =>
-            _store.DeleteCategory(id);
+        public void DeleteCategory(Guid categoryId) =>
+            _store.DeleteCategory(categoryId);
 
-        public TransactionCategory? GetCategory(Guid id) =>
-            _store.GetCategory(id);
+        public void DeactivateCategory(Guid categoryId) =>
+            _store.DeactivateCategory(categoryId);
 
-        public IEnumerable<TransactionCategory> GetAllCategories() =>
-            _store.GetAllCategories();
+        public void MergeCategories(Guid keepCategoryId, Guid retireCategoryId) =>
+            _store.MergeCategories(keepCategoryId, retireCategoryId);
+
+        public ExpenseCategory? GetCategory(Guid categoryId) =>
+            _store.GetCategory(categoryId);
+
+        public IEnumerable<ExpenseCategory> GetAllCategories(bool includeInactive = false) =>
+            _store.GetAllCategories(includeInactive);
+
+        public IEnumerable<ExpenseCategory> GetChildCategories(Guid parentCategoryId) =>
+            _store.GetChildCategories(parentCategoryId);
+
+        public IEnumerable<ExpenseCategory> GetCategoryTree(bool includeInactive = true) =>
+            _store.GetCategoryTree(includeInactive);
+
+        public CategoryUsage CountCategoryUsage(Guid categoryId) =>
+            _store.CountCategoryUsage(categoryId);
+
+        public void EnsureDefaultCategories() =>
+            _store.EnsureDefaultCategories();
+
+        public void UpsertAssignment(string normalizedDescription, Guid categoryId) =>
+            _store.UpsertAssignment(normalizedDescription, categoryId);
+
+        public CategoryAssignment? GetAssignment(string normalizedDescription) =>
+            _store.GetAssignment(normalizedDescription);
+
+        public IEnumerable<ExpenseBudgetRule> GetAllExpenseBudgetRules() =>
+            _store.GetAllExpenseBudgets();
 
         // ------------------------------------------------------------
         // Utility Queries

@@ -18,15 +18,20 @@ namespace THMS.UI
         public void LoadModules()
         {
             AddSectionLabel("Dashboards");
-            AddDashboard("Transportation", new TransportationDashboardForm());
-            AddDashboard("Energy", new EnergyDashboardForm());
             AddDashboard("Finance", new FinanceDashboardForm());
+            AddDashboard("Transportation", new TransportationDashboardForm());
             AddDashboard("Vehicles", new VehicleListDashboardForm());
+            AddDashboard("Energy", new EnergyDashboardForm());
 
             AddSectionLabel("Data Management");
             AddEmbeddedForm("Data Manager", new DataManagerForm());
             AddEmbeddedForm("Data Center", new DataCenterForm());
             AddEmbeddedForm("Finance Data Center", new FinanceDataCenterForm());
+        }
+
+        private void OnLoad(object sender, EventArgs e)
+        {
+            ShowDashboard("Finance");
         }
 
         private void AddSectionLabel(string text)
@@ -104,7 +109,7 @@ namespace THMS.UI
         {
             if (sender is not Button button) return;
 
-            ShowModule(button.Text);
+            ShowDashboard(button.Text);
         }
 
         private void OnClickNavigateToEmbedded(object? sender, EventArgs e)
@@ -114,7 +119,7 @@ namespace THMS.UI
             ShowFormInMainPanel(button.Text);
         }
 
-        private void ShowModule(string moduleName)
+        private void ShowDashboard(string moduleName)
         {
             HideAllEmbeddedForms();
 

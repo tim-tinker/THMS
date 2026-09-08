@@ -45,11 +45,66 @@ namespace THMS.Tests.Logic
 
             new Categorizer().ApplyCategories(txs);
 
-            Assert.That(txs[0].Category, Is.EqualTo("Shopping"));
+            Assert.That(txs[0].Category, Is.EqualTo("Restaurants"));
+            Assert.That(txs[0].CategoryId, Is.EqualTo(DefaultExpenseCategories.RestaurantsId));
             Assert.That(txs[1].Category, Is.EqualTo("Groceries"));
             Assert.That(txs[2].Category, Is.EqualTo("Payment"));
             Assert.That(txs[3].Category, Is.EqualTo("Uncategorized"));
             Assert.That(txs[4].Category, Is.EqualTo("Uncategorized"));
+        }
+
+        [Test]
+        public void Suggest_UsesLearnedAssignmentBeforePatterns()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var categorizer = new Categorizer(store);
+            var first = new PostedTransaction { Description = "LOCAL POWER CO", Amount = -40 };
+            categorizer.Learn(first.Description, DefaultExpenseCategories.ElectricId);
+
+            var suggestion = categorizer.Suggest(new PostedTransaction
+            {
+                Description = "LOCAL POWER CO",
+                Amount = -22
+            });
+
+            Assert.That(suggestion.CategoryId, Is.EqualTo(DefaultExpenseCategories.ElectricId));
+            Assert.That(suggestion.Confidence, Is.GreaterThan(0.9));
+        }
+
+        [Test]
+        public void ApplySuggestion_DoesNotOverwriteExistingCategoryId()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var categorizer = new Categorizer(store);
+            var tx = new PostedTransaction
+            {
+                Description = "AMAZON marketplace",
+                Amount = -12,
+                CategoryId = DefaultExpenseCategories.GroceriesId,
+                Category = "Groceries"
+            };
+
+            categorizer.ApplySuggestion(tx);
+
+            Assert.That(tx.CategoryId, Is.EqualTo(DefaultExpenseCategories.GroceriesId));
+        }
+
+        [Test]
+        public void Suggest_SkipsInactiveLearnedCategory()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var categorizer = new Categorizer(store);
+            store.AddCategory(new ExpenseCategory { Name = "Old Merchant", IsActive = false });
+            var inactive = store.GetAllCategories(includeInactive: true).Single(c => c.Name == "Old Merchant");
+            categorizer.Learn("LOCAL POWER CO", inactive.Id);
+
+            var suggestion = categorizer.Suggest(new PostedTransaction
+            {
+                Description = "LOCAL POWER CO",
+                Amount = -22
+            });
+
+            Assert.That(suggestion.CategoryId, Is.Not.EqualTo(inactive.Id));
         }
     }
 
@@ -82,6 +137,7 @@ namespace THMS.Tests.Logic
             Assert.That(detected, Has.Count.EqualTo(1));
             Assert.That(detected[0].Frequency, Is.EqualTo(expected));
             Assert.That(detected[0].IsActive, Is.True);
+            Assert.That(detected[0].IsUserCreated, Is.False);
         }
 
         [Test]
@@ -148,6 +204,98 @@ namespace THMS.Tests.Logic
 
             historical[2].Amount = 80;
             Assert.That(detector.DetectRecurringTransfers(historical, []), Is.Empty);
+        }
+
+        [Test]
+        public void DetectRecurringSingles_UpdatesAutoRulesButLeavesUserCreatedAlone()
+        {
+            var detector = new RecurringDetector();
+            var weekly = Series("Hulu", new DateTime(2026, 1, 1), 3, 7, 12);
+            var accountId = weekly[0].AccountId;
+
+            var userRule = new RecurringSingleTransactionRule
+            {
+                Description = "Hulu",
+                AccountId = accountId,
+                Frequency = RecurrenceFrequency.Weekly,
+                Amount = 99,
+                IsUserCreated = true
+            };
+            Assert.That(detector.DetectRecurringSingles(weekly, [userRule]), Is.Empty);
+            Assert.That(userRule.Amount, Is.EqualTo(99));
+
+            var autoRule = new RecurringSingleTransactionRule
+            {
+                Description = "Hulu",
+                AccountId = accountId,
+                Frequency = RecurrenceFrequency.Weekly,
+                Amount = 1,
+                Category = "Old",
+                IsUserCreated = false
+            };
+            Assert.That(detector.DetectRecurringSingles(weekly, [autoRule]), Is.Empty);
+            Assert.That(autoRule.Amount, Is.EqualTo(12));
+        }
+
+        [Test]
+        public void DetectRecurringSingles_IsIdempotentForNormalizedPatternAndDistinctDates()
+        {
+            var accountId = Guid.NewGuid();
+            var historical = Enumerable.Range(1, 5)
+                .Select(month => new PostedTransaction
+                {
+                    AccountId = accountId,
+                    Description = "LESLIES POOLMART",
+                    Date = new DateTime(2026, month, 20),
+                    Amount = -45.67m
+                })
+                .ToList();
+            historical.Add(new PostedTransaction
+            {
+                AccountId = accountId,
+                Description = "LESLIES POOLMART",
+                Date = new DateTime(2026, 5, 20).AddHours(3),
+                Amount = -45.67m
+            });
+
+            var detector = new RecurringDetector();
+            var first = detector.DetectRecurringSingles(historical, []);
+            Assert.That(first, Has.Count.EqualTo(1));
+            Assert.That(first[0].Frequency, Is.EqualTo(RecurrenceFrequency.Monthly));
+            Assert.That(first[0].NextOccurrence.Date, Is.EqualTo(new DateTime(2026, 6, 20)));
+
+            var existing = new RecurringSingleTransactionRule
+            {
+                AccountId = accountId,
+                Description = "  leslies   poolmart ",
+                Amount = -45.67m,
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = new DateTime(2026, 1, 20)
+            };
+            Assert.That(detector.DetectRecurringSingles(historical, [existing]), Is.Empty);
+            Assert.That(existing.NextOccurrence.Date, Is.EqualTo(new DateTime(2026, 6, 20)));
+            Assert.That(existing.LastOccurrence, Is.EqualTo(new DateTime(2026, 5, 20).AddHours(3)));
+        }
+
+        [Test]
+        public void DuplicateAutoRuleIds_KeepsOneAutoRulePerPattern()
+        {
+            var accountId = Guid.NewGuid();
+            var rules = Enumerable.Range(0, 8)
+                .Select(_ => new RecurringSingleTransactionRule
+                {
+                    AccountId = accountId,
+                    Description = "LESLIES POOLMART",
+                    Amount = -45.67m,
+                    Frequency = RecurrenceFrequency.Monthly,
+                    NextOccurrence = new DateTime(2026, 6, 20),
+                    IsUserCreated = false
+                })
+                .ToList();
+
+            var extras = RecurringDetector.DuplicateAutoRuleIds(rules).ToList();
+            Assert.That(extras, Has.Count.EqualTo(7));
+            Assert.That(rules.Select(r => r.Id).Except(extras).Count(), Is.EqualTo(1));
         }
     }
 
@@ -290,44 +438,18 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void GenerateExpenseBudgetForecast_CreatesMonthlyViews_WithoutAdvancingNextOccurrence()
+        public void GenerateForecast_DoesNotEmitBudgetTransactions()
         {
             var accountId = Guid.NewGuid();
-            var start = DateTime.Today.AddMonths(1);
-            var originalNext = start;
-            var rule = new UtilityBudgetRule
-            {
-                AccountId = accountId,
-                CurrentAverage = -42.5m,
-                NextOccurrence = start
-            };
+            var start = DateTime.Today;
+            var futures = new ForecastGenerator().GenerateForecast(
+                accountId,
+                start,
+                start.AddMonths(3),
+                [],
+                []);
 
-            var futures = new ExpenseBudgetForecastGenerator().Generate(rule, DateTime.Today, DateTime.Today.AddMonths(3));
-
-            Assert.That(futures, Is.Not.Empty);
-            Assert.That(futures.All(f => f.AccountId == accountId), Is.True);
-            Assert.That(futures.All(f => f.Amount == -42.5m), Is.True);
-            Assert.That(futures.All(f => f.Category == "Utilities"), Is.True);
-            Assert.That(futures.All(f => f.Description == "Utilities Budget"), Is.True);
-            Assert.That(futures.All(f => f.Type == UnifiedTransactionView.ForecastBudgetType), Is.True);
-            Assert.That(futures.Select(f => f.Date), Is.Ordered);
-            Assert.That(rule.NextOccurrence, Is.EqualTo(originalNext));
-        }
-
-        [Test]
-        public void GenerateExpenseBudgetForecast_WhenNextIsPastHorizon_ReturnsEmpty()
-        {
-            var originalNext = DateTime.Today.AddMonths(4);
-            var rule = new UtilityBudgetRule
-            {
-                AccountId = Guid.NewGuid(),
-                CurrentAverage = 10,
-                NextOccurrence = originalNext
-            };
-
-            var futures = new ExpenseBudgetForecastGenerator().Generate(rule, DateTime.Today, DateTime.Today.AddMonths(3));
-            Assert.That(futures, Is.Empty);
-            Assert.That(rule.NextOccurrence, Is.EqualTo(originalNext));
+            Assert.That(futures.Any(f => f.Type == UnifiedTransactionView.ForecastBudgetType), Is.False);
         }
     }
 
@@ -335,79 +457,125 @@ namespace THMS.Tests.Logic
     public class ExpenseBudgetDetectorTests
     {
         [Test]
-        public void Detect_NoMatchingPostings_CreatesRuleWithZeroAverage()
+        public void ComputeRecommendedAmount_NoMatchingPostings_ReturnsZero()
         {
-            var accountId = Guid.NewGuid();
             var posted = new List<PostedTransaction>
             {
-                new() { AccountId = accountId, Date = new DateTime(2026, 1, 5), Amount = -12, Category = "Groceries" }
+                new() { Date = new DateTime(2026, 1, 5), Amount = -12, Category = "Groceries" }
             };
 
-            var rule = new ExpenseBudgetDetector().Detect(accountId, posted, null, ["Utilities"]);
-
-            Assert.That(rule, Is.TypeOf<UtilityBudgetRule>());
-            Assert.That(rule.AccountId, Is.EqualTo(accountId));
-            Assert.That(rule.CurrentAverage, Is.EqualTo(0));
-            Assert.That(rule.Category, Is.EqualTo("Utilities"));
-            Assert.That(rule.NextOccurrence.Date, Is.EqualTo(DateTime.Today.AddMonths(1).Date));
-            Assert.That(rule.Id, Is.Not.EqualTo(Guid.Empty));
+            var amount = new ExpenseBudgetDetector().ComputeRecommendedAmount(
+                [],
+                BudgetFrequency.Monthly,
+                posted,
+                [DefaultExpenseCategories.UtilityId],
+                DefaultExpenseCategories.All);
+            Assert.That(amount, Is.EqualTo(0));
         }
 
         [Test]
-        public void Detect_AveragesMonthlyTotalsForIncludedCategories()
+        public void ComputeRecommendedAmount_UsesPositivePeriodActuals()
         {
-            var accountId = Guid.NewGuid();
             var posted = new List<PostedTransaction>
             {
-                new() { Date = new DateTime(2026, 1, 8), Amount = -30, Category = "Electric" },
-                new() { Date = new DateTime(2026, 1, 22), Amount = -10, Category = "Water" },
-                new() { Date = new DateTime(2026, 2, 3), Amount = -20, Category = "Gas" },
-                new() { Date = new DateTime(2026, 2, 4), Amount = -5, Category = "Shopping" }
+                new() { Date = new DateTime(2026, 1, 8), Amount = -30, Category = "Electric", CategoryId = DefaultExpenseCategories.ElectricId },
+                new() { Date = new DateTime(2026, 1, 22), Amount = -10, Category = "Water", CategoryId = DefaultExpenseCategories.WaterId },
+                new() { Date = new DateTime(2026, 2, 3), Amount = -20, Category = "Gas", CategoryId = DefaultExpenseCategories.GasId },
+                new() { Date = new DateTime(2026, 2, 4), Amount = -5, Category = "Shopping", CategoryId = DefaultExpenseCategories.RestaurantsId }
             };
 
-            var existing = new UtilityBudgetRule
-            {
-                AccountId = accountId,
-                SmoothingMode = ExpenseSmoothingMode.SimpleAverage,
-                NextOccurrence = DateTime.Today.AddMonths(1)
-            };
-
-            var rule = new ExpenseBudgetDetector().Detect(
-                accountId,
+            var amount = new ExpenseBudgetDetector().ComputeRecommendedAmount(
+                [],
+                BudgetFrequency.Monthly,
                 posted,
-                existing,
-                existing.IncludedCategories);
+                [DefaultExpenseCategories.UtilityId],
+                DefaultExpenseCategories.All);
 
-            Assert.That(rule.CurrentAverage, Is.EqualTo(-30m));
+            Assert.That(amount, Is.GreaterThan(0));
+            Assert.That(amount, Is.LessThanOrEqualTo(40m));
         }
 
         [Test]
-        public void Detect_UpdatesExistingRuleInPlace()
+        public void ComputeActualExpenses_NetsReimbursementsAndStaysNonNegative()
         {
-            var accountId = Guid.NewGuid();
-            var existing = new UtilityBudgetRule
-            {
-                Id = Guid.NewGuid(),
-                AccountId = accountId,
-                CurrentAverage = 1,
-                NextOccurrence = new DateTime(2026, 6, 1)
-            };
-
             var posted = new List<PostedTransaction>
             {
-                new() { Date = new DateTime(2026, 3, 1), Amount = -18, Category = "Electric" }
+                new() { Date = new DateTime(2026, 3, 1), Amount = -40, CategoryId = DefaultExpenseCategories.ElectricId },
+                new() { Date = new DateTime(2026, 3, 10), Amount = 15, CategoryId = DefaultExpenseCategories.ElectricId },
+                new() { Date = new DateTime(2026, 4, 1), Amount = -40, CategoryId = DefaultExpenseCategories.ElectricId }
             };
 
-            var updated = new ExpenseBudgetDetector().Detect(
-                accountId,
+            var actual = new ExpenseBudgetDetector().ComputeActualExpenses(
                 posted,
-                existing,
-                existing.IncludedCategories);
+                [DefaultExpenseCategories.ElectricId],
+                new DateTime(2026, 3, 1),
+                new DateTime(2026, 3, 31));
 
-            Assert.That(updated, Is.SameAs(existing));
-            Assert.That(updated.Id, Is.EqualTo(existing.Id));
-            Assert.That(updated.CurrentAverage, Is.EqualTo(-18m));
-            Assert.That(updated.NextOccurrence, Is.EqualTo(new DateTime(2026, 6, 1)));
+            Assert.That(actual, Is.EqualTo(25m));
+
+            var refundOnly = new ExpenseBudgetDetector().ComputeActualExpenses(
+                [new PostedTransaction { Date = new DateTime(2026, 3, 10), Amount = 15, CategoryId = DefaultExpenseCategories.ElectricId }],
+                [DefaultExpenseCategories.ElectricId],
+                new DateTime(2026, 3, 1),
+                new DateTime(2026, 3, 31));
+            Assert.That(refundOnly, Is.EqualTo(0m));
+        }
+
+        [Test]
+        public void ComputeRecommendedAmount_UsesHistoryActualsNotSignedLedger()
+        {
+            var history = new List<ExpenseBudgetHistory>
+            {
+                new() { PeriodStart = new DateTime(2026, 1, 1), PeriodEnd = new DateTime(2026, 1, 31), ActualExpenses = 40 },
+                new() { PeriodStart = new DateTime(2026, 2, 1), PeriodEnd = new DateTime(2026, 2, 28), ActualExpenses = 20 }
+            };
+
+            var recommended = new ExpenseBudgetDetector().ComputeRecommendedAmount(
+                history,
+                BudgetFrequency.Monthly);
+
+            Assert.That(recommended, Is.GreaterThan(0));
+            Assert.That(recommended, Is.Not.EqualTo(40m + 20m));
+        }
+    }
+
+    [TestFixture]
+    public class BudgetPeriodCalculatorTests
+    {
+        [Test]
+        public void PeriodContaining_MonthlyUsesCalendarMonth()
+        {
+            var period = BudgetPeriodCalculator.PeriodContaining(new DateTime(2026, 9, 7), BudgetFrequency.Monthly);
+            Assert.That(period.Start, Is.EqualTo(new DateTime(2026, 9, 1)));
+            Assert.That(period.End, Is.EqualTo(new DateTime(2026, 9, 30)));
+        }
+
+        [Test]
+        public void PeriodContaining_WeeklyIsMondayThroughSunday()
+        {
+            var period = BudgetPeriodCalculator.PeriodContaining(new DateTime(2026, 9, 9), BudgetFrequency.Weekly);
+            Assert.That(period.Start, Is.EqualTo(new DateTime(2026, 9, 7)));
+            Assert.That(period.End, Is.EqualTo(new DateTime(2026, 9, 13)));
+        }
+
+        [Test]
+        public void PeriodContaining_QuarterlyAndAnnualUseCalendarBoundaries()
+        {
+            var quarter = BudgetPeriodCalculator.PeriodContaining(new DateTime(2026, 9, 7), BudgetFrequency.Quarterly);
+            Assert.That(quarter.Start, Is.EqualTo(new DateTime(2026, 7, 1)));
+            Assert.That(quarter.End, Is.EqualTo(new DateTime(2026, 9, 30)));
+
+            var year = BudgetPeriodCalculator.PeriodContaining(new DateTime(2026, 9, 7), BudgetFrequency.Annual);
+            Assert.That(year.Start, Is.EqualTo(new DateTime(2026, 1, 1)));
+            Assert.That(year.End, Is.EqualTo(new DateTime(2026, 12, 31)));
+        }
+
+        [Test]
+        public void NextPeriod_MonthlyStartsOnFirstOfFollowingMonth()
+        {
+            var next = BudgetPeriodCalculator.NextPeriod(new DateTime(2026, 9, 30), BudgetFrequency.Monthly);
+            Assert.That(next.Start, Is.EqualTo(new DateTime(2026, 10, 1)));
+            Assert.That(next.End, Is.EqualTo(new DateTime(2026, 10, 31)));
         }
     }
 
@@ -722,6 +890,77 @@ namespace THMS.Tests.Logic
             });
             orchestrator.ReconcileRules(accountId);
             Assert.That(store.GetRecurringTransferRules(accountId).First(r => r.Amount == 20).LastOccurrence, Is.EqualTo(start));
+        }
+    }
+
+    [TestFixture]
+    public class RecurringRuleOrchestratorTests
+    {
+        [Test]
+        public void CrudAndNextPaymentDate_IncludeUserCreatedRules()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new RecurringRuleOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            var other = Guid.NewGuid();
+
+            var single = new RecurringSingleTransactionRule
+            {
+                AccountId = accountId,
+                Description = "Rent",
+                Amount = -1200,
+                Category = "Housing",
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = new DateTime(2026, 10, 1),
+                IsActive = true
+            };
+            orchestrator.AddSingleRule(single);
+            Assert.That(single.IsUserCreated, Is.True);
+
+            var transfer = new RecurringTransferRule
+            {
+                FromAccountId = accountId,
+                ToAccountId = other,
+                Description = "Sweep",
+                Amount = 200,
+                Frequency = RecurrenceFrequency.Weekly,
+                NextOccurrence = new DateTime(2026, 9, 8),
+                IsActive = true
+            };
+            orchestrator.AddTransferRule(transfer);
+            Assert.That(transfer.IsUserCreated, Is.True);
+
+            Assert.That(orchestrator.GetSingleRules(accountId), Has.Count.EqualTo(1));
+            Assert.That(orchestrator.GetTransferRules(accountId), Has.Count.EqualTo(1));
+            Assert.That(orchestrator.GetNextPaymentDate(accountId), Is.EqualTo(new DateTime(2026, 9, 8)));
+
+            single.Amount = -1250;
+            orchestrator.UpdateSingleRule(single);
+            Assert.That(orchestrator.GetSingleRule(single.Id)!.Amount, Is.EqualTo(-1250));
+
+            store.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = accountId,
+                Description = "Auto",
+                Amount = -10,
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = new DateTime(2026, 9, 15),
+                IsActive = true,
+                IsUserCreated = false
+            });
+
+            var forecast = new TransactionOrchestrator(store).GenerateForecast(
+                accountId,
+                new DateTime(2026, 9, 1),
+                new DateTime(2026, 10, 2));
+            Assert.That(forecast.Any(f => f.Description == "Rent"), Is.True);
+            Assert.That(forecast.Any(f => f.Description == "Auto"), Is.True);
+            Assert.That(forecast.Any(f => f.Description == "Sweep"), Is.True);
+
+            orchestrator.DeleteSingleRule(single.Id);
+            orchestrator.DeleteTransferRule(transfer.Id);
+            Assert.That(orchestrator.GetSingleRules(accountId).Any(r => r.IsUserCreated), Is.False);
+            Assert.That(orchestrator.GetTransferRules(accountId), Is.Empty);
         }
     }
 }

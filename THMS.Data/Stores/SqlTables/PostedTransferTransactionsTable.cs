@@ -20,6 +20,7 @@ namespace THMS.Data.Stores.SqlTables
                     Direction TEXT NOT NULL
                 );";
             cmd.ExecuteNonQuery();
+            SqliteCategoryColumns.EnsureCategoryId(conn, "PostedTransferTransactions");
         }
 
         public void Add(SqliteConnection conn, PostedTransferTransaction transaction)
@@ -27,9 +28,9 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO PostedTransferTransactions
-                (Id, AccountId, Date, Description, Amount, Category, RelatedPostedTransactionId, Direction)
+                (Id, AccountId, Date, Description, Amount, Category, CategoryId, RelatedPostedTransactionId, Direction)
                 VALUES
-                (@Id, @AccountId, @Date, @Description, @Amount, @Category, @RelatedPostedTransactionId, @Direction);";
+                (@Id, @AccountId, @Date, @Description, @Amount, @Category, @CategoryId, @RelatedPostedTransactionId, @Direction);";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
         }
@@ -44,6 +45,7 @@ namespace THMS.Data.Stores.SqlTables
                     Description = @Description,
                     Amount = @Amount,
                     Category = @Category,
+                    CategoryId = @CategoryId,
                     RelatedPostedTransactionId = @RelatedPostedTransactionId,
                     Direction = @Direction
                 WHERE Id = @Id;";
@@ -117,7 +119,7 @@ namespace THMS.Data.Stores.SqlTables
         }
 
         private const string SelectColumns =
-            "SELECT Id, AccountId, Date, Description, Amount, Category, RelatedPostedTransactionId, Direction";
+            "SELECT Id, AccountId, Date, Description, Amount, Category, RelatedPostedTransactionId, Direction, CategoryId";
 
         private static void Bind(SqliteCommand cmd, PostedTransferTransaction transaction)
         {
@@ -127,6 +129,7 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@Description", (object?)transaction.Description ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@Amount", transaction.Amount);
             cmd.Parameters.AddWithValue("@Category", (object?)transaction.Category ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@CategoryId", SqliteCategoryColumns.BindId(transaction.CategoryId));
             cmd.Parameters.AddWithValue(
                 "@RelatedPostedTransactionId",
                 transaction.RelatedPostedTransactionId == Guid.Empty
@@ -146,7 +149,8 @@ namespace THMS.Data.Stores.SqlTables
                 Amount = (decimal)(double)reader.GetDouble(4),
                 Category = reader.IsDBNull(5) ? null : reader.GetString(5),
                 RelatedPostedTransactionId = reader.IsDBNull(6) ? Guid.Empty : Guid.Parse(reader.GetString(6)),
-                Direction = Enum.Parse<TransferDirection>(reader.GetString(7))
+                Direction = Enum.Parse<TransferDirection>(reader.GetString(7)),
+                CategoryId = SqliteCategoryColumns.ReadId(reader, 8)
             };
         }
 

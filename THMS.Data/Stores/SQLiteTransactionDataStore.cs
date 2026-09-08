@@ -1,10 +1,11 @@
 using Microsoft.Data.Sqlite;
 using THMS.Data.Stores.SqliteStores;
+using THMS.Data.Stores.SqlTables;
 using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores.SQLite
 {
-    public class SQLiteTransactionDataStore : ITransactionDataStore
+    public class SQLiteTransactionDataStore : ITransactionDataStore, ICategoryDataStore
     {
         private readonly string _connectionString;
         private readonly SqliteTransactionStore _store = new();
@@ -222,6 +223,19 @@ namespace THMS.Data.Stores.SQLite
         public void AddRecurringSingleRule(RecurringSingleTransactionRule rule)
         {
             using var conn = OpenConnection();
+            var existing = _store.RecurringSingles.GetByAccount(conn, rule.AccountId)
+                .FirstOrDefault(r => RecurringRulePattern.Matches(r, rule));
+            if (existing is not null)
+            {
+                if (existing.IsUserCreated && !rule.IsUserCreated)
+                    return;
+
+                rule.Id = existing.Id;
+                rule.IsUserCreated = existing.IsUserCreated || rule.IsUserCreated;
+                _store.RecurringSingles.Update(conn, rule);
+                return;
+            }
+
             _store.RecurringSingles.Add(conn, rule);
         }
 
@@ -256,6 +270,19 @@ namespace THMS.Data.Stores.SQLite
         public void AddRecurringTransferRule(RecurringTransferRule rule)
         {
             using var conn = OpenConnection();
+            var existing = _store.RecurringTransfers.GetByAccount(conn, rule.FromAccountId)
+                .FirstOrDefault(r => RecurringRulePattern.Matches(r, rule));
+            if (existing is not null)
+            {
+                if (existing.IsUserCreated && !rule.IsUserCreated)
+                    return;
+
+                rule.Id = existing.Id;
+                rule.IsUserCreated = existing.IsUserCreated || rule.IsUserCreated;
+                _store.RecurringTransfers.Update(conn, rule);
+                return;
+            }
+
             _store.RecurringTransfers.Add(conn, rule);
         }
 
@@ -287,10 +314,29 @@ namespace THMS.Data.Stores.SQLite
         // Expense Budget Rules
         // ------------------------------------------------------------
 
-        public void UpsertExpenseBudgetRule(ExpenseBudgetRule? rule)
+        public void AddExpenseBudgetRule(ExpenseBudgetRule rule)
         {
             using var conn = OpenConnection();
-            _store.ExpenseBudgetRules.Upsert(conn, rule);
+            _store.ExpenseBudgetRules.Add(conn, rule);
+        }
+
+        public void UpdateExpenseBudgetRule(ExpenseBudgetRule rule)
+        {
+            using var conn = OpenConnection();
+            _store.ExpenseBudgetRules.Update(conn, rule);
+        }
+
+        public void DeleteExpenseBudgetRule(Guid ruleId)
+        {
+            using var conn = OpenConnection();
+            _store.ExpenseBudgetHistory.DeleteByRule(conn, ruleId);
+            _store.ExpenseBudgetRules.Delete(conn, ruleId);
+        }
+
+        public ExpenseBudgetRule? GetExpenseBudgetRule(Guid ruleId)
+        {
+            using var conn = OpenConnection();
+            return _store.ExpenseBudgetRules.GetById(conn, ruleId);
         }
 
         public IEnumerable<ExpenseBudgetRule> GetExpenseBudgetRules(Guid accountId)
@@ -299,38 +345,197 @@ namespace THMS.Data.Stores.SQLite
             return _store.ExpenseBudgetRules.GetByAccount(conn, accountId).ToList();
         }
 
+        public IEnumerable<ExpenseBudgetRule> GetAllExpenseBudgetRules()
+        {
+            using var conn = OpenConnection();
+            return _store.ExpenseBudgetRules.GetAll(conn).ToList();
+        }
+
+        public void AddExpenseBudgetHistory(ExpenseBudgetHistory history)
+        {
+            using var conn = OpenConnection();
+            _store.ExpenseBudgetHistory.Add(conn, history);
+        }
+
+        public void UpdateExpenseBudgetHistory(ExpenseBudgetHistory history)
+        {
+            using var conn = OpenConnection();
+            _store.ExpenseBudgetHistory.Update(conn, history);
+        }
+
+        public ExpenseBudgetHistory? GetExpenseBudgetHistoryById(Guid historyId)
+        {
+            using var conn = OpenConnection();
+            return _store.ExpenseBudgetHistory.GetById(conn, historyId);
+        }
+
+        public IEnumerable<ExpenseBudgetHistory> GetExpenseBudgetHistory(Guid budgetRuleId)
+        {
+            using var conn = OpenConnection();
+            return _store.ExpenseBudgetHistory.GetByRule(conn, budgetRuleId).ToList();
+        }
+
+        public ExpenseBudgetHistory? GetActiveBudgetHistory(Guid budgetRuleId)
+        {
+            using var conn = OpenConnection();
+            return _store.ExpenseBudgetHistory.GetActive(conn, budgetRuleId);
+        }
+
+        public IEnumerable<ExpenseBudgetHistory> GetBudgetHistoryForPeriod(
+            Guid budgetRuleId,
+            DateTime periodStart,
+            DateTime periodEnd)
+        {
+            using var conn = OpenConnection();
+            return _store.ExpenseBudgetHistory.GetForPeriod(conn, budgetRuleId, periodStart, periodEnd).ToList();
+        }
+
+        public void CloseBudgetHistory(Guid historyId)
+        {
+            using var conn = OpenConnection();
+            var history = _store.ExpenseBudgetHistory.GetById(conn, historyId);
+            if (history is null)
+                return;
+
+            history.IsClosed = true;
+            history.RecalculateRemaining();
+            _store.ExpenseBudgetHistory.Update(conn, history);
+        }
+
         // ------------------------------------------------------------
         // Categories
         // ------------------------------------------------------------
 
-        public void AddCategory(TransactionCategory category)
+        public void AddCategory(ExpenseCategory category)
         {
             using var conn = OpenConnection();
             _store.Categories.Add(conn, category);
         }
 
-        public void UpdateCategory(TransactionCategory category)
+        public void UpdateCategory(ExpenseCategory category)
         {
             using var conn = OpenConnection();
             _store.Categories.Update(conn, category);
         }
 
-        public void DeleteCategory(Guid id)
+        public void DeleteCategory(Guid categoryId) =>
+            DeactivateCategory(categoryId);
+
+        public void DeactivateCategory(Guid categoryId)
         {
             using var conn = OpenConnection();
-            _store.Categories.Delete(conn, id);
+            _store.Categories.SoftDelete(conn, categoryId);
         }
 
-        public TransactionCategory? GetCategory(Guid id)
+        public void MergeCategories(Guid keepCategoryId, Guid retireCategoryId)
         {
+            if (keepCategoryId == retireCategoryId)
+                throw new InvalidOperationException("A category cannot be merged into itself.");
+
             using var conn = OpenConnection();
-            return _store.Categories.GetById(conn, id);
+            using var tx = conn.BeginTransaction();
+
+            var keep = _store.Categories.GetById(conn, keepCategoryId)
+                ?? throw new InvalidOperationException($"Category {keepCategoryId} was not found.");
+            var retire = _store.Categories.GetById(conn, retireCategoryId)
+                ?? throw new InvalidOperationException($"Category {retireCategoryId} was not found.");
+
+            if (keep.ParentCategoryId == retire.Id)
+            {
+                keep.ParentCategoryId = retire.ParentCategoryId;
+                _store.Categories.Update(conn, keep);
+            }
+
+            foreach (var child in _store.Categories.GetAll(conn, includeInactive: true)
+                         .Where(c => c.ParentCategoryId == retire.Id && c.Id != keep.Id))
+            {
+                child.ParentCategoryId = keep.Id;
+                _store.Categories.Update(conn, child);
+            }
+
+            SqliteCategoryColumns.Retarget(conn, "PostedTransactions", retire.Id, keep.Id, keep.Name);
+            SqliteCategoryColumns.Retarget(conn, "PostedTransferTransactions", retire.Id, keep.Id, keep.Name);
+            SqliteCategoryColumns.Retarget(conn, "FutureSingleTransactions", retire.Id, keep.Id, keep.Name);
+            SqliteCategoryColumns.Retarget(conn, "FutureTransferTransactions", retire.Id, keep.Id, keep.Name);
+            SqliteCategoryColumns.Retarget(conn, "RecurringSingleTransactionRules", retire.Id, keep.Id, keep.Name);
+            SqliteCategoryColumns.Retarget(conn, "RecurringTransferRules", retire.Id, keep.Id, keep.Name);
+
+            foreach (var rule in _store.ExpenseBudgetRules.GetAll(conn))
+            {
+                if (!rule.IncludedCategoryIds.Contains(retire.Id))
+                    continue;
+
+                rule.IncludedCategoryIds = rule.IncludedCategoryIds
+                    .Select(id => id == retire.Id ? keep.Id : id)
+                    .Distinct()
+                    .ToList();
+                _store.ExpenseBudgetRules.Update(conn, rule);
+            }
+
+            _store.Assignments.Retarget(conn, retire.Id, keep.Id);
+            _store.Categories.SoftDelete(conn, retire.Id);
+            tx.Commit();
         }
 
-        public IEnumerable<TransactionCategory> GetAllCategories()
+        public ExpenseCategory? GetCategory(Guid categoryId)
         {
             using var conn = OpenConnection();
-            return _store.Categories.GetAll(conn).ToList();
+            return _store.Categories.GetById(conn, categoryId);
+        }
+
+        public IEnumerable<ExpenseCategory> GetAllCategories(bool includeInactive = false)
+        {
+            using var conn = OpenConnection();
+            return _store.Categories.GetAll(conn, includeInactive).ToList();
+        }
+
+        public IEnumerable<ExpenseCategory> GetChildCategories(Guid parentCategoryId)
+        {
+            using var conn = OpenConnection();
+            return _store.Categories.GetChildren(conn, parentCategoryId).ToList();
+        }
+
+        public IEnumerable<ExpenseCategory> GetCategoryTree(bool includeInactive = true)
+        {
+            using var conn = OpenConnection();
+            return _store.Categories.GetAll(conn, includeInactive).ToList();
+        }
+
+        public CategoryUsage CountCategoryUsage(Guid categoryId)
+        {
+            using var conn = OpenConnection();
+            return new CategoryUsage
+            {
+                TransactionCount =
+                    SqliteCategoryColumns.Count(conn, "PostedTransactions", categoryId) +
+                    SqliteCategoryColumns.Count(conn, "PostedTransferTransactions", categoryId) +
+                    SqliteCategoryColumns.Count(conn, "FutureSingleTransactions", categoryId) +
+                    SqliteCategoryColumns.Count(conn, "FutureTransferTransactions", categoryId),
+                RecurringRuleCount =
+                    SqliteCategoryColumns.Count(conn, "RecurringSingleTransactionRules", categoryId) +
+                    SqliteCategoryColumns.Count(conn, "RecurringTransferRules", categoryId),
+                BudgetRuleCount = _store.ExpenseBudgetRules.GetAll(conn)
+                    .Count(r => r.IncludedCategoryIds.Contains(categoryId)),
+                LearnedMappingCount = _store.Assignments.CountByCategory(conn, categoryId)
+            };
+        }
+
+        public void EnsureDefaultCategories()
+        {
+            using var conn = OpenConnection();
+            _store.Categories.EnsureDefaults(conn);
+        }
+
+        public void UpsertAssignment(string normalizedDescription, Guid categoryId)
+        {
+            using var conn = OpenConnection();
+            _store.Assignments.Upsert(conn, normalizedDescription, categoryId);
+        }
+
+        public CategoryAssignment? GetAssignment(string normalizedDescription)
+        {
+            using var conn = OpenConnection();
+            return _store.Assignments.Get(conn, normalizedDescription);
         }
 
         // ------------------------------------------------------------

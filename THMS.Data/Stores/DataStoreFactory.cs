@@ -31,6 +31,15 @@ namespace THMS.Data.Stores
             return _transactionStore ??= CreateTransactionStore();
         }
 
+        public ICategoryDataStore GetCategoryStore()
+        {
+            var transactions = GetTransactionStore();
+            if (transactions is ICategoryDataStore categories)
+                return categories;
+
+            throw new InvalidOperationException("Transaction store does not implement ICategoryDataStore.");
+        }
+
         public IVehicleDataStore GetVehicleStore()
         {
             return _vehicleStore ??= CreateVehicleStore();

@@ -7,108 +7,208 @@ namespace THMS.Logic.Finance.Recurrence
         private const decimal AmountVarianceThreshold = 5m;
         private const int MinOccurrences = 3;
 
-        // ------------------------------------------------------------
-        // Detect recurring single-account rules (historical ledger only)
-        // ------------------------------------------------------------
         public List<RecurringSingleTransactionRule> DetectRecurringSingles(
             IEnumerable<PostedTransaction> historical,
             IEnumerable<RecurringSingleTransactionRule> existingRules)
         {
             var results = new List<RecurringSingleTransactionRule>();
+            var existing = existingRules.ToList();
 
-            var groups = historical.GroupBy(t => t.Description);
+            var groups = historical.GroupBy(t => (
+                t.AccountId,
+                RecurringRulePattern.NormalizeDescription(t.Description),
+                t.Amount));
 
             foreach (var g in groups)
             {
-                var ordered = g.OrderBy(t => t.Date).ToList();
-                if (ordered.Count < MinOccurrences) continue;
-
-                var deltas = ordered.Zip(ordered.Skip(1),
-                    (a, b) => (b.Date - a.Date).TotalDays).ToList();
-
-                var freq = ClassifyFrequency(deltas);
-                if (freq == null) continue;
-
-                var avgAmount = ordered.Average(t => t.Amount);
-                var variance = ordered.Max(t => t.Amount) - ordered.Min(t => t.Amount);
-                if (variance > AmountVarianceThreshold) continue;
-
-                // dedup
-                if (existingRules.Any(r =>
-                    r.Description == g.Key &&
-                    r.AccountId == ordered.First().AccountId &&
-                    r.Frequency == freq))
+                var distinct = DistinctByDate(g);
+                if (distinct.Count < MinOccurrences)
                     continue;
 
-                results.Add(new RecurringSingleTransactionRule
+                var freq = ClassifyFrequency(Deltas(distinct));
+                if (freq == null)
+                    continue;
+
+                var variance = distinct.Max(t => t.Amount) - distinct.Min(t => t.Amount);
+                if (variance > AmountVarianceThreshold)
+                    continue;
+
+                var last = distinct[^1];
+                var amount = g.Key.Amount;
+                var match = existing.FirstOrDefault(r =>
+                    RecurringRulePattern.MatchesMerchantSchedule(r, last.AccountId, last.Description, freq.Value));
+                if (match is not null)
+                {
+                    ApplyDetectedSchedule(match, last, amount, freq.Value);
+                    continue;
+                }
+
+                var created = new RecurringSingleTransactionRule
                 {
                     Id = Guid.NewGuid(),
-                    AccountId = ordered.First().AccountId,
-                    Description = g.Key,
-                    Amount = avgAmount,
+                    AccountId = last.AccountId,
+                    Description = last.Description,
+                    Amount = amount,
+                    Category = last.Category,
+                    CategoryId = last.CategoryId,
                     Frequency = freq.Value,
-                    LastOccurrence = ordered.Last().Date,
-                    NextOccurrence = ordered.Last().Date.AddFrequency(freq.Value),
-                    IsActive = true
-                });
+                    LastOccurrence = last.Date,
+                    NextOccurrence = last.Date.AddFrequency(freq.Value),
+                    IsActive = true,
+                    IsUserCreated = false
+                };
+                results.Add(created);
+                existing.Add(created);
             }
 
             return results;
         }
 
-        // ------------------------------------------------------------
-        // Detect recurring transfer rules (historical ledger only)
-        // ------------------------------------------------------------
         public List<RecurringTransferRule> DetectRecurringTransfers(
             IEnumerable<PostedTransferTransaction> historical,
             IEnumerable<RecurringTransferRule> existingRules)
         {
             var results = new List<RecurringTransferRule>();
+            var existing = existingRules.ToList();
 
-            var groups = historical.GroupBy(t => t.Description);
+            var groups = historical.GroupBy(t => (
+                t.AccountId,
+                RecurringRulePattern.NormalizeDescription(t.Description),
+                t.Amount));
 
             foreach (var g in groups)
             {
-                var ordered = g.OrderBy(t => t.Date).ToList();
-                if (ordered.Count < MinOccurrences) continue;
-
-                var deltas = ordered.Zip(ordered.Skip(1),
-                    (a, b) => (b.Date - a.Date).TotalDays).ToList();
-
-                var freq = ClassifyFrequency(deltas);
-                if (freq == null) continue;
-
-                var avgAmount = ordered.Average(t => t.Amount);
-                var variance = ordered.Max(t => t.Amount) - ordered.Min(t => t.Amount);
-                if (variance > AmountVarianceThreshold) continue;
-
-                // dedup
-                if (existingRules.Any(r =>
-                    r.Description == g.Key &&
-                    r.FromAccountId == ordered.First().AccountId &&
-                    r.Frequency == freq))
+                var distinct = DistinctByDate(g);
+                if (distinct.Count < MinOccurrences)
                     continue;
 
-                results.Add(new RecurringTransferRule
+                var freq = ClassifyFrequency(Deltas(distinct));
+                if (freq == null)
+                    continue;
+
+                var variance = distinct.Max(t => t.Amount) - distinct.Min(t => t.Amount);
+                if (variance > AmountVarianceThreshold)
+                    continue;
+
+                var last = distinct[^1];
+                var amount = g.Key.Amount;
+                var match = existing.FirstOrDefault(r =>
+                    RecurringRulePattern.MatchesMerchantSchedule(r, last.AccountId, last.Description, freq.Value));
+                if (match is not null)
+                {
+                    ApplyDetectedSchedule(match, last, amount, freq.Value);
+                    continue;
+                }
+
+                var created = new RecurringTransferRule
                 {
                     Id = Guid.NewGuid(),
-                    FromAccountId = ordered.First().AccountId,
-                    ToAccountId = ordered.First().AccountId, // refine later
-                    Description = g.Key,
-                    Amount = avgAmount,
+                    FromAccountId = last.AccountId,
+                    ToAccountId = last.AccountId,
+                    Description = last.Description,
+                    Amount = amount,
+                    Category = last.Category,
+                    CategoryId = last.CategoryId,
                     Frequency = freq.Value,
-                    LastOccurrence = ordered.Last().Date,
-                    NextOccurrence = ordered.Last().Date.AddFrequency(freq.Value),
-                    IsActive = true
-                });
+                    LastOccurrence = last.Date,
+                    NextOccurrence = last.Date.AddFrequency(freq.Value),
+                    IsActive = true,
+                    IsUserCreated = false
+                };
+                results.Add(created);
+                existing.Add(created);
             }
 
             return results;
         }
 
-        // ------------------------------------------------------------
-        // Frequency classifier
-        // ------------------------------------------------------------
+        public static IEnumerable<Guid> DuplicateAutoRuleIds(
+            IEnumerable<RecurringSingleTransactionRule> rules)
+        {
+            foreach (var group in rules.GroupBy(r => (
+                r.AccountId,
+                RecurringRulePattern.NormalizeDescription(r.Description),
+                decimal.Round(r.Amount, 2),
+                r.Frequency)))
+            {
+                foreach (var extra in ExtrasToDelete(group.ToList(), r => r.IsUserCreated, r => r.LastOccurrence ?? r.NextOccurrence))
+                    yield return extra.Id;
+            }
+        }
+
+        public static IEnumerable<Guid> DuplicateAutoRuleIds(
+            IEnumerable<RecurringTransferRule> rules)
+        {
+            foreach (var group in rules.GroupBy(r => (
+                r.FromAccountId,
+                RecurringRulePattern.NormalizeDescription(r.Description),
+                decimal.Round(r.Amount, 2),
+                r.Frequency)))
+            {
+                foreach (var extra in ExtrasToDelete(group.ToList(), r => r.IsUserCreated, r => r.LastOccurrence ?? r.NextOccurrence))
+                    yield return extra.Id;
+            }
+        }
+
+        private static void ApplyDetectedSchedule(
+            RecurringSingleTransactionRule rule,
+            PostedTransaction last,
+            decimal amount,
+            RecurrenceFrequency frequency)
+        {
+            if (rule.IsUserCreated)
+                return;
+
+            rule.Amount = amount;
+            rule.Category = last.Category;
+            rule.CategoryId = last.CategoryId;
+            rule.Description = last.Description;
+            rule.LastOccurrence = last.Date;
+            rule.NextOccurrence = last.Date.AddFrequency(frequency);
+        }
+
+        private static void ApplyDetectedSchedule(
+            RecurringTransferRule rule,
+            PostedTransferTransaction last,
+            decimal amount,
+            RecurrenceFrequency frequency)
+        {
+            if (rule.IsUserCreated)
+                return;
+
+            rule.Amount = amount;
+            rule.Category = last.Category;
+            rule.CategoryId = last.CategoryId;
+            rule.Description = last.Description;
+            rule.LastOccurrence = last.Date;
+            rule.NextOccurrence = last.Date.AddFrequency(frequency);
+        }
+
+        private static List<T> DistinctByDate<T>(IEnumerable<T> items) where T : BaseTransaction =>
+            items
+                .GroupBy(t => t.Date.Date)
+                .Select(day => day.OrderBy(t => t.Date).Last())
+                .OrderBy(t => t.Date)
+                .ToList();
+
+        private static List<double> Deltas<T>(IReadOnlyList<T> ordered) where T : BaseTransaction =>
+            ordered.Zip(ordered.Skip(1), (a, b) => (b.Date.Date - a.Date.Date).TotalDays).ToList();
+
+        private static IEnumerable<T> ExtrasToDelete<T>(
+            List<T> members,
+            Func<T, bool> isUserCreated,
+            Func<T, DateTime> recency) where T : BaseDomainModel
+        {
+            if (members.Count < 2)
+                yield break;
+
+            var keep = members.FirstOrDefault(isUserCreated)
+                ?? members.OrderByDescending(recency).ThenBy(r => r.Id).First();
+
+            foreach (var extra in members.Where(r => r.Id != keep.Id && !isUserCreated(r)))
+                yield return extra;
+        }
+
         private RecurrenceFrequency? ClassifyFrequency(List<double> deltas)
         {
             if (deltas.All(d => Math.Abs(d - 7) <= 2))

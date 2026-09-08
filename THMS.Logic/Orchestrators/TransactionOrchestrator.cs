@@ -42,8 +42,7 @@ namespace THMS.Logic.Orchestrators
                 from,
                 to,
                 _store.GetRecurringSingleRules(accountId),
-                _store.GetRecurringTransferRules(accountId),
-                _store.GetExpenseBudgetRules(accountId));
+                _store.GetRecurringTransferRules(accountId));
         }
 
         public decimal ComputePostedBalance(Guid accountId, decimal startingBalance)

@@ -82,6 +82,8 @@ namespace THMS.Logic.Finance.Forecast
             rule.LastOccurrence = posted.Date;
             rule.NextOccurrence = posted.Date.AddFrequency(rule.Frequency);
             rule.Amount = posted.Amount;
+            if (posted.CategoryId is Guid categoryId)
+                rule.CategoryId = categoryId;
             if (!string.IsNullOrWhiteSpace(posted.Category))
                 rule.Category = posted.Category;
             if (!string.IsNullOrWhiteSpace(posted.Description))
@@ -93,6 +95,8 @@ namespace THMS.Logic.Finance.Forecast
             rule.LastOccurrence = posted.Date;
             rule.NextOccurrence = posted.Date.AddFrequency(rule.Frequency);
             rule.Amount = Math.Abs(posted.Amount);
+            if (posted.CategoryId is Guid categoryId)
+                rule.CategoryId = categoryId;
             if (!string.IsNullOrWhiteSpace(posted.Category))
                 rule.Category = posted.Category;
             if (!string.IsNullOrWhiteSpace(posted.Description))

@@ -4,7 +4,6 @@
     {
         private System.ComponentModel.IContainer components = null;
         private System.Windows.Forms.Panel panelHost;
-        private System.Windows.Forms.Button btnClose;
 
         protected override void Dispose(bool disposing)
         {
@@ -28,7 +27,6 @@
             addToolStripMenuItem = new ToolStripMenuItem();
             editToolStripMenuItem1 = new ToolStripMenuItem();
             deleteToolStripMenuItem = new ToolStripMenuItem();
-            btnClose = new Button();
             _menuItemImport = new ToolStripMenuItem();
             panelHost.SuspendLayout();
             menuStrip1.SuspendLayout();
@@ -44,7 +42,7 @@
             panelHost.Margin = new Padding(12);
             panelHost.Name = "panelHost";
             panelHost.Padding = new Padding(12);
-            panelHost.Size = new Size(1320, 912);
+            panelHost.Size = new Size(1320, 960);
             panelHost.TabIndex = 1;
             // 
             // menuStrip1
@@ -119,18 +117,6 @@
             deleteToolStripMenuItem.Text = "Delete";
             deleteToolStripMenuItem.Click += OnClickEditDeleteAction;
             // 
-            // btnClose
-            // 
-            btnClose.Dock = DockStyle.Bottom;
-            btnClose.Location = new Point(0, 912);
-            btnClose.Margin = new Padding(4);
-            btnClose.Name = "btnClose";
-            btnClose.Size = new Size(1320, 48);
-            btnClose.TabIndex = 2;
-            btnClose.Text = "Close";
-            btnClose.UseVisualStyleBackColor = true;
-            btnClose.Click += OnClickClose;
-            // 
             // _menuItemImport
             // 
             _menuItemImport.Name = "_menuItemImport";
@@ -144,7 +130,6 @@
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1320, 960);
             Controls.Add(panelHost);
-            Controls.Add(btnClose);
             MainMenuStrip = menuStrip1;
             Margin = new Padding(4);
             MinimumSize = new Size(1075, 707);

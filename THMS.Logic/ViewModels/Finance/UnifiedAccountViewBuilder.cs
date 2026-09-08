@@ -4,7 +4,9 @@ namespace THMS.Logic.ViewModels.Finance
 {
     public static class UnifiedAccountViewBuilder
     {
-        public static List<UnifiedAccountView> Build(IEnumerable<Account> accounts)
+        public static List<UnifiedAccountView> Build(
+            IEnumerable<Account> accounts,
+            IReadOnlyDictionary<Guid, DateTime?>? nextPaymentByAccount = null)
         {
             var list = new List<UnifiedAccountView>();
 
@@ -17,6 +19,7 @@ namespace THMS.Logic.ViewModels.Finance
                     Institution = acct.Institution,
                     AccountNumber = acct.AccountNumber,
                     AccountType = Kind(acct),
+                    WebsiteUrl = acct.WebsiteUrl ?? "",
                     AsOfDate = acct.BalanceAsOf
                 };
 
@@ -40,12 +43,13 @@ namespace THMS.Logic.ViewModels.Finance
                     case LoanAccount loan:
                         view.Balance = loan.Principal;
                         view.APR = loan.InterestRate;
+                        view.DueDate = LookupNextPayment(acct.Id, nextPaymentByAccount);
                         break;
 
                     case MortgageAccount mortgage:
                         view.Balance = mortgage.Principal;
                         view.APR = mortgage.InterestRate;
-                        view.DueDate = mortgage.NextPaymentDate;
+                        view.DueDate = LookupNextPayment(acct.Id, nextPaymentByAccount);
                         break;
                 }
 
@@ -53,6 +57,16 @@ namespace THMS.Logic.ViewModels.Finance
             }
 
             return list;
+        }
+
+        private static DateTime? LookupNextPayment(
+            Guid accountId,
+            IReadOnlyDictionary<Guid, DateTime?>? nextPaymentByAccount)
+        {
+            if (nextPaymentByAccount is null)
+                return null;
+
+            return nextPaymentByAccount.TryGetValue(accountId, out var next) ? next : null;
         }
 
         private static string Kind(Account acct) => acct switch

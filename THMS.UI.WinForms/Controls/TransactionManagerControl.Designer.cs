@@ -10,6 +10,10 @@
         private System.Windows.Forms.Panel forecastPanel;
         private System.Windows.Forms.Label lblForecastPeriod;
         private System.Windows.Forms.ComboBox cmbForecastPeriod;
+        private System.Windows.Forms.Label lblShow;
+        private System.Windows.Forms.ComboBox cmbShow;
+        private System.Windows.Forms.Button btnAddRule;
+        private System.Windows.Forms.Button btnDeleteRule;
 
         protected override void Dispose(bool disposing)
         {
@@ -23,20 +27,31 @@
 
         private void InitializeComponent()
         {
+            DataGridViewCellStyle dataGridViewCellStyle7 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle8 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle9 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle8 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle9 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle10 = new DataGridViewCellStyle();
             splitContainer = new SplitContainer();
+            masterGrid = new DataGridView();
+            detailGrid = new DataGridView();
+            DateColumn = new DataGridViewTextBoxColumn();
+            AmountColumn = new DataGridViewTextBoxColumn();
+            ForecastColumn = new DataGridViewTextBoxColumn();
+            CategoryColumn = new DataGridViewTextBoxColumn();
+            TypeColumn = new DataGridViewTextBoxColumn();
+            DescriptionColumn = new DataGridViewTextBoxColumn();
             forecastPanel = new Panel();
             lblForecastPeriod = new Label();
             cmbForecastPeriod = new ComboBox();
-            masterGrid = new DataGridView();
+            lblShow = new Label();
+            cmbShow = new ComboBox();
+            btnAddRule = new Button();
+            btnDeleteRule = new Button();
             NameColumn = new DataGridViewTextBoxColumn();
             AccountTypeColumn = new DataGridViewTextBoxColumn();
             AsOfDateColumn = new DataGridViewTextBoxColumn();
@@ -45,19 +60,14 @@
             AvailableColumn = new DataGridViewTextBoxColumn();
             AprColumn = new DataGridViewTextBoxColumn();
             CreditLimitColumn = new DataGridViewTextBoxColumn();
-            detailGrid = new DataGridView();
-            DateColumn = new DataGridViewTextBoxColumn();
-            AmountColumn = new DataGridViewTextBoxColumn();
-            ForecastColumn = new DataGridViewTextBoxColumn();
-            CategoryColumn = new DataGridViewTextBoxColumn();
-            TypeColumn = new DataGridViewTextBoxColumn();
-            DescriptionColumn = new DataGridViewTextBoxColumn();
+            WebsiteColumn = new DataGridViewLinkColumn();
             ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
             splitContainer.Panel1.SuspendLayout();
             splitContainer.Panel2.SuspendLayout();
             splitContainer.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)masterGrid).BeginInit();
             ((System.ComponentModel.ISupportInitialize)detailGrid).BeginInit();
+            forecastPanel.SuspendLayout();
             SuspendLayout();
             // 
             // splitContainer
@@ -79,34 +89,6 @@
             splitContainer.SplitterDistance = 200;
             splitContainer.TabIndex = 0;
             // 
-            // forecastPanel
-            // 
-            forecastPanel.Controls.Add(lblForecastPeriod);
-            forecastPanel.Controls.Add(cmbForecastPeriod);
-            forecastPanel.Dock = DockStyle.Top;
-            forecastPanel.Location = new Point(0, 0);
-            forecastPanel.Name = "forecastPanel";
-            forecastPanel.Padding = new Padding(8, 6, 8, 6);
-            forecastPanel.Size = new Size(1260, 42);
-            forecastPanel.TabIndex = 0;
-            // 
-            // lblForecastPeriod
-            // 
-            lblForecastPeriod.AutoSize = true;
-            lblForecastPeriod.Location = new Point(8, 10);
-            lblForecastPeriod.Name = "lblForecastPeriod";
-            lblForecastPeriod.Size = new Size(140, 25);
-            lblForecastPeriod.TabIndex = 0;
-            lblForecastPeriod.Text = "Forecast Period:";
-            // 
-            // cmbForecastPeriod
-            // 
-            cmbForecastPeriod.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbForecastPeriod.Location = new Point(160, 6);
-            cmbForecastPeriod.Name = "cmbForecastPeriod";
-            cmbForecastPeriod.Size = new Size(160, 33);
-            cmbForecastPeriod.TabIndex = 1;
-            // 
             // masterGrid
             // 
             masterGrid.AllowUserToAddRows = false;
@@ -114,111 +96,16 @@
             masterGrid.AllowUserToResizeRows = false;
             masterGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             masterGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            masterGrid.Columns.AddRange(new DataGridViewColumn[] { NameColumn, AccountTypeColumn, AsOfDateColumn, BalanceColumn, DueDateColumn, AvailableColumn, AprColumn, CreditLimitColumn });
+            masterGrid.Columns.AddRange(new DataGridViewColumn[] { NameColumn, AccountTypeColumn, AsOfDateColumn, BalanceColumn, DueDateColumn, AvailableColumn, AprColumn, CreditLimitColumn, WebsiteColumn });
             masterGrid.Dock = DockStyle.Fill;
-            masterGrid.EditMode = DataGridViewEditMode.EditOnKeystrokeOrF2;
             masterGrid.Location = new Point(0, 0);
             masterGrid.MultiSelect = false;
             masterGrid.Name = "masterGrid";
-            masterGrid.ReadOnly = false;
             masterGrid.RowHeadersVisible = false;
             masterGrid.RowHeadersWidth = 72;
             masterGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             masterGrid.Size = new Size(1260, 200);
             masterGrid.TabIndex = 1;
-            // 
-            // NameColumn
-            // 
-            NameColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            NameColumn.DataPropertyName = "Name";
-            NameColumn.HeaderText = "Account";
-            NameColumn.MinimumWidth = 9;
-            NameColumn.Name = "NameColumn";
-            NameColumn.ReadOnly = true;
-            // 
-            // AccountTypeColumn
-            // 
-            AccountTypeColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            AccountTypeColumn.DataPropertyName = "AccountType";
-            AccountTypeColumn.HeaderText = "Type";
-            AccountTypeColumn.MinimumWidth = 9;
-            AccountTypeColumn.Name = "AccountTypeColumn";
-            AccountTypeColumn.ReadOnly = true;
-            AccountTypeColumn.ToolTipText = "Type of Account";
-            AccountTypeColumn.Width = 97;
-            // 
-            // AsOfDateColumn
-            // 
-            AsOfDateColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            AsOfDateColumn.DataPropertyName = "AsOfDate";
-            dataGridViewCellStyle1.Format = "d";
-            AsOfDateColumn.DefaultCellStyle = dataGridViewCellStyle1;
-            AsOfDateColumn.HeaderText = "As Of";
-            AsOfDateColumn.MinimumWidth = 9;
-            AsOfDateColumn.Name = "AsOfDateColumn";
-            AsOfDateColumn.ReadOnly = true;
-            AsOfDateColumn.ToolTipText = "Date for the balance";
-            AsOfDateColumn.Width = 78;
-            // 
-            // BalanceColumn
-            // 
-            BalanceColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            BalanceColumn.DataPropertyName = "Balance";
-            dataGridViewCellStyle2.Format = "c2";
-            BalanceColumn.DefaultCellStyle = dataGridViewCellStyle2;
-            BalanceColumn.HeaderText = "Balance";
-            BalanceColumn.MinimumWidth = 9;
-            BalanceColumn.Name = "BalanceColumn";
-            BalanceColumn.ReadOnly = false;
-            BalanceColumn.Width = 126;
-            // 
-            // DueDateColumn
-            // 
-            DueDateColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            DueDateColumn.DataPropertyName = "DueDate";
-            dataGridViewCellStyle3.Format = "d";
-            DueDateColumn.DefaultCellStyle = dataGridViewCellStyle3;
-            DueDateColumn.HeaderText = "Payment Due";
-            DueDateColumn.MinimumWidth = 9;
-            DueDateColumn.Name = "DueDateColumn";
-            DueDateColumn.ReadOnly = true;
-            DueDateColumn.Width = 164;
-            // 
-            // AvailableColumn
-            // 
-            AvailableColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            AvailableColumn.DataPropertyName = "BankCreditAvailable";
-            dataGridViewCellStyle4.Format = "c2";
-            AvailableColumn.DefaultCellStyle = dataGridViewCellStyle4;
-            AvailableColumn.HeaderText = "Available";
-            AvailableColumn.MinimumWidth = 9;
-            AvailableColumn.Name = "AvailableColumn";
-            AvailableColumn.ReadOnly = true;
-            AvailableColumn.ToolTipText = "For bank or credit accounts";
-            AvailableColumn.Width = 138;
-            // 
-            // AprColumn
-            // 
-            AprColumn.DataPropertyName = "APR";
-            dataGridViewCellStyle5.Format = "N2";
-            dataGridViewCellStyle5.NullValue = null;
-            AprColumn.DefaultCellStyle = dataGridViewCellStyle5;
-            AprColumn.HeaderText = "APR";
-            AprColumn.MinimumWidth = 9;
-            AprColumn.Name = "AprColumn";
-            AprColumn.ReadOnly = true;
-            // 
-            // CreditLimitColumn
-            // 
-            CreditLimitColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            CreditLimitColumn.DataPropertyName = "CreditLimit";
-            dataGridViewCellStyle6.Format = "c2";
-            CreditLimitColumn.DefaultCellStyle = dataGridViewCellStyle6;
-            CreditLimitColumn.HeaderText = "Credit Limit";
-            CreditLimitColumn.MinimumWidth = 9;
-            CreditLimitColumn.Name = "CreditLimitColumn";
-            CreditLimitColumn.ReadOnly = true;
-            CreditLimitColumn.Width = 148;
             // 
             // detailGrid
             // 
@@ -235,17 +122,17 @@
             detailGrid.ReadOnly = true;
             detailGrid.RowHeadersVisible = false;
             detailGrid.RowHeadersWidth = 72;
-            detailGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            detailGrid.Size = new Size(1260, 396);
+            detailGrid.SelectionMode = DataGridViewSelectionMode.CellSelect;
+            detailGrid.Size = new Size(1260, 354);
             detailGrid.TabIndex = 2;
             // 
             // DateColumn
             // 
             DateColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             DateColumn.DataPropertyName = "Date";
-            dataGridViewCellStyle8.Format = "d";
-            dataGridViewCellStyle8.NullValue = null;
-            DateColumn.DefaultCellStyle = dataGridViewCellStyle8;
+            dataGridViewCellStyle7.Format = "d";
+            dataGridViewCellStyle7.NullValue = null;
+            DateColumn.DefaultCellStyle = dataGridViewCellStyle7;
             DateColumn.HeaderText = "Date";
             DateColumn.MinimumWidth = 9;
             DateColumn.Name = "DateColumn";
@@ -256,8 +143,8 @@
             // 
             AmountColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             AmountColumn.DataPropertyName = "Amount";
-            dataGridViewCellStyle9.Format = "c2";
-            AmountColumn.DefaultCellStyle = dataGridViewCellStyle9;
+            dataGridViewCellStyle8.Format = "c2";
+            AmountColumn.DefaultCellStyle = dataGridViewCellStyle8;
             AmountColumn.HeaderText = "Amount";
             AmountColumn.MinimumWidth = 9;
             AmountColumn.Name = "AmountColumn";
@@ -268,8 +155,8 @@
             // 
             ForecastColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             ForecastColumn.DataPropertyName = "ForecastBalance";
-            dataGridViewCellStyle10.Format = "c2";
-            ForecastColumn.DefaultCellStyle = dataGridViewCellStyle10;
+            dataGridViewCellStyle9.Format = "c2";
+            ForecastColumn.DefaultCellStyle = dataGridViewCellStyle9;
             ForecastColumn.HeaderText = "Balance";
             ForecastColumn.MinimumWidth = 9;
             ForecastColumn.Name = "ForecastColumn";
@@ -305,6 +192,180 @@
             DescriptionColumn.Name = "DescriptionColumn";
             DescriptionColumn.ReadOnly = true;
             // 
+            // forecastPanel
+            // 
+            forecastPanel.Controls.Add(lblForecastPeriod);
+            forecastPanel.Controls.Add(cmbForecastPeriod);
+            forecastPanel.Controls.Add(lblShow);
+            forecastPanel.Controls.Add(cmbShow);
+            forecastPanel.Controls.Add(btnAddRule);
+            forecastPanel.Controls.Add(btnDeleteRule);
+            forecastPanel.Dock = DockStyle.Top;
+            forecastPanel.Location = new Point(0, 0);
+            forecastPanel.Name = "forecastPanel";
+            forecastPanel.Padding = new Padding(8, 6, 8, 6);
+            forecastPanel.Size = new Size(1260, 42);
+            forecastPanel.TabIndex = 0;
+            // 
+            // lblForecastPeriod
+            // 
+            lblForecastPeriod.AutoSize = true;
+            lblForecastPeriod.Location = new Point(16, 10);
+            lblForecastPeriod.Name = "lblForecastPeriod";
+            lblForecastPeriod.Size = new Size(159, 30);
+            lblForecastPeriod.TabIndex = 0;
+            lblForecastPeriod.Text = "Forecast Period:";
+            // 
+            // cmbForecastPeriod
+            // 
+            cmbForecastPeriod.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbForecastPeriod.Location = new Point(160, 6);
+            cmbForecastPeriod.Name = "cmbForecastPeriod";
+            cmbForecastPeriod.Size = new Size(140, 38);
+            cmbForecastPeriod.TabIndex = 1;
+            // 
+            // lblShow
+            // 
+            lblShow.AutoSize = true;
+            lblShow.Location = new Point(316, 10);
+            lblShow.Name = "lblShow";
+            lblShow.Size = new Size(60, 30);
+            lblShow.TabIndex = 2;
+            lblShow.Text = "Show:";
+            // 
+            // cmbShow
+            // 
+            cmbShow.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbShow.Location = new Point(380, 6);
+            cmbShow.Name = "cmbShow";
+            cmbShow.Size = new Size(160, 38);
+            cmbShow.TabIndex = 3;
+            // 
+            // btnAddRule
+            // 
+            btnAddRule.Location = new Point(556, 4);
+            btnAddRule.Name = "btnAddRule";
+            btnAddRule.Size = new Size(120, 34);
+            btnAddRule.TabIndex = 4;
+            btnAddRule.Text = "Add Rule";
+            btnAddRule.UseVisualStyleBackColor = true;
+            // 
+            // btnDeleteRule
+            // 
+            btnDeleteRule.Enabled = false;
+            btnDeleteRule.Location = new Point(684, 4);
+            btnDeleteRule.Name = "btnDeleteRule";
+            btnDeleteRule.Size = new Size(120, 34);
+            btnDeleteRule.TabIndex = 5;
+            btnDeleteRule.Text = "Delete Rule";
+            btnDeleteRule.UseVisualStyleBackColor = true;
+            // 
+            // NameColumn
+            // 
+            NameColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            NameColumn.DataPropertyName = "Name";
+            NameColumn.HeaderText = "Account";
+            NameColumn.MinimumWidth = 9;
+            NameColumn.Name = "NameColumn";
+            NameColumn.ReadOnly = true;
+            NameColumn.Width = 131;
+            // 
+            // AccountTypeColumn
+            // 
+            AccountTypeColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            AccountTypeColumn.DataPropertyName = "AccountType";
+            AccountTypeColumn.HeaderText = "Type";
+            AccountTypeColumn.MinimumWidth = 9;
+            AccountTypeColumn.Name = "AccountTypeColumn";
+            AccountTypeColumn.ReadOnly = true;
+            AccountTypeColumn.ToolTipText = "Type of Account";
+            AccountTypeColumn.Width = 97;
+            // 
+            // AsOfDateColumn
+            // 
+            AsOfDateColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            AsOfDateColumn.DataPropertyName = "AsOfDate";
+            dataGridViewCellStyle1.Format = "d";
+            AsOfDateColumn.DefaultCellStyle = dataGridViewCellStyle1;
+            AsOfDateColumn.HeaderText = "As Of";
+            AsOfDateColumn.MinimumWidth = 9;
+            AsOfDateColumn.Name = "AsOfDateColumn";
+            AsOfDateColumn.ReadOnly = true;
+            AsOfDateColumn.ToolTipText = "Date for the balance";
+            AsOfDateColumn.Width = 106;
+            // 
+            // BalanceColumn
+            // 
+            BalanceColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            BalanceColumn.DataPropertyName = "Balance";
+            dataGridViewCellStyle2.Format = "c2";
+            BalanceColumn.DefaultCellStyle = dataGridViewCellStyle2;
+            BalanceColumn.HeaderText = "Balance";
+            BalanceColumn.MinimumWidth = 9;
+            BalanceColumn.Name = "BalanceColumn";
+            BalanceColumn.Width = 126;
+            // 
+            // DueDateColumn
+            // 
+            DueDateColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            DueDateColumn.DataPropertyName = "DueDate";
+            dataGridViewCellStyle3.Format = "d";
+            DueDateColumn.DefaultCellStyle = dataGridViewCellStyle3;
+            DueDateColumn.HeaderText = "Payment Due";
+            DueDateColumn.MinimumWidth = 9;
+            DueDateColumn.Name = "DueDateColumn";
+            DueDateColumn.ReadOnly = true;
+            DueDateColumn.Width = 178;
+            // 
+            // AvailableColumn
+            // 
+            AvailableColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            AvailableColumn.DataPropertyName = "BankCreditAvailable";
+            dataGridViewCellStyle4.Format = "c2";
+            AvailableColumn.DefaultCellStyle = dataGridViewCellStyle4;
+            AvailableColumn.HeaderText = "Available";
+            AvailableColumn.MinimumWidth = 9;
+            AvailableColumn.Name = "AvailableColumn";
+            AvailableColumn.ReadOnly = true;
+            AvailableColumn.ToolTipText = "For bank or credit accounts";
+            AvailableColumn.Width = 138;
+            // 
+            // AprColumn
+            // 
+            AprColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            AprColumn.DataPropertyName = "APR";
+            dataGridViewCellStyle5.Format = "N2";
+            dataGridViewCellStyle5.NullValue = null;
+            AprColumn.DefaultCellStyle = dataGridViewCellStyle5;
+            AprColumn.HeaderText = "APR";
+            AprColumn.MinimumWidth = 9;
+            AprColumn.Name = "AprColumn";
+            AprColumn.ReadOnly = true;
+            AprColumn.Width = 93;
+            // 
+            // CreditLimitColumn
+            // 
+            CreditLimitColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            CreditLimitColumn.DataPropertyName = "CreditLimit";
+            dataGridViewCellStyle6.Format = "c2";
+            CreditLimitColumn.DefaultCellStyle = dataGridViewCellStyle6;
+            CreditLimitColumn.HeaderText = "Credit Limit";
+            CreditLimitColumn.MinimumWidth = 9;
+            CreditLimitColumn.Name = "CreditLimitColumn";
+            CreditLimitColumn.ReadOnly = true;
+            CreditLimitColumn.Width = 160;
+            // 
+            // WebsiteColumn
+            // 
+            WebsiteColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            WebsiteColumn.DataPropertyName = "WebsiteUrl";
+            WebsiteColumn.HeaderText = "Web Site";
+            WebsiteColumn.LinkBehavior = LinkBehavior.HoverUnderline;
+            WebsiteColumn.MinimumWidth = 9;
+            WebsiteColumn.Name = "WebsiteColumn";
+            WebsiteColumn.ReadOnly = true;
+            WebsiteColumn.TrackVisitedState = false;
+            // 
             // TransactionManagerControl
             // 
             AutoScaleDimensions = new SizeF(12F, 30F);
@@ -318,6 +379,8 @@
             splitContainer.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)masterGrid).EndInit();
             ((System.ComponentModel.ISupportInitialize)detailGrid).EndInit();
+            forecastPanel.ResumeLayout(false);
+            forecastPanel.PerformLayout();
             ResumeLayout(false);
         }
 
@@ -337,5 +400,6 @@
         private DataGridViewTextBoxColumn AvailableColumn;
         private DataGridViewTextBoxColumn AprColumn;
         private DataGridViewTextBoxColumn CreditLimitColumn;
+        private DataGridViewLinkColumn WebsiteColumn;
     }
 }

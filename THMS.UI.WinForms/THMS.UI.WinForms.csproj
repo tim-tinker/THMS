@@ -46,6 +46,27 @@
     <Compile Update="Controls\HomeCircuitAttributionManagerControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Update="Controls\RecurringRuleEditor.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\BudgetRuleEditor.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\BudgetPeriodEditor.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\BudgetHistoryViewer.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\CategoryManager.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\CategoryMergeDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\CategoryEditor.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Properties\Resources.Designer.cs">
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>

@@ -13,7 +13,9 @@ namespace THMS.Data.Stores.SqliteStores
         private readonly RecurringSingleTransactionRulesTable _recurringSingles = new();
         private readonly RecurringTransferRulesTable _recurringTransfers = new();
         private readonly ExpenseBudgetRulesTable _expenseBudgetRules = new();
-        private readonly TransactionCategoriesTable _categories = new();
+        private readonly ExpenseBudgetHistoryTable _expenseBudgetHistory = new();
+        private readonly ExpenseCategoriesTable _categories = new();
+        private readonly CategoryAssignmentHistoryTable _assignments = new();
 
         public void InitializeSchema(SqliteConnection conn)
         {
@@ -24,7 +26,10 @@ namespace THMS.Data.Stores.SqliteStores
             _recurringSingles.InitializeSchema(conn);
             _recurringTransfers.InitializeSchema(conn);
             _expenseBudgetRules.InitializeSchema(conn);
+            _expenseBudgetHistory.InitializeSchema(conn);
             _categories.InitializeSchema(conn);
+            _assignments.InitializeSchema(conn);
+            _categories.MigrateLegacyCategoryStrings(conn);
         }
 
         public PostedTransactionsTable Posted => _posted;
@@ -34,6 +39,8 @@ namespace THMS.Data.Stores.SqliteStores
         public RecurringSingleTransactionRulesTable RecurringSingles => _recurringSingles;
         public RecurringTransferRulesTable RecurringTransfers => _recurringTransfers;
         public ExpenseBudgetRulesTable ExpenseBudgetRules => _expenseBudgetRules;
-        public TransactionCategoriesTable Categories => _categories;
+        public ExpenseBudgetHistoryTable ExpenseBudgetHistory => _expenseBudgetHistory;
+        public ExpenseCategoriesTable Categories => _categories;
+        public CategoryAssignmentHistoryTable Assignments => _assignments;
     }
 }

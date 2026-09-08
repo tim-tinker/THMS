@@ -7,6 +7,7 @@
         public string Institution { get; set; } = "";
         public string AccountNumber { get; set; } = "";
         public string AccountType { get; set; } = "";
+        public string WebsiteUrl { get; set; } = "";
         public DateTime? AsOfDate { get; set; }
 
         // UI-only fields

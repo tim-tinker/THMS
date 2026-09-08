@@ -89,11 +89,6 @@ namespace THMS.UI.WinForms
 
         }
 
-        private void OnClickClose(object sender, EventArgs e)
-        {
-            Close();
-        }
-
 
         private void OnClickImportHistoricalData(object sender, EventArgs e)
         {

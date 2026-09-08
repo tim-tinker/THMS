@@ -2,7 +2,6 @@
 using THMS.Domain.Finance;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
-using THMS.Logic.Finance.Budget;
 using THMS.Logic.Finance.Forecast;
 using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Recurrence;
@@ -18,8 +17,7 @@ namespace THMS.Logic.Orchestrators
         private readonly TransferDetector _transferDetector = new();
         private readonly RecurringDetector _recurringDetector = new();
         private readonly FutureReconciler _futureReconciler = new();
-
-        private readonly ExpenseBudgetDetector _expenseBudgetDetector = new();
+        private readonly BudgetOrchestrator _budgetOrchestrator;
 
         private const int RecurrenceMonths = 13;
         private const int TransferLookbackDays = 3;
@@ -38,6 +36,7 @@ namespace THMS.Logic.Orchestrators
         {
             _accountStore = accountStore;
             _transactionStore = transactionStore;
+            _budgetOrchestrator = new BudgetOrchestrator(transactionStore);
         }
 
         public UpdaterResult RunLedgerUpdate()
@@ -90,40 +89,39 @@ namespace THMS.Logic.Orchestrators
 
                 var recurrenceStart = latestPostedDate.Value.AddMonths(-RecurrenceMonths);
 
-                var posted = _transactionStore.GetPostedTransactions(recurrenceStart, latestPostedDate.Value).ToList();
-                var postedTransfers = _transactionStore.GetPostedTransferTransactions(recurrenceStart, latestPostedDate.Value).ToList();
+                var posted = _transactionStore.GetPostedTransactions(account.Id)
+                    .Where(t => t.Date >= recurrenceStart && t.Date <= latestPostedDate.Value)
+                    .ToList();
+                var postedTransfers = _transactionStore.GetPostedTransferTransactions(account.Id)
+                    .Where(t => t.Date >= recurrenceStart && t.Date <= latestPostedDate.Value)
+                    .ToList();
+
+                foreach (var duplicateId in RecurringDetector.DuplicateAutoRuleIds(
+                    _transactionStore.GetRecurringSingleRules(account.Id)))
+                    _transactionStore.DeleteRecurringSingleRule(duplicateId);
+
+                foreach (var duplicateId in RecurringDetector.DuplicateAutoRuleIds(
+                    _transactionStore.GetRecurringTransferRules(account.Id)))
+                    _transactionStore.DeleteRecurringTransferRule(duplicateId);
 
                 var existingSingleRules = _transactionStore.GetRecurringSingleRules(account.Id).ToList();
                 var existingTransferRules = _transactionStore.GetRecurringTransferRules(account.Id).ToList();
-
-                var existingBudgetRules = _transactionStore.GetExpenseBudgetRules(account.Id).ToList();
 
                 var newSingleRules = _recurringDetector.DetectRecurringSingles(posted, existingSingleRules);
                 var newTransferRules = _recurringDetector.DetectRecurringTransfers(postedTransfers, existingTransferRules);
 
                 result.RecurringRulesUpdated += newSingleRules.Count + newTransferRules.Count;
 
-                foreach (var rule in existingBudgetRules)
-                {
-                    var updated = _expenseBudgetDetector.Detect(
-                        account.Id,
-                        posted,
-                        rule,
-                        rule.IncludedCategories);
-
-                    _transactionStore.UpsertExpenseBudgetRule(updated);
-                }
-
                 foreach (var r in newSingleRules)
                     _transactionStore.AddRecurringSingleRule(r);
 
-                foreach (var r in existingSingleRules)
+                foreach (var r in existingSingleRules.Where(r => !r.IsUserCreated))
                     _transactionStore.UpdateRecurringSingleRule(r);
 
                 foreach (var r in newTransferRules)
                     _transactionStore.AddRecurringTransferRule(r);
 
-                foreach (var r in existingTransferRules)
+                foreach (var r in existingTransferRules.Where(r => !r.IsUserCreated))
                     _transactionStore.UpdateRecurringTransferRule(r);
 
                 var allPostedNow = _transactionStore.GetPostedTransactions(account.Id).ToList();
@@ -151,6 +149,9 @@ namespace THMS.Logic.Orchestrators
                 result.ForecastUpdated = true;
                 result.RollOffCompleted = true;
             }
+
+            foreach (var account in accounts)
+                _budgetOrchestrator.RefreshAccount(account.Id);
 
             return result;
         }

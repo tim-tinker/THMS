@@ -9,6 +9,7 @@ using THMS.Domain.Finance.Transactions;
 using THMS.Domain.Transportation;
 using THMS.Ingestion;
 using THMS.Logic.Energy;
+using THMS.Logic.Finance.Aggregation;
 using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Energy;
 using THMS.Logic.ViewModels.Finance;
@@ -171,7 +172,7 @@ namespace THMS.Tests.Logic
         {
             var views = UnifiedAccountViewBuilder.Build(
             [
-                new BankAccount { Name = "B", Institution = "I", AccountNumber = "1", PostedBalance = 10, OverdraftLimit = 2, BalanceAsOf = DateTime.Today },
+                new BankAccount { Name = "B", Institution = "I", AccountNumber = "1", PostedBalance = 10, OverdraftLimit = 2, BalanceAsOf = DateTime.Today, WebsiteUrl = "https://bank.example" },
                 new CreditAccount { Name = "C", PostedBalance = 3, CreditLimit = 4, DueDate = DateTime.Today },
                 new InvestmentAccount { Name = "Inv", CashBalance = 5 },
                 new LoanAccount { Name = "L", Principal = 7, InterestRate = 0.05m },
@@ -192,6 +193,32 @@ namespace THMS.Tests.Logic
             Assert.That(views[3].APR, Is.EqualTo(0.05m));
             Assert.That(views[4].APR, Is.EqualTo(0.04m));
             Assert.That(views[5].Balance, Is.Null);
+            Assert.That(views[0].WebsiteUrl, Is.EqualTo("https://bank.example"));
+            Assert.That(views[1].WebsiteUrl, Is.EqualTo(""));
+            Assert.That(views[1].DueDate, Is.EqualTo(DateTime.Today));
+            Assert.That(views[3].DueDate, Is.Null);
+            Assert.That(views[4].DueDate, Is.Null);
+        }
+
+        [Test]
+        public void UnifiedAccountViewBuilder_UsesRecurringRulesForLoanAndMortgageDueDates()
+        {
+            var loanId = Guid.NewGuid();
+            var mortgageId = Guid.NewGuid();
+            var next = new DateTime(2026, 10, 15);
+            var views = UnifiedAccountViewBuilder.Build(
+                [
+                    new LoanAccount { Id = loanId, Name = "L", Principal = 7 },
+                    new MortgageAccount { Id = mortgageId, Name = "M", Principal = 8, NextPaymentDate = DateTime.Today }
+                ],
+                new Dictionary<Guid, DateTime?>
+                {
+                    [loanId] = next,
+                    [mortgageId] = next.AddDays(5)
+                });
+
+            Assert.That(views[0].DueDate, Is.EqualTo(next));
+            Assert.That(views[1].DueDate, Is.EqualTo(next.AddDays(5)));
         }
 
         [Test]
@@ -219,18 +246,208 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void FinanceDashboardViewModel_InitializeRefreshAndTotals()
+        public void UnifiedTransactionViewBuilder_BuildRecurringRules()
         {
-            var vm = new FinanceDashboardViewModel(new InMemoryFinanceDataStore());
+            var account = Guid.NewGuid();
+            var other = Guid.NewGuid();
+            var views = UnifiedTransactionViewBuilder.BuildRecurringRules(
+                [
+                    new RecurringSingleTransactionRule
+                    {
+                        AccountId = account,
+                        Description = "Rent",
+                        Amount = -10,
+                        Category = "Housing",
+                        NextOccurrence = new DateTime(2026, 2, 1)
+                    }
+                ],
+                [
+                    new RecurringTransferRule
+                    {
+                        FromAccountId = account,
+                        ToAccountId = other,
+                        Description = "Sweep",
+                        Amount = 20,
+                        NextOccurrence = new DateTime(2026, 1, 15)
+                    }
+                ]);
+
+            Assert.That(views, Has.Count.EqualTo(2));
+            Assert.That(views.Single(v => v.Type == UnifiedTransactionView.RecurringRuleType).Description, Is.EqualTo("Rent"));
+            Assert.That(views.Single(v => v.Type == UnifiedTransactionView.RecurringTransferRuleType).Description, Is.EqualTo("Sweep"));
+            Assert.That(views.All(v => v.IsRecurringRule), Is.True);
+            Assert.That(views.All(v => !v.IsForecasted), Is.True);
+        }
+
+        [Test]
+        public void UnifiedTransactionView_DisplayAndRunningBalanceOrdersAreReversesWithAmount()
+        {
+            var day = new DateTime(2026, 1, 5);
+            var earlierId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            var laterId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+            var items = new List<UnifiedTransactionView>
+            {
+                new() { Id = earlierId, Date = day, Amount = 1, Type = "Posted" },
+                new() { Id = laterId, Date = day, Amount = 10, Type = "Posted" },
+                new() { Id = Guid.NewGuid(), Date = day.AddDays(-1), Amount = 5, Type = "Posted" }
+            };
+
+            var display = UnifiedTransactionView.OrderForDisplay(items).Select(t => (t.Date, t.Amount, t.Id)).ToList();
+            var running = UnifiedTransactionView.OrderForRunningBalance(items).Select(t => (t.Date, t.Amount, t.Id)).ToList();
+
+            Assert.That(display, Is.EqualTo(new[]
+            {
+                (day, 1m, earlierId),
+                (day, 10m, laterId),
+                (day.AddDays(-1), 5m, items[2].Id)
+            }));
+            Assert.That(running, Is.EqualTo(display.AsEnumerable().Reverse().ToList()));
+        }
+
+        [Test]
+        public void FinanceDashboardViewModel_Refresh_BuildsHouseholdSnapshot()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var txs = new InMemoryTransactionDataStore();
+            var checking = new BankAccount
+            {
+                Id = Guid.NewGuid(),
+                Name = "Checking",
+                Institution = "Bank",
+                AccountNumber = "1",
+                PostedBalance = 1200
+            };
+            var card = new CreditAccount
+            {
+                Id = Guid.NewGuid(),
+                Name = "Visa",
+                Institution = "Bank",
+                AccountNumber = "2",
+                PostedBalance = -400,
+                CreditLimit = 1000
+            };
+            accounts.UpsertAccount(checking);
+            accounts.UpsertAccount(card);
+            accounts.UpsertAccount(new InternalAccount
+            {
+                Id = Guid.NewGuid(),
+                Name = "Internal",
+                Institution = "House",
+                AccountNumber = "3"
+            });
+
+            txs.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = checking.Id,
+                Date = DateTime.Today,
+                Amount = -25,
+                CategoryId = DefaultExpenseCategories.UncategorizedId,
+                Category = DefaultExpenseCategories.Uncategorized
+            });
+            txs.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = checking.Id,
+                Description = "Rent",
+                Amount = -900,
+                NextOccurrence = DateTime.Today.AddDays(3),
+                IsActive = true
+            });
+
+            var vm = new FinanceDashboardViewModel(accounts, txs);
             vm.Initialize();
-            vm.Refresh();
-            vm.Transactions.Add(new FinanceTransaction { Amount = -5 });
-            vm.Transactions.Add(new FinanceTransaction { Amount = 8 });
-            typeof(FinanceDashboardViewModel)
-                .GetMethod("ComputeTotals", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(vm, null);
-            Assert.That(vm.TotalSpending, Is.EqualTo(-5));
-            Assert.That(vm.TotalIncome, Is.EqualTo(8));
+
+            Assert.That(vm.Snapshot.BankBalance, Is.EqualTo(1200m));
+            Assert.That(vm.Snapshot.CreditOwed, Is.EqualTo(400m));
+            Assert.That(vm.Snapshot.NetLiquid, Is.EqualTo(800m));
+            Assert.That(vm.Snapshot.UncategorizedCount, Is.EqualTo(1));
+            Assert.That(vm.Snapshot.Alerts.Any(a => a.Contains("High utilization")), Is.True);
+            Assert.That(vm.Snapshot.UpcomingPayments.Any(p => p.Description == "Rent"), Is.True);
+            Assert.That(vm.Snapshot.UpcomingForecast.Any(f => f.Description == "Rent"), Is.True);
+        }
+    }
+
+    [TestFixture]
+    public class FinanceDashboardComposerTests
+    {
+        [Test]
+        public void Compose_NetsReimbursementsAndFlagsOverspentBudget()
+        {
+            var asOf = new DateTime(2026, 9, 7);
+            var accountId = Guid.NewGuid();
+            var ruleId = Guid.NewGuid();
+            var checking = new BankAccount { Id = accountId, Name = "Checking", PostedBalance = 50 };
+            var period = new ExpenseBudgetHistory
+            {
+                BudgetRuleId = ruleId,
+                PeriodStart = new DateTime(2026, 9, 1),
+                PeriodEnd = new DateTime(2026, 9, 10),
+                StartingBalance = 0,
+                BudgetAmount = 40,
+                ActualExpenses = 55,
+                RecommendedAmount = 45
+            };
+            period.RecalculateRemaining();
+
+            var snapshot = new FinanceDashboardComposer().Compose(
+                asOf,
+                [checking],
+                [
+                    new PostedTransaction
+                    {
+                        AccountId = accountId,
+                        Date = new DateTime(2026, 9, 2),
+                        Amount = 10,
+                        CategoryId = DefaultExpenseCategories.GroceriesId,
+                        Category = DefaultExpenseCategories.Groceries
+                    },
+                    new PostedTransaction
+                    {
+                        AccountId = accountId,
+                        Date = new DateTime(2026, 9, 3),
+                        Amount = -50,
+                        CategoryId = DefaultExpenseCategories.GroceriesId,
+                        Category = DefaultExpenseCategories.Groceries
+                    },
+                    new PostedTransaction
+                    {
+                        AccountId = accountId,
+                        Date = new DateTime(2026, 9, 4),
+                        Amount = 2000,
+                        CategoryId = DefaultExpenseCategories.PaymentId,
+                        Category = DefaultExpenseCategories.Payment
+                    }
+                ],
+                [],
+                [
+                    new ExpenseBudgetRule
+                    {
+                        Id = ruleId,
+                        AccountId = accountId,
+                        BudgetName = "Groceries",
+                        IncludedCategoryIds = [DefaultExpenseCategories.GroceriesId],
+                        BudgetFrequency = BudgetFrequency.Monthly,
+                        IsActive = true
+                    }
+                ],
+                new Dictionary<Guid, ExpenseBudgetHistory?> { [ruleId] = period },
+                [],
+                [],
+                DefaultExpenseCategories.All.ToList());
+
+            Assert.That(snapshot.Budgets.Single().Status, Is.EqualTo("Overspent, Ends soon"));
+            Assert.That(snapshot.CategorySlices.Single(s => s.Name == DefaultExpenseCategories.Groceries).Amount, Is.EqualTo(40m));
+            Assert.That(snapshot.MonthlyTrend.Single(p => p.Month == new DateTime(2026, 9, 1)).Spending, Is.EqualTo(40m));
+            Assert.That(snapshot.MonthlyTrend.Single(p => p.Month == new DateTime(2026, 9, 1)).Income, Is.EqualTo(2000m));
+            Assert.That(snapshot.Alerts.Any(a => a.StartsWith("Overspent: Groceries")), Is.True);
+        }
+
+        [Test]
+        public void CreditOwed_UsesNegativePostedBalance()
+        {
+            var credit = new CreditAccount { PostedBalance = -250, CreditLimit = 1000 };
+            Assert.That(FinanceDashboardComposer.CreditOwed(credit), Is.EqualTo(250m));
+            Assert.That(FinanceDashboardComposer.Utilization(credit), Is.EqualTo(0.25m));
+            Assert.That(FinanceDashboardComposer.CreditOwed(new CreditAccount { PostedBalance = 50, CreditLimit = 1000 }), Is.EqualTo(0m));
         }
     }
 

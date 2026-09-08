@@ -5,6 +5,7 @@ using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.Domain.Transportation;
 using THMS.External;
+using THMS.Logic.Finance.Budget;
 using THMS.Logic.Orchestrators;
 using THMS.Tests.Logic.TestSupport;
 
@@ -360,7 +361,7 @@ namespace THMS.Tests.Logic
                 store.GetPostedTransactions(account.Id).Any(t => t.Description == "NoPlaid" && t.Category == "Uncategorized"),
                 Is.True);
             Assert.That(
-                store.GetPostedTransactions(account.Id).Any(t => t.Description == "STARBUCKS #12" && t.Category == "Coffee"),
+                store.GetPostedTransactions(account.Id).Any(t => t.Description == "STARBUCKS #12" && t.Category == "Restaurants"),
                 Is.True);
 
             var otherAccount = Guid.NewGuid();
@@ -631,6 +632,126 @@ namespace THMS.Tests.Logic
             var transferRules = txs.GetRecurringTransferRules(account.Id).ToList();
             Assert.That(transferRules, Has.Count.EqualTo(1));
             Assert.That(transferRules[0].Description, Is.EqualTo("Sweep"));
+            Assert.That(singleRules[0].IsUserCreated, Is.False);
+            Assert.That(transferRules[0].IsUserCreated, Is.False);
+        }
+
+        [Test]
+        public void RunLedgerUpdate_DoesNotDeleteOrOverwriteUserCreatedRules()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var txs = new InMemoryTransactionDataStore();
+            var orchestrator = new TransactionUpdaterOrchestrator(accounts, txs);
+
+            var account = new BankAccount { Name = "Checking", Institution = "Bank", AccountNumber = "1" };
+            accounts.UpsertAccount(account);
+
+            var userRuleId = Guid.NewGuid();
+            txs.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                Id = userRuleId,
+                AccountId = account.Id,
+                Description = "Netflix",
+                Amount = 99,
+                Frequency = RecurrenceFrequency.Weekly,
+                NextOccurrence = DateTime.Today.AddDays(7),
+                IsActive = true,
+                IsUserCreated = true
+            });
+
+            var date = DateTime.Today.AddDays(-2);
+            foreach (var i in Enumerable.Range(0, 3))
+            {
+                txs.AddPostedTransaction(new PostedTransaction
+                {
+                    AccountId = account.Id,
+                    Description = "Netflix",
+                    Amount = 15.99m,
+                    Date = date.AddDays(-21 + i * 7)
+                });
+            }
+
+            orchestrator.RunLedgerUpdate();
+
+            var rules = txs.GetRecurringSingleRules(account.Id).ToList();
+            Assert.That(rules, Has.Count.EqualTo(1));
+            Assert.That(rules[0].Id, Is.EqualTo(userRuleId));
+            Assert.That(rules[0].Amount, Is.EqualTo(99));
+            Assert.That(rules[0].IsUserCreated, Is.True);
+        }
+
+        [Test]
+        public void RunLedgerUpdate_DoesNotInsertDuplicateRecurringRulesAcrossAccountsOrReruns()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var txs = new InMemoryTransactionDataStore();
+            var orchestrator = new TransactionUpdaterOrchestrator(accounts, txs);
+
+            var checking = new BankAccount { Name = "Checking", Institution = "Bank", AccountNumber = "1" };
+            var savings = new BankAccount { Name = "Savings", Institution = "Bank", AccountNumber = "2" };
+            var cash = new BankAccount { Name = "Cash", Institution = "Bank", AccountNumber = "3" };
+            accounts.UpsertAccount(checking);
+            accounts.UpsertAccount(savings);
+            accounts.UpsertAccount(cash);
+
+            foreach (var month in Enumerable.Range(1, 5))
+            {
+                txs.AddPostedTransaction(new PostedTransaction
+                {
+                    AccountId = checking.Id,
+                    Description = "LESLIES POOLMART",
+                    Amount = -45.67m,
+                    Date = new DateTime(2026, month, 20)
+                });
+            }
+
+            txs.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = savings.Id,
+                Description = "Interest",
+                Amount = 1.25m,
+                Date = new DateTime(2026, 5, 21)
+            });
+            txs.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = cash.Id,
+                Description = "ATM",
+                Amount = -20,
+                Date = new DateTime(2026, 5, 22)
+            });
+
+            orchestrator.RunLedgerUpdate();
+            orchestrator.RunLedgerUpdate();
+
+            var rules = txs.GetRecurringSingleRules(checking.Id).ToList();
+            Assert.That(rules, Has.Count.EqualTo(1));
+            Assert.That(rules[0].Description, Is.EqualTo("LESLIES POOLMART"));
+            Assert.That(rules[0].NextOccurrence, Is.EqualTo(new DateTime(2026, 6, 20)));
+        }
+
+        [Test]
+        public void AddRecurringSingleRule_UpsertsMatchingPatternInsteadOfInserting()
+        {
+            var txs = new InMemoryTransactionDataStore();
+            var accountId = Guid.NewGuid();
+            txs.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = accountId,
+                Description = "LESLIES POOLMART",
+                Amount = -45.67m,
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = new DateTime(2026, 6, 20)
+            });
+            txs.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = accountId,
+                Description = "leslies poolmart",
+                Amount = -45.67m,
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = new DateTime(2026, 6, 20)
+            });
+
+            Assert.That(txs.GetRecurringSingleRules(accountId).Count(), Is.EqualTo(1));
         }
 
         [Test]
@@ -673,7 +794,7 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void RunLedgerUpdate_CreatesUtilityBudgetRuleAndForecast()
+        public void RunLedgerUpdate_RefreshesBudgetPeriodActualsAndRecommended()
         {
             var accounts = new InMemoryAccountDataStore();
             var txs = new InMemoryTransactionDataStore();
@@ -688,6 +809,7 @@ namespace THMS.Tests.Logic
                 Date = new DateTime(month1.Year, month1.Month, 5),
                 Amount = -30,
                 Category = "Electric",
+                CategoryId = DefaultExpenseCategories.ElectricId,
                 Description = "Electric"
             });
             txs.AddPostedTransaction(new PostedTransaction
@@ -696,6 +818,7 @@ namespace THMS.Tests.Logic
                 Date = new DateTime(month1.Year, month1.Month, 20),
                 Amount = -10,
                 Category = "Water",
+                CategoryId = DefaultExpenseCategories.WaterId,
                 Description = "Water"
             });
             txs.AddPostedTransaction(new PostedTransaction
@@ -704,6 +827,7 @@ namespace THMS.Tests.Logic
                 Date = new DateTime(month2.Year, month2.Month, 8),
                 Amount = -20,
                 Category = "Gas",
+                CategoryId = DefaultExpenseCategories.GasId,
                 Description = "Gas"
             });
             txs.AddPostedTransaction(new PostedTransaction
@@ -712,61 +836,583 @@ namespace THMS.Tests.Logic
                 Date = new DateTime(month2.Year, month2.Month, 9),
                 Amount = -99,
                 Category = "Shopping",
+                CategoryId = DefaultExpenseCategories.RestaurantsId,
                 Description = "Not a utility"
             });
 
-            txs.UpsertExpenseBudgetRule(null);
-            Assert.That(txs.GetExpenseBudgetRules(account.Id), Is.Empty);
-
-            var seeded = new ExpenseBudgetRuleFactory().Create("Utilities");
-            seeded.AccountId = account.Id;
-            seeded.NextOccurrence = DateTime.Today.AddMonths(1);
-            txs.UpsertExpenseBudgetRule(seeded);
+            var budgets = new BudgetOrchestrator(txs);
+            budgets.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = account.Id,
+                BudgetName = "Utilities",
+                IncludedCategoryIds = DefaultExpenseCategories.UtilityMemberIds.ToList(),
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = -200,
+                IsActive = true
+            });
 
             var result = new TransactionUpdaterOrchestrator(accounts, txs).RunLedgerUpdate();
             Assert.That(result.ForecastUpdated, Is.True);
 
             var rule = txs.GetExpenseBudgetRules(account.Id).Single();
-            Assert.That(rule.CurrentAverage, Is.EqualTo(-22m));
+            Assert.That(rule.BudgetName, Is.EqualTo("Utilities"));
             Assert.That(rule.AccountId, Is.EqualTo(account.Id));
-            Assert.That(rule.Category, Is.EqualTo("Utilities"));
-            Assert.That(rule, Is.TypeOf<UtilityBudgetRule>());
 
+            var period = txs.GetActiveBudgetHistory(rule.Id);
+            Assert.That(period, Is.Not.Null);
+            Assert.That(period!.RecommendedAmount, Is.GreaterThan(0));
+            Assert.That(period.Remaining, Is.EqualTo(period.StartingBalance + Math.Abs(period.BudgetAmount) - period.ActualExpenses));
             Assert.That(txs.GetFutureSingleTransactions(account.Id), Is.Empty);
         }
 
         [Test]
-        public void RunLedgerUpdate_UpdatesExistingUtilityBudgetRule()
+        public void RunLedgerUpdate_UpdatesExistingBudgetPeriodActuals()
         {
             var accounts = new InMemoryAccountDataStore();
             var txs = new InMemoryTransactionDataStore();
             var account = new BankAccount { Name = "Checking", Institution = "Bank", AccountNumber = "2" };
             accounts.UpsertAccount(account);
 
-            var existingId = Guid.NewGuid();
-            var originalNext = DateTime.Today.AddMonths(1);
-            txs.UpsertExpenseBudgetRule(new UtilityBudgetRule
+            var budgets = new BudgetOrchestrator(txs);
+            budgets.AddRule(new ExpenseBudgetRule
             {
-                Id = existingId,
                 AccountId = account.Id,
-                CurrentAverage = -5,
-                NextOccurrence = originalNext
+                BudgetName = "Utilities",
+                IncludedCategoryIds = [DefaultExpenseCategories.ElectricId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = -100,
+                IsActive = true
             });
+
+            var ruleId = txs.GetExpenseBudgetRules(account.Id).Single().Id;
+            var originalPeriodId = txs.GetActiveBudgetHistory(ruleId)!.Id;
 
             txs.AddPostedTransaction(new PostedTransaction
             {
                 AccountId = account.Id,
-                Date = DateTime.Today.AddDays(-3),
+                Date = DateTime.Today,
                 Amount = -48,
-                Category = "Electric"
+                Category = "Electric",
+                CategoryId = DefaultExpenseCategories.ElectricId
             });
 
             new TransactionUpdaterOrchestrator(accounts, txs).RunLedgerUpdate();
 
-            var updated = txs.GetExpenseBudgetRules(account.Id).Single();
-            Assert.That(updated.Id, Is.EqualTo(existingId));
-            Assert.That(updated.CurrentAverage, Is.EqualTo(-48m));
-            Assert.That(updated.NextOccurrence, Is.EqualTo(originalNext));
+            var updated = txs.GetActiveBudgetHistory(ruleId);
+            Assert.That(updated, Is.Not.Null);
+            Assert.That(updated!.Id, Is.EqualTo(originalPeriodId));
+            Assert.That(updated.ActualExpenses, Is.EqualTo(48m));
+            Assert.That(updated.Remaining, Is.EqualTo(52m));
+            Assert.That(updated.EndingBalance, Is.EqualTo(52m));
+        }
+    }
+
+    [TestFixture]
+    public class BudgetOrchestratorTests
+    {
+        [Test]
+        public void AddUpdateDeleteRule_PersistsDefinitionAndHistory()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Utilities",
+                IncludedCategoryIds = [DefaultExpenseCategories.ElectricId, DefaultExpenseCategories.WaterId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = -150,
+                IsActive = true
+            });
+
+            var rule = orchestrator.GetRules(accountId).Single();
+            Assert.That(rule.BudgetName, Is.EqualTo("Utilities"));
+            Assert.That(rule.IncludedCategoryIds, Is.EquivalentTo(new[] { DefaultExpenseCategories.ElectricId, DefaultExpenseCategories.WaterId }));
+            Assert.That(rule.DefaultBudgetAmount, Is.EqualTo(-150m));
+            Assert.That(rule.BudgetFrequency, Is.EqualTo(BudgetFrequency.Monthly));
+
+            var period = orchestrator.GetActivePeriod(rule.Id);
+            Assert.That(period, Is.Not.Null);
+            Assert.That(period!.BudgetAmount, Is.EqualTo(150m));
+            Assert.That(period.StartingBalance, Is.EqualTo(0m));
+            Assert.That(period.IsClosed, Is.False);
+
+            rule.BudgetName = "Home utilities";
+            rule.IncludedCategoryIds = [DefaultExpenseCategories.ElectricId];
+            rule.DefaultBudgetAmount = -175;
+            rule.BudgetFrequency = BudgetFrequency.Weekly;
+            orchestrator.UpdateRule(rule);
+
+            var updated = orchestrator.GetRule(rule.Id);
+            Assert.That(updated!.BudgetName, Is.EqualTo("Home utilities"));
+            Assert.That(updated.IncludedCategoryIds, Is.EquivalentTo(new[] { DefaultExpenseCategories.ElectricId }));
+            Assert.That(updated.DefaultBudgetAmount, Is.EqualTo(-175m));
+            Assert.That(updated.BudgetFrequency, Is.EqualTo(BudgetFrequency.Weekly));
+
+            orchestrator.DeleteRule(rule.Id);
+            Assert.That(orchestrator.GetRules(accountId), Is.Empty);
+            Assert.That(store.GetExpenseBudgetHistory(rule.Id), Is.Empty);
+        }
+
+        [Test]
+        public void RefreshAccount_RollsForwardEndedPeriod()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Utilities",
+                IncludedCategoryIds = [DefaultExpenseCategories.ElectricId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = -100,
+                IsActive = true
+            });
+
+            var ruleId = orchestrator.GetRules(accountId).Single().Id;
+            var original = store.GetActiveBudgetHistory(ruleId)!;
+            original.PeriodStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(-1);
+            original.PeriodEnd = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddDays(-1);
+            store.UpdateExpenseBudgetHistory(original);
+
+            orchestrator.RefreshAccount(accountId);
+
+            var closed = store.GetExpenseBudgetHistoryById(original.Id);
+            Assert.That(closed, Is.Not.Null);
+            Assert.That(closed!.IsClosed, Is.True);
+
+            var active = store.GetActiveBudgetHistory(ruleId);
+            Assert.That(active, Is.Not.Null);
+            Assert.That(active!.Id, Is.Not.EqualTo(original.Id));
+            Assert.That(active.PeriodStart, Is.EqualTo(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1)));
+            Assert.That(store.GetExpenseBudgetHistory(ruleId).Count(h => !h.IsClosed), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void SavePeriod_OverridesBudgetAmountAndRemaining()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = DateTime.Today,
+                Amount = -40,
+                Category = "Electric",
+                CategoryId = DefaultExpenseCategories.ElectricId
+            });
+
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Utilities",
+                IncludedCategoryIds = [DefaultExpenseCategories.ElectricId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = -100,
+                IsActive = true
+            });
+
+            var period = orchestrator.GetActivePeriod(orchestrator.GetRules(accountId).Single().Id)!;
+            Assert.That(period.ActualExpenses, Is.EqualTo(40m));
+            Assert.That(period.Remaining, Is.EqualTo(60m));
+            Assert.That(period.EndingBalance, Is.EqualTo(60m));
+
+            period.BudgetAmount = 80;
+            orchestrator.SavePeriod(period);
+
+            var saved = orchestrator.GetActivePeriod(period.BudgetRuleId)!;
+            Assert.That(saved.BudgetAmount, Is.EqualTo(80m));
+            Assert.That(saved.Remaining, Is.EqualTo(40m));
+            Assert.That(saved.EndingBalance, Is.EqualTo(40m));
+        }
+
+        [Test]
+        public void RollForward_ClosesCurrentAndOpensNextPeriod()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Utilities",
+                IncludedCategoryIds = [DefaultExpenseCategories.ElectricId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = -100,
+                IsActive = true
+            });
+
+            var ruleId = orchestrator.GetRules(accountId).Single().Id;
+            var current = orchestrator.GetActivePeriod(ruleId)!;
+            var created = orchestrator.RollForward(ruleId);
+
+            Assert.That(store.GetExpenseBudgetHistoryById(current.Id)!.IsClosed, Is.True);
+            Assert.That(created.IsClosed, Is.False);
+            Assert.That(created.StartingBalance, Is.EqualTo(store.GetExpenseBudgetHistoryById(current.Id)!.EndingBalance));
+            Assert.That(created.PeriodStart, Is.EqualTo(BudgetPeriodCalculator.NextPeriod(current.PeriodEnd, BudgetFrequency.Monthly).Start));
+            Assert.That(store.GetActiveBudgetHistory(ruleId)!.Id, Is.EqualTo(created.Id));
+        }
+
+        [Test]
+        public void ClosePeriod_DoesNotCreateOverlappingActivePeriod()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Utilities",
+                IncludedCategoryIds = [DefaultExpenseCategories.ElectricId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = -100,
+                IsActive = true
+            });
+
+            var ruleId = orchestrator.GetRules(accountId).Single().Id;
+            var current = orchestrator.GetActivePeriod(ruleId)!;
+            orchestrator.ClosePeriod(current.Id);
+            orchestrator.RefreshAccount(accountId);
+
+            Assert.That(orchestrator.GetActivePeriod(ruleId), Is.Null);
+            Assert.That(store.GetExpenseBudgetHistory(ruleId).Count(h => !h.IsClosed), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void RefreshAccount_RecommendedIncludesForecast_NotPostedActuals()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            var lastMonth = DateTime.Today.AddMonths(-1);
+
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = new DateTime(lastMonth.Year, lastMonth.Month, 8),
+                Amount = -10,
+                Category = "Electric",
+                CategoryId = DefaultExpenseCategories.ElectricId
+            });
+            store.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = accountId,
+                Description = "Electric",
+                Amount = -20,
+                Category = "Electric",
+                CategoryId = DefaultExpenseCategories.ElectricId,
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = DateTime.Today,
+                IsActive = true
+            });
+
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Utilities",
+                IncludedCategoryIds = [DefaultExpenseCategories.ElectricId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = -100,
+                IsActive = true
+            });
+
+            var period = orchestrator.GetActivePeriod(orchestrator.GetRules(accountId).Single().Id)!;
+            Assert.That(period.ActualExpenses, Is.EqualTo(0m));
+            Assert.That(period.RecommendedAmount, Is.GreaterThan(0m));
+            Assert.That(period.RecommendedAmount, Is.Not.EqualTo(period.ActualExpenses));
+        }
+
+        [Test]
+        public void RollForward_CarriesEndingBalanceIntoNextStartingBalance()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = DateTime.Today,
+                Amount = -40,
+                CategoryId = DefaultExpenseCategories.ElectricId
+            });
+
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Utilities",
+                IncludedCategoryIds = [DefaultExpenseCategories.ElectricId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = 100,
+                IsActive = true
+            });
+
+            var ruleId = orchestrator.GetRules(accountId).Single().Id;
+            var current = orchestrator.GetActivePeriod(ruleId)!;
+            Assert.That(current.ActualExpenses, Is.EqualTo(40m));
+            Assert.That(current.Remaining, Is.EqualTo(60m));
+            Assert.That(current.EndingBalance, Is.EqualTo(60m));
+
+            var next = orchestrator.RollForward(ruleId);
+            Assert.That(next.StartingBalance, Is.EqualTo(60m));
+            Assert.That(next.BudgetAmount, Is.EqualTo(100m));
+            Assert.That(next.Remaining, Is.EqualTo(next.StartingBalance + next.BudgetAmount - next.ActualExpenses));
+        }
+
+        [Test]
+        public void SetStartingBalance_UpdatesRemainingAndEnding()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Groceries",
+                IncludedCategoryIds = [DefaultExpenseCategories.GroceriesId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = 100,
+                IsActive = true
+            });
+
+            var period = orchestrator.GetActivePeriod(orchestrator.GetRules(accountId).Single().Id)!;
+            orchestrator.SetStartingBalance(period.Id, 25);
+
+            var updated = orchestrator.GetActivePeriod(period.BudgetRuleId)!;
+            Assert.That(updated.StartingBalance, Is.EqualTo(25m));
+            Assert.That(updated.Remaining, Is.EqualTo(125m));
+            Assert.That(updated.EndingBalance, Is.EqualTo(125m));
+
+            orchestrator.SetStartingBalance(updated.Id, 0);
+            var reset = orchestrator.GetActivePeriod(period.BudgetRuleId)!;
+            Assert.That(reset.StartingBalance, Is.EqualTo(0m));
+            Assert.That(reset.Remaining, Is.EqualTo(100m));
+        }
+
+        [Test]
+        public void SetStartingBalance_RejectsClosedPeriod()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Groceries",
+                IncludedCategoryIds = [DefaultExpenseCategories.GroceriesId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = 100,
+                IsActive = true
+            });
+
+            var period = orchestrator.GetActivePeriod(orchestrator.GetRules(accountId).Single().Id)!;
+            orchestrator.ClosePeriod(period.Id);
+
+            Assert.That(
+                () => orchestrator.SetStartingBalance(period.Id, 0),
+                Throws.InvalidOperationException.With.Message.Contains("Closed periods"));
+        }
+
+        [Test]
+        public void TransferBalance_MovesStartingBetweenOpenPeriods()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Groceries",
+                IncludedCategoryIds = [DefaultExpenseCategories.GroceriesId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = 100,
+                IsActive = true
+            });
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Dining",
+                IncludedCategoryIds = [DefaultExpenseCategories.RestaurantsId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = 50,
+                IsActive = true
+            });
+
+            var groceries = orchestrator.GetRules(accountId).Single(r => r.BudgetName == "Groceries");
+            var dining = orchestrator.GetRules(accountId).Single(r => r.BudgetName == "Dining");
+            orchestrator.SetStartingBalance(orchestrator.GetActivePeriod(groceries.Id)!.Id, 40);
+
+            orchestrator.TransferBalance(groceries.Id, dining.Id, 15);
+
+            var groceriesPeriod = orchestrator.GetActivePeriod(groceries.Id)!;
+            var diningPeriod = orchestrator.GetActivePeriod(dining.Id)!;
+            Assert.That(groceriesPeriod.StartingBalance, Is.EqualTo(25m));
+            Assert.That(groceriesPeriod.Remaining, Is.EqualTo(125m));
+            Assert.That(diningPeriod.StartingBalance, Is.EqualTo(15m));
+            Assert.That(diningPeriod.Remaining, Is.EqualTo(65m));
+        }
+
+        [Test]
+        public void TransferBalance_RejectsSameBudgetAndNonPositiveAmount()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Groceries",
+                IncludedCategoryIds = [DefaultExpenseCategories.GroceriesId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = 100,
+                IsActive = true
+            });
+
+            var ruleId = orchestrator.GetRules(accountId).Single().Id;
+            Assert.That(() => orchestrator.TransferBalance(ruleId, ruleId, 10), Throws.ArgumentException);
+            Assert.That(
+                () => orchestrator.TransferBalance(ruleId, Guid.NewGuid(), 0),
+                Throws.ArgumentException);
+        }
+    }
+
+    [TestFixture]
+    public class CategoryOrchestratorTests
+    {
+        [Test]
+        public void CreateAndRename_DoesNotChangeTransactionCategoryId()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new CategoryOrchestrator(store, store);
+            var created = orchestrator.CreateCategory("MICROSOFT*STORE MICROSOFT.COMWA");
+            var accountId = Guid.NewGuid();
+            var tx = new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = new DateTime(2026, 1, 8),
+                Description = "MICROSOFT*STORE",
+                Amount = -12,
+                CategoryId = created.Id,
+                Category = created.Name
+            };
+            store.AddPostedTransaction(tx);
+
+            created.Name = "Software";
+            orchestrator.UpdateCategory(created);
+
+            var stored = store.GetPostedTransaction(tx.Id);
+            Assert.That(store.GetCategory(created.Id)!.Name, Is.EqualTo("Software"));
+            Assert.That(stored!.CategoryId, Is.EqualTo(created.Id));
+            Assert.That(stored.Category, Is.EqualTo("MICROSOFT*STORE MICROSOFT.COMWA"));
+        }
+
+        [Test]
+        public void AssignParent_BuildsHierarchyAndUsageCountsTransactions()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new CategoryOrchestrator(store, store);
+            var gaming = orchestrator.CreateCategory("Gaming", DefaultExpenseCategories.RestaurantsId);
+
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = Guid.NewGuid(),
+                Date = DateTime.Today,
+                Description = "FS *Gameloft Club",
+                Amount = -8,
+                CategoryId = gaming.Id,
+                Category = gaming.Name
+            });
+
+            var tree = orchestrator.GetCategoryTree();
+            Assert.That(tree.Any(c => c.Id == gaming.Id && c.ParentCategoryId == DefaultExpenseCategories.RestaurantsId), Is.True);
+            Assert.That(orchestrator.GetUsage(gaming.Id).TransactionCount, Is.EqualTo(1));
+            Assert.That(orchestrator.GetUsage(gaming.Id).Total, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void MergeCategories_RetargetsTransactionsBudgetsRulesAndAssignments()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new CategoryOrchestrator(store, store);
+            var keep = orchestrator.CreateCategory("Software");
+            var retire = orchestrator.CreateCategory("MICROSOFT*STORE MICROSOFT.COMWA");
+            var child = orchestrator.CreateCategory("Office Apps", retire.Id);
+            var accountId = Guid.NewGuid();
+
+            var posted = new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = new DateTime(2026, 3, 1),
+                Description = "MICROSOFT*STORE",
+                Amount = -20,
+                CategoryId = retire.Id,
+                Category = retire.Name
+            };
+            store.AddPostedTransaction(posted);
+            store.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = accountId,
+                Description = "Microsoft 365",
+                Amount = -10,
+                CategoryId = retire.Id,
+                Category = retire.Name,
+                NextOccurrence = DateTime.Today.AddDays(7)
+            });
+            store.UpsertAssignment(Categorizer.Normalize(posted.Description), retire.Id);
+
+            var budgets = new BudgetOrchestrator(store);
+            budgets.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Software",
+                IncludedCategoryIds = [retire.Id],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = -50,
+                IsActive = true
+            });
+
+            orchestrator.MergeCategories(keep.Id, retire.Id);
+
+            Assert.That(store.GetPostedTransaction(posted.Id)!.CategoryId, Is.EqualTo(keep.Id));
+            Assert.That(store.GetPostedTransaction(posted.Id)!.Category, Is.EqualTo("Software"));
+            Assert.That(store.GetAllRecurringSingleRules().Single().CategoryId, Is.EqualTo(keep.Id));
+            Assert.That(store.GetAssignment(Categorizer.Normalize(posted.Description))!.CategoryId, Is.EqualTo(keep.Id));
+            Assert.That(store.GetExpenseBudgetRules(accountId).Single().IncludedCategoryIds, Is.EquivalentTo(new[] { keep.Id }));
+            Assert.That(store.GetCategory(retire.Id)!.IsActive, Is.False);
+            Assert.That(store.GetCategory(child.Id)!.ParentCategoryId, Is.EqualTo(keep.Id));
+            Assert.That(store.GetCategory(keep.Id)!.IsActive, Is.True);
+            Assert.That(orchestrator.GetActiveCategories().Select(c => c.Id), Does.Not.Contain(retire.Id));
+        }
+
+        [Test]
+        public void DeactivateCategory_HidesFromActiveListAndBlocksUncategorized()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new CategoryOrchestrator(store, store);
+            var created = orchestrator.CreateCategory("Temp");
+
+            orchestrator.DeactivateCategory(created.Id);
+
+            Assert.That(store.GetCategory(created.Id)!.IsActive, Is.False);
+            Assert.That(orchestrator.GetActiveCategories().Select(c => c.Id), Does.Not.Contain(created.Id));
+            Assert.That(
+                () => orchestrator.DeactivateCategory(DefaultExpenseCategories.UncategorizedId),
+                Throws.InvalidOperationException);
+        }
+
+        [Test]
+        public void UpdateCategory_RejectsCyclicParent()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new CategoryOrchestrator(store, store);
+            var parent = orchestrator.CreateCategory("Utility Group");
+            var child = orchestrator.CreateCategory("Electric Bill", parent.Id);
+
+            parent.ParentCategoryId = child.Id;
+            Assert.That(() => orchestrator.UpdateCategory(parent), Throws.InvalidOperationException);
         }
     }
 

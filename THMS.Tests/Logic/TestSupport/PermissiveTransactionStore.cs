@@ -7,7 +7,7 @@ namespace THMS.Tests.Logic.TestSupport
     /// In-memory transaction store that upserts on replace so transfer detection
     /// can finish after matching an imported transaction that is not yet persisted.
     /// </summary>
-    public sealed class PermissiveTransactionStore : ITransactionDataStore
+    public sealed class PermissiveTransactionStore : ITransactionDataStore, ICategoryDataStore
     {
         private readonly InMemoryTransactionDataStore _inner = new();
 
@@ -65,14 +65,36 @@ namespace THMS.Tests.Logic.TestSupport
         public RecurringTransferRule? GetRecurringTransferRule(Guid id) => _inner.GetRecurringTransferRule(id);
         public IEnumerable<RecurringTransferRule> GetRecurringTransferRules(Guid accountId) => _inner.GetRecurringTransferRules(accountId);
 
-        public void UpsertExpenseBudgetRule(ExpenseBudgetRule? rule) => _inner.UpsertExpenseBudgetRule(rule);
+        public void AddExpenseBudgetRule(ExpenseBudgetRule rule) => _inner.AddExpenseBudgetRule(rule);
+        public void UpdateExpenseBudgetRule(ExpenseBudgetRule rule) => _inner.UpdateExpenseBudgetRule(rule);
+        public void DeleteExpenseBudgetRule(Guid ruleId) => _inner.DeleteExpenseBudgetRule(ruleId);
+        public ExpenseBudgetRule? GetExpenseBudgetRule(Guid ruleId) => _inner.GetExpenseBudgetRule(ruleId);
         public IEnumerable<ExpenseBudgetRule> GetExpenseBudgetRules(Guid accountId) => _inner.GetExpenseBudgetRules(accountId);
 
-        public void AddCategory(TransactionCategory category) => _inner.AddCategory(category);
-        public void UpdateCategory(TransactionCategory category) => _inner.UpdateCategory(category);
-        public void DeleteCategory(Guid id) => _inner.DeleteCategory(id);
-        public TransactionCategory? GetCategory(Guid id) => _inner.GetCategory(id);
-        public IEnumerable<TransactionCategory> GetAllCategories() => _inner.GetAllCategories();
+        public void AddExpenseBudgetHistory(ExpenseBudgetHistory history) => _inner.AddExpenseBudgetHistory(history);
+        public void UpdateExpenseBudgetHistory(ExpenseBudgetHistory history) => _inner.UpdateExpenseBudgetHistory(history);
+        public ExpenseBudgetHistory? GetExpenseBudgetHistoryById(Guid historyId) => _inner.GetExpenseBudgetHistoryById(historyId);
+        public IEnumerable<ExpenseBudgetHistory> GetExpenseBudgetHistory(Guid budgetRuleId) => _inner.GetExpenseBudgetHistory(budgetRuleId);
+        public ExpenseBudgetHistory? GetActiveBudgetHistory(Guid budgetRuleId) => _inner.GetActiveBudgetHistory(budgetRuleId);
+        public IEnumerable<ExpenseBudgetHistory> GetBudgetHistoryForPeriod(Guid budgetRuleId, DateTime periodStart, DateTime periodEnd) =>
+            _inner.GetBudgetHistoryForPeriod(budgetRuleId, periodStart, periodEnd);
+        public void CloseBudgetHistory(Guid historyId) => _inner.CloseBudgetHistory(historyId);
+
+        public void AddCategory(ExpenseCategory category) => _inner.AddCategory(category);
+        public void UpdateCategory(ExpenseCategory category) => _inner.UpdateCategory(category);
+        public void DeleteCategory(Guid categoryId) => _inner.DeleteCategory(categoryId);
+        public void DeactivateCategory(Guid categoryId) => _inner.DeactivateCategory(categoryId);
+        public void MergeCategories(Guid keepCategoryId, Guid retireCategoryId) =>
+            _inner.MergeCategories(keepCategoryId, retireCategoryId);
+        public ExpenseCategory? GetCategory(Guid categoryId) => _inner.GetCategory(categoryId);
+        public IEnumerable<ExpenseCategory> GetAllCategories(bool includeInactive = false) => _inner.GetAllCategories(includeInactive);
+        public IEnumerable<ExpenseCategory> GetChildCategories(Guid parentCategoryId) => _inner.GetChildCategories(parentCategoryId);
+        public IEnumerable<ExpenseCategory> GetCategoryTree(bool includeInactive = true) => _inner.GetCategoryTree(includeInactive);
+        public CategoryUsage CountCategoryUsage(Guid categoryId) => _inner.CountCategoryUsage(categoryId);
+        public void EnsureDefaultCategories() => _inner.EnsureDefaultCategories();
+        public void UpsertAssignment(string normalizedDescription, Guid categoryId) => _inner.UpsertAssignment(normalizedDescription, categoryId);
+        public CategoryAssignment? GetAssignment(string normalizedDescription) => _inner.GetAssignment(normalizedDescription);
+        public IEnumerable<ExpenseBudgetRule> GetAllExpenseBudgetRules() => _inner.GetAllExpenseBudgetRules();
 
         public IEnumerable<PostedTransaction> GetUnmatchedPostedTransactions(Guid accountId) => _inner.GetUnmatchedPostedTransactions(accountId);
         public IEnumerable<PostedTransferTransaction> GetUnmatchedPostedTransferTransactions(Guid accountId) => _inner.GetUnmatchedPostedTransferTransactions(accountId);
