@@ -3,76 +3,82 @@
     partial class FinanceDataCenterForm
     {
         private System.ComponentModel.IContainer components = null;
-        private ToolStrip toolStrip;
-        private ToolStripDropDownButton dataTypeToolStripMenuItem;
-        private Panel panelHost;
-        private Button btnClose;
+        private TabControl tabs;
+        private TabPage tabAccounts;
+        private TabPage tabTransactions;
+        private TabPage tabDiagnostics;
+        private Controls.AccountsIngestionControl accountsIngestion;
+        private Controls.TransactionIngestionControl transactionIngestion;
+        private Controls.FinanceDiagnosticsControl financeDiagnostics;
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing && (components != null))
+            if (disposing && components != null)
                 components.Dispose();
             base.Dispose(disposing);
         }
 
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FinanceDataCenterForm));
-            toolStrip = new ToolStrip();
-            dataTypeToolStripMenuItem = new ToolStripDropDownButton();
-            panelHost = new Panel();
-            btnClose = new Button();
-            toolStripButton1 = new ToolStripButton();
-            toolStrip.SuspendLayout();
+            tabs = new TabControl();
+            tabAccounts = new TabPage();
+            tabTransactions = new TabPage();
+            tabDiagnostics = new TabPage();
+            accountsIngestion = new Controls.AccountsIngestionControl();
+            transactionIngestion = new Controls.TransactionIngestionControl();
+            financeDiagnostics = new Controls.FinanceDiagnosticsControl();
+            tabs.SuspendLayout();
+            tabAccounts.SuspendLayout();
+            tabTransactions.SuspendLayout();
+            tabDiagnostics.SuspendLayout();
             SuspendLayout();
             // 
-            // toolStrip
+            // tabs
             // 
-            toolStrip.ImageScalingSize = new Size(28, 28);
-            toolStrip.Items.AddRange(new ToolStripItem[] { dataTypeToolStripMenuItem, toolStripButton1 });
-            toolStrip.Location = new Point(0, 0);
-            toolStrip.Name = "toolStrip";
-            toolStrip.Size = new Size(876, 44);
-            toolStrip.TabIndex = 2;
+            tabs.Controls.Add(tabAccounts);
+            tabs.Controls.Add(tabTransactions);
+            tabs.Controls.Add(tabDiagnostics);
+            tabs.Dock = DockStyle.Fill;
+            tabs.Name = "tabs";
             // 
-            // dataTypeToolStripMenuItem
+            // tabAccounts
             // 
-            dataTypeToolStripMenuItem.Name = "dataTypeToolStripMenuItem";
-            dataTypeToolStripMenuItem.Size = new Size(127, 38);
-            dataTypeToolStripMenuItem.Text = "Data Type";
+            tabAccounts.Controls.Add(accountsIngestion);
+            tabAccounts.Name = "tabAccounts";
+            tabAccounts.Padding = new Padding(4);
+            tabAccounts.Text = "Accounts";
             // 
-            // panelHost
+            // tabTransactions
             // 
-            panelHost.Dock = DockStyle.Fill;
-            panelHost.Location = new Point(0, 44);
-            panelHost.Name = "panelHost";
-            panelHost.Size = new Size(876, 552);
-            panelHost.TabIndex = 0;
+            tabTransactions.Controls.Add(transactionIngestion);
+            tabTransactions.Name = "tabTransactions";
+            tabTransactions.Padding = new Padding(4);
+            tabTransactions.Text = "Transactions";
             // 
-            // btnClose
+            // tabDiagnostics
             // 
-            btnClose.Dock = DockStyle.Bottom;
-            btnClose.Location = new Point(0, 596);
-            btnClose.Name = "btnClose";
-            btnClose.Size = new Size(876, 40);
-            btnClose.TabIndex = 1;
-            btnClose.Text = "Close";
-            btnClose.Click += OnClickClose;
+            tabDiagnostics.Controls.Add(financeDiagnostics);
+            tabDiagnostics.Name = "tabDiagnostics";
+            tabDiagnostics.Padding = new Padding(4);
+            tabDiagnostics.Text = "Diagnostics";
+            // 
+            // hosted controls
+            // 
+            accountsIngestion.Dock = DockStyle.Fill;
+            transactionIngestion.Dock = DockStyle.Fill;
+            financeDiagnostics.Dock = DockStyle.Fill;
             // 
             // FinanceDataCenterForm
             // 
-            ClientSize = new Size(876, 636);
-            Controls.Add(panelHost);
-            Controls.Add(toolStrip);
-            Controls.Add(btnClose);
+            ClientSize = new Size(1100, 760);
+            Controls.Add(tabs);
             Name = "FinanceDataCenterForm";
             Text = "Finance Data Center";
-            toolStrip.ResumeLayout(false);
-            toolStrip.PerformLayout();
+            tabs.ResumeLayout(false);
+            tabAccounts.ResumeLayout(false);
+            tabTransactions.ResumeLayout(false);
+            tabDiagnostics.ResumeLayout(false);
             ResumeLayout(false);
-            PerformLayout();
         }
-
-        private ToolStripButton toolStripButton1;
     }
 }

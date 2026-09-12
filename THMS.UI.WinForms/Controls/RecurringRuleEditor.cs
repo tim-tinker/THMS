@@ -10,9 +10,11 @@ namespace THMS.UI.WinForms.Controls
     {
         private RecurringRuleOrchestrator? _ruleOrchestrator;
         private AccountOrchestrator? _accountOrchestrator;
+        private TransactionOrchestrator? _transactionOrchestrator;
 
         private Guid? _existingSingleId;
         private Guid? _existingTransferId;
+        private List<SplitTransactionRow> _pendingSplits = [];
 
         public RecurringRuleEditor()
         {
@@ -59,6 +61,9 @@ namespace THMS.UI.WinForms.Controls
 
         private AccountOrchestrator Accounts =>
             _accountOrchestrator ??= new AccountOrchestrator();
+
+        private TransactionOrchestrator Transactions =>
+            _transactionOrchestrator ??= new TransactionOrchestrator();
 
         private void PopulateLookups(Guid? preferredAccountId)
         {
@@ -109,6 +114,7 @@ namespace THMS.UI.WinForms.Controls
             SelectCategory(rule.CategoryId, rule.Category);
             cmbFrequency.SelectedItem = ToFrequencyLabel(rule.Frequency);
             dtNextOccurrence.Value = rule.NextOccurrence == default ? DateTime.Today : rule.NextOccurrence;
+            _pendingSplits = rule.Splits.Select(s => s.Clone()).ToList();
         }
 
         private void BindTransfer(RecurringTransferRule rule)
@@ -124,6 +130,7 @@ namespace THMS.UI.WinForms.Controls
             SelectCategory(rule.CategoryId, rule.Category);
             cmbFrequency.SelectedItem = ToFrequencyLabel(rule.Frequency);
             dtNextOccurrence.Value = rule.NextOccurrence == default ? DateTime.Today : rule.NextOccurrence;
+            _pendingSplits = rule.Splits.Select(s => s.Clone()).ToList();
         }
 
         private void SelectCategory(Guid? categoryId, string? name)
@@ -175,6 +182,7 @@ namespace THMS.UI.WinForms.Controls
             lblAccount.Visible = cmbAccount.Visible = true;
             lblFromAccount.Visible = cmbFromAccount.Visible = false;
             lblToAccount.Visible = cmbToAccount.Visible = false;
+            btnEditSplits.Enabled = true;
         }
 
         private void ShowTransferFields()
@@ -182,6 +190,7 @@ namespace THMS.UI.WinForms.Controls
             lblAccount.Visible = cmbAccount.Visible = false;
             lblFromAccount.Visible = cmbFromAccount.Visible = true;
             lblToAccount.Visible = cmbToAccount.Visible = true;
+            btnEditSplits.Enabled = true;
         }
 
         private void UpdateButtonState()
@@ -196,17 +205,27 @@ namespace THMS.UI.WinForms.Controls
             if (!TryBuildRule(out var single, out var transfer, newId: true))
                 return;
 
-            if (single is not null)
+            try
             {
-                Rules.AddSingleRule(single);
-                _existingSingleId = single.Id;
-                _existingTransferId = null;
+                if (single is not null)
+                {
+                    Rules.AddSingleRule(single);
+                    PersistPendingSplits(single.Id);
+                    _existingSingleId = single.Id;
+                    _existingTransferId = null;
+                }
+                else if (transfer is not null)
+                {
+                    Rules.AddTransferRule(transfer);
+                    PersistPendingSplits(transfer.Id);
+                    _existingTransferId = transfer.Id;
+                    _existingSingleId = null;
+                }
             }
-            else if (transfer is not null)
+            catch (InvalidOperationException ex)
             {
-                Rules.AddTransferRule(transfer);
-                _existingTransferId = transfer.Id;
-                _existingSingleId = null;
+                MessageBox.Show(this, ex.Message, "Recurring Rule", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
             }
 
             DialogResult = DialogResult.OK;
@@ -218,15 +237,25 @@ namespace THMS.UI.WinForms.Controls
             if (!TryBuildRule(out var single, out var transfer, newId: false))
                 return;
 
-            if (single is not null)
+            try
             {
-                single.IsUserCreated = true;
-                Rules.UpdateSingleRule(single);
+                if (single is not null)
+                {
+                    single.IsUserCreated = true;
+                    Rules.UpdateSingleRule(single);
+                    PersistPendingSplits(single.Id);
+                }
+                else if (transfer is not null)
+                {
+                    transfer.IsUserCreated = true;
+                    Rules.UpdateTransferRule(transfer);
+                    PersistPendingSplits(transfer.Id);
+                }
             }
-            else if (transfer is not null)
+            catch (InvalidOperationException ex)
             {
-                transfer.IsUserCreated = true;
-                Rules.UpdateTransferRule(transfer);
+                MessageBox.Show(this, ex.Message, "Recurring Rule", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
             }
 
             DialogResult = DialogResult.OK;
@@ -273,6 +302,14 @@ namespace THMS.UI.WinForms.Controls
                 return false;
             }
 
+            if (_pendingSplits.Count > 0 &&
+                !SplitTransactionMath.AmountsMatch(numAmount.Value, _pendingSplits))
+            {
+                MessageBox.Show(this, "Split amounts must equal the rule amount. Open Edit Splits to auto-balance.",
+                    "Recurring Rule", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return false;
+            }
+
             var frequency = ParseFrequency(cmbFrequency.SelectedItem?.ToString());
             var isTransfer = cmbRuleType.SelectedItem?.ToString() == "Transfer";
 
@@ -303,6 +340,7 @@ namespace THMS.UI.WinForms.Controls
                     IsUserCreated = true
                 };
                 ApplySelectedCategory(transfer);
+                transfer.Splits = _pendingSplits.Select(s => s.Clone()).ToList();
                 return true;
             }
 
@@ -324,7 +362,33 @@ namespace THMS.UI.WinForms.Controls
                 IsUserCreated = true
             };
             ApplySelectedCategory(single);
+            single.Splits = _pendingSplits.Select(s => s.Clone()).ToList();
             return true;
+        }
+
+        private void OnEditSplits(object? sender, EventArgs e)
+        {
+            using var editor = new SplitTransactionEditor(
+                txtDescription.Text.Trim(),
+                numAmount.Value,
+                _pendingSplits,
+                Rules.GetCategories().ToList(),
+                Accounts.GetAllAccounts().ToList());
+            if (editor.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            _pendingSplits = editor.Result;
+        }
+
+        private void PersistPendingSplits(Guid parentId)
+        {
+            if (_pendingSplits.Count == 0)
+            {
+                Transactions.ClearSplits(parentId);
+                return;
+            }
+
+            Transactions.ApplySplits(parentId, _pendingSplits.Select(s => s.Clone()).ToList());
         }
 
         private static RecurrenceFrequency ParseFrequency(string? label) => label switch

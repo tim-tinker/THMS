@@ -14,21 +14,41 @@ namespace THMS.Data.Stores.InMemoryStores
         private readonly List<ExpenseBudgetHistory> _expenseBudgetHistory = new();
         private readonly List<ExpenseCategory> _categories = new();
         private readonly List<CategoryAssignment> _assignments = new();
+        private readonly List<SplitTransactionRow> _splits = new();
 
         // ------------------------------------------------------------
         // Posted Transactions
         // ------------------------------------------------------------
 
-        public void AddPosted(PostedTransaction transaction) => Add(_posted, transaction);
+        public void AddPosted(PostedTransaction transaction)
+        {
+            Add(_posted, transaction);
+            PersistIncomingSplits(transaction);
+        }
+
         public void UpdatePosted(PostedTransaction transaction) => Update(_posted, transaction);
-        public void DeletePosted(Guid id) => _posted.RemoveAll(t => t.Id == id);
-        public PostedTransaction? GetPosted(Guid id) => _posted.FirstOrDefault(t => t.Id == id);
+        public void DeletePosted(Guid id)
+        {
+            _posted.RemoveAll(t => t.Id == id);
+            DeleteSplits(id);
+        }
+
+        public PostedTransaction? GetPosted(Guid id) => Attach(_posted.FirstOrDefault(t => t.Id == id));
 
         public IEnumerable<PostedTransaction> GetPostedByAccount(Guid accountId) =>
-            _posted.Where(t => t.AccountId == accountId).OrderBy(t => t.Date);
+            Attach(_posted.Where(t => t.AccountId == accountId).OrderBy(t => t.Date));
 
         public IEnumerable<PostedTransaction> GetPostedByDateRange(DateTime start, DateTime end) =>
-            _posted.Where(t => InRange(t.Date, start, end)).OrderBy(t => t.Date);
+            Attach(_posted.Where(t => InRange(t.Date, start, end)).OrderBy(t => t.Date));
+
+        public IEnumerable<PostedTransaction> GetPostedByAccount(Guid accountId, DateTime start, DateTime end) =>
+            Attach(_posted.Where(t => t.AccountId == accountId && InRange(t.Date, start, end)).OrderBy(t => t.Date));
+
+        public decimal SumPostedBefore(Guid accountId, DateTime before) =>
+            _posted.Where(t => t.AccountId == accountId && t.Date < before).Sum(t => t.Amount);
+
+        public decimal SumPostedAfter(Guid accountId, DateTime after) =>
+            _posted.Where(t => t.AccountId == accountId && t.Date > after).Sum(t => t.Amount);
 
         public PostedTransaction? GetLatestPosted(Guid accountId) =>
             _posted
@@ -43,42 +63,57 @@ namespace THMS.Data.Stores.InMemoryStores
                 .Where(id => id != Guid.Empty)
                 .ToHashSet();
 
-            return _posted
+            return Attach(_posted
                 .Where(t => t.AccountId == accountId && !matchedIds.Contains(t.Id))
-                .OrderBy(t => t.Date);
+                .OrderBy(t => t.Date));
         }
 
         public void ReplacePostedTransaction(PostedTransaction replacement)
         {
-            // 1. Find existing transaction by Id
-            var existing = _posted
-                .FirstOrDefault(t => t.Id == replacement.Id);
-
+            var existing = _posted.FirstOrDefault(t => t.Id == replacement.Id);
             if (existing is null)
                 throw new InvalidOperationException(
                     $"Posted transaction {replacement.Id} not found.");
 
-            // 2. Remove the old transaction
             _posted.Remove(existing);
-
-            // 3. Insert the replacement
             _posted.Add(replacement);
+            PersistIncomingSplits(replacement);
         }
 
         // ------------------------------------------------------------
         // Posted Transfer Transactions
         // ------------------------------------------------------------
 
-        public void AddPostedTransfer(PostedTransferTransaction transaction) => Add(_postedTransfers, transaction);
+        public void AddPostedTransfer(PostedTransferTransaction transaction)
+        {
+            Add(_postedTransfers, transaction);
+            PersistIncomingSplits(transaction);
+        }
+
         public void UpdatePostedTransfer(PostedTransferTransaction transaction) => Update(_postedTransfers, transaction);
-        public void DeletePostedTransfer(Guid id) => _postedTransfers.RemoveAll(t => t.Id == id);
-        public PostedTransferTransaction? GetPostedTransfer(Guid id) => _postedTransfers.FirstOrDefault(t => t.Id == id);
+        public void DeletePostedTransfer(Guid id)
+        {
+            _postedTransfers.RemoveAll(t => t.Id == id);
+            DeleteSplits(id);
+        }
+
+        public PostedTransferTransaction? GetPostedTransfer(Guid id) =>
+            Attach(_postedTransfers.FirstOrDefault(t => t.Id == id));
 
         public IEnumerable<PostedTransferTransaction> GetPostedTransfersByAccount(Guid accountId) =>
-            _postedTransfers.Where(t => t.AccountId == accountId).OrderBy(t => t.Date);
+            Attach(_postedTransfers.Where(t => t.AccountId == accountId).OrderBy(t => t.Date));
 
         public IEnumerable<PostedTransferTransaction> GetPostedTransfersByDateRange(DateTime start, DateTime end) =>
-            _postedTransfers.Where(t => InRange(t.Date, start, end)).OrderBy(t => t.Date);
+            Attach(_postedTransfers.Where(t => InRange(t.Date, start, end)).OrderBy(t => t.Date));
+
+        public IEnumerable<PostedTransferTransaction> GetPostedTransfersByAccount(Guid accountId, DateTime start, DateTime end) =>
+            Attach(_postedTransfers.Where(t => t.AccountId == accountId && InRange(t.Date, start, end)).OrderBy(t => t.Date));
+
+        public decimal SumPostedTransfersBefore(Guid accountId, DateTime before) =>
+            _postedTransfers.Where(t => t.AccountId == accountId && t.Date < before).Sum(t => t.Amount);
+
+        public decimal SumPostedTransfersAfter(Guid accountId, DateTime after) =>
+            _postedTransfers.Where(t => t.AccountId == accountId && t.Date > after).Sum(t => t.Amount);
 
         public PostedTransferTransaction? GetLatestPostedTransfer(Guid accountId) =>
             _postedTransfers
@@ -87,53 +122,88 @@ namespace THMS.Data.Stores.InMemoryStores
                 .FirstOrDefault();
 
         public IEnumerable<PostedTransferTransaction> GetUnmatchedPostedTransfers(Guid accountId) =>
-            _postedTransfers
+            Attach(_postedTransfers
                 .Where(t => t.AccountId == accountId && t.RelatedPostedTransactionId == Guid.Empty)
-                .OrderBy(t => t.Date);
+                .OrderBy(t => t.Date));
 
         // ------------------------------------------------------------
         // Future Single Transactions
         // ------------------------------------------------------------
 
-        public void AddFutureSingle(FutureSingleTransaction transaction) => Add(_futureSingles, transaction);
+        public void AddFutureSingle(FutureSingleTransaction transaction)
+        {
+            Add(_futureSingles, transaction);
+            PersistIncomingSplits(transaction);
+        }
+
         public void UpdateFutureSingle(FutureSingleTransaction transaction) => Update(_futureSingles, transaction);
-        public void DeleteFutureSingle(Guid id) => _futureSingles.RemoveAll(t => t.Id == id);
-        public FutureSingleTransaction? GetFutureSingle(Guid id) => _futureSingles.FirstOrDefault(t => t.Id == id);
+        public void DeleteFutureSingle(Guid id)
+        {
+            _futureSingles.RemoveAll(t => t.Id == id);
+            DeleteSplits(id);
+        }
+
+        public FutureSingleTransaction? GetFutureSingle(Guid id) =>
+            Attach(_futureSingles.FirstOrDefault(t => t.Id == id));
 
         public IEnumerable<FutureSingleTransaction> GetFutureSinglesByAccount(Guid accountId) =>
-            _futureSingles.Where(t => t.AccountId == accountId).OrderBy(t => t.Date);
+            Attach(_futureSingles.Where(t => t.AccountId == accountId).OrderBy(t => t.Date));
 
         public IEnumerable<FutureSingleTransaction> GetFutureSinglesByDateRange(DateTime start, DateTime end) =>
-            _futureSingles.Where(t => InRange(t.Date, start, end)).OrderBy(t => t.Date);
+            Attach(_futureSingles.Where(t => InRange(t.Date, start, end)).OrderBy(t => t.Date));
+
+        public IEnumerable<FutureSingleTransaction> GetPlannedPayments(Guid accountId) =>
+            Attach(_futureSingles.Where(t => t.IsPlannedPayment && t.AccountId == accountId).OrderBy(t => t.Date));
+
+        public IEnumerable<FutureSingleTransaction> GetAllPlannedPayments() =>
+            Attach(_futureSingles.Where(t => t.IsPlannedPayment).OrderBy(t => t.Date));
 
         public IEnumerable<FutureSingleTransaction> GetAllFutureSingles() =>
-            _futureSingles.OrderBy(t => t.Date);
+            Attach(_futureSingles.OrderBy(t => t.Date));
 
         public IEnumerable<FutureSingleTransaction> GetRealizedFutureSingles(DateTime cutoff) =>
-            _futureSingles.Where(t => t.IsRealized && t.Date <= cutoff).OrderBy(t => t.Date);
+            Attach(_futureSingles.Where(t => t.IsRealized && t.Date <= cutoff).OrderBy(t => t.Date));
 
         // ------------------------------------------------------------
         // Future Transfer Transactions
         // ------------------------------------------------------------
 
-        public void AddFutureTransfer(FutureTransferTransaction transaction) => Add(_futureTransfers, transaction);
+        public void AddFutureTransfer(FutureTransferTransaction transaction)
+        {
+            Add(_futureTransfers, transaction);
+            PersistIncomingSplits(transaction);
+        }
+
         public void UpdateFutureTransfer(FutureTransferTransaction transaction) => Update(_futureTransfers, transaction);
-        public void DeleteFutureTransfer(Guid id) => _futureTransfers.RemoveAll(t => t.Id == id);
-        public FutureTransferTransaction? GetFutureTransfer(Guid id) => _futureTransfers.FirstOrDefault(t => t.Id == id);
+        public void DeleteFutureTransfer(Guid id)
+        {
+            _futureTransfers.RemoveAll(t => t.Id == id);
+            DeleteSplits(id);
+        }
+
+        public FutureTransferTransaction? GetFutureTransfer(Guid id) =>
+            Attach(_futureTransfers.FirstOrDefault(t => t.Id == id));
 
         public IEnumerable<FutureTransferTransaction> GetFutureTransfersByAccount(Guid accountId) =>
-            _futureTransfers
+            Attach(_futureTransfers
                 .Where(t => t.FromAccountId == accountId || t.ToAccountId == accountId)
-                .OrderBy(t => t.Date);
+                .OrderBy(t => t.Date));
 
         public IEnumerable<FutureTransferTransaction> GetFutureTransfersByDateRange(DateTime start, DateTime end) =>
-            _futureTransfers.Where(t => InRange(t.Date, start, end)).OrderBy(t => t.Date);
+            Attach(_futureTransfers.Where(t => InRange(t.Date, start, end)).OrderBy(t => t.Date));
+
+        public IEnumerable<FutureTransferTransaction> GetPlannedTransfers(Guid accountId) =>
+            Attach(_futureTransfers.Where(t => t.IsPlannedPayment &&
+                (t.FromAccountId == accountId || t.ToAccountId == accountId)).OrderBy(t => t.Date));
+
+        public IEnumerable<FutureTransferTransaction> GetAllPlannedTransfers() =>
+            Attach(_futureTransfers.Where(t => t.IsPlannedPayment).OrderBy(t => t.Date));
 
         public IEnumerable<FutureTransferTransaction> GetAllFutureTransfers() =>
-            _futureTransfers.OrderBy(t => t.Date);
+            Attach(_futureTransfers.OrderBy(t => t.Date));
 
         public IEnumerable<FutureTransferTransaction> GetRealizedFutureTransfers(DateTime cutoff) =>
-            _futureTransfers.Where(t => t.IsRealized && t.Date <= cutoff).OrderBy(t => t.Date);
+            Attach(_futureTransfers.Where(t => t.IsRealized && t.Date <= cutoff).OrderBy(t => t.Date));
 
         // ------------------------------------------------------------
         // Recurring Single Rules
@@ -145,20 +215,29 @@ namespace THMS.Data.Stores.InMemoryStores
             if (existing is not null)
             {
                 UpsertExisting(existing, rule, r => Update(_recurringSingles, r));
+                PersistIncomingSplits(rule);
                 return;
             }
 
             Add(_recurringSingles, rule);
+            PersistIncomingSplits(rule);
         }
+
         public void UpdateRecurringSingle(RecurringSingleTransactionRule rule) => Update(_recurringSingles, rule);
-        public void DeleteRecurringSingle(Guid id) => _recurringSingles.RemoveAll(r => r.Id == id);
-        public RecurringSingleTransactionRule? GetRecurringSingle(Guid id) => _recurringSingles.FirstOrDefault(r => r.Id == id);
+        public void DeleteRecurringSingle(Guid id)
+        {
+            _recurringSingles.RemoveAll(r => r.Id == id);
+            DeleteSplits(id);
+        }
+
+        public RecurringSingleTransactionRule? GetRecurringSingle(Guid id) =>
+            Attach(_recurringSingles.FirstOrDefault(r => r.Id == id));
 
         public IEnumerable<RecurringSingleTransactionRule> GetRecurringSinglesByAccount(Guid accountId) =>
-            _recurringSingles.Where(r => r.AccountId == accountId).OrderBy(r => r.Date);
+            Attach(_recurringSingles.Where(r => r.AccountId == accountId).OrderBy(r => r.Date));
 
         public IEnumerable<RecurringSingleTransactionRule> GetAllRecurringSingles() =>
-            _recurringSingles.OrderBy(r => r.Date);
+            Attach(_recurringSingles.OrderBy(r => r.Date));
 
         // ------------------------------------------------------------
         // Recurring Transfer Rules
@@ -170,22 +249,31 @@ namespace THMS.Data.Stores.InMemoryStores
             if (existing is not null)
             {
                 UpsertExisting(existing, rule, r => Update(_recurringTransfers, r));
+                PersistIncomingSplits(rule);
                 return;
             }
 
             Add(_recurringTransfers, rule);
+            PersistIncomingSplits(rule);
         }
+
         public void UpdateRecurringTransfer(RecurringTransferRule rule) => Update(_recurringTransfers, rule);
-        public void DeleteRecurringTransfer(Guid id) => _recurringTransfers.RemoveAll(r => r.Id == id);
-        public RecurringTransferRule? GetRecurringTransfer(Guid id) => _recurringTransfers.FirstOrDefault(r => r.Id == id);
+        public void DeleteRecurringTransfer(Guid id)
+        {
+            _recurringTransfers.RemoveAll(r => r.Id == id);
+            DeleteSplits(id);
+        }
+
+        public RecurringTransferRule? GetRecurringTransfer(Guid id) =>
+            Attach(_recurringTransfers.FirstOrDefault(r => r.Id == id));
 
         public IEnumerable<RecurringTransferRule> GetRecurringTransfersByAccount(Guid accountId) =>
-            _recurringTransfers
+            Attach(_recurringTransfers
                 .Where(r => r.FromAccountId == accountId || r.ToAccountId == accountId)
-                .OrderBy(r => r.Date);
+                .OrderBy(r => r.Date));
 
         public IEnumerable<RecurringTransferRule> GetAllRecurringTransfers() =>
-            _recurringTransfers.OrderBy(r => r.Date);
+            Attach(_recurringTransfers.OrderBy(r => r.Date));
 
         // ------------------------------------------------------------
         // Expense Budget Rules
@@ -282,6 +370,7 @@ namespace THMS.Data.Stores.InMemoryStores
             Retarget(_futureTransfers, keep, retire.Id);
             Retarget(_recurringSingles, keep, retire.Id);
             Retarget(_recurringTransfers, keep, retire.Id);
+            RetargetSplits(keep, retire.Id);
 
             foreach (var rule in _expenseBudgetRules)
             {
@@ -332,13 +421,14 @@ namespace THMS.Data.Stores.InMemoryStores
             return new CategoryUsage
             {
                 TransactionCount =
-                    _posted.Count(t => t.CategoryId == categoryId) +
-                    _postedTransfers.Count(t => t.CategoryId == categoryId) +
-                    _futureSingles.Count(t => t.CategoryId == categoryId) +
-                    _futureTransfers.Count(t => t.CategoryId == categoryId),
+                    CountUnsplit(_posted, categoryId) +
+                    CountUnsplit(_postedTransfers, categoryId) +
+                    CountUnsplit(_futureSingles, categoryId) +
+                    CountUnsplit(_futureTransfers, categoryId) +
+                    _splits.Count(s => s.CategoryId == categoryId),
                 RecurringRuleCount =
-                    _recurringSingles.Count(r => r.CategoryId == categoryId) +
-                    _recurringTransfers.Count(r => r.CategoryId == categoryId),
+                    CountUnsplit(_recurringSingles, categoryId) +
+                    CountUnsplit(_recurringTransfers, categoryId),
                 BudgetRuleCount = _expenseBudgetRules.Count(r => r.IncludedCategoryIds.Contains(categoryId)),
                 LearnedMappingCount = _assignments.Count(a => a.CategoryId == categoryId)
             };
@@ -386,6 +476,77 @@ namespace THMS.Data.Stores.InMemoryStores
         public CategoryAssignment? GetAssignment(string normalizedDescription) =>
             _assignments.FirstOrDefault(a =>
                 string.Equals(a.NormalizedDescription, normalizedDescription, StringComparison.Ordinal));
+
+        public void SaveSplits(Guid parentId, IEnumerable<SplitTransactionRow> splits)
+        {
+            DeleteSplits(parentId);
+            foreach (var split in splits)
+            {
+                var copy = split.Clone();
+                if (copy.Id == Guid.Empty)
+                    copy.Id = Guid.NewGuid();
+                copy.ParentTransactionId = parentId;
+                _splits.Add(copy);
+            }
+
+            AttachKnownParent(parentId);
+        }
+
+        public List<SplitTransactionRow> GetSplits(Guid parentId) =>
+            _splits.Where(s => s.ParentTransactionId == parentId).Select(s => s.Clone()).ToList();
+
+        public void DeleteSplits(Guid parentId)
+        {
+            _splits.RemoveAll(s => s.ParentTransactionId == parentId);
+            AttachKnownParent(parentId);
+        }
+
+        private void PersistIncomingSplits(BaseTransaction item)
+        {
+            if (item.Splits.Count > 0)
+                SaveSplits(item.Id, item.Splits);
+        }
+
+        private void AttachKnownParent(Guid parentId)
+        {
+            var attached = GetSplits(parentId);
+            var parent =
+                (BaseTransaction?)_posted.FirstOrDefault(t => t.Id == parentId) ??
+                _postedTransfers.FirstOrDefault(t => t.Id == parentId) ??
+                _futureSingles.FirstOrDefault(t => t.Id == parentId) ??
+                _futureTransfers.FirstOrDefault(t => t.Id == parentId) ??
+                (BaseTransaction?)_recurringSingles.FirstOrDefault(t => t.Id == parentId) ??
+                _recurringTransfers.FirstOrDefault(t => t.Id == parentId);
+            if (parent is not null)
+                parent.Splits = attached;
+        }
+
+        private T? Attach<T>(T? item) where T : BaseTransaction
+        {
+            if (item is not null)
+                item.Splits = GetSplits(item.Id);
+            return item;
+        }
+
+        private IEnumerable<T> Attach<T>(IEnumerable<T> items) where T : BaseTransaction
+        {
+            var list = items.ToList();
+            foreach (var item in list)
+                item.Splits = GetSplits(item.Id);
+            return list;
+        }
+
+        private int CountUnsplit<T>(IEnumerable<T> items, Guid categoryId) where T : BaseTransaction =>
+            items.Count(t => t.CategoryId == categoryId && !_splits.Any(s => s.ParentTransactionId == t.Id));
+
+        private void RetargetSplits(ExpenseCategory keep, Guid retireId)
+        {
+            foreach (var split in _splits.Where(s => s.CategoryId == retireId))
+            {
+                split.CategoryId = keep.Id;
+                split.Category = keep.Name;
+            }
+        }
 
         private static void UpsertExisting<T>(T existing, T incoming, Action<T> update)
             where T : BaseDomainModel

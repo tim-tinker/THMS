@@ -4,10 +4,13 @@
     {
         private System.ComponentModel.IContainer components = null;
         private DataGridView gridAccounts;
-        private Panel pnlButtons;
-        private Button btnAdd;
-        private Button btnEdit;
-        private Button btnDelete;
+        private FlowLayoutPanel pnlButtons;
+        private ThmsButton btnAdd;
+        private ThmsButton btnEdit;
+        private ThmsButton btnDelete;
+        private ThmsButton btnImport;
+        private ThmsButton btnConnectPlaid;
+        private ThmsButton btnDiagnostics;
 
         protected override void Dispose(bool disposing)
         {
@@ -19,10 +22,13 @@
         private void InitializeComponent()
         {
             gridAccounts = new DataGridView();
-            pnlButtons = new Panel();
-            btnAdd = new Button();
-            btnEdit = new Button();
-            btnDelete = new Button();
+            pnlButtons = new FlowLayoutPanel();
+            btnAdd = new ThmsButton();
+            btnEdit = new ThmsButton();
+            btnDelete = new ThmsButton();
+            btnImport = new ThmsButton();
+            btnConnectPlaid = new ThmsButton();
+            btnDiagnostics = new ThmsButton();
             ((System.ComponentModel.ISupportInitialize)gridAccounts).BeginInit();
             pnlButtons.SuspendLayout();
             SuspendLayout();
@@ -31,6 +37,7 @@
             // 
             gridAccounts.AllowUserToAddRows = false;
             gridAccounts.AllowUserToDeleteRows = false;
+            gridAccounts.AutoGenerateColumns = false;
             gridAccounts.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             gridAccounts.ColumnHeadersHeight = 40;
             gridAccounts.Dock = DockStyle.Fill;
@@ -40,44 +47,73 @@
             gridAccounts.RowHeadersWidth = 72;
             gridAccounts.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             gridAccounts.TabIndex = 0;
+            gridAccounts.Columns.AddRange(
+                TextColumn("Name", "Name"),
+                TextColumn("Type", "Type"),
+                TextColumn("Institution", "Institution"),
+                TextColumn("AccountNumber", "Account Number"),
+                TextColumn("BalanceAsOf", "As Of"));
             // 
             // pnlButtons
             // 
             pnlButtons.Controls.Add(btnAdd);
             pnlButtons.Controls.Add(btnEdit);
             pnlButtons.Controls.Add(btnDelete);
+            pnlButtons.Controls.Add(btnImport);
+            pnlButtons.Controls.Add(btnConnectPlaid);
+            pnlButtons.Controls.Add(btnDiagnostics);
+            pnlButtons.AutoSize = true;
+            pnlButtons.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             pnlButtons.Dock = DockStyle.Bottom;
-            pnlButtons.Location = new Point(0, 0);
+            pnlButtons.FlowDirection = FlowDirection.LeftToRight;
             pnlButtons.Name = "pnlButtons";
-            pnlButtons.Size = new Size(800, 64);
+            pnlButtons.Padding = new Padding(8, 8, 8, 8);
+            pnlButtons.Size = new Size(800, 56);
             pnlButtons.TabIndex = 1;
+            pnlButtons.WrapContents = true;
             // 
             // btnAdd
             // 
-            btnAdd.Location = new Point(12, 12);
             btnAdd.Name = "btnAdd";
-            btnAdd.Size = new Size(120, 40);
             btnAdd.TabIndex = 0;
             btnAdd.Text = "Add Account";
             btnAdd.Click += OnAddAccount;
             // 
             // btnEdit
             // 
-            btnEdit.Location = new Point(144, 12);
             btnEdit.Name = "btnEdit";
-            btnEdit.Size = new Size(120, 40);
             btnEdit.TabIndex = 1;
             btnEdit.Text = "Edit Account";
             btnEdit.Click += OnEditAccount;
             // 
             // btnDelete
             // 
-            btnDelete.Location = new Point(276, 12);
+            btnDelete.Destructive = true;
             btnDelete.Name = "btnDelete";
-            btnDelete.Size = new Size(120, 40);
             btnDelete.TabIndex = 2;
             btnDelete.Text = "Delete Account";
             btnDelete.Click += OnDeleteAccount;
+            // 
+            // btnImport
+            // 
+            btnImport.Name = "btnImport";
+            btnImport.TabIndex = 3;
+            btnImport.Text = "Import";
+            btnImport.Click += OnImportAccounts;
+            // 
+            // btnConnectPlaid
+            // 
+            btnConnectPlaid.Name = "btnConnectPlaid";
+            btnConnectPlaid.TabIndex = 4;
+            btnConnectPlaid.Text = "Connect to Plaid";
+            btnConnectPlaid.Click += OnConnectToPlaid;
+            // 
+            // btnDiagnostics
+            // 
+            btnDiagnostics.Name = "btnDiagnostics";
+            btnDiagnostics.TabIndex = 5;
+            btnDiagnostics.Text = "Diagnostics";
+            btnDiagnostics.Click += OnRunDiagnostics;
             // 
             // AccountUpdaterControl
             // 
@@ -89,5 +125,14 @@
             pnlButtons.ResumeLayout(false);
             ResumeLayout(false);
         }
+
+        private static DataGridViewTextBoxColumn TextColumn(string property, string header) =>
+            new()
+            {
+                DataPropertyName = property,
+                HeaderText = header,
+                Name = property,
+                ReadOnly = true
+            };
     }
 }

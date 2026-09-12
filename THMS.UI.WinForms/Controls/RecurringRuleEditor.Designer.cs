@@ -40,6 +40,7 @@ namespace THMS.UI.WinForms.Controls
             btnSave = new Button();
             btnDelete = new Button();
             btnClose = new Button();
+            btnEditSplits = new Button();
             ((System.ComponentModel.ISupportInitialize)numAmount).BeginInit();
             pnlButtons.SuspendLayout();
             SuspendLayout();
@@ -208,6 +209,16 @@ namespace THMS.UI.WinForms.Controls
             dtNextOccurrence.Size = new Size(220, 23);
             dtNextOccurrence.TabIndex = 17;
             // 
+            // btnEditSplits
+            // 
+            btnEditSplits.Location = new Point(150, 332);
+            btnEditSplits.Name = "btnEditSplits";
+            btnEditSplits.Size = new Size(220, 28);
+            btnEditSplits.TabIndex = 18;
+            btnEditSplits.Text = "Edit Splits";
+            btnEditSplits.UseVisualStyleBackColor = true;
+            btnEditSplits.Click += OnEditSplits;
+            // 
             // pnlButtons
             // 
             pnlButtons.Controls.Add(btnAdd);
@@ -215,10 +226,10 @@ namespace THMS.UI.WinForms.Controls
             pnlButtons.Controls.Add(btnDelete);
             pnlButtons.Controls.Add(btnClose);
             pnlButtons.Dock = DockStyle.Bottom;
-            pnlButtons.Location = new Point(0, 341);
+            pnlButtons.Location = new Point(0, 371);
             pnlButtons.Name = "pnlButtons";
             pnlButtons.Size = new Size(414, 60);
-            pnlButtons.TabIndex = 18;
+            pnlButtons.TabIndex = 19;
             // 
             // btnAdd
             // 
@@ -266,7 +277,7 @@ namespace THMS.UI.WinForms.Controls
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = btnClose;
-            ClientSize = new Size(414, 401);
+            ClientSize = new Size(414, 431);
             Controls.Add(lblRuleType);
             Controls.Add(cmbRuleType);
             Controls.Add(lblAccount);
@@ -285,6 +296,7 @@ namespace THMS.UI.WinForms.Controls
             Controls.Add(cmbFrequency);
             Controls.Add(lblNextOccurrence);
             Controls.Add(dtNextOccurrence);
+            Controls.Add(btnEditSplits);
             Controls.Add(pnlButtons);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -318,6 +330,7 @@ namespace THMS.UI.WinForms.Controls
         private ComboBox cmbFrequency;
         private Label lblNextOccurrence;
         private DateTimePicker dtNextOccurrence;
+        private Button btnEditSplits;
         private Panel pnlButtons;
         private Button btnAdd;
         private Button btnSave;

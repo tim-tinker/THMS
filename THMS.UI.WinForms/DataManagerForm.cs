@@ -5,6 +5,7 @@ namespace THMS.UI.WinForms
     public partial class DataManagerForm : BaseEmbeddedForm
     {
         private IDataManagerControl? _currentControl;
+        private Control? _hostedControl;
         private readonly TransactionManagerControl _transactionManagerControl = new();
 
         private Dictionary<string, Control> _controls = [];
@@ -35,7 +36,10 @@ namespace THMS.UI.WinForms
 
         private void ClearControls()
         {
-            panelHost.Controls.Remove(_currentControl as Control);
+            if (_hostedControl != null)
+                panelHost.Controls.Remove(_hostedControl);
+
+            _hostedControl = null;
             _currentControl = null;
         }
 
@@ -48,15 +52,27 @@ namespace THMS.UI.WinForms
             DisplayControl(menuLabel);
         }
 
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            base.OnVisibleChanged(e);
+            if (Visible && !Disposing && _hostedControl is TransactionManagerControl ledger)
+                ledger.RefreshAll();
+        }
+
         private void DisplayControl(string label)
         {
             if (!_controls.ContainsKey(label))
                 return;
             ClearControls();
             var control = _controls[label];
+            _hostedControl = control;
             _currentControl = control as IDataManagerControl;
             panelHost.Controls.Add(control);
             control.BringToFront();
+            if (control is TransactionManagerControl ledger)
+                ledger.RefreshAll();
+            else
+                _currentControl?.SetGridDataSource("Month");
         }
 
         private void OnClickViewMonth(object sender, EventArgs e)
@@ -87,17 +103,6 @@ namespace THMS.UI.WinForms
         private void OnClickEditDeleteAction(object sender, EventArgs e)
         {
 
-        }
-
-
-        private void OnClickImportHistoricalData(object sender, EventArgs e)
-        {
-            using var dlg = new ImportDataForm();
-            if (dlg.ShowDialog() == DialogResult.OK)
-            {
-                DisplayControl("Accounts and Transactions");
-                _transactionManagerControl.RefreshAll();
-            }
         }
     }
 }

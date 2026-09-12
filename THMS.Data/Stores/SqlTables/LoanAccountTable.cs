@@ -68,9 +68,26 @@ namespace THMS.Data.Stores.SqlTables
 
         private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
         {
+            if (ColumnExists(conn, columnName))
+                return;
+
             using var alter = conn.CreateCommand();
-            alter.CommandText = $"ALTER TABLE LoanAccounts ADD COLUMN IF NOT EXISTS {columnName} {columnDef};";
+            alter.CommandText = $"ALTER TABLE LoanAccounts ADD COLUMN {columnName} {columnDef};";
             alter.ExecuteNonQuery();
+        }
+
+        private static bool ColumnExists(SqliteConnection conn, string columnName)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "PRAGMA table_info(LoanAccounts);";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
     }
 }

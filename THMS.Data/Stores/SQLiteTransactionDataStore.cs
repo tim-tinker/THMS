@@ -32,6 +32,7 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _store.Posted.Add(conn, transaction);
+            PersistIncomingSplits(conn, transaction);
         }
 
         public void UpdatePostedTransaction(PostedTransaction transaction)
@@ -64,24 +65,43 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _store.Posted.Delete(conn, id);
+            _store.Splits.DeleteByParent(conn, id);
         }
 
         public PostedTransaction? GetPostedTransaction(Guid id)
         {
             using var conn = OpenConnection();
-            return _store.Posted.GetById(conn, id);
+            return AttachOne(conn, _store.Posted.GetById(conn, id));
         }
 
         public IEnumerable<PostedTransaction> GetPostedTransactions(Guid accountId)
         {
             using var conn = OpenConnection();
-            return _store.Posted.GetByAccount(conn, accountId).ToList();
+            return AttachMany(conn, _store.Posted.GetByAccount(conn, accountId));
         }
 
         public IEnumerable<PostedTransaction> GetPostedTransactions(DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _store.Posted.GetByDateRange(conn, start, end).ToList();
+            return AttachMany(conn, _store.Posted.GetByDateRange(conn, start, end));
+        }
+
+        public IEnumerable<PostedTransaction> GetPostedTransactions(Guid accountId, DateTime start, DateTime end)
+        {
+            using var conn = OpenConnection();
+            return AttachMany(conn, _store.Posted.GetByAccountAndDateRange(conn, accountId, start, end));
+        }
+
+        public decimal SumPostedAmountsBefore(Guid accountId, DateTime before)
+        {
+            using var conn = OpenConnection();
+            return _store.Posted.SumAmountBefore(conn, accountId, before);
+        }
+
+        public decimal SumPostedAmountsAfter(Guid accountId, DateTime after)
+        {
+            using var conn = OpenConnection();
+            return _store.Posted.SumAmountAfter(conn, accountId, after);
         }
 
         public DateTime? GetLatestPostedTransactionDate(Guid accountId)
@@ -98,6 +118,7 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _store.PostedTransfers.Add(conn, transaction);
+            PersistIncomingSplits(conn, transaction);
         }
 
         public void UpdatePostedTransferTransaction(PostedTransferTransaction transaction)
@@ -110,24 +131,43 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _store.PostedTransfers.Delete(conn, id);
+            _store.Splits.DeleteByParent(conn, id);
         }
 
         public PostedTransferTransaction? GetPostedTransferTransaction(Guid id)
         {
             using var conn = OpenConnection();
-            return _store.PostedTransfers.GetById(conn, id);
+            return AttachOne(conn, _store.PostedTransfers.GetById(conn, id));
         }
 
         public IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(Guid accountId)
         {
             using var conn = OpenConnection();
-            return _store.PostedTransfers.GetByAccount(conn, accountId).ToList();
+            return AttachMany(conn, _store.PostedTransfers.GetByAccount(conn, accountId));
         }
 
         public IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _store.PostedTransfers.GetByDateRange(conn, start, end).ToList();
+            return AttachMany(conn, _store.PostedTransfers.GetByDateRange(conn, start, end));
+        }
+
+        public IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(Guid accountId, DateTime start, DateTime end)
+        {
+            using var conn = OpenConnection();
+            return AttachMany(conn, _store.PostedTransfers.GetByAccountAndDateRange(conn, accountId, start, end));
+        }
+
+        public decimal SumPostedTransferAmountsBefore(Guid accountId, DateTime before)
+        {
+            using var conn = OpenConnection();
+            return _store.PostedTransfers.SumAmountBefore(conn, accountId, before);
+        }
+
+        public decimal SumPostedTransferAmountsAfter(Guid accountId, DateTime after)
+        {
+            using var conn = OpenConnection();
+            return _store.PostedTransfers.SumAmountAfter(conn, accountId, after);
         }
 
         public DateTime? GetLatestPostedTransferTransactionDate(Guid accountId)
@@ -144,6 +184,7 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _store.FutureSingles.Add(conn, transaction);
+            PersistIncomingSplits(conn, transaction);
         }
 
         public void UpdateFutureSingleTransaction(FutureSingleTransaction transaction)
@@ -156,24 +197,37 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _store.FutureSingles.Delete(conn, id);
+            _store.Splits.DeleteByParent(conn, id);
         }
 
         public FutureSingleTransaction? GetFutureSingleTransaction(Guid id)
         {
             using var conn = OpenConnection();
-            return _store.FutureSingles.GetById(conn, id);
+            return AttachOne(conn, _store.FutureSingles.GetById(conn, id));
         }
 
         public IEnumerable<FutureSingleTransaction> GetFutureSingleTransactions(Guid accountId)
         {
             using var conn = OpenConnection();
-            return _store.FutureSingles.GetByAccount(conn, accountId).ToList();
+            return AttachMany(conn, _store.FutureSingles.GetByAccount(conn, accountId));
         }
 
         public IEnumerable<FutureSingleTransaction> GetFutureSingleTransactions(DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _store.FutureSingles.GetByDateRange(conn, start, end).ToList();
+            return AttachMany(conn, _store.FutureSingles.GetByDateRange(conn, start, end));
+        }
+
+        public List<FutureSingleTransaction> GetPlannedPayments(Guid accountId)
+        {
+            using var conn = OpenConnection();
+            return AttachMany(conn, _store.FutureSingles.GetPlanned(conn, accountId));
+        }
+
+        public List<FutureSingleTransaction> GetAllPlannedPayments()
+        {
+            using var conn = OpenConnection();
+            return AttachMany(conn, _store.FutureSingles.GetAllPlanned(conn));
         }
 
         // ------------------------------------------------------------
@@ -184,6 +238,7 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _store.FutureTransfers.Add(conn, transaction);
+            PersistIncomingSplits(conn, transaction);
         }
 
         public void UpdateFutureTransferTransaction(FutureTransferTransaction transaction)
@@ -196,24 +251,37 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _store.FutureTransfers.Delete(conn, id);
+            _store.Splits.DeleteByParent(conn, id);
         }
 
         public FutureTransferTransaction? GetFutureTransferTransaction(Guid id)
         {
             using var conn = OpenConnection();
-            return _store.FutureTransfers.GetById(conn, id);
+            return AttachOne(conn, _store.FutureTransfers.GetById(conn, id));
         }
 
         public IEnumerable<FutureTransferTransaction> GetFutureTransferTransactions(Guid accountId)
         {
             using var conn = OpenConnection();
-            return _store.FutureTransfers.GetByAccount(conn, accountId).ToList();
+            return AttachMany(conn, _store.FutureTransfers.GetByAccount(conn, accountId));
         }
 
         public IEnumerable<FutureTransferTransaction> GetFutureTransferTransactions(DateTime start, DateTime end)
         {
             using var conn = OpenConnection();
-            return _store.FutureTransfers.GetByDateRange(conn, start, end).ToList();
+            return AttachMany(conn, _store.FutureTransfers.GetByDateRange(conn, start, end));
+        }
+
+        public List<FutureTransferTransaction> GetPlannedTransfers(Guid accountId)
+        {
+            using var conn = OpenConnection();
+            return AttachMany(conn, _store.FutureTransfers.GetPlanned(conn, accountId));
+        }
+
+        public List<FutureTransferTransaction> GetAllPlannedTransfers()
+        {
+            using var conn = OpenConnection();
+            return AttachMany(conn, _store.FutureTransfers.GetAllPlanned(conn));
         }
 
         // ------------------------------------------------------------
@@ -233,10 +301,12 @@ namespace THMS.Data.Stores.SQLite
                 rule.Id = existing.Id;
                 rule.IsUserCreated = existing.IsUserCreated || rule.IsUserCreated;
                 _store.RecurringSingles.Update(conn, rule);
+                PersistIncomingSplits(conn, rule);
                 return;
             }
 
             _store.RecurringSingles.Add(conn, rule);
+            PersistIncomingSplits(conn, rule);
         }
 
         public void UpdateRecurringSingleRule(RecurringSingleTransactionRule rule)
@@ -249,18 +319,19 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _store.RecurringSingles.Delete(conn, id);
+            _store.Splits.DeleteByParent(conn, id);
         }
 
         public RecurringSingleTransactionRule? GetRecurringSingleRule(Guid id)
         {
             using var conn = OpenConnection();
-            return _store.RecurringSingles.GetById(conn, id);
+            return AttachOne(conn, _store.RecurringSingles.GetById(conn, id));
         }
 
         public IEnumerable<RecurringSingleTransactionRule> GetRecurringSingleRules(Guid accountId)
         {
             using var conn = OpenConnection();
-            return _store.RecurringSingles.GetByAccount(conn, accountId).ToList();
+            return AttachMany(conn, _store.RecurringSingles.GetByAccount(conn, accountId));
         }
 
         // ------------------------------------------------------------
@@ -280,10 +351,12 @@ namespace THMS.Data.Stores.SQLite
                 rule.Id = existing.Id;
                 rule.IsUserCreated = existing.IsUserCreated || rule.IsUserCreated;
                 _store.RecurringTransfers.Update(conn, rule);
+                PersistIncomingSplits(conn, rule);
                 return;
             }
 
             _store.RecurringTransfers.Add(conn, rule);
+            PersistIncomingSplits(conn, rule);
         }
 
         public void UpdateRecurringTransferRule(RecurringTransferRule rule)
@@ -296,18 +369,19 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _store.RecurringTransfers.Delete(conn, id);
+            _store.Splits.DeleteByParent(conn, id);
         }
 
         public RecurringTransferRule? GetRecurringTransferRule(Guid id)
         {
             using var conn = OpenConnection();
-            return _store.RecurringTransfers.GetById(conn, id);
+            return AttachOne(conn, _store.RecurringTransfers.GetById(conn, id));
         }
 
         public IEnumerable<RecurringTransferRule> GetRecurringTransferRules(Guid accountId)
         {
             using var conn = OpenConnection();
-            return _store.RecurringTransfers.GetByAccount(conn, accountId).ToList();
+            return AttachMany(conn, _store.RecurringTransfers.GetByAccount(conn, accountId));
         }
 
         // ------------------------------------------------------------
@@ -459,6 +533,7 @@ namespace THMS.Data.Stores.SQLite
             SqliteCategoryColumns.Retarget(conn, "FutureTransferTransactions", retire.Id, keep.Id, keep.Name);
             SqliteCategoryColumns.Retarget(conn, "RecurringSingleTransactionRules", retire.Id, keep.Id, keep.Name);
             SqliteCategoryColumns.Retarget(conn, "RecurringTransferRules", retire.Id, keep.Id, keep.Name);
+            SqliteCategoryColumns.Retarget(conn, "SplitTransactionRows", retire.Id, keep.Id, keep.Name);
 
             foreach (var rule in _store.ExpenseBudgetRules.GetAll(conn))
             {
@@ -507,13 +582,14 @@ namespace THMS.Data.Stores.SQLite
             return new CategoryUsage
             {
                 TransactionCount =
-                    SqliteCategoryColumns.Count(conn, "PostedTransactions", categoryId) +
-                    SqliteCategoryColumns.Count(conn, "PostedTransferTransactions", categoryId) +
-                    SqliteCategoryColumns.Count(conn, "FutureSingleTransactions", categoryId) +
-                    SqliteCategoryColumns.Count(conn, "FutureTransferTransactions", categoryId),
+                    SqliteCategoryColumns.CountUnsplit(conn, "PostedTransactions", categoryId) +
+                    SqliteCategoryColumns.CountUnsplit(conn, "PostedTransferTransactions", categoryId) +
+                    SqliteCategoryColumns.CountUnsplit(conn, "FutureSingleTransactions", categoryId) +
+                    SqliteCategoryColumns.CountUnsplit(conn, "FutureTransferTransactions", categoryId) +
+                    SqliteCategoryColumns.Count(conn, "SplitTransactionRows", categoryId),
                 RecurringRuleCount =
-                    SqliteCategoryColumns.Count(conn, "RecurringSingleTransactionRules", categoryId) +
-                    SqliteCategoryColumns.Count(conn, "RecurringTransferRules", categoryId),
+                    SqliteCategoryColumns.CountUnsplit(conn, "RecurringSingleTransactionRules", categoryId) +
+                    SqliteCategoryColumns.CountUnsplit(conn, "RecurringTransferRules", categoryId),
                 BudgetRuleCount = _store.ExpenseBudgetRules.GetAll(conn)
                     .Count(r => r.IncludedCategoryIds.Contains(categoryId)),
                 LearnedMappingCount = _store.Assignments.CountByCategory(conn, categoryId)
@@ -545,49 +621,92 @@ namespace THMS.Data.Stores.SQLite
         public IEnumerable<PostedTransaction> GetUnmatchedPostedTransactions(Guid accountId)
         {
             using var conn = OpenConnection();
-            return _store.Posted.GetUnmatchedByAccount(conn, accountId).ToList();
+            return AttachMany(conn, _store.Posted.GetUnmatchedByAccount(conn, accountId));
         }
 
         public IEnumerable<PostedTransferTransaction> GetUnmatchedPostedTransferTransactions(Guid accountId)
         {
             using var conn = OpenConnection();
-            return _store.PostedTransfers.GetUnmatchedByAccount(conn, accountId).ToList();
+            return AttachMany(conn, _store.PostedTransfers.GetUnmatchedByAccount(conn, accountId));
         }
 
         public IEnumerable<FutureSingleTransaction> GetRealizedFutureSingleTransactions(DateTime cutoff)
         {
             using var conn = OpenConnection();
-            return _store.FutureSingles.GetRealized(conn, cutoff).ToList();
+            return AttachMany(conn, _store.FutureSingles.GetRealized(conn, cutoff));
         }
 
         public IEnumerable<FutureTransferTransaction> GetRealizedFutureTransferTransactions(DateTime cutoff)
         {
             using var conn = OpenConnection();
-            return _store.FutureTransfers.GetRealized(conn, cutoff).ToList();
+            return AttachMany(conn, _store.FutureTransfers.GetRealized(conn, cutoff));
         }
 
         public IEnumerable<FutureSingleTransaction> GetAllFutureSingleTransactions()
         {
             using var conn = OpenConnection();
-            return _store.FutureSingles.GetAll(conn).ToList();
+            return AttachMany(conn, _store.FutureSingles.GetAll(conn));
         }
 
         public IEnumerable<FutureTransferTransaction> GetAllFutureTransferTransactions()
         {
             using var conn = OpenConnection();
-            return _store.FutureTransfers.GetAll(conn).ToList();
+            return AttachMany(conn, _store.FutureTransfers.GetAll(conn));
         }
 
         public IEnumerable<RecurringSingleTransactionRule> GetAllRecurringSingleRules()
         {
             using var conn = OpenConnection();
-            return _store.RecurringSingles.GetAll(conn).ToList();
+            return AttachMany(conn, _store.RecurringSingles.GetAll(conn));
         }
 
         public IEnumerable<RecurringTransferRule> GetAllRecurringTransferRules()
         {
             using var conn = OpenConnection();
-            return _store.RecurringTransfers.GetAll(conn).ToList();
+            return AttachMany(conn, _store.RecurringTransfers.GetAll(conn));
+        }
+
+        public void SaveSplits(Guid parentId, IEnumerable<SplitTransactionRow> splits)
+        {
+            using var conn = OpenConnection();
+            _store.Splits.ReplaceAll(conn, parentId, splits);
+        }
+
+        public List<SplitTransactionRow> GetSplits(Guid parentId)
+        {
+            using var conn = OpenConnection();
+            return _store.Splits.GetByParent(conn, parentId);
+        }
+
+        public void DeleteSplits(Guid parentId)
+        {
+            using var conn = OpenConnection();
+            _store.Splits.DeleteByParent(conn, parentId);
+        }
+
+        private void PersistIncomingSplits(SqliteConnection conn, BaseTransaction item)
+        {
+            if (item.Splits.Count > 0)
+                _store.Splits.ReplaceAll(conn, item.Id, item.Splits);
+        }
+
+        private T? AttachOne<T>(SqliteConnection conn, T? item) where T : BaseTransaction
+        {
+            if (item is not null)
+                item.Splits = _store.Splits.GetByParent(conn, item.Id);
+            return item;
+        }
+
+        private List<T> AttachMany<T>(SqliteConnection conn, IEnumerable<T> items) where T : BaseTransaction
+        {
+            var list = items.ToList();
+            if (list.Count == 0)
+                return list;
+
+            var lookup = _store.Splits.GetByParents(conn, list.Select(i => i.Id).ToList());
+            foreach (var item in list)
+                item.Splits = lookup.GetValueOrDefault(item.Id, []);
+            return list;
         }
     }
 }

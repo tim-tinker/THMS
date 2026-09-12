@@ -2,7 +2,9 @@
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.External;
+using THMS.Ingestion.Importers.Finance;
 using THMS.Logic.Mapping;
+using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Logic.Orchestrators
 {
@@ -10,23 +12,134 @@ namespace THMS.Logic.Orchestrators
     {
         private readonly IExternalTransactionFetcher _transactionFetcher;
         private readonly ITransactionDataStore _txStore;
+        private readonly SpreadsheetTransactionImporter _spreadsheetImporter;
+        private readonly TransactionUpdaterOrchestrator _ledgerUpdater;
         private readonly Categorizer _categorizer;
         private double _dateWindowSize = 3; // use three because of weekends
 
         public TransactionImportOrchestrator()
             : this(
                 new ExternalFetcherFactory().GetTransactionFetcher(),
-                new DataStoreFactory().GetTransactionStore())
+                new DataStoreFactory().GetTransactionStore(),
+                new DataStoreFactory().GetAccountStore())
         {
         }
 
         public TransactionImportOrchestrator(
             IExternalTransactionFetcher transactionFetcher,
             ITransactionDataStore txStore)
+            : this(transactionFetcher, txStore, new DataStoreFactory().GetAccountStore())
+        {
+        }
+
+        public TransactionImportOrchestrator(
+            IExternalTransactionFetcher transactionFetcher,
+            ITransactionDataStore txStore,
+            IAccountDataStore accountStore)
+            : this(
+                transactionFetcher,
+                txStore,
+                new SpreadsheetTransactionImporter(txStore, accountStore),
+                new TransactionUpdaterOrchestrator(accountStore, txStore))
+        {
+        }
+
+        public TransactionImportOrchestrator(
+            IExternalTransactionFetcher transactionFetcher,
+            ITransactionDataStore txStore,
+            SpreadsheetTransactionImporter spreadsheetImporter,
+            TransactionUpdaterOrchestrator ledgerUpdater)
         {
             _transactionFetcher = transactionFetcher;
             _txStore = txStore;
+            _spreadsheetImporter = spreadsheetImporter;
+            _ledgerUpdater = ledgerUpdater;
             _categorizer = new Categorizer(txStore as ICategoryDataStore ?? new DataStoreFactory().GetCategoryStore());
+        }
+
+        public List<TransactionImportPreview> LoadTransactionsFromFiles(IEnumerable<string> paths)
+        {
+            ArgumentNullException.ThrowIfNull(paths);
+            var rows = new List<TransactionImportPreview>();
+            foreach (var path in paths)
+            {
+                if (string.IsNullOrWhiteSpace(path))
+                    throw new ArgumentException("A file path is required.");
+                if (!File.Exists(path))
+                    throw new FileNotFoundException("The selected file was not found.", path);
+
+                foreach (var parsed in _spreadsheetImporter.Parse(path))
+                {
+                    rows.Add(new TransactionImportPreview
+                    {
+                        Date = parsed.Transaction.Date,
+                        Description = parsed.Transaction.Description ?? "",
+                        Amount = parsed.Transaction.Amount,
+                        Account = parsed.AccountName,
+                        Category = parsed.CategoryName,
+                        AccountId = parsed.Transaction.AccountId
+                    });
+                }
+            }
+
+            return rows;
+        }
+
+        public int ImportTransactions(IEnumerable<TransactionImportPreview> previewRows) =>
+            ImportTransactions(previewRows, progress: null);
+
+        public int ImportTransactions(
+            IEnumerable<TransactionImportPreview> previewRows,
+            IProgress<TransactionImportProgress>? progress)
+        {
+            ArgumentNullException.ThrowIfNull(previewRows);
+            var rows = previewRows as IReadOnlyList<TransactionImportPreview> ?? previewRows.ToList();
+            var imported = 0;
+            var existingByAccount = new Dictionary<Guid, List<PostedTransaction>>();
+            var steps = rows.Count + 1;
+            Report(progress, 0, steps);
+
+            for (var i = 0; i < rows.Count; i++)
+            {
+                var row = rows[i];
+                if (row.AccountId != Guid.Empty && !IsDuplicate(row, existingByAccount))
+                {
+                    var posted = new PostedTransaction
+                    {
+                        AccountId = row.AccountId,
+                        Date = row.Date,
+                        Amount = row.Amount,
+                        Description = row.Description ?? ""
+                    };
+
+                    if (!string.IsNullOrWhiteSpace(row.Category))
+                        posted.ApplyCategory(_categorizer.GetOrCreate(row.Category));
+                    else
+                        _categorizer.ApplySuggestion(posted);
+
+                    _txStore.AddPostedTransaction(posted);
+                    existingByAccount[row.AccountId].Add(posted);
+                    imported++;
+                }
+
+                Report(progress, i + 1, steps);
+            }
+
+            if (imported > 0)
+                _ledgerUpdater.RunLedgerUpdate();
+
+            Report(progress, steps, steps);
+            return imported;
+        }
+
+        private static void Report(IProgress<TransactionImportProgress>? progress, int completed, int total)
+        {
+            if (progress is null)
+                return;
+            if (completed != 0 && completed != total && completed % 25 != 0)
+                return;
+
+            progress.Report(new TransactionImportProgress(completed, total));
         }
 
         public async Task<TransactionImportResult> ImportAsync(Account account)
@@ -63,6 +176,22 @@ namespace THMS.Logic.Orchestrators
                 PostedImported = posted.Count,
                 TransfersDetected = transfers.Count
             };
+        }
+
+        private bool IsDuplicate(
+            TransactionImportPreview row,
+            Dictionary<Guid, List<PostedTransaction>> existingByAccount)
+        {
+            if (!existingByAccount.TryGetValue(row.AccountId, out var existing))
+            {
+                existing = _txStore.GetPostedTransactions(row.AccountId).ToList();
+                existingByAccount[row.AccountId] = existing;
+            }
+
+            return existing.Any(posted =>
+                posted.Date.Date == row.Date.Date
+                && posted.Amount == row.Amount
+                && string.Equals(posted.Description ?? "", row.Description ?? "", StringComparison.OrdinalIgnoreCase));
         }
 
         private PostedTransaction MapPosted(TransactionDto dto, Guid accountId)
@@ -180,7 +309,7 @@ namespace THMS.Logic.Orchestrators
             return Math.Abs((d1.Date - d2.Date).TotalDays) <= _dateWindowSize;
         }
 
-        private bool LooksLikeTransfer(string d1, string d2)
+        private bool LooksLikeTransfer(string? d1, string? d2)
         {
             var text = (d1 + " " + d2).ToUpperInvariant();
             return text.Contains("TRANSFER")
@@ -202,4 +331,6 @@ namespace THMS.Logic.Orchestrators
             public int TransfersDetected { get; set; }
         }
     }
+
+    public readonly record struct TransactionImportProgress(int Completed, int Total);
 }

@@ -11,6 +11,9 @@
         Mortgage,
         Investment,
         Retirement,
-        Internal
+        Internal,
+        Utility,
+        Service,
+        Insurance
     }
 }

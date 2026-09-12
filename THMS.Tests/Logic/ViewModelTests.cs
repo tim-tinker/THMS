@@ -177,18 +177,26 @@ namespace THMS.Tests.Logic
                 new InvestmentAccount { Name = "Inv", CashBalance = 5 },
                 new LoanAccount { Name = "L", Principal = 7, InterestRate = 0.05m },
                 new MortgageAccount { Name = "M", Principal = 8, InterestRate = 0.04m, NextPaymentDate = DateTime.Today },
-                new InternalAccount { Name = "Int" }
+                new InternalAccount { Name = "Int" },
+                new UntrackedAccount { Name = "Power", Type = AccountType.Utility },
+                new UntrackedAccount { Name = "Lawn", Type = AccountType.Service },
+                new UntrackedAccount { Name = "Home", Type = AccountType.Insurance }
             ]);
 
-            Assert.That(views, Has.Count.EqualTo(6));
+            Assert.That(views, Has.Count.EqualTo(9));
             Assert.That(views[0].AccountType, Is.EqualTo("Bank"));
             Assert.That(views[1].AccountType, Is.EqualTo("Credit"));
             Assert.That(views[2].AccountType, Is.EqualTo("Investment"));
             Assert.That(views[3].AccountType, Is.EqualTo("Loan"));
             Assert.That(views[4].AccountType, Is.EqualTo("Mortgage"));
             Assert.That(views[5].AccountType, Is.EqualTo("Internal"));
+            Assert.That(views[6].AccountType, Is.EqualTo("Utility"));
+            Assert.That(views[7].AccountType, Is.EqualTo("Service"));
+            Assert.That(views[8].AccountType, Is.EqualTo("Insurance"));
             Assert.That(views[0].BankCreditAvailable, Is.EqualTo(2));
             Assert.That(views[1].CreditLimit, Is.EqualTo(4));
+            Assert.That(views[1].Balance, Is.EqualTo(-3));
+            Assert.That(views[1].BankCreditAvailable, Is.EqualTo(7));
             Assert.That(views[2].Balance, Is.EqualTo(5));
             Assert.That(views[3].APR, Is.EqualTo(0.05m));
             Assert.That(views[4].APR, Is.EqualTo(0.04m));
@@ -219,6 +227,42 @@ namespace THMS.Tests.Logic
 
             Assert.That(views[0].DueDate, Is.EqualTo(next));
             Assert.That(views[1].DueDate, Is.EqualTo(next.AddDays(5)));
+        }
+
+        [Test]
+        public void UnifiedAccountViewBuilder_CreditBalanceIsAmountOwed()
+        {
+            var owed = UnifiedAccountViewBuilder.Build(
+                [new CreditAccount { Name = "C", PostedBalance = -1500, CreditLimit = 5000 }]);
+            Assert.That(owed[0].Balance, Is.EqualTo(1500m));
+            Assert.That(owed[0].BankCreditAvailable, Is.EqualTo(3500m));
+
+            var creditBalance = UnifiedAccountViewBuilder.Build(
+                [new CreditAccount { Name = "C", PostedBalance = 200, CreditLimit = 5000 }]);
+            Assert.That(creditBalance[0].Balance, Is.EqualTo(-200m));
+            Assert.That(creditBalance[0].BankCreditAvailable, Is.EqualTo(5200m));
+        }
+
+        [Test]
+        public void UnifiedAccountViewBuilder_OmitsPostedBalanceWhenNotUsable()
+        {
+            var bankId = Guid.NewGuid();
+            var creditId = Guid.NewGuid();
+            var loanId = Guid.NewGuid();
+            var usable = new HashSet<Guid> { bankId };
+            var views = UnifiedAccountViewBuilder.Build(
+                [
+                    new BankAccount { Id = bankId, Name = "B", PostedBalance = 10, OverdraftLimit = 2 },
+                    new CreditAccount { Id = creditId, Name = "C", PostedBalance = -1500, CreditLimit = 5000 },
+                    new LoanAccount { Id = loanId, Name = "L", Principal = 7 }
+                ],
+                usablePostedBalanceAccountIds: usable);
+
+            Assert.That(views[0].Balance, Is.EqualTo(10m));
+            Assert.That(views[1].Balance, Is.Null);
+            Assert.That(views[1].BankCreditAvailable, Is.Null);
+            Assert.That(views[1].CreditLimit, Is.EqualTo(5000m));
+            Assert.That(views[2].Balance, Is.Null);
         }
 
         [Test]

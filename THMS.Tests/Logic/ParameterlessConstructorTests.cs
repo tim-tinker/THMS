@@ -44,6 +44,15 @@ namespace THMS.Tests.Logic
             Assert.That(new CategoryOrchestrator(), Is.Not.Null);
             Assert.That(new AccountSyncOrchestrator(), Is.Not.Null);
             Assert.That(new TransactionImportOrchestrator(), Is.Not.Null);
+            Assert.That(new AccountImportOrchestrator(), Is.Not.Null);
+            Assert.That(new AccountDiagnosticsOrchestrator(), Is.Not.Null);
+            Assert.That(new TransactionDiagnosticsOrchestrator(), Is.Not.Null);
+            Assert.That(new SplitDiagnosticsOrchestrator(), Is.Not.Null);
+            Assert.That(new LoanDiagnosticsOrchestrator(), Is.Not.Null);
+            Assert.That(new ForecastDiagnosticsOrchestrator(), Is.Not.Null);
+            Assert.That(new PlanningOrchestrator(), Is.Not.Null);
+            Assert.That(new PlaidAccountOrchestrator(), Is.Not.Null);
+            Assert.That(new PlaidTransactionOrchestrator(), Is.Not.Null);
             Assert.That(new ExternalTransactionAccess(), Is.Not.Null);
         }
     }

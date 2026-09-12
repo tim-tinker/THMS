@@ -16,6 +16,9 @@ namespace THMS.Data.Stores
         PostedTransaction? GetPostedTransaction(Guid id);
         IEnumerable<PostedTransaction> GetPostedTransactions(Guid accountId);
         IEnumerable<PostedTransaction> GetPostedTransactions(DateTime start, DateTime end);
+        IEnumerable<PostedTransaction> GetPostedTransactions(Guid accountId, DateTime start, DateTime end);
+        decimal SumPostedAmountsBefore(Guid accountId, DateTime before);
+        decimal SumPostedAmountsAfter(Guid accountId, DateTime after);
         DateTime? GetLatestPostedTransactionDate(Guid accountId);
 
 
@@ -29,6 +32,9 @@ namespace THMS.Data.Stores
         PostedTransferTransaction? GetPostedTransferTransaction(Guid id);
         IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(Guid accountId);
         IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(DateTime start, DateTime end);
+        IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(Guid accountId, DateTime start, DateTime end);
+        decimal SumPostedTransferAmountsBefore(Guid accountId, DateTime before);
+        decimal SumPostedTransferAmountsAfter(Guid accountId, DateTime after);
         DateTime? GetLatestPostedTransferTransactionDate(Guid accountId);
 
 
@@ -42,6 +48,8 @@ namespace THMS.Data.Stores
         FutureSingleTransaction? GetFutureSingleTransaction(Guid id);
         IEnumerable<FutureSingleTransaction> GetFutureSingleTransactions(Guid accountId);
         IEnumerable<FutureSingleTransaction> GetFutureSingleTransactions(DateTime start, DateTime end);
+        List<FutureSingleTransaction> GetPlannedPayments(Guid accountId);
+        List<FutureSingleTransaction> GetAllPlannedPayments();
 
 
         // ------------------------------------------------------------
@@ -54,6 +62,8 @@ namespace THMS.Data.Stores
         FutureTransferTransaction? GetFutureTransferTransaction(Guid id);
         IEnumerable<FutureTransferTransaction> GetFutureTransferTransactions(Guid accountId);
         IEnumerable<FutureTransferTransaction> GetFutureTransferTransactions(DateTime start, DateTime end);
+        List<FutureTransferTransaction> GetPlannedTransfers(Guid accountId);
+        List<FutureTransferTransaction> GetAllPlannedTransfers();
 
 
         // ------------------------------------------------------------
@@ -135,5 +145,12 @@ namespace THMS.Data.Stores
         IEnumerable<RecurringSingleTransactionRule> GetAllRecurringSingleRules();
         IEnumerable<RecurringTransferRule> GetAllRecurringTransferRules();
         IEnumerable<ExpenseBudgetRule> GetAllExpenseBudgetRules();
+
+        // ------------------------------------------------------------
+        // Split Transaction Rows
+        // ------------------------------------------------------------
+        void SaveSplits(Guid parentId, IEnumerable<SplitTransactionRow> splits);
+        List<SplitTransactionRow> GetSplits(Guid parentId);
+        void DeleteSplits(Guid parentId);
     }
 }

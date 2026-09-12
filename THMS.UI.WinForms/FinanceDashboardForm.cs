@@ -164,13 +164,13 @@ namespace THMS.UI.WinForms
             _budgetGrid = CreateGrid();
             _budgetGrid.DataSource = _budgetsSource;
             _budgetGrid.Columns.AddRange(
-                TextColumn("BudgetName", "Budget", 140),
-                TextColumn("AccountName", "Account", 100),
-                TextColumn("Frequency", "Frequency", 80),
+                TextColumn("BudgetName", "Budget", DataGridViewAutoSizeColumnMode.AllCells, 140),
+                TextColumn("AccountName", "Account", DataGridViewAutoSizeColumnMode.AllCells, 100),
                 CurrencyColumn("Remaining", "Remaining"),
                 CurrencyColumn("Ending", "Ending"),
                 CurrencyColumn("Recommended", "Recommended"),
-                TextColumn("Status", "Status", 120));
+                TextColumn("Frequency", "Frequency", DataGridViewAutoSizeColumnMode.AllCells, 80),
+                TextColumn("Status", "Status", DataGridViewAutoSizeColumnMode.Fill, 120));
             _budgetGrid.CellFormatting += OnBudgetCellFormatting;
             _budgetGrid.CellDoubleClick += (_, _) => OpenSelectedPeriod();
 
@@ -189,29 +189,17 @@ namespace THMS.UI.WinForms
             };
             _alerts = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
             split.Panel1.Controls.Add(_alerts);
-            split.Panel1.Controls.Add(new Label
-            {
-                Text = "Alerts",
-                Dock = DockStyle.Top,
-                Height = 22,
-                Font = new Font(Font, FontStyle.Bold)
-            });
+            split.Panel1.Controls.Add(CreateSectionHeader("Alerts"));
 
             _paymentGrid = CreateGrid();
             _paymentGrid.DataSource = _paymentsSource;
             _paymentGrid.Columns.AddRange(
                 DateColumn("Date", "Date"),
-                TextColumn("AccountName", "Account", 110),
-                TextColumn("Description", "Description", 140),
+                TextColumn("AccountName", "Account", DataGridViewAutoSizeColumnMode.AllCells, 110),
+                TextColumn("Description", "Description", DataGridViewAutoSizeColumnMode.Fill, 140),
                 CurrencyColumn("Amount", "Amount"));
             split.Panel2.Controls.Add(_paymentGrid);
-            split.Panel2.Controls.Add(new Label
-            {
-                Text = "Upcoming payments",
-                Dock = DockStyle.Top,
-                Height = 22,
-                Font = new Font(Font, FontStyle.Bold)
-            });
+            split.Panel2.Controls.Add(CreateSectionHeader("Upcoming payments"));
             Shown += (_, _) =>
             {
                 if (split.Height > 40)
@@ -244,17 +232,17 @@ namespace THMS.UI.WinForms
             _recentGrid.DataSource = _recentSource;
             _recentGrid.Columns.AddRange(
                 DateColumn("Date", "Date"),
-                TextColumn("Description", "Description", 220),
+                TextColumn("Description", "Description", DataGridViewAutoSizeColumnMode.Fill, 220),
                 CurrencyColumn("Amount", "Amount"),
-                TextColumn("Category", "Category", 120));
+                TextColumn("Category", "Category", DataGridViewAutoSizeColumnMode.AllCells, 120));
 
             _forecastGrid = CreateGrid();
             _forecastGrid.DataSource = _forecastSource;
             _forecastGrid.Columns.AddRange(
                 DateColumn("Date", "Date"),
-                TextColumn("Description", "Description", 220),
+                TextColumn("Description", "Description", DataGridViewAutoSizeColumnMode.Fill, 220),
                 CurrencyColumn("Amount", "Amount"),
-                TextColumn("Category", "Category", 120));
+                TextColumn("Category", "Category", DataGridViewAutoSizeColumnMode.AllCells, 120));
 
             recentPage.Controls.Add(_recentGrid);
             forecastPage.Controls.Add(_forecastGrid);
@@ -321,6 +309,22 @@ namespace THMS.UI.WinForms
             host.Controls.Add(chart);
         }
 
+        private Label CreateSectionHeader(string text)
+        {
+            var font = new Font(Font, FontStyle.Bold);
+            var padding = new Padding(0, 4, 0, 4);
+            return new Label
+            {
+                Text = text,
+                Dock = DockStyle.Top,
+                AutoSize = false,
+                Height = TextRenderer.MeasureText("Ag", font).Height + padding.Vertical,
+                Padding = padding,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = font
+            };
+        }
+
         private static Control CreateCard(string caption, Label value)
         {
             var cell = new TableLayoutPanel
@@ -365,12 +369,13 @@ namespace THMS.UI.WinForms
             };
         }
 
-        private static DataGridViewTextBoxColumn TextColumn(string property, string header, int width) =>
+        private static DataGridViewTextBoxColumn TextColumn(string property, string header, DataGridViewAutoSizeColumnMode autoSizeMode, int width) =>
             new()
             {
                 DataPropertyName = property,
                 HeaderText = header,
                 Name = property,
+                AutoSizeMode = autoSizeMode,
                 Width = width
             };
 
@@ -380,7 +385,7 @@ namespace THMS.UI.WinForms
                 DataPropertyName = property,
                 HeaderText = header,
                 Name = property,
-                Width = 100,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells,
                 DefaultCellStyle = { Format = "c2", Alignment = DataGridViewContentAlignment.MiddleRight }
             };
 
@@ -390,7 +395,7 @@ namespace THMS.UI.WinForms
                 DataPropertyName = property,
                 HeaderText = header,
                 Name = property,
-                Width = 90,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells,
                 DefaultCellStyle = { Format = "d" }
             };
     }

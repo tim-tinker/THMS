@@ -2,6 +2,7 @@ using THMS.Data.Stores;
 using THMS.Domain.Energy;
 using THMS.Domain.Finance;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 using THMS.Domain.Transportation;
 using THMS.External;
@@ -585,6 +586,99 @@ namespace THMS.Tests.Logic
             var result = orchestrator.RunLedgerUpdate();
             Assert.That(result.ForecastUpdated, Is.True);
             Assert.That(result.RollOffCompleted, Is.True);
+        }
+
+        [Test]
+        public void RunLedgerUpdate_PostedBalanceUsesLatestStatementPlusLaterActivity()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var txs = new InMemoryTransactionDataStore();
+            var statements = new InMemoryAccountStatementDataStore();
+            var orchestrator = new TransactionUpdaterOrchestrator(accounts, txs, statements);
+
+            var account = new BankAccount
+            {
+                Name = "Checking",
+                Institution = "Bank",
+                AccountNumber = "1",
+                StartingBalance = 0,
+                PostedBalance = 0
+            };
+            accounts.UpsertAccount(account);
+
+            var statementDate = new DateTime(2026, 8, 31);
+            statements.Save(new BankStatement
+            {
+                AccountId = account.Id,
+                StatementDate = statementDate,
+                PeriodStart = new DateTime(2026, 8, 1),
+                EndingBalance = 1000
+            });
+
+            txs.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = account.Id,
+                Date = statementDate.AddDays(-10),
+                Amount = 500,
+                Description = "Already on statement"
+            });
+            txs.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = account.Id,
+                Date = statementDate,
+                Amount = 75,
+                Description = "Same-day as statement"
+            });
+            txs.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = account.Id,
+                Date = statementDate.AddDays(3),
+                Amount = -40,
+                Description = "After statement"
+            });
+            txs.AddPostedTransferTransaction(new PostedTransferTransaction
+            {
+                AccountId = account.Id,
+                Date = statementDate.AddDays(4),
+                Amount = 15,
+                Description = "Transfer after statement"
+            });
+
+            orchestrator.RunLedgerUpdate();
+
+            var updated = (BankAccount)accounts.GetAllAccounts().Single(a => a.Id == account.Id);
+            Assert.That(updated.PostedBalance, Is.EqualTo(975m));
+        }
+
+        [Test]
+        public void RunLedgerUpdate_WithoutStatementLeavesStoredPostedBalanceUnchanged()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var txs = new InMemoryTransactionDataStore();
+            var statements = new InMemoryAccountStatementDataStore();
+            var orchestrator = new TransactionUpdaterOrchestrator(accounts, txs, statements);
+
+            var account = new BankAccount
+            {
+                Name = "Checking",
+                Institution = "Bank",
+                AccountNumber = "1",
+                StartingBalance = 100,
+                PostedBalance = 2500
+            };
+            accounts.UpsertAccount(account);
+            txs.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = account.Id,
+                Date = DateTime.Today.AddDays(-2),
+                Amount = -25,
+                Description = "Spend"
+            });
+
+            orchestrator.RunLedgerUpdate();
+
+            var updated = (BankAccount)accounts.GetAllAccounts().Single();
+            Assert.That(updated.PostedBalance, Is.EqualTo(2500m));
         }
 
         [Test]

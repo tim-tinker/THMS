@@ -89,8 +89,10 @@ namespace THMS.Data.Stores.SqlTables
             cmd.CommandText = @"SELECT Id FROM Accounts ORDER BY Name;";
 
             using var reader = cmd.ExecuteReader();
+            var ids = new List<Guid>();
             while (reader.Read())
-                yield return Guid.Parse(reader.GetString(0));
+                ids.Add(Guid.Parse(reader.GetString(0)));
+            return ids;
         }
 
         public void Delete(SqliteConnection conn, Guid id)

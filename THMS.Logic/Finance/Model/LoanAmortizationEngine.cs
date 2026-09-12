@@ -1,4 +1,5 @@
 ﻿using THMS.Domain.Finance.Loans;
+using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Logic.Finance.Model
 {
@@ -91,5 +92,10 @@ namespace THMS.Logic.Finance.Model
 
             return schedule.AsReadOnly();
         }
+
+        public static (decimal PrincipalPaid, decimal InterestPaid, decimal RemainingPrincipal) SummarizePayments(
+            decimal originalPrincipal,
+            IEnumerable<SplitTransactionRow> splits) =>
+            SplitTransactionMath.SummarizeLoanPayments(originalPrincipal, splits);
     }
 }

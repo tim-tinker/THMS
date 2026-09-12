@@ -1,8 +1,10 @@
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Budget;
 using THMS.Logic.Finance.Forecast;
+using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Recurrence;
 using THMS.Logic.Finance.Transfer;
 using THMS.Logic.Orchestrators;
@@ -25,6 +27,145 @@ namespace THMS.Tests.Logic
             Assert.That(orchestrator.CallGetStartDate(end, "Lifetime"), Is.EqualTo(DateTime.MinValue));
             Assert.That(orchestrator.CallGetStartDate(end, "Month"), Is.EqualTo(end.AddMonths(-1)));
             Assert.That(orchestrator.CallGetStartDate(end, "whatever"), Is.EqualTo(end.AddMonths(-1)));
+        }
+    }
+
+    [TestFixture]
+    public class TransactionHistoryRangeTests
+    {
+        [Test]
+        public void GetTransactionsForAccount_FiltersPostedToDateRange()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var accountId = Guid.NewGuid();
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = accountId,
+                Date = new DateTime(2026, 1, 15),
+                Amount = -10,
+                Description = "old"
+            });
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = accountId,
+                Date = new DateTime(2026, 9, 2),
+                Amount = -5,
+                Description = "recent"
+            });
+
+            var orchestrator = new TransactionOrchestrator(store);
+            var month = orchestrator.GetTransactionsForAccount(
+                accountId,
+                new DateTime(2026, 8, 11),
+                new DateTime(2026, 9, 11));
+
+            Assert.That(month.Posted.Select(t => t.Description), Is.EqualTo(new[] { "recent" }));
+        }
+
+        [Test]
+        public void SumPostedAmountsBefore_ExcludesLaterTransactions()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var accountId = Guid.NewGuid();
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = accountId,
+                Date = new DateTime(2026, 1, 15),
+                Amount = -10,
+                Description = "old"
+            });
+            store.AddPostedTransferTransaction(new PostedTransferTransaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = accountId,
+                Date = new DateTime(2026, 1, 20),
+                Amount = 4,
+                Description = "transfer"
+            });
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = accountId,
+                Date = new DateTime(2026, 9, 2),
+                Amount = -5,
+                Description = "recent"
+            });
+
+            var orchestrator = new TransactionOrchestrator(store);
+
+            Assert.That(orchestrator.SumPostedAmountsBefore(accountId, new DateTime(2026, 8, 11)), Is.EqualTo(-6m));
+            Assert.That(orchestrator.SumPostedAmountsBefore(accountId, DateTime.MinValue), Is.EqualTo(0m));
+        }
+    }
+
+    [TestFixture]
+    public class PostedBalanceCalculatorTests
+    {
+        [Test]
+        public void TryResolveAnchor_UsesLatestMatchingStatementAndIgnoresOlderRegisterActivity()
+        {
+            var bank = new BankAccount { StartingBalance = 0, PostedBalance = 0 };
+            var older = new BankStatement
+            {
+                Id = Guid.NewGuid(),
+                AccountId = bank.Id,
+                StatementDate = new DateTime(2026, 1, 31),
+                EndingBalance = 800
+            };
+            var latest = new BankStatement
+            {
+                Id = Guid.NewGuid(),
+                AccountId = bank.Id,
+                StatementDate = new DateTime(2026, 8, 31),
+                EndingBalance = 1250
+            };
+
+            Assert.That(PostedBalanceCalculator.TryResolveAnchor(bank, [older, latest], out var anchor), Is.True);
+            Assert.That(anchor.LedgerBalance, Is.EqualTo(1250m));
+            Assert.That(anchor.AsOf, Is.EqualTo(latest.StatementDate));
+            Assert.That(PostedBalanceCalculator.ComputeFromAnchor(anchor, 40m), Is.EqualTo(1290m));
+        }
+
+        [Test]
+        public void TryGetStatementAnchor_ConvertsCreditStatementBalanceToLedgerSpace()
+        {
+            var card = new CreditAccount { CreditLimit = 5000 };
+            var statement = new CreditCardStatement
+            {
+                StatementDate = new DateTime(2026, 8, 15),
+                StatementBalance = 400
+            };
+
+            Assert.That(PostedBalanceCalculator.TryGetStatementAnchor(card, statement, out var anchor), Is.True);
+            Assert.That(anchor.LedgerBalance, Is.EqualTo(-400m));
+            Assert.That(PostedBalanceCalculator.ComputeFromAnchor(anchor, -25m), Is.EqualTo(-425m));
+        }
+
+        [Test]
+        public void TryResolveAnchor_SkipsStatementsThatDoNotMatchAccountKind()
+        {
+            var bank = new BankAccount();
+            var utility = new UtilityStatement { StatementDate = DateTime.Today, AmountDue = 90 };
+
+            Assert.That(PostedBalanceCalculator.TryResolveAnchor(bank, [utility], out _), Is.False);
+        }
+
+        [Test]
+        public void HasUsablePostedBalance_RequiresMatchingStatement()
+        {
+            var bank = new BankAccount { PostedBalance = 2500 };
+            var statement = new BankStatement
+            {
+                AccountId = bank.Id,
+                StatementDate = new DateTime(2026, 8, 31),
+                EndingBalance = 1000
+            };
+
+            Assert.That(PostedBalanceCalculator.HasUsablePostedBalance(bank, []), Is.False);
+            Assert.That(PostedBalanceCalculator.HasUsablePostedBalance(bank, [statement]), Is.True);
         }
     }
 
@@ -704,6 +845,23 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void Save_UntrackedAccount_KeepsAlphanumericAccountNumber()
+        {
+            var store = new InMemoryAccountDataStore();
+            var orchestrator = new AccountOrchestrator(store);
+            orchestrator.Save(new UntrackedAccount
+            {
+                Name = "Electric",
+                Institution = "Duke",
+                AccountNumber = "ABC-123",
+                Type = AccountType.Utility
+            });
+
+            Assert.That(store.GetAccount("Electric")!.AccountNumber, Is.EqualTo("ABC-123"));
+            Assert.That(store.GetAccount("Electric"), Is.TypeOf<UntrackedAccount>());
+        }
+
+        [Test]
         public void UpdatePostedBalance_CoversAllAccountTypes()
         {
             var store = new InMemoryAccountDataStore();
@@ -739,6 +897,17 @@ namespace THMS.Tests.Logic
             store.UpsertAccount(internalAcc);
             orchestrator.UpdatePostedBalance(internalAcc.Name, 1, asOf);
             Assert.That(store.GetAccount(internalAcc.Name)!.BalanceAsOf, Is.EqualTo(asOf));
+
+            var utility = new UntrackedAccount
+            {
+                Name = "Electric",
+                Institution = "I",
+                AccountNumber = "1",
+                Type = AccountType.Utility
+            };
+            store.UpsertAccount(utility);
+            orchestrator.UpdatePostedBalance(utility.Name, 1, asOf);
+            Assert.That(store.GetAccount(utility.Name)!.BalanceAsOf, Is.EqualTo(asOf));
 
             var unknown = new UnknownAccount { Name = "U", Institution = "I", AccountNumber = "1" };
             store.UpsertAccount(unknown);
@@ -792,6 +961,19 @@ namespace THMS.Tests.Logic
             var updatedCredit = (CreditAccount)store.GetAccount(credit.Name)!;
             Assert.That(updatedCredit.StartingBalance, Is.EqualTo(-30));
             Assert.That(updatedCredit.PostedBalance, Is.EqualTo(-90));
+        }
+
+        [Test]
+        public void CreditDisplayBalance_InvertsLedgerSoPositiveIsAmountOwed()
+        {
+            var credit = new CreditAccount { PostedBalance = -400, StartingBalance = -50, CreditLimit = 1000 };
+            Assert.That(PostedBalanceCalculator.ToDisplayBalance(credit, credit.PostedBalance), Is.EqualTo(400m));
+            Assert.That(PostedBalanceCalculator.ToLedgerBalance(credit, 400m), Is.EqualTo(-400m));
+            Assert.That(PostedBalanceCalculator.ToLedgerPostedDelta(credit, 25m), Is.EqualTo(-25m));
+
+            var bank = new BankAccount { PostedBalance = 400 };
+            Assert.That(PostedBalanceCalculator.ToDisplayBalance(bank, 400m), Is.EqualTo(400m));
+            Assert.That(PostedBalanceCalculator.ToLedgerPostedDelta(bank, 25m), Is.EqualTo(25m));
         }
     }
 

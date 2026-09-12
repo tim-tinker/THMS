@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Diagnostics;
 
+using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Model;
@@ -10,34 +11,88 @@ using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.UI.WinForms.Controls
 {
-    public partial class TransactionManagerControl : UserControl
+    public partial class TransactionManagerControl : UserControl, IDataManagerControl
     {
         private const string ShowAll = "All";
         private const string ShowPosted = "Posted";
         private const string ShowForecast = "Forecast";
         private const string ShowRecurringRules = "Recurring Rules";
+        private const string HistoryMonth = "Month";
+        private const string HistoryYear = "Year";
+        private const string HistoryLifetime = "Lifetime";
 
         private readonly AccountOrchestrator _accountOrchestrator = new();
         private readonly TransactionOrchestrator _txOrchestrator = new();
         private readonly RecurringRuleOrchestrator _ruleOrchestrator = new();
         private readonly BudgetOrchestrator _budgetOrchestrator = new();
         private readonly CategoryOrchestrator _categoryOrchestrator = new();
+        private readonly IAccountStatementDataStore _statements = new DataStoreFactory().GetAccountStatementStore();
 
         private BindingSource _accountsSource = new BindingSource();
         private BindingSource _transactionsSource = new BindingSource();
         private BindingSource _budgetsSource = new BindingSource();
         private DataGridView budgetGrid = null!;
+        private Label? lblLoadStatus;
+        private ProgressBar? progressLoad;
+        private TabControl? _detailTabs;
+        private TabPage? _budgetsPage;
+        private CancellationTokenSource? _txLoadCts;
         private bool _filterApplied;
+        private bool _ready;
+        private bool _suspendAccountChange;
+        private bool _suspendHistoryChange;
         private decimal _postedBalanceBeforeEdit;
 
         public TransactionManagerControl()
         {
             InitializeComponent();
+            LayoutForecastToolbar();
+            InitializeHistory();
             InitializeForecastPeriod();
             InitializeShowFilter();
             InitializeGrids();
             HostBudgetUi();
             LoadAccounts();
+            _ready = true;
+        }
+
+        public Control GetControl() => this;
+
+        public void SetGridDataSource(string period)
+        {
+            SelectHistory(period);
+            RefreshAll();
+        }
+
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            base.OnVisibleChanged(e);
+            if (_ready && Visible && IsHandleCreated && Parent != null && !Disposing)
+                RefreshAll();
+        }
+
+        private void LayoutForecastToolbar()
+        {
+            cmbHistory.Width = 120;
+            cmbHistory.DropDownWidth = 120;
+            cmbHistory.IntegralHeight = false;
+            cmbForecastPeriod.Width = 140;
+            cmbForecastPeriod.DropDownWidth = 140;
+            cmbForecastPeriod.IntegralHeight = false;
+            cmbShow.Width = 200;
+            cmbShow.DropDownWidth = 220;
+            cmbShow.IntegralHeight = false;
+            btnAddRule.AutoSize = true;
+            btnDeleteRule.AutoSize = true;
+            btnSplitTransaction.AutoSize = true;
+        }
+
+        private void InitializeHistory()
+        {
+            cmbHistory.Items.Clear();
+            cmbHistory.Items.AddRange([HistoryMonth, HistoryYear, HistoryLifetime]);
+            cmbHistory.SelectedItem = HistoryMonth;
+            cmbHistory.SelectedIndexChanged += OnHistoryChanged;
         }
 
         private void InitializeForecastPeriod()
@@ -56,6 +111,7 @@ namespace THMS.UI.WinForms.Controls
             cmbShow.SelectedIndexChanged += OnShowFilterChanged;
             btnAddRule.Click += OnAddRuleClicked;
             btnDeleteRule.Click += OnDeleteRuleClicked;
+            btnSplitTransaction.Click += OnSplitTransactionClicked;
         }
 
         private void InitializeGrids()
@@ -69,6 +125,8 @@ namespace THMS.UI.WinForms.Controls
 
             detailGrid.DataSource = _transactionsSource;
             masterGrid.DataSource = _accountsSource;
+            BalanceColumn.DefaultCellStyle.NullValue = "N/A";
+            AvailableColumn.DefaultCellStyle.NullValue = "N/A";
 
             _accountsSource.CurrentChanged += OnCurrentAccountChanged;
             _transactionsSource.ListChanged += OnTransactionsListChanged;
@@ -80,6 +138,7 @@ namespace THMS.UI.WinForms.Controls
             masterGrid.DataError += OnAccountGridDataError;
             masterGrid.CellDoubleClick += OnAccountCellDoubleClick;
             masterGrid.CellContentClick += OnAccountWebsiteClicked;
+            masterGrid.CellFormatting += OnAccountGridCellFormatting;
 
             detailGrid.CellDoubleClick += OnTransactionCellDoubleClick;
             detailGrid.KeyDown += OnTransactionGridKeyDown;
@@ -96,8 +155,44 @@ namespace THMS.UI.WinForms.Controls
 
             splitContainer.Panel2.Controls.Remove(detailGrid);
             splitContainer.Panel2.Controls.Remove(forecastPanel);
+
+            var forecastBar = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(8, 6, 8, 6),
+                Name = "forecastBar"
+            };
+            var forecastControls = forecastPanel.Controls.Cast<Control>().ToArray();
+            forecastPanel.Controls.Clear();
+            foreach (var child in forecastControls)
+            {
+                child.Margin = new Padding(4, 4, 8, 4);
+                forecastBar.Controls.Add(child);
+            }
+
+            lblLoadStatus = new Label
+            {
+                AutoSize = true,
+                Margin = new Padding(12, 8, 8, 4),
+                Visible = false
+            };
+            progressLoad = new ProgressBar
+            {
+                Width = 220,
+                Height = 22,
+                Margin = new Padding(4, 8, 8, 4),
+                Style = ProgressBarStyle.Marquee,
+                MarqueeAnimationSpeed = 30,
+                Visible = false
+            };
+            forecastBar.Controls.Add(lblLoadStatus);
+            forecastBar.Controls.Add(progressLoad);
+
             transactionsPage.Controls.Add(detailGrid);
-            transactionsPage.Controls.Add(forecastPanel);
+            transactionsPage.Controls.Add(forecastBar);
 
             var toolbar = new FlowLayoutPanel
             {
@@ -159,6 +254,13 @@ namespace THMS.UI.WinForms.Controls
             budgetsPage.Controls.Add(toolbar);
             tabDetails.TabPages.Add(transactionsPage);
             tabDetails.TabPages.Add(budgetsPage);
+            tabDetails.SelectedIndexChanged += (_, _) =>
+            {
+                if (tabDetails.SelectedTab == budgetsPage)
+                    LoadBudgetsForSelectedAccount();
+            };
+            _detailTabs = tabDetails;
+            _budgetsPage = budgetsPage;
             splitContainer.Panel2.Controls.Add(tabDetails);
         }
 
@@ -174,40 +276,54 @@ namespace THMS.UI.WinForms.Controls
 
         private void LoadAccounts()
         {
-            var accounts = _accountOrchestrator.GetAllAccounts().ToList();
-            foreach (var account in accounts)
-                ApplyPostedBalance(account);
+            _suspendAccountChange = true;
+            try
+            {
+                var accounts = _accountOrchestrator.GetAllAccounts().ToList();
+                var nextPayments = accounts
+                    .Where(a => a is LoanAccount or MortgageAccount)
+                    .ToDictionary(a => a.Id, a => _ruleOrchestrator.GetNextPaymentDate(a.Id));
+                var usableBalances = PostedBalanceCalculator.UsablePostedBalanceAccountIds(
+                    accounts,
+                    id => _statements.GetForAccount(id));
 
-            var nextPayments = accounts
-                .Where(a => a is LoanAccount or MortgageAccount)
-                .ToDictionary(a => a.Id, a => _ruleOrchestrator.GetNextPaymentDate(a.Id));
-
-            _accountsSource.DataSource = UnifiedAccountViewBuilder.Build(accounts, nextPayments);
-        }
-
-        private void ApplyPostedBalance(Account account)
-        {
-            if (account is not BankAccount and not CreditAccount)
-                return;
-
-            var postedBalance = _txOrchestrator.ComputePostedBalance(
-                account.Id,
-                PostedBalanceCalculator.GetStartingBalance(account));
-            PostedBalanceCalculator.ApplyPostedBalance(account, postedBalance);
+                _accountsSource.DataSource = UnifiedAccountViewBuilder.Build(accounts, nextPayments, usableBalances);
+            }
+            finally
+            {
+                _suspendAccountChange = false;
+            }
         }
 
         private void OnCurrentAccountChanged(object? sender, EventArgs e)
         {
+            if (_suspendAccountChange || !_ready)
+                return;
+
+            RefreshCurrentAccount();
+        }
+
+        private void OnHistoryChanged(object? sender, EventArgs e)
+        {
+            if (_suspendHistoryChange || !_ready)
+                return;
+
             RefreshCurrentAccount();
         }
 
         private void OnForecastPeriodChanged(object? sender, EventArgs e)
         {
+            if (!_ready)
+                return;
+
             RefreshCurrentAccount();
         }
 
         private void OnShowFilterChanged(object? sender, EventArgs e)
         {
+            if (!_ready)
+                return;
+
             _filterApplied = SelectedShowMode() == ShowPosted;
             var showingRules = SelectedShowMode() == ShowRecurringRules;
             cmbForecastPeriod.Enabled = SelectedShowMode() is ShowAll or ShowForecast;
@@ -218,36 +334,87 @@ namespace THMS.UI.WinForms.Controls
         private string SelectedShowMode() =>
             cmbShow.SelectedItem?.ToString() ?? ShowAll;
 
-        private void LoadTransactionsForAccount(Guid accountId)
+        private string SelectedHistory() =>
+            cmbHistory.SelectedItem?.ToString() ?? HistoryMonth;
+
+        private void SelectHistory(string period)
+        {
+            var item = period is HistoryYear or HistoryLifetime ? period : HistoryMonth;
+            if (Equals(cmbHistory.SelectedItem, item))
+                return;
+
+            _suspendHistoryChange = true;
+            cmbHistory.SelectedItem = item;
+            _suspendHistoryChange = false;
+        }
+
+        private async Task LoadTransactionsForAccountAsync(Guid accountId, CancellationToken token)
         {
             var show = SelectedShowMode();
+            var history = SelectedHistory();
+            var forecastEnd = GetForecastEnd();
+            ShowLoadProgress($"Loading {history.ToLowerInvariant()} history...");
+
+            try
+            {
+                var views = await Task.Run(
+                    () => BuildTransactionViews(accountId, show, history, forecastEnd, token),
+                    token);
+                if (token.IsCancellationRequested || CurrentAccountId != accountId)
+                    return;
+
+                ShowLoadProgress("Updating grid...");
+                _transactionsSource.DataSource = views;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        private List<UnifiedTransactionView> BuildTransactionViews(
+            Guid accountId,
+            string show,
+            string history,
+            DateTime forecastEnd,
+            CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
             if (show == ShowRecurringRules)
             {
                 var rules = UnifiedTransactionViewBuilder.BuildRecurringRules(
                     _ruleOrchestrator.GetSingleRules(accountId),
                     _ruleOrchestrator.GetTransferRules(accountId));
                 ApplyCategoryDisplayNames(rules);
-                _transactionsSource.DataSource = rules;
-                return;
+                return rules;
             }
 
-            var chronological = BuildUnifiedTransactions(accountId, show);
+            var chronological = BuildUnifiedTransactions(accountId, show, history, forecastEnd);
+            token.ThrowIfCancellationRequested();
             ApplyCategoryDisplayNames(chronological);
 
             if (show != ShowAll)
             {
                 ClearForecastBalances(chronological);
-                _transactionsSource.DataSource = UnifiedTransactionView.OrderForDisplay(chronological).ToList();
-                return;
+                return UnifiedTransactionView.OrderForDisplay(chronological).ToList();
             }
 
-            ApplyRunningBalances(chronological, GetStartingBalance(accountId));
-            _transactionsSource.DataSource = UnifiedTransactionView.OrderForDisplay(chronological).ToList();
+            var historyStart = BaseOrchestrator.GetStartDate(DateTime.Today, history);
+            var opening = GetStartingBalance(accountId)
+                + _txOrchestrator.SumPostedAmountsBefore(accountId, historyStart);
+            ApplyRunningBalances(chronological, opening, accountId);
+            return UnifiedTransactionView.OrderForDisplay(chronological).ToList();
         }
 
-        private List<UnifiedTransactionView> BuildUnifiedTransactions(Guid accountId, string show)
+        private List<UnifiedTransactionView> BuildUnifiedTransactions(
+            Guid accountId,
+            string show,
+            string history,
+            DateTime forecastEnd)
         {
-            var txs = _txOrchestrator.GetTransactionsForAccount(accountId);
+            var start = BaseOrchestrator.GetStartDate(DateTime.Today, history);
+            var txs = history == HistoryLifetime
+                ? _txOrchestrator.GetTransactionsForAccount(accountId)
+                : _txOrchestrator.GetTransactionsForAccount(accountId, start, DateTime.Today);
             var posted = UnifiedTransactionViewBuilder.Build(
                 txs.Posted,
                 txs.PostedTransfers,
@@ -260,7 +427,7 @@ namespace THMS.UI.WinForms.Controls
             var forecast = _txOrchestrator.GenerateForecast(
                 accountId,
                 DateTime.Today,
-                GetForecastEnd());
+                forecastEnd);
 
             if (show == ShowForecast)
                 return forecast;
@@ -282,13 +449,17 @@ namespace THMS.UI.WinForms.Controls
             };
         }
 
-        private void ApplyRunningBalances(IEnumerable<UnifiedTransactionView> chronological, decimal startingBalance)
+        private void ApplyRunningBalances(
+            IEnumerable<UnifiedTransactionView> chronological,
+            decimal startingBalance,
+            Guid accountId)
         {
+            var credit = _accountOrchestrator.GetAccount(accountId) is CreditAccount;
             decimal balance = startingBalance;
             foreach (var tx in chronological)
             {
                 balance += tx.Amount;
-                tx.ForecastBalance = balance;
+                tx.ForecastBalance = credit ? -balance : balance;
             }
         }
 
@@ -344,13 +515,15 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             var entered = view.Balance ?? 0;
-            var delta = entered - _postedBalanceBeforeEdit;
-            if (delta == 0)
+            var displayDelta = entered - _postedBalanceBeforeEdit;
+            if (displayDelta == 0)
                 return;
 
             try
             {
-                _accountOrchestrator.AdjustStartingBalanceForPostedDelta(view.Id, delta);
+                var account = _accountOrchestrator.GetAccount(view.Id);
+                var ledgerDelta = PostedBalanceCalculator.ToLedgerPostedDelta(account, displayDelta);
+                _accountOrchestrator.AdjustStartingBalanceForPostedDelta(view.Id, ledgerDelta);
                 view.Balance = entered;
                 RefreshCurrentAccount();
             }
@@ -406,12 +579,29 @@ namespace THMS.UI.WinForms.Controls
         private bool IsPostedBalanceColumn(int columnIndex) =>
             columnIndex >= 0 && masterGrid.Columns[columnIndex] == BalanceColumn;
 
+        private void OnAccountGridCellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.ColumnIndex < 0)
+                return;
+
+            var column = masterGrid.Columns[e.ColumnIndex];
+            if (column != BalanceColumn && column != AvailableColumn)
+                return;
+
+            if (e.Value is not null and not DBNull)
+                return;
+
+            e.Value = "N/A";
+            e.FormattingApplied = true;
+        }
+
         private bool IsEditablePostedBalanceCell(int rowIndex, int columnIndex)
         {
             if (!IsPostedBalanceColumn(columnIndex) || rowIndex < 0)
                 return false;
 
-            return GetAccountView(rowIndex)?.AccountType is "Bank" or "Credit";
+            return GetAccountView(rowIndex)?.AccountType is "Bank" or "Credit"
+                && GetAccountView(rowIndex)?.Balance is not null;
         }
 
         private UnifiedAccountView? GetAccountView(int rowIndex)
@@ -465,7 +655,7 @@ namespace THMS.UI.WinForms.Controls
             }
 
             var chronological = UnifiedTransactionView.OrderForRunningBalance(unified).ToList();
-            ApplyRunningBalances(chronological, GetStartingBalance(account.Id));
+            ApplyRunningBalances(chronological, GetStartingBalance(account.Id), account.Id);
             detailGrid.Refresh();
         }
 
@@ -480,13 +670,17 @@ namespace THMS.UI.WinForms.Controls
                 return;
             }
 
-            if (SelectedShowMode() != ShowRecurringRules)
+            if (detailGrid.Rows[e.RowIndex].DataBoundItem is not UnifiedTransactionView view)
                 return;
 
-            if (GetSelectedRuleView() is not UnifiedTransactionView view)
+            if (view.IsRecurringRule)
+            {
+                OpenRuleEditor(view);
                 return;
+            }
 
-            OpenRuleEditor(view);
+            if (CanSplit(view))
+                OpenSplitEditor(view);
         }
 
         private void OnCategoryCellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
@@ -519,7 +713,7 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             var posted = view.Type == UnifiedTransactionView.PostedType
-                ? _txOrchestrator.GetTransactionsForAccount(view.AccountId).Posted.FirstOrDefault(t => t.Id == view.Id)
+                ? _txOrchestrator.GetTransactionsForAccount(view.AccountId).Posted.FirstOrDefault(t => t.Id == view.LookupId)
                 : null;
             var suggestion = posted is null ? null : _categoryOrchestrator.Suggest(posted);
 
@@ -544,13 +738,13 @@ namespace THMS.UI.WinForms.Controls
             menu.Items.Add(manageItem);
 
             var cell = detailGrid.GetCellDisplayRectangle(CategoryColumn.Index, rowIndex, cutOverflow: false);
-            menu.Closed += (_, _) => menu.Dispose();
+            menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
             menu.Show(detailGrid, new Point(cell.Left, cell.Bottom));
         }
 
         private void AssignCategory(UnifiedTransactionView view, Guid categoryId)
         {
-            _categoryOrchestrator.AssignToPosted(view.Id, categoryId);
+            _categoryOrchestrator.AssignToPosted(view.LookupId, categoryId, splitRowId: view.SplitRowId);
             RefreshAll();
         }
 
@@ -608,6 +802,90 @@ namespace THMS.UI.WinForms.Controls
                 RefreshAll();
         }
 
+        private void OnSplitTransactionClicked(object? sender, EventArgs e)
+        {
+            if (detailGrid.CurrentRow?.DataBoundItem is not UnifiedTransactionView view)
+            {
+                MessageBox.Show(FindForm(), "Select a transaction or rule to split.", "Split Transaction",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            OpenSplitEditor(view);
+        }
+
+        private static bool CanSplit(UnifiedTransactionView view) =>
+            view.Type is UnifiedTransactionView.PostedType
+                or UnifiedTransactionView.PostedTransferType
+                or UnifiedTransactionView.FutureType
+                or UnifiedTransactionView.FutureTransferType
+                or UnifiedTransactionView.RecurringRuleType
+                or UnifiedTransactionView.RecurringTransferRuleType
+                or UnifiedTransactionView.ForecastType
+                or UnifiedTransactionView.ForecastTransferType;
+
+        private void OpenSplitEditor(UnifiedTransactionView view)
+        {
+            if (!CanSplit(view))
+                return;
+
+            var parentId = view.LookupId;
+            decimal amount;
+            string description;
+            List<SplitTransactionRow> existing;
+
+            if (view.IsRecurringRule || view.IsForecasted)
+            {
+                var single = _ruleOrchestrator.GetSingleRule(parentId);
+                var transfer = single is null ? _ruleOrchestrator.GetTransferRule(parentId) : null;
+                if (single is null && transfer is null)
+                {
+                    MessageBox.Show(FindForm(), "Splits on forecast rows are edited on the recurring rule.",
+                        "Split Transaction", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                amount = single?.Amount ?? transfer!.Amount;
+                description = single?.Description ?? transfer!.Description ?? view.Description;
+                existing = _txOrchestrator.GetSplits(parentId);
+            }
+            else
+            {
+                var txs = _txOrchestrator.GetTransactionsForAccount(view.AccountId);
+                BaseTransaction? parent =
+                    (BaseTransaction?)txs.Posted.FirstOrDefault(t => t.Id == parentId) ??
+                    txs.PostedTransfers.FirstOrDefault(t => t.Id == parentId) ??
+                    (BaseTransaction?)txs.FutureSingles.FirstOrDefault(t => t.Id == parentId) ??
+                    txs.FutureTransfers.FirstOrDefault(t => t.Id == parentId);
+                if (parent is null)
+                    return;
+
+                amount = parent.Amount;
+                description = parent.Description ?? view.Description;
+                existing = parent.Splits.Select(s => s.Clone()).ToList();
+            }
+
+            using var editor = new SplitTransactionEditor(
+                description,
+                amount,
+                existing,
+                _categoryOrchestrator.GetActiveCategories(),
+                _accountOrchestrator.GetAllAccounts().ToList());
+            if (editor.ShowDialog(FindForm()) != DialogResult.OK)
+                return;
+
+            try
+            {
+                _txOrchestrator.ApplySplits(parentId, editor.Result);
+                RefreshAll();
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(FindForm(), ex.Message, "Split Transaction",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
         private void OnDeleteRuleClicked(object? sender, EventArgs e)
         {
             DeleteSelectedRule();
@@ -625,7 +903,7 @@ namespace THMS.UI.WinForms.Controls
         {
             if (view.Type == UnifiedTransactionView.RecurringRuleType)
             {
-                var rule = _ruleOrchestrator.GetSingleRule(view.Id);
+                var rule = _ruleOrchestrator.GetSingleRule(view.LookupId);
                 if (rule is null)
                     return;
 
@@ -635,7 +913,7 @@ namespace THMS.UI.WinForms.Controls
                 return;
             }
 
-            var transfer = _ruleOrchestrator.GetTransferRule(view.Id);
+            var transfer = _ruleOrchestrator.GetTransferRule(view.LookupId);
             if (transfer is null)
                 return;
 
@@ -660,9 +938,9 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             if (view.Type == UnifiedTransactionView.RecurringRuleType)
-                _ruleOrchestrator.DeleteSingleRule(view.Id);
+                _ruleOrchestrator.DeleteSingleRule(view.LookupId);
             else
-                _ruleOrchestrator.DeleteTransferRule(view.Id);
+                _ruleOrchestrator.DeleteTransferRule(view.LookupId);
 
             RefreshAll();
         }
@@ -695,11 +973,61 @@ namespace THMS.UI.WinForms.Controls
 
         public void RefreshCurrentAccount()
         {
+            _ = RefreshCurrentAccountAsync();
+        }
+
+        private async Task RefreshCurrentAccountAsync()
+        {
             if (_accountsSource.Current is not UnifiedAccountView account)
                 return;
 
-            LoadTransactionsForAccount(account.Id);
-            LoadBudgetsForAccount(account.Id);
+            _txLoadCts?.Cancel();
+            var cts = new CancellationTokenSource();
+            _txLoadCts = cts;
+
+            try
+            {
+                if (IsBudgetsTabSelected())
+                    LoadBudgetsForAccount(account.Id);
+
+                await LoadTransactionsForAccountAsync(account.Id, cts.Token);
+            }
+            finally
+            {
+                if (ReferenceEquals(_txLoadCts, cts) && !cts.IsCancellationRequested)
+                    HideLoadProgress();
+            }
+        }
+
+        private bool IsBudgetsTabSelected() =>
+            _detailTabs is not null && _budgetsPage is not null && _detailTabs.SelectedTab == _budgetsPage;
+
+        private void LoadBudgetsForSelectedAccount()
+        {
+            if (_accountsSource.Current is UnifiedAccountView account)
+                LoadBudgetsForAccount(account.Id);
+        }
+
+        private void ShowLoadProgress(string status)
+        {
+            if (lblLoadStatus is null || progressLoad is null)
+                return;
+
+            lblLoadStatus.Text = status;
+            lblLoadStatus.Visible = true;
+            progressLoad.Visible = true;
+            lblLoadStatus.Update();
+            progressLoad.Update();
+        }
+
+        private void HideLoadProgress()
+        {
+            if (lblLoadStatus is null || progressLoad is null)
+                return;
+
+            progressLoad.Visible = false;
+            lblLoadStatus.Visible = false;
+            lblLoadStatus.Text = "";
         }
 
         private void LoadBudgetsForAccount(Guid accountId)

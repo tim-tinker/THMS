@@ -25,6 +25,10 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
             EnsureColumn(conn, "IsUserCreated", "INTEGER NOT NULL DEFAULT 0");
             SqliteCategoryColumns.EnsureCategoryId(conn, "FutureTransferTransactions");
+            EnsureColumn(conn, "IsPlannedPayment", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn(conn, "StatementId", "TEXT");
+            EnsureColumn(conn, "PromotionalBalanceId", "TEXT");
+            EnsureColumn(conn, "PlanningNote", "TEXT");
         }
 
         public void Add(SqliteConnection conn, FutureTransferTransaction transaction)
@@ -33,10 +37,12 @@ namespace THMS.Data.Stores.SqlTables
             cmd.CommandText = @"
                 INSERT INTO FutureTransferTransactions
                 (Id, Date, Description, Amount, Category, CategoryId, FromAccountId, ToAccountId,
-                 IsRealized, PostedFromTransactionId, PostedToTransactionId, IsUserCreated)
+                 IsRealized, PostedFromTransactionId, PostedToTransactionId, IsUserCreated,
+                 IsPlannedPayment, StatementId, PromotionalBalanceId, PlanningNote)
                 VALUES
                 (@Id, @Date, @Description, @Amount, @Category, @CategoryId, @FromAccountId, @ToAccountId,
-                 @IsRealized, @PostedFromTransactionId, @PostedToTransactionId, @IsUserCreated);";
+                 @IsRealized, @PostedFromTransactionId, @PostedToTransactionId, @IsUserCreated,
+                 @IsPlannedPayment, @StatementId, @PromotionalBalanceId, @PlanningNote);";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
         }
@@ -56,7 +62,11 @@ namespace THMS.Data.Stores.SqlTables
                     IsRealized = @IsRealized,
                     PostedFromTransactionId = @PostedFromTransactionId,
                     PostedToTransactionId = @PostedToTransactionId,
-                    IsUserCreated = @IsUserCreated
+                    IsUserCreated = @IsUserCreated,
+                    IsPlannedPayment = @IsPlannedPayment,
+                    StatementId = @StatementId,
+                    PromotionalBalanceId = @PromotionalBalanceId,
+                    PlanningNote = @PlanningNote
                 WHERE Id = @Id;";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
@@ -120,9 +130,31 @@ namespace THMS.Data.Stores.SqlTables
             return ReadAll(cmd);
         }
 
+        public IEnumerable<FutureTransferTransaction> GetPlanned(SqliteConnection conn, Guid accountId)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = SelectColumns + @"
+                FROM FutureTransferTransactions
+                WHERE IsPlannedPayment = 1 AND (FromAccountId = @AccountId OR ToAccountId = @AccountId)
+                ORDER BY Date;";
+            cmd.Parameters.AddWithValue("@AccountId", accountId.ToString());
+            return ReadAll(cmd);
+        }
+
+        public IEnumerable<FutureTransferTransaction> GetAllPlanned(SqliteConnection conn)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = SelectColumns + @"
+                FROM FutureTransferTransactions
+                WHERE IsPlannedPayment = 1
+                ORDER BY Date;";
+            return ReadAll(cmd);
+        }
+
         private const string SelectColumns =
             @"SELECT Id, Date, Description, Amount, Category, FromAccountId, ToAccountId,
-                     IsRealized, PostedFromTransactionId, PostedToTransactionId, IsUserCreated, CategoryId";
+                     IsRealized, PostedFromTransactionId, PostedToTransactionId, IsUserCreated, CategoryId,
+                     IsPlannedPayment, StatementId, PromotionalBalanceId, PlanningNote";
 
         private static void Bind(SqliteCommand cmd, FutureTransferTransaction transaction)
         {
@@ -146,6 +178,10 @@ namespace THMS.Data.Stores.SqlTables
                     ? transaction.PostedToTransactionId.Value.ToString()
                     : DBNull.Value);
             cmd.Parameters.AddWithValue("@IsUserCreated", transaction.IsUserCreated ? 1 : 0);
+            cmd.Parameters.AddWithValue("@IsPlannedPayment", transaction.IsPlannedPayment ? 1 : 0);
+            cmd.Parameters.AddWithValue("@StatementId", BindGuid(transaction.StatementId));
+            cmd.Parameters.AddWithValue("@PromotionalBalanceId", BindGuid(transaction.PromotionalBalanceId));
+            cmd.Parameters.AddWithValue("@PlanningNote", (object?)transaction.PlanningNote ?? DBNull.Value);
         }
 
         private static FutureTransferTransaction Read(SqliteDataReader reader)
@@ -163,9 +199,19 @@ namespace THMS.Data.Stores.SqlTables
                 PostedFromTransactionId = reader.IsDBNull(8) ? null : Guid.Parse(reader.GetString(8)),
                 PostedToTransactionId = reader.IsDBNull(9) ? null : Guid.Parse(reader.GetString(9)),
                 IsUserCreated = reader.FieldCount > 10 && !reader.IsDBNull(10) && reader.GetInt32(10) == 1,
-                CategoryId = SqliteCategoryColumns.ReadId(reader, 11)
+                CategoryId = SqliteCategoryColumns.ReadId(reader, 11),
+                IsPlannedPayment = ReadBool(reader, 12),
+                StatementId = SqliteCategoryColumns.ReadId(reader, 13),
+                PromotionalBalanceId = SqliteCategoryColumns.ReadId(reader, 14),
+                PlanningNote = reader.FieldCount > 15 && !reader.IsDBNull(15) ? reader.GetString(15) : null
             };
         }
+
+        private static bool ReadBool(SqliteDataReader reader, int index) =>
+            reader.FieldCount > index && !reader.IsDBNull(index) && reader.GetInt32(index) == 1;
+
+        private static object BindGuid(Guid? id) =>
+            id is Guid value && value != Guid.Empty ? value.ToString() : DBNull.Value;
 
         private static IEnumerable<FutureTransferTransaction> ReadAll(SqliteCommand cmd)
         {

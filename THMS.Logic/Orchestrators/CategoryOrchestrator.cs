@@ -107,7 +107,7 @@ namespace THMS.Logic.Orchestrators
             _budgets.RefreshAllActive();
         }
 
-        public void AssignToPosted(Guid transactionId, Guid categoryId, bool learn = true)
+        public void AssignToPosted(Guid transactionId, Guid categoryId, bool learn = true, Guid? splitRowId = null)
         {
             var category = _categories.GetCategory(categoryId)
                 ?? throw new InvalidOperationException($"Category {categoryId} was not found.");
@@ -117,8 +117,20 @@ namespace THMS.Logic.Orchestrators
             var posted = _transactions.GetPostedTransaction(transactionId);
             if (posted is not null)
             {
-                posted.ApplyCategory(category);
-                _transactions.UpdatePostedTransaction(posted);
+                if (splitRowId is Guid splitId && posted.HasSplits)
+                {
+                    var split = posted.Splits.FirstOrDefault(s => s.Id == splitId)
+                        ?? throw new InvalidOperationException($"Split {splitId} was not found.");
+                    split.CategoryId = category.Id;
+                    split.Category = category.Name;
+                    _transactions.SaveSplits(posted.Id, posted.Splits);
+                }
+                else
+                {
+                    posted.ApplyCategory(category);
+                    _transactions.UpdatePostedTransaction(posted);
+                }
+
                 if (learn)
                     _categorizer.Learn(posted.Description, category.Id);
                 _budgets.RefreshAccount(posted.AccountId);
@@ -129,8 +141,20 @@ namespace THMS.Logic.Orchestrators
             if (transfer is null)
                 return;
 
-            transfer.ApplyCategory(category);
-            _transactions.UpdatePostedTransferTransaction(transfer);
+            if (splitRowId is Guid transferSplitId && transfer.HasSplits)
+            {
+                var split = transfer.Splits.FirstOrDefault(s => s.Id == transferSplitId)
+                    ?? throw new InvalidOperationException($"Split {transferSplitId} was not found.");
+                split.CategoryId = category.Id;
+                split.Category = category.Name;
+                _transactions.SaveSplits(transfer.Id, transfer.Splits);
+            }
+            else
+            {
+                transfer.ApplyCategory(category);
+                _transactions.UpdatePostedTransferTransaction(transfer);
+            }
+
             if (learn)
                 _categorizer.Learn(transfer.Description, category.Id);
             _budgets.RefreshAccount(transfer.AccountId);

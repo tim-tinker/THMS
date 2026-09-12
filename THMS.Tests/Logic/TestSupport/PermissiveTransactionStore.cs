@@ -17,6 +17,12 @@ namespace THMS.Tests.Logic.TestSupport
         public PostedTransaction? GetPostedTransaction(Guid id) => _inner.GetPostedTransaction(id);
         public IEnumerable<PostedTransaction> GetPostedTransactions(Guid accountId) => _inner.GetPostedTransactions(accountId);
         public IEnumerable<PostedTransaction> GetPostedTransactions(DateTime start, DateTime end) => _inner.GetPostedTransactions(start, end);
+        public IEnumerable<PostedTransaction> GetPostedTransactions(Guid accountId, DateTime start, DateTime end) =>
+            _inner.GetPostedTransactions(accountId, start, end);
+        public decimal SumPostedAmountsBefore(Guid accountId, DateTime before) =>
+            _inner.SumPostedAmountsBefore(accountId, before);
+        public decimal SumPostedAmountsAfter(Guid accountId, DateTime after) =>
+            _inner.SumPostedAmountsAfter(accountId, after);
         public DateTime? GetLatestPostedTransactionDate(Guid accountId) => _inner.GetLatestPostedTransactionDate(accountId);
 
         public void ReplacePostedTransaction(PostedTransaction replacement)
@@ -37,6 +43,12 @@ namespace THMS.Tests.Logic.TestSupport
         public PostedTransferTransaction? GetPostedTransferTransaction(Guid id) => _inner.GetPostedTransferTransaction(id);
         public IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(Guid accountId) => _inner.GetPostedTransferTransactions(accountId);
         public IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(DateTime start, DateTime end) => _inner.GetPostedTransferTransactions(start, end);
+        public IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(Guid accountId, DateTime start, DateTime end) =>
+            _inner.GetPostedTransferTransactions(accountId, start, end);
+        public decimal SumPostedTransferAmountsBefore(Guid accountId, DateTime before) =>
+            _inner.SumPostedTransferAmountsBefore(accountId, before);
+        public decimal SumPostedTransferAmountsAfter(Guid accountId, DateTime after) =>
+            _inner.SumPostedTransferAmountsAfter(accountId, after);
         public DateTime? GetLatestPostedTransferTransactionDate(Guid accountId) => _inner.GetLatestPostedTransferTransactionDate(accountId);
 
         public void AddFutureSingleTransaction(FutureSingleTransaction transaction) => _inner.AddFutureSingleTransaction(transaction);
@@ -45,6 +57,8 @@ namespace THMS.Tests.Logic.TestSupport
         public FutureSingleTransaction? GetFutureSingleTransaction(Guid id) => _inner.GetFutureSingleTransaction(id);
         public IEnumerable<FutureSingleTransaction> GetFutureSingleTransactions(Guid accountId) => _inner.GetFutureSingleTransactions(accountId);
         public IEnumerable<FutureSingleTransaction> GetFutureSingleTransactions(DateTime start, DateTime end) => _inner.GetFutureSingleTransactions(start, end);
+        public List<FutureSingleTransaction> GetPlannedPayments(Guid accountId) => _inner.GetPlannedPayments(accountId);
+        public List<FutureSingleTransaction> GetAllPlannedPayments() => _inner.GetAllPlannedPayments();
 
         public void AddFutureTransferTransaction(FutureTransferTransaction transaction) => _inner.AddFutureTransferTransaction(transaction);
         public void UpdateFutureTransferTransaction(FutureTransferTransaction transaction) => _inner.UpdateFutureTransferTransaction(transaction);
@@ -52,6 +66,8 @@ namespace THMS.Tests.Logic.TestSupport
         public FutureTransferTransaction? GetFutureTransferTransaction(Guid id) => _inner.GetFutureTransferTransaction(id);
         public IEnumerable<FutureTransferTransaction> GetFutureTransferTransactions(Guid accountId) => _inner.GetFutureTransferTransactions(accountId);
         public IEnumerable<FutureTransferTransaction> GetFutureTransferTransactions(DateTime start, DateTime end) => _inner.GetFutureTransferTransactions(start, end);
+        public List<FutureTransferTransaction> GetPlannedTransfers(Guid accountId) => _inner.GetPlannedTransfers(accountId);
+        public List<FutureTransferTransaction> GetAllPlannedTransfers() => _inner.GetAllPlannedTransfers();
 
         public void AddRecurringSingleRule(RecurringSingleTransactionRule rule) => _inner.AddRecurringSingleRule(rule);
         public void UpdateRecurringSingleRule(RecurringSingleTransactionRule rule) => _inner.UpdateRecurringSingleRule(rule);
@@ -95,6 +111,12 @@ namespace THMS.Tests.Logic.TestSupport
         public void UpsertAssignment(string normalizedDescription, Guid categoryId) => _inner.UpsertAssignment(normalizedDescription, categoryId);
         public CategoryAssignment? GetAssignment(string normalizedDescription) => _inner.GetAssignment(normalizedDescription);
         public IEnumerable<ExpenseBudgetRule> GetAllExpenseBudgetRules() => _inner.GetAllExpenseBudgetRules();
+
+        public void SaveSplits(Guid parentId, IEnumerable<SplitTransactionRow> splits) =>
+            _inner.SaveSplits(parentId, splits);
+
+        public List<SplitTransactionRow> GetSplits(Guid parentId) => _inner.GetSplits(parentId);
+        public void DeleteSplits(Guid parentId) => _inner.DeleteSplits(parentId);
 
         public IEnumerable<PostedTransaction> GetUnmatchedPostedTransactions(Guid accountId) => _inner.GetUnmatchedPostedTransactions(accountId);
         public IEnumerable<PostedTransferTransaction> GetUnmatchedPostedTransferTransactions(Guid accountId) => _inner.GetUnmatchedPostedTransferTransactions(accountId);

@@ -12,5 +12,6 @@ namespace THMS.Domain.Finance.Accounts
         public string PlaidAccountId { get; set; } = "";
         public string InstitutionId { get; set; } = "";
         public string AccountMask { get; set; } = "";
+        public string InstitutionName { get; set; } = "";
     }
 }

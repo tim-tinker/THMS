@@ -9,6 +9,9 @@
         public Guid? CategoryId { get; set; }
         public string? Category { get; set; }
 
+        public List<SplitTransactionRow> Splits { get; set; } = [];
+        public bool HasSplits => Splits.Count > 0;
+
         public void ApplyCategory(ExpenseCategory? category)
         {
             if (category is null)

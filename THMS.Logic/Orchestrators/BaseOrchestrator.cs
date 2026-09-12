@@ -2,25 +2,14 @@
 {
     public class BaseOrchestrator
     {
-        protected DateTime GetStartDate(DateTime end, string period)
+        public static DateTime GetStartDate(DateTime end, string period)
         {
-            DateTime start = end.AddMonths(-1);
-            switch (period)
+            return period switch
             {
-                case "Year":
-                    start = end.AddYears(-1);
-                    break;
-
-                case "Lifetime":
-                    start = DateTime.MinValue;
-                    break;
-
-                default:
-                    start = end.AddMonths(-1);
-                    break;
-            }
-
-            return start;
+                "Year" => end.AddYears(-1),
+                "Lifetime" => DateTime.MinValue,
+                _ => end.AddMonths(-1)
+            };
         }
     }
 }

@@ -25,6 +25,17 @@
 
         public decimal? ForecastBalance { get; set; }
 
+        public Guid ParentTransactionId { get; set; }
+        public Guid? SplitRowId { get; set; }
+        public string? SplitKind { get; set; }
+
+        public bool IsSplitRow => SplitRowId.HasValue && SplitRowId.Value != Guid.Empty;
+
+        public string TypeLabel =>
+            IsSplitRow && !string.IsNullOrWhiteSpace(SplitKind) ? SplitKind! : Type;
+
+        public Guid LookupId => ParentTransactionId != Guid.Empty ? ParentTransactionId : Id;
+
         public bool IsForecasted =>
             Type is ForecastType or ForecastTransferType or ForecastBudgetType;
 

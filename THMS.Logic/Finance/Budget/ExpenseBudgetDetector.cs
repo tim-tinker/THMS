@@ -21,14 +21,27 @@ namespace THMS.Logic.Finance.Budget
             decimal actual = 0;
 
             foreach (var transaction in posted.Where(t =>
-                         Matches(t.CategoryId, t.Category, included, categories) &&
                          t.Date.Date >= periodStart.Date &&
                          t.Date.Date <= periodEnd.Date))
             {
-                if (transaction.Amount < 0)
-                    actual += -transaction.Amount;
-                else if (transaction.Amount > 0)
-                    actual -= transaction.Amount;
+                if (transaction.HasSplits)
+                {
+                    foreach (var split in transaction.Splits)
+                    {
+                        if (!SplitTransactionMath.AffectsBudget(split.Type))
+                            continue;
+                        if (!Matches(split.CategoryId, split.Category, included, categories))
+                            continue;
+                        actual = SplitTransactionMath.ApplyBudgetAmount(actual, split.Amount);
+                    }
+
+                    continue;
+                }
+
+                if (!Matches(transaction.CategoryId, transaction.Category, included, categories))
+                    continue;
+
+                actual = SplitTransactionMath.ApplyBudgetAmount(actual, transaction.Amount);
             }
 
             return Math.Max(actual, 0);

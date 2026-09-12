@@ -1,66 +1,51 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Windows.Forms;
-using THMS.UI.WinForms.Controls;
-
-namespace THMS.UI.WinForms
+﻿namespace THMS.UI.WinForms
 {
     public partial class FinanceDataCenterForm : BaseEmbeddedForm
     {
-        private Control? _currentControl;
-        private readonly Dictionary<string, Control> _controls = new();
+        private static readonly Font TabHeaderFont = new("Segoe UI", 12F, FontStyle.Bold);
+        private static readonly Color IdleTabBack = Color.FromArgb(92, 45, 145);
+        private static readonly Color IdleTabFore = Color.White;
+        private static readonly Color ActiveTabBack = Color.FromArgb(255, 213, 0);
+        private static readonly Color ActiveTabFore = Color.FromArgb(48, 20, 80);
 
         public FinanceDataCenterForm()
         {
             InitializeComponent();
-            CreateControlDictionary();
+            ConfigureTabs();
         }
 
-        private void CreateControlDictionary()
+        private void ConfigureTabs()
         {
-            AddControl(new AccountUpdaterControl(), "Accounts");
-            AddControl(new TransactionUpdaterControl(), "Transactions");
+            tabs.DrawMode = TabDrawMode.OwnerDrawFixed;
+            tabs.SizeMode = TabSizeMode.Fixed;
+            tabs.ItemSize = new Size(LogicalToDeviceUnits(180), LogicalToDeviceUnits(42));
+            tabs.Padding = new Point(18, 8);
+            tabs.DrawItem += OnDrawTab;
+            tabs.SelectedIndexChanged += (_, _) => tabs.Invalidate();
+
+            var pageTint = Color.FromArgb(255, 252, 235);
+            tabAccounts.BackColor = pageTint;
+            tabTransactions.BackColor = pageTint;
+            tabDiagnostics.BackColor = pageTint;
         }
 
-        private void AddControl(UserControl control, string label)
+        private void OnDrawTab(object? sender, DrawItemEventArgs e)
         {
-            control.Dock = DockStyle.Fill;
-            _controls[label] = control;
+            var selected = e.Index == tabs.SelectedIndex;
+            var bounds = e.Bounds;
+            if (selected)
+                bounds.Inflate(0, 2);
 
-            var menuItem = dataTypeToolStripMenuItem.DropDownItems.Add(label);
-            menuItem.Click += OnClickTypeMenuItem;
-        }
+            using var back = new SolidBrush(selected ? ActiveTabBack : IdleTabBack);
+            e.Graphics.FillRectangle(back, bounds);
 
-        private void ClearControls()
-        {
-            if (_currentControl != null)
-            {
-                panelHost.Controls.Remove(_currentControl);
-                _currentControl = null;
-            }
-        }
-
-        private void OnClickTypeMenuItem(object sender, EventArgs e)
-        {
-            if (sender is not ToolStripMenuItem menuItem)
-                return;
-
-            var label = menuItem.Text;
-            if (!_controls.ContainsKey(label))
-                return;
-
-            ClearControls();
-
-            var control = _controls[label];
-            _currentControl = control;
-
-            panelHost.Controls.Add(control);
-            control.BringToFront();
-        }
-
-        private void OnClickClose(object sender, EventArgs e)
-        {
-            Close();
+            TextRenderer.DrawText(
+                e.Graphics,
+                tabs.TabPages[e.Index].Text,
+                TabHeaderFont,
+                bounds,
+                selected ? ActiveTabFore : IdleTabFore,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         }
     }
 }

@@ -35,7 +35,9 @@ namespace THMS.Logic.Finance.Aggregation
             var budgets = BuildBudgets(today, budgetRules, activePeriods, names);
             var payments = BuildPayments(today, accounts, recurringSingles, names);
             var uncategorized = posted.Count(IsUncategorized);
-            var alerts = BuildAlerts(accounts, budgets, payments, today, uncategorized);
+            var mismatch = posted.Count(t => t.HasSplits && !SplitTransactionMath.AmountsMatch(t.Amount, t.Splits));
+            var interestSpike = HasInterestSpike(today, posted);
+            var alerts = BuildAlerts(accounts, budgets, payments, today, uncategorized, mismatch, interestSpike);
             var slices = BuildCategorySlices(monthPosted, budgetedIds, categories);
             var trend = BuildMonthlyTrend(today, posted, budgetedIds);
             var recent = BuildRecent(posted, postedTransfers);
@@ -198,7 +200,9 @@ namespace THMS.Logic.Finance.Aggregation
             IReadOnlyList<FinanceDashboardBudgetRow> budgets,
             IReadOnlyList<FinanceDashboardPaymentRow> payments,
             DateTime today,
-            int uncategorized)
+            int uncategorized,
+            int mismatch,
+            bool interestSpike)
         {
             var alerts = new List<string>();
 
@@ -223,6 +227,10 @@ namespace THMS.Logic.Finance.Aggregation
 
             if (uncategorized > 0)
                 alerts.Add($"{uncategorized} uncategorized transaction{(uncategorized == 1 ? "" : "s")}");
+            if (mismatch > 0)
+                alerts.Add("Split mismatch detected");
+            if (interestSpike)
+                alerts.Add("Loan interest spike detected");
 
             return alerts;
         }
@@ -274,15 +282,7 @@ namespace THMS.Logic.Finance.Aggregation
                 decimal spending = 0;
                 decimal income = 0;
                 foreach (var transaction in posted.Where(t => t.Date.Date >= month && t.Date.Date <= monthEnd))
-                {
-                    var categoryId = ResolveCategoryId(transaction);
-                    if (transaction.Amount < 0)
-                        spending += -transaction.Amount;
-                    else if (transaction.Amount > 0 && budgetedIds.Contains(categoryId))
-                        spending -= transaction.Amount;
-                    else if (transaction.Amount > 0)
-                        income += transaction.Amount;
-                }
+                    ApplyTrend(ref spending, ref income, transaction, budgetedIds);
 
                 points.Add(new FinanceDashboardMonthlyPoint
                 {
@@ -309,11 +309,88 @@ namespace THMS.Logic.Finance.Aggregation
             PostedTransaction transaction,
             HashSet<Guid> budgetedIds)
         {
-            var categoryId = ResolveCategoryId(transaction);
-            if (transaction.Amount < 0)
-                totals[categoryId] = totals.GetValueOrDefault(categoryId) + -transaction.Amount;
-            else if (transaction.Amount > 0 && budgetedIds.Contains(categoryId))
-                totals[categoryId] = totals.GetValueOrDefault(categoryId) - transaction.Amount;
+            if (transaction.HasSplits)
+            {
+                foreach (var split in transaction.Splits)
+                {
+                    if (!SplitTransactionMath.AffectsBudget(split.Type))
+                        continue;
+                    ApplyNetAmount(totals, split.Amount, ResolveCategoryId(split.CategoryId), budgetedIds);
+                }
+
+                return;
+            }
+
+            ApplyNetAmount(totals, transaction.Amount, ResolveCategoryId(transaction), budgetedIds);
+        }
+
+        private static void ApplyNetAmount(
+            Dictionary<Guid, decimal> totals,
+            decimal amount,
+            Guid categoryId,
+            HashSet<Guid> budgetedIds)
+        {
+            if (amount < 0)
+                totals[categoryId] = totals.GetValueOrDefault(categoryId) + -amount;
+            else if (amount > 0 && budgetedIds.Contains(categoryId))
+                totals[categoryId] = totals.GetValueOrDefault(categoryId) - amount;
+        }
+
+        private static void ApplyTrend(
+            ref decimal spending,
+            ref decimal income,
+            PostedTransaction transaction,
+            HashSet<Guid> budgetedIds)
+        {
+            if (transaction.HasSplits)
+            {
+                foreach (var split in transaction.Splits)
+                {
+                    if (!SplitTransactionMath.AffectsBudget(split.Type))
+                        continue;
+                    ApplyTrendAmount(ref spending, ref income, split.Amount, ResolveCategoryId(split.CategoryId), budgetedIds);
+                }
+
+                return;
+            }
+
+            ApplyTrendAmount(ref spending, ref income, transaction.Amount, ResolveCategoryId(transaction), budgetedIds);
+        }
+
+        private static void ApplyTrendAmount(
+            ref decimal spending,
+            ref decimal income,
+            decimal amount,
+            Guid categoryId,
+            HashSet<Guid> budgetedIds)
+        {
+            if (amount < 0)
+                spending += -amount;
+            else if (amount > 0 && budgetedIds.Contains(categoryId))
+                spending -= amount;
+            else if (amount > 0)
+                income += amount;
+        }
+
+        private static bool HasInterestSpike(DateTime today, IReadOnlyList<PostedTransaction> posted)
+        {
+            var monthStart = new DateTime(today.Year, today.Month, 1);
+            var previousStart = monthStart.AddMonths(-1);
+            decimal current = 0;
+            decimal previous = 0;
+            foreach (var transaction in posted.Where(t => t.HasSplits))
+            {
+                foreach (var split in transaction.Splits.Where(s => s.Type == SplitType.Interest))
+                {
+                    var date = transaction.Date.Date;
+                    if (date >= monthStart && date < monthStart.AddMonths(1))
+                        current += Math.Abs(split.Amount);
+                    else if (date >= previousStart && date < monthStart)
+                        previous += Math.Abs(split.Amount);
+                }
+            }
+
+            return previous > 0 && current > previous * 1.5m;
         }
 
         private static HashSet<Guid> BudgetedCategoryIds(
@@ -326,15 +403,21 @@ namespace THMS.Logic.Finance.Aggregation
 
         public static bool IsUncategorized(PostedTransaction transaction)
         {
-            if (transaction.CategoryId is not Guid id || id == Guid.Empty)
-                return true;
-            if (id == DefaultExpenseCategories.UncategorizedId)
-                return true;
-            return string.Equals(transaction.Category, DefaultExpenseCategories.Uncategorized, StringComparison.OrdinalIgnoreCase);
+            if (transaction.HasSplits)
+            {
+                return transaction.Splits.Any(split =>
+                    SplitTransactionMath.RequiresCategory(split.Type) &&
+                    SplitTransactionMath.IsUncategorized(split.CategoryId, split.Category));
+            }
+
+            return SplitTransactionMath.IsUncategorized(transaction.CategoryId, transaction.Category);
         }
 
         private static Guid ResolveCategoryId(PostedTransaction transaction) =>
-            transaction.CategoryId is Guid id && id != Guid.Empty
+            ResolveCategoryId(transaction.CategoryId);
+
+        private static Guid ResolveCategoryId(Guid? categoryId) =>
+            categoryId is Guid id && id != Guid.Empty
                 ? id
                 : DefaultExpenseCategories.UncategorizedId;
     }

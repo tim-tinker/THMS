@@ -43,10 +43,64 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Update="Controls\AccountsIngestionControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\PlaidLinkDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\AccountImportPreviewDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\PlaidAccountSetupDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\ThmsButton.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="RegisterForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\TransactionImportPreviewDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\PlaidTransactionImportDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\TransactionIngestionControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\FinanceDiagnosticsControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\UpcomingObligationsControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\PlannedPaymentsControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\CashFlowForecastControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+            <Compile Update="Controls\PlannedPaymentEditForm.cs">
+              <SubType>Form</SubType>
+            </Compile>
+            <Compile Update="Controls\StatementEditorDialog.cs">
+              <SubType>Form</SubType>
+            </Compile>
+    <Compile Update="Controls\ExtraPrincipalDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\ManualReconcileDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Controls\HomeCircuitAttributionManagerControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\RecurringRuleEditor.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\SplitTransactionEditor.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="Controls\BudgetRuleEditor.cs">

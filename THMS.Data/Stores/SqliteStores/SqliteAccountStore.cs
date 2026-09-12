@@ -52,6 +52,8 @@ namespace THMS.Data.Stores.SqliteStores
                 case InternalAccount internalAccount:
                     _internalAccountTable.Upsert(conn, internalAccount);
                     break;
+                case UntrackedAccount:
+                    break;
                 default:
                     throw new InvalidOperationException($"Unknown account type: {account.GetType().Name}");
             }
@@ -83,6 +85,7 @@ namespace THMS.Data.Stores.SqliteStores
                 nameof(MortgageAccount) => LoadMortgage(conn, id),
                 nameof(InvestmentAccount) => LoadInvestment(conn, id),
                 nameof(InternalAccount) => LoadInternal(conn, id),
+                nameof(UntrackedAccount) => new UntrackedAccount(),
                 _ => null
             };
 

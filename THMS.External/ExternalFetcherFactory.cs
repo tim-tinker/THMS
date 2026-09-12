@@ -10,6 +10,7 @@ namespace THMS.External
 
         private IExternalAccountFetcher? _accountFetcher;
         private IExternalTransactionFetcher? _transactionFetcher;
+        private IPlaidLinkSession? _linkSession;
 
         public IExternalAccountFetcher GetAccountFetcher()
         {
@@ -19,6 +20,11 @@ namespace THMS.External
         public IExternalTransactionFetcher GetTransactionFetcher()
         {
             return _transactionFetcher ??= CreateTransactionFetcher();
+        }
+
+        public IPlaidLinkSession GetLinkSession()
+        {
+            return _linkSession ??= new PlaidLinkManager(Client);
         }
 
         private IExternalAccountFetcher CreateAccountFetcher()

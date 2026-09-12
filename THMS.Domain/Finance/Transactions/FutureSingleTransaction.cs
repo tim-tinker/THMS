@@ -9,5 +9,10 @@
 
         // Link to the posted transaction that fulfilled it
         public Guid? PostedTransactionId { get; set; }
+
+        public bool IsPlannedPayment { get; set; }
+        public Guid? StatementId { get; set; }
+        public Guid? PromotionalBalanceId { get; set; }
+        public string? PlanningNote { get; set; }
     }
 }

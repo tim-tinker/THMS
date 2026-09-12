@@ -1,14 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
+﻿using System.Globalization;
 using ExcelDataReader;
-
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Ingestion.Importers.Finance
 {
+    public sealed class ParsedSpreadsheetTransaction
+    {
+        public PostedTransaction Transaction { get; init; } = null!;
+        public string AccountName { get; init; } = "";
+        public string CategoryName { get; init; } = "";
+    }
+
     public class SpreadsheetTransactionImporter
     {
         private readonly ITransactionDataStore _transactionStore;
@@ -20,7 +23,7 @@ namespace THMS.Ingestion.Importers.Finance
                 new DataStoreFactory().GetAccountStore())
         {
         }
-            
+
         public SpreadsheetTransactionImporter(
             ITransactionDataStore transactionStore,
             IAccountDataStore accountStore)
@@ -33,64 +36,91 @@ namespace THMS.Ingestion.Importers.Finance
                 System.Text.CodePagesEncodingProvider.Instance);
         }
 
-        public void Import(string filePath)
+        public List<ParsedSpreadsheetTransaction> Parse(string filePath)
         {
-            using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read);
-            using var reader = ExcelReaderFactory.CreateReader(stream);
+            using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = CreateReader(stream, filePath);
 
+            var rows = new List<ParsedSpreadsheetTransaction>();
             var rowIndex = 0;
 
             while (reader.Read())
             {
                 rowIndex++;
-
-                // Skip header row
                 if (rowIndex == 1)
                     continue;
 
-                // Expected columns:
-                // 0 = Category
-                // 1 = Account
-                // 2 = Date
-                // 3 = Amount
-                // 4 = Transaction (description)
+                var parsed = ReadRow(reader, rowIndex);
+                if (parsed is not null)
+                    rows.Add(parsed);
+            }
 
-                var category = reader.GetString(0)?.Trim();
-                var accountName = reader.GetString(1)?.Trim();
-                var dateString = reader.GetValue(2)?.ToString()?.Trim();
-                var amountString = reader.GetValue(3)?.ToString()?.Trim();
-                var description = reader.GetString(4)?.Trim();
+            return rows;
+        }
 
-                if (string.IsNullOrWhiteSpace(accountName))
-                    continue;
+        private static IExcelDataReader CreateReader(Stream stream, string filePath)
+        {
+            if (Path.GetExtension(filePath).Equals(".csv", StringComparison.OrdinalIgnoreCase))
+                return ExcelReaderFactory.CreateCsvReader(stream);
 
-                var account = _accountStore.GetAccount(accountName);
-                if (account is null)
-                {
-                    Console.WriteLine(
-                        $"Skipping row {rowIndex}: account '{accountName}' not found.");
-                    continue;
-                }
+            return ExcelReaderFactory.CreateReader(stream);
+        }
 
-                if (!DateTime.TryParse(dateString, out var date))
-                    continue;
+        public void Import(string filePath)
+        {
+            foreach (var parsed in Parse(filePath))
+            {
+                parsed.Transaction.ApplyCategory(ResolveCategory(parsed.CategoryName));
+                _transactionStore.AddPostedTransaction(parsed.Transaction);
+            }
+        }
 
-                if (!decimal.TryParse(amountString, NumberStyles.Any,
-                    CultureInfo.InvariantCulture, out var amount))
-                    continue;
+        private ParsedSpreadsheetTransaction? ReadRow(IExcelDataReader reader, int rowIndex)
+        {
+            var category = ReadString(reader, 0);
+            var accountName = ReadString(reader, 1);
+            var dateString = ReadString(reader, 2);
+            var amountString = ReadString(reader, 3);
+            var description = ReadString(reader, 4);
 
-                var posted = new PostedTransaction
+            if (string.IsNullOrWhiteSpace(accountName))
+                return null;
+
+            var account = _accountStore.GetAccount(accountName);
+            if (account is null)
+            {
+                Console.WriteLine($"Skipping row {rowIndex}: account '{accountName}' not found.");
+                return null;
+            }
+
+            if (!DateTime.TryParse(dateString, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+                && !DateTime.TryParse(dateString, out date))
+                return null;
+
+            if (!decimal.TryParse(amountString, NumberStyles.Any, CultureInfo.InvariantCulture, out var amount)
+                && !decimal.TryParse(amountString, NumberStyles.Any, CultureInfo.CurrentCulture, out amount))
+                return null;
+
+            return new ParsedSpreadsheetTransaction
+            {
+                AccountName = accountName,
+                CategoryName = category,
+                Transaction = new PostedTransaction
                 {
                     Id = Guid.NewGuid(),
                     AccountId = account.Id,
                     Date = date,
                     Amount = amount,
-                    Description = description ?? string.Empty
-                };
-                posted.ApplyCategory(ResolveCategory(category));
+                    Description = description
+                }
+            };
+        }
 
-                _transactionStore.AddPostedTransaction(posted);
-            }
+        private static string ReadString(IExcelDataReader reader, int index)
+        {
+            if (index >= reader.FieldCount)
+                return "";
+            return reader.GetValue(index)?.ToString()?.Trim() ?? "";
         }
 
         private ExpenseCategory ResolveCategory(string? name)

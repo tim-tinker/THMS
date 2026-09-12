@@ -34,6 +34,15 @@ namespace THMS.Data.Stores
         public IEnumerable<PostedTransaction> GetPostedTransactions(DateTime start, DateTime end) =>
             _store.GetPostedByDateRange(start, end);
 
+        public IEnumerable<PostedTransaction> GetPostedTransactions(Guid accountId, DateTime start, DateTime end) =>
+            _store.GetPostedByAccount(accountId, start, end);
+
+        public decimal SumPostedAmountsBefore(Guid accountId, DateTime before) =>
+            _store.SumPostedBefore(accountId, before);
+
+        public decimal SumPostedAmountsAfter(Guid accountId, DateTime after) =>
+            _store.SumPostedAfter(accountId, after);
+
         public DateTime? GetLatestPostedTransactionDate(Guid accountId) =>
             _store.GetLatestPosted(accountId)?.Date;
 
@@ -61,6 +70,15 @@ namespace THMS.Data.Stores
         public IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(DateTime start, DateTime end) =>
             _store.GetPostedTransfersByDateRange(start, end);
 
+        public IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(Guid accountId, DateTime start, DateTime end) =>
+            _store.GetPostedTransfersByAccount(accountId, start, end);
+
+        public decimal SumPostedTransferAmountsBefore(Guid accountId, DateTime before) =>
+            _store.SumPostedTransfersBefore(accountId, before);
+
+        public decimal SumPostedTransferAmountsAfter(Guid accountId, DateTime after) =>
+            _store.SumPostedTransfersAfter(accountId, after);
+
         public DateTime? GetLatestPostedTransferTransactionDate(Guid accountId) =>
             _store.GetLatestPostedTransfer(accountId)?.Date;
 
@@ -86,6 +104,12 @@ namespace THMS.Data.Stores
         public IEnumerable<FutureSingleTransaction> GetFutureSingleTransactions(DateTime start, DateTime end) =>
             _store.GetFutureSinglesByDateRange(start, end);
 
+        public List<FutureSingleTransaction> GetPlannedPayments(Guid accountId) =>
+            _store.GetPlannedPayments(accountId).ToList();
+
+        public List<FutureSingleTransaction> GetAllPlannedPayments() =>
+            _store.GetAllPlannedPayments().ToList();
+
         // ------------------------------------------------------------
         // Future Transfer Transactions
         // ------------------------------------------------------------
@@ -107,6 +131,12 @@ namespace THMS.Data.Stores
 
         public IEnumerable<FutureTransferTransaction> GetFutureTransferTransactions(DateTime start, DateTime end) =>
             _store.GetFutureTransfersByDateRange(start, end);
+
+        public List<FutureTransferTransaction> GetPlannedTransfers(Guid accountId) =>
+            _store.GetPlannedTransfers(accountId).ToList();
+
+        public List<FutureTransferTransaction> GetAllPlannedTransfers() =>
+            _store.GetAllPlannedTransfers().ToList();
 
         // ------------------------------------------------------------
         // Recurring Single Rules
@@ -234,6 +264,15 @@ namespace THMS.Data.Stores
 
         public IEnumerable<ExpenseBudgetRule> GetAllExpenseBudgetRules() =>
             _store.GetAllExpenseBudgets();
+
+        public void SaveSplits(Guid parentId, IEnumerable<SplitTransactionRow> splits) =>
+            _store.SaveSplits(parentId, splits);
+
+        public List<SplitTransactionRow> GetSplits(Guid parentId) =>
+            _store.GetSplits(parentId);
+
+        public void DeleteSplits(Guid parentId) =>
+            _store.DeleteSplits(parentId);
 
         // ------------------------------------------------------------
         // Utility Queries

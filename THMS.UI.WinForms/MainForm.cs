@@ -5,6 +5,10 @@ namespace THMS.UI
     public partial class MainForm : Form
     {
         private const int NavButtonHeight = 40;
+        private static readonly Color NavSelectedBack = Color.FromArgb(0, 99, 177);
+        private static readonly Color NavSelectedFore = Color.White;
+        private static readonly Color NavIdleBack = Color.FromArgb(245, 245, 245);
+        private static readonly Color NavIdleFore = Color.FromArgb(32, 32, 32);
 
         private readonly Dictionary<string, BaseDashboardForm> _dashboards = [];
         private readonly Dictionary<string, BaseEmbeddedForm> _embeddedForms = [];
@@ -24,9 +28,10 @@ namespace THMS.UI
             AddDashboard("Energy", new EnergyDashboardForm());
 
             AddSectionLabel("Data Management");
+            AddEmbeddedForm("Planning Center", new PlanningCenterForm());
+            AddEmbeddedForm("Register", new RegisterForm());
             AddEmbeddedForm("Data Manager", new DataManagerForm());
             AddEmbeddedForm("Data Center", new DataCenterForm());
-            AddEmbeddedForm("Finance Data Center", new FinanceDataCenterForm());
         }
 
         private void OnLoad(object sender, EventArgs e)
@@ -76,8 +81,15 @@ namespace THMS.UI
                 Height = NavButtonHeight,
                 Width = GetNavButtonWidth(),
                 Margin = new Padding(0, 0, 0, 8),
-                UseVisualStyleBackColor = true,
+                FlatStyle = FlatStyle.Flat,
+                UseVisualStyleBackColor = false,
+                BackColor = NavIdleBack,
+                ForeColor = NavIdleFore,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(8, 0, 8, 0)
             };
+            button.FlatAppearance.BorderColor = Color.FromArgb(200, 200, 200);
+            button.FlatAppearance.BorderSize = 1;
             navigationPanel.Controls.Add(button);
             return button;
         }
@@ -126,6 +138,7 @@ namespace THMS.UI
             var dashboard = _dashboards[moduleName];
             dashboard.Visible = true;
             dashboard.RefreshDashboard();
+            HighlightNavButton(moduleName);
         }
 
         private void ShowFormInMainPanel(string formName)
@@ -134,6 +147,23 @@ namespace THMS.UI
 
             var dashboard = _embeddedForms[formName];
             dashboard.Visible = true;
+            HighlightNavButton(formName);
+        }
+
+        private void HighlightNavButton(string label)
+        {
+            foreach (Control control in navigationPanel.Controls)
+            {
+                if (control is not Button button)
+                    continue;
+
+                var selected = string.Equals(button.Text, label, StringComparison.Ordinal);
+                button.BackColor = selected ? NavSelectedBack : NavIdleBack;
+                button.ForeColor = selected ? NavSelectedFore : NavIdleFore;
+                button.FlatAppearance.BorderColor = selected
+                    ? NavSelectedBack
+                    : Color.FromArgb(200, 200, 200);
+            }
         }
 
         private void HideAllEmbeddedForms()

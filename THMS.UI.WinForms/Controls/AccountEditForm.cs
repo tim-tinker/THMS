@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Windows.Forms;
 using THMS.Domain.Finance.Accounts;
+using THMS.Logic.Finance.Model;
 
 namespace THMS.UI.WinForms.Controls
 {
@@ -13,7 +14,7 @@ namespace THMS.UI.WinForms.Controls
             InitializeComponent();
 
             // If creating new, default to BankAccount
-            Account = existing ?? new BankAccount();
+            Account = existing ?? new BankAccount { Type = AccountType.Checking };
 
             PopulateAccountTypeCombo();
             BindFields();
@@ -28,6 +29,7 @@ namespace THMS.UI.WinForms.Controls
 
         private void PopulateAccountTypeCombo()
         {
+            cmbAccountType.SelectedIndexChanged -= OnAccountTypeChanged;
             cmbAccountType.Items.Clear();
             cmbAccountType.Items.Add("Bank");
             cmbAccountType.Items.Add("Credit");
@@ -35,9 +37,26 @@ namespace THMS.UI.WinForms.Controls
             cmbAccountType.Items.Add("Mortgage");
             cmbAccountType.Items.Add("Investment");
             cmbAccountType.Items.Add("Internal");
-
-            cmbAccountType.SelectedItem = Account.Type.ToString();
+            cmbAccountType.Items.Add("Utility");
+            cmbAccountType.Items.Add("Service");
+            cmbAccountType.Items.Add("Insurance");
+            cmbAccountType.SelectedItem = ComboLabel(Account);
+            cmbAccountType.SelectedIndexChanged += OnAccountTypeChanged;
         }
+
+        private static string ComboLabel(Account account) => AccountKinds.Of(account) switch
+        {
+            AccountKinds.Bank => "Bank",
+            AccountKinds.Credit => "Credit",
+            AccountKinds.Loan => "Loan",
+            AccountKinds.Mortgage => "Mortgage",
+            AccountKinds.Investment => "Investment",
+            AccountKinds.Internal => "Internal",
+            AccountKinds.Utility => "Utility",
+            AccountKinds.Service => "Service",
+            AccountKinds.Insurance => "Insurance",
+            _ => "Bank"
+        };
 
         private void BindFields()
         {
@@ -45,24 +64,25 @@ namespace THMS.UI.WinForms.Controls
             txtInstitution.Text = Account.Institution;
             txtAccountNumber.Text = Account.AccountNumber;
             txtUrl.Text = Account.WebsiteUrl;
-            dtBalanceAsOf.Value = Account.BalanceAsOf ?? DateTime.Today;
+
+            var openingAsOf = PickerDate(dtBankOpeningAsOf, Account.BalanceAsOf);
+            dtBankOpeningAsOf.Value = openingAsOf;
+            dtCreditOpeningAsOf.Value = PickerDate(dtCreditOpeningAsOf, Account.BalanceAsOf);
 
             // Subtype-specific binding
             switch (Account)
             {
                 case BankAccount bank:
                     numBankStarting.Value = bank.StartingBalance;
-                    numBankPosted.Value = bank.PostedBalance;
                     numBankOverdraft.Value = bank.OverdraftLimit;
                     break;
 
                 case CreditAccount credit:
                     numCreditLimit.Value = credit.CreditLimit;
                     numCreditApr.Value = credit.APR;
-                    dtCreditStatement.Value = credit.StatementDate;
-                    dtCreditDue.Value = credit.DueDate;
-                    numCreditPosted.Value = credit.PostedBalance;
-                    numCreditStarting.Value = credit.StartingBalance;
+                    dtCreditStatement.Value = PickerDate(dtCreditStatement, credit.StatementDate);
+                    dtCreditDue.Value = PickerDate(dtCreditDue, credit.DueDate);
+                    numCreditStarting.Value = Clamp(numCreditStarting, PostedBalanceCalculator.ToDisplayBalance(credit, credit.StartingBalance));
                     break;
 
                 case LoanAccount loan:
@@ -75,7 +95,7 @@ namespace THMS.UI.WinForms.Controls
                     numMortPrincipal.Value = mortgage.Principal;
                     numMortRate.Value = mortgage.InterestRate;
                     numMortTerm.Value = mortgage.TermMonths;
-                    dtMortNext.Value = mortgage.NextPaymentDate;
+                    dtMortNext.Value = PickerDate(dtMortNext, mortgage.NextPaymentDate);
                     break;
 
                 case InvestmentAccount invest:
@@ -93,16 +113,15 @@ namespace THMS.UI.WinForms.Controls
             Account.Name = txtName.Text;
             Account.Institution = txtInstitution.Text;
             Account.AccountNumber = txtAccountNumber.Text;
-            Account.BalanceAsOf = dtBalanceAsOf.Value;
             Account.WebsiteUrl = txtUrl.Text;
 
             // Subtype-specific save
             switch (Account)
             {
                 case BankAccount bank:
-                    bank.StartingBalance = numBankStarting.Value;
-                    bank.PostedBalance = numBankPosted.Value;
+                    ShiftStartingBalance(bank, numBankStarting.Value);
                     bank.OverdraftLimit = numBankOverdraft.Value;
+                    bank.BalanceAsOf = dtBankOpeningAsOf.Value;
                     break;
 
                 case CreditAccount credit:
@@ -110,8 +129,9 @@ namespace THMS.UI.WinForms.Controls
                     credit.APR = numCreditApr.Value;
                     credit.StatementDate = dtCreditStatement.Value;
                     credit.DueDate = dtCreditDue.Value;
-                    credit.PostedBalance = numCreditPosted.Value;
-                    credit.StartingBalance = numCreditStarting.Value;
+                    var openingOwed = PostedBalanceCalculator.ToLedgerBalance(credit, numCreditStarting.Value);
+                    ShiftStartingBalance(credit, openingOwed);
+                    credit.BalanceAsOf = dtCreditOpeningAsOf.Value;
                     break;
 
                 case LoanAccount loan:
@@ -145,6 +165,7 @@ namespace THMS.UI.WinForms.Controls
             pnlMortgage.Visible = false;
             pnlInvestment.Visible = false;
             pnlInternal.Visible = false;
+            pnlUntracked.Visible = false;
         }
 
         private void ShowCorrectPanel()
@@ -159,6 +180,7 @@ namespace THMS.UI.WinForms.Controls
                 MortgageAccount => pnlMortgage,
                 InvestmentAccount => pnlInvestment,
                 InternalAccount => pnlInternal,
+                UntrackedAccount => pnlUntracked,
                 _ => null
             };
 
@@ -193,25 +215,38 @@ namespace THMS.UI.WinForms.Controls
             var selected = cmbAccountType.SelectedItem?.ToString();
             if (selected == null) return;
 
-            // Replace Account with new subtype instance
+            var name = txtName.Text;
+            var institution = txtInstitution.Text;
+            var accountNumber = txtAccountNumber.Text;
+            var url = txtUrl.Text;
+
             Account = selected switch
             {
-                "Bank" => new BankAccount(),
+                "Bank" => new BankAccount { Type = AccountType.Checking },
                 "Credit" => new CreditAccount
                 {
+                    Type = AccountType.CreditCard,
                     StatementDate = DateTime.Today,
                     DueDate = DateTime.Today
                 },
-                "Loan" => new LoanAccount(),
+                "Loan" => new LoanAccount { Type = AccountType.Loan },
                 "Mortgage" => new MortgageAccount
                 {
+                    Type = AccountType.Mortgage,
                     NextPaymentDate = DateTime.Today
                 },
-                "Investment" => new InvestmentAccount(),
-                "Internal" => new InternalAccount(),
+                "Investment" => new InvestmentAccount { Type = AccountType.Investment },
+                "Internal" => new InternalAccount { Type = AccountType.Internal },
+                "Utility" => new UntrackedAccount { Type = AccountType.Utility },
+                "Service" => new UntrackedAccount { Type = AccountType.Service },
+                "Insurance" => new UntrackedAccount { Type = AccountType.Insurance },
                 _ => Account
             };
 
+            Account.Name = name;
+            Account.Institution = institution;
+            Account.AccountNumber = accountNumber;
+            Account.WebsiteUrl = url;
             BindFields();
             ShowCorrectPanel();
         }
@@ -219,6 +254,18 @@ namespace THMS.UI.WinForms.Controls
         private void OnSave(object sender, EventArgs e)
         {
             SaveFields();
+            if (string.IsNullOrWhiteSpace(Account.Name) ||
+                string.IsNullOrWhiteSpace(Account.Institution) ||
+                string.IsNullOrWhiteSpace(Account.AccountNumber))
+            {
+                MessageBox.Show(this,
+                    "Name, institution, and account number are required.",
+                    "Account Editor",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
             DialogResult = DialogResult.OK;
             Close();
         }
@@ -227,6 +274,29 @@ namespace THMS.UI.WinForms.Controls
         {
             DialogResult = DialogResult.Cancel;
             Close();
+        }
+
+        private static void ShiftStartingBalance(Account account, decimal newStartingBalance)
+        {
+            var current = PostedBalanceCalculator.GetStartingBalance(account);
+            PostedBalanceCalculator.AdjustStartingBalance(account, newStartingBalance - current);
+        }
+
+        private static decimal Clamp(NumericUpDown box, decimal value)
+        {
+            if (value < box.Minimum)
+                return box.Minimum;
+            if (value > box.Maximum)
+                return box.Maximum;
+            return value;
+        }
+
+        private static DateTime PickerDate(DateTimePicker picker, DateTime? value)
+        {
+            var date = value ?? DateTime.Today;
+            if (date < picker.MinDate || date > picker.MaxDate)
+                return DateTime.Today;
+            return date;
         }
     }
 }

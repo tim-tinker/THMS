@@ -7,13 +7,16 @@
         private System.Windows.Forms.DataGridView masterGrid;
         private System.Windows.Forms.DataGridView detailGrid;
         private System.Windows.Forms.SplitContainer splitContainer;
-        private System.Windows.Forms.Panel forecastPanel;
+        private System.Windows.Forms.FlowLayoutPanel forecastPanel;
+        private System.Windows.Forms.Label lblHistory;
+        private System.Windows.Forms.ComboBox cmbHistory;
         private System.Windows.Forms.Label lblForecastPeriod;
         private System.Windows.Forms.ComboBox cmbForecastPeriod;
         private System.Windows.Forms.Label lblShow;
         private System.Windows.Forms.ComboBox cmbShow;
         private System.Windows.Forms.Button btnAddRule;
         private System.Windows.Forms.Button btnDeleteRule;
+        private System.Windows.Forms.Button btnSplitTransaction;
 
         protected override void Dispose(bool disposing)
         {
@@ -45,13 +48,16 @@
             CategoryColumn = new DataGridViewTextBoxColumn();
             TypeColumn = new DataGridViewTextBoxColumn();
             DescriptionColumn = new DataGridViewTextBoxColumn();
-            forecastPanel = new Panel();
+            forecastPanel = new FlowLayoutPanel();
+            lblHistory = new Label();
+            cmbHistory = new ComboBox();
             lblForecastPeriod = new Label();
             cmbForecastPeriod = new ComboBox();
             lblShow = new Label();
             cmbShow = new ComboBox();
             btnAddRule = new Button();
             btnDeleteRule = new Button();
+            btnSplitTransaction = new Button();
             NameColumn = new DataGridViewTextBoxColumn();
             AccountTypeColumn = new DataGridViewTextBoxColumn();
             AsOfDateColumn = new DataGridViewTextBoxColumn();
@@ -176,7 +182,7 @@
             // TypeColumn
             // 
             TypeColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            TypeColumn.DataPropertyName = "Type";
+            TypeColumn.DataPropertyName = "TypeLabel";
             TypeColumn.HeaderText = "Type";
             TypeColumn.MinimumWidth = 9;
             TypeColumn.Name = "TypeColumn";
@@ -194,71 +200,125 @@
             // 
             // forecastPanel
             // 
+            forecastPanel.Controls.Add(lblHistory);
+            forecastPanel.Controls.Add(cmbHistory);
             forecastPanel.Controls.Add(lblForecastPeriod);
             forecastPanel.Controls.Add(cmbForecastPeriod);
             forecastPanel.Controls.Add(lblShow);
             forecastPanel.Controls.Add(cmbShow);
             forecastPanel.Controls.Add(btnAddRule);
             forecastPanel.Controls.Add(btnDeleteRule);
+            forecastPanel.Controls.Add(btnSplitTransaction);
+            forecastPanel.AutoSize = true;
+            forecastPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             forecastPanel.Dock = DockStyle.Top;
+            forecastPanel.FlowDirection = FlowDirection.LeftToRight;
             forecastPanel.Location = new Point(0, 0);
             forecastPanel.Name = "forecastPanel";
             forecastPanel.Padding = new Padding(8, 6, 8, 6);
-            forecastPanel.Size = new Size(1260, 42);
+            forecastPanel.Size = new Size(1260, 50);
             forecastPanel.TabIndex = 0;
+            forecastPanel.WrapContents = true;
+            // 
+            // lblHistory
+            // 
+            lblHistory.Anchor = AnchorStyles.Left;
+            lblHistory.AutoSize = true;
+            lblHistory.Location = new Point(12, 12);
+            lblHistory.Margin = new Padding(4, 8, 8, 4);
+            lblHistory.Name = "lblHistory";
+            lblHistory.Size = new Size(80, 30);
+            lblHistory.TabIndex = 0;
+            lblHistory.Text = "History:";
+            // 
+            // cmbHistory
+            // 
+            cmbHistory.Anchor = AnchorStyles.Left;
+            cmbHistory.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbHistory.DropDownWidth = 120;
+            cmbHistory.Location = new Point(100, 10);
+            cmbHistory.Margin = new Padding(4, 4, 8, 4);
+            cmbHistory.Name = "cmbHistory";
+            cmbHistory.Size = new Size(120, 38);
+            cmbHistory.TabIndex = 1;
             // 
             // lblForecastPeriod
             // 
+            lblForecastPeriod.Anchor = AnchorStyles.Left;
             lblForecastPeriod.AutoSize = true;
-            lblForecastPeriod.Location = new Point(16, 10);
+            lblForecastPeriod.Location = new Point(12, 12);
+            lblForecastPeriod.Margin = new Padding(4, 8, 8, 4);
             lblForecastPeriod.Name = "lblForecastPeriod";
             lblForecastPeriod.Size = new Size(159, 30);
-            lblForecastPeriod.TabIndex = 0;
+            lblForecastPeriod.TabIndex = 2;
             lblForecastPeriod.Text = "Forecast Period:";
             // 
             // cmbForecastPeriod
             // 
+            cmbForecastPeriod.Anchor = AnchorStyles.Left;
             cmbForecastPeriod.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbForecastPeriod.Location = new Point(160, 6);
+            cmbForecastPeriod.DropDownWidth = 140;
+            cmbForecastPeriod.Location = new Point(183, 10);
+            cmbForecastPeriod.Margin = new Padding(4, 4, 8, 4);
             cmbForecastPeriod.Name = "cmbForecastPeriod";
             cmbForecastPeriod.Size = new Size(140, 38);
-            cmbForecastPeriod.TabIndex = 1;
+            cmbForecastPeriod.TabIndex = 3;
             // 
             // lblShow
             // 
+            lblShow.Anchor = AnchorStyles.Left;
             lblShow.AutoSize = true;
-            lblShow.Location = new Point(316, 10);
+            lblShow.Location = new Point(335, 12);
+            lblShow.Margin = new Padding(4, 8, 8, 4);
             lblShow.Name = "lblShow";
             lblShow.Size = new Size(60, 30);
-            lblShow.TabIndex = 2;
+            lblShow.TabIndex = 4;
             lblShow.Text = "Show:";
             // 
             // cmbShow
             // 
+            cmbShow.Anchor = AnchorStyles.Left;
             cmbShow.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbShow.Location = new Point(380, 6);
+            cmbShow.DropDownWidth = 220;
+            cmbShow.Location = new Point(407, 10);
+            cmbShow.Margin = new Padding(4, 4, 8, 4);
             cmbShow.Name = "cmbShow";
-            cmbShow.Size = new Size(160, 38);
-            cmbShow.TabIndex = 3;
+            cmbShow.Size = new Size(200, 38);
+            cmbShow.TabIndex = 5;
             // 
             // btnAddRule
             // 
-            btnAddRule.Location = new Point(556, 4);
+            btnAddRule.AutoSize = true;
+            btnAddRule.Location = new Point(619, 10);
+            btnAddRule.Margin = new Padding(4, 4, 8, 4);
             btnAddRule.Name = "btnAddRule";
             btnAddRule.Size = new Size(120, 34);
-            btnAddRule.TabIndex = 4;
+            btnAddRule.TabIndex = 6;
             btnAddRule.Text = "Add Rule";
             btnAddRule.UseVisualStyleBackColor = true;
             // 
             // btnDeleteRule
             // 
+            btnDeleteRule.AutoSize = true;
             btnDeleteRule.Enabled = false;
-            btnDeleteRule.Location = new Point(684, 4);
+            btnDeleteRule.Location = new Point(751, 10);
+            btnDeleteRule.Margin = new Padding(4, 4, 8, 4);
             btnDeleteRule.Name = "btnDeleteRule";
             btnDeleteRule.Size = new Size(120, 34);
-            btnDeleteRule.TabIndex = 5;
+            btnDeleteRule.TabIndex = 7;
             btnDeleteRule.Text = "Delete Rule";
             btnDeleteRule.UseVisualStyleBackColor = true;
+            // 
+            // btnSplitTransaction
+            // 
+            btnSplitTransaction.AutoSize = true;
+            btnSplitTransaction.Location = new Point(883, 10);
+            btnSplitTransaction.Margin = new Padding(4, 4, 8, 4);
+            btnSplitTransaction.Name = "btnSplitTransaction";
+            btnSplitTransaction.Size = new Size(140, 34);
+            btnSplitTransaction.TabIndex = 8;
+            btnSplitTransaction.Text = "Split Transaction";
+            btnSplitTransaction.UseVisualStyleBackColor = true;
             // 
             // NameColumn
             // 
@@ -299,6 +359,7 @@
             BalanceColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             BalanceColumn.DataPropertyName = "Balance";
             dataGridViewCellStyle2.Format = "c2";
+            dataGridViewCellStyle2.NullValue = "N/A";
             BalanceColumn.DefaultCellStyle = dataGridViewCellStyle2;
             BalanceColumn.HeaderText = "Balance";
             BalanceColumn.MinimumWidth = 9;
@@ -322,6 +383,7 @@
             AvailableColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             AvailableColumn.DataPropertyName = "BankCreditAvailable";
             dataGridViewCellStyle4.Format = "c2";
+            dataGridViewCellStyle4.NullValue = "N/A";
             AvailableColumn.DefaultCellStyle = dataGridViewCellStyle4;
             AvailableColumn.HeaderText = "Available";
             AvailableColumn.MinimumWidth = 9;

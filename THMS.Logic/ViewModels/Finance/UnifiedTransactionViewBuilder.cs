@@ -13,54 +13,17 @@ namespace THMS.Logic.ViewModels.Finance
             var list = new List<UnifiedTransactionView>();
 
             foreach (var tx in posted)
-            {
-                list.Add(new UnifiedTransactionView
-                {
-                    Id = tx.Id,
-                    AccountId = tx.AccountId,
-                    Date = tx.Date,
-                    Description = tx.Description ?? "",
-                    Amount = tx.Amount,
-                    Category = tx.Category,
-                    CategoryId = tx.CategoryId,
-                    Type = UnifiedTransactionView.PostedType,
-                    ForecastBalance = null
-                });
-            }
+                list.AddRange(Expand(tx, tx.AccountId, UnifiedTransactionView.PostedType));
 
             foreach (var tx in postedTransfers)
-            {
-                list.Add(new UnifiedTransactionView
-                {
-                    Id = tx.Id,
-                    AccountId = tx.AccountId,
-                    Date = tx.Date,
-                    Description = tx.Description ?? "",
-                    Amount = tx.Amount,
-                    Category = tx.Category,
-                    CategoryId = tx.CategoryId,
-                    Type = UnifiedTransactionView.PostedTransferType,
-                    ForecastBalance = null
-                });
-            }
+                list.AddRange(Expand(tx, tx.AccountId, UnifiedTransactionView.PostedTransferType));
 
             foreach (var tx in userFutureSingles ?? [])
             {
                 if (!tx.IsUserCreated || tx.IsRealized)
                     continue;
 
-                list.Add(new UnifiedTransactionView
-                {
-                    Id = tx.Id,
-                    AccountId = tx.AccountId,
-                    Date = tx.Date,
-                    Description = tx.Description ?? "",
-                    Amount = tx.Amount,
-                    Category = tx.Category,
-                    CategoryId = tx.CategoryId,
-                    Type = UnifiedTransactionView.FutureType,
-                    ForecastBalance = null
-                });
+                list.AddRange(Expand(tx, tx.AccountId, UnifiedTransactionView.FutureType));
             }
 
             foreach (var tx in userFutureTransfers ?? [])
@@ -68,18 +31,7 @@ namespace THMS.Logic.ViewModels.Finance
                 if (!tx.IsUserCreated || tx.IsRealized)
                     continue;
 
-                list.Add(new UnifiedTransactionView
-                {
-                    Id = tx.Id,
-                    AccountId = tx.FromAccountId,
-                    Date = tx.Date,
-                    Description = tx.Description ?? "",
-                    Amount = tx.Amount,
-                    Category = tx.Category,
-                    CategoryId = tx.CategoryId,
-                    Type = UnifiedTransactionView.FutureTransferType,
-                    ForecastBalance = null
-                });
+                list.AddRange(Expand(tx, tx.FromAccountId, UnifiedTransactionView.FutureTransferType));
             }
 
             return UnifiedTransactionView.OrderForRunningBalance(list).ToList();
@@ -92,38 +44,65 @@ namespace THMS.Logic.ViewModels.Finance
             var list = new List<UnifiedTransactionView>();
 
             foreach (var rule in singles)
-            {
-                list.Add(new UnifiedTransactionView
-                {
-                    Id = rule.Id,
-                    AccountId = rule.AccountId,
-                    Date = rule.NextOccurrence,
-                    Description = rule.Description ?? "",
-                    Amount = rule.Amount,
-                    Category = rule.Category,
-                    CategoryId = rule.CategoryId,
-                    Type = UnifiedTransactionView.RecurringRuleType,
-                    ForecastBalance = null
-                });
-            }
+                list.AddRange(Expand(rule, rule.AccountId, UnifiedTransactionView.RecurringRuleType));
 
             foreach (var rule in transfers)
-            {
-                list.Add(new UnifiedTransactionView
-                {
-                    Id = rule.Id,
-                    AccountId = rule.FromAccountId,
-                    Date = rule.NextOccurrence,
-                    Description = rule.Description ?? "",
-                    Amount = rule.Amount,
-                    Category = rule.Category,
-                    CategoryId = rule.CategoryId,
-                    Type = UnifiedTransactionView.RecurringTransferRuleType,
-                    ForecastBalance = null
-                });
-            }
+                list.AddRange(Expand(rule, rule.FromAccountId, UnifiedTransactionView.RecurringTransferRuleType));
 
             return UnifiedTransactionView.OrderForDisplay(list).ToList();
         }
+
+        public static IEnumerable<UnifiedTransactionView> Expand(
+            BaseTransaction transaction,
+            Guid accountId,
+            string type)
+        {
+            if (!transaction.HasSplits)
+            {
+                yield return Create(transaction, accountId, type, transaction.Id, transaction.Amount,
+                    transaction.CategoryId, transaction.Category, splitRowId: null, splitKind: null);
+                yield break;
+            }
+
+            foreach (var split in transaction.Splits.OrderBy(s => s.Id))
+            {
+                yield return Create(
+                    transaction,
+                    accountId,
+                    type,
+                    split.Id,
+                    split.Amount,
+                    split.CategoryId,
+                    split.Category,
+                    split.Id,
+                    split.Type.ToString());
+            }
+        }
+
+        private static UnifiedTransactionView Create(
+            BaseTransaction transaction,
+            Guid accountId,
+            string type,
+            Guid id,
+            decimal amount,
+            Guid? categoryId,
+            string? category,
+            Guid? splitRowId,
+            string? splitKind) =>
+            new()
+            {
+                Id = id,
+                ParentTransactionId = transaction.Id,
+                AccountId = accountId,
+                Date = transaction.Date,
+                Description = transaction.Description ?? "",
+                Amount = amount,
+                Category = category,
+                CategoryId = categoryId,
+                Type = type,
+                SplitRowId = splitRowId,
+                SplitKind = splitKind,
+                ForecastBalance = null
+            };
     }
 }

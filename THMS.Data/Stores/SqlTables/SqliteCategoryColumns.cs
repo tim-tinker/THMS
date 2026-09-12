@@ -40,5 +40,18 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@Id", categoryId.ToString());
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
+
+        public static int CountUnsplit(SqliteConnection conn, string tableName, Guid categoryId)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $@"
+                SELECT COUNT(*) FROM {tableName} t
+                WHERE t.CategoryId = @Id
+                  AND NOT EXISTS (
+                      SELECT 1 FROM SplitTransactionRows s
+                      WHERE s.ParentTransactionId = t.Id);";
+            cmd.Parameters.AddWithValue("@Id", categoryId.ToString());
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
     }
 }

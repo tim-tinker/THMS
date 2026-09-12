@@ -10,6 +10,7 @@ namespace THMS.Data.Stores
         private static IFinanceDataStore? _financeStore;
         private static ITransactionDataStore? _transactionStore;
         private static IVehicleDataStore? _vehicleStore;
+        private static IAccountStatementDataStore? _statementStore;
 
         public IAccountDataStore GetAccountStore()
         {
@@ -45,6 +46,11 @@ namespace THMS.Data.Stores
             return _vehicleStore ??= CreateVehicleStore();
         }
 
+        public IAccountStatementDataStore GetAccountStatementStore()
+        {
+            return _statementStore ??= CreateAccountStatementStore();
+        }
+
         private IAccountDataStore CreateAccountStore()
         {
             return "Production" == AppConfig.Instance.Environment 
@@ -71,6 +77,13 @@ namespace THMS.Data.Stores
             return "Production" == AppConfig.Instance.Environment 
                 ? new SQLiteTransactionDataStore(AppConfig.Instance.SQLiteDataBase)
                 : new InMemoryTransactionDataStore();
+        }
+
+        private IAccountStatementDataStore CreateAccountStatementStore()
+        {
+            return "Production" == AppConfig.Instance.Environment
+                ? new SQLiteAccountStatementDataStore(AppConfig.Instance.SQLiteDataBase)
+                : new InMemoryAccountStatementDataStore();
         }
 
         private IVehicleDataStore CreateVehicleStore()

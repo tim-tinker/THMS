@@ -44,18 +44,43 @@ namespace THMS.Logic.Finance.Forecast
                         ? rule.FinalPaymentAmount ?? rule.Amount
                         : rule.Amount;
 
-                    yield return new UnifiedTransactionView
+                    if (rule.HasSplits && amount == rule.Amount)
                     {
-                        Id = Guid.NewGuid(),
-                        AccountId = rule.AccountId,
-                        Date = next,
-                        Description = rule.Description ?? "",
-                        Amount = amount,
-                        Category = rule.Category,
-                        CategoryId = rule.CategoryId,
-                        Type = UnifiedTransactionView.ForecastType,
-                        ForecastBalance = null
-                    };
+                        foreach (var split in rule.Splits)
+                        {
+                            yield return new UnifiedTransactionView
+                            {
+                                Id = Guid.NewGuid(),
+                                ParentTransactionId = rule.Id,
+                                SplitRowId = split.Id,
+                                SplitKind = split.Type.ToString(),
+                                AccountId = rule.AccountId,
+                                Date = next,
+                                Description = rule.Description ?? "",
+                                Amount = split.Amount,
+                                Category = split.Category,
+                                CategoryId = split.CategoryId,
+                                Type = UnifiedTransactionView.ForecastType,
+                                ForecastBalance = null
+                            };
+                        }
+                    }
+                    else
+                    {
+                        yield return new UnifiedTransactionView
+                        {
+                            Id = Guid.NewGuid(),
+                            ParentTransactionId = rule.Id,
+                            AccountId = rule.AccountId,
+                            Date = next,
+                            Description = rule.Description ?? "",
+                            Amount = amount,
+                            Category = rule.Category,
+                            CategoryId = rule.CategoryId,
+                            Type = UnifiedTransactionView.ForecastType,
+                            ForecastBalance = null
+                        };
+                    }
                 }
 
                 next = next.AddFrequency(rule.Frequency);
@@ -85,18 +110,44 @@ namespace THMS.Logic.Finance.Forecast
                     if (rule.FromAccountId != rule.ToAccountId && rule.ToAccountId == accountId)
                         amount = -amount;
 
-                    yield return new UnifiedTransactionView
+                    if (rule.HasSplits && Math.Abs(amount) == Math.Abs(rule.Amount))
                     {
-                        Id = Guid.NewGuid(),
-                        AccountId = accountId,
-                        Date = next,
-                        Description = rule.Description ?? "",
-                        Amount = amount,
-                        Category = rule.Category,
-                        CategoryId = rule.CategoryId,
-                        Type = UnifiedTransactionView.ForecastTransferType,
-                        ForecastBalance = null
-                    };
+                        var sign = amount < 0 && rule.Amount >= 0 || amount >= 0 && rule.Amount < 0 ? -1m : 1m;
+                        foreach (var split in rule.Splits)
+                        {
+                            yield return new UnifiedTransactionView
+                            {
+                                Id = Guid.NewGuid(),
+                                ParentTransactionId = rule.Id,
+                                SplitRowId = split.Id,
+                                SplitKind = split.Type.ToString(),
+                                AccountId = accountId,
+                                Date = next,
+                                Description = rule.Description ?? "",
+                                Amount = split.Amount * sign,
+                                Category = split.Category,
+                                CategoryId = split.CategoryId,
+                                Type = UnifiedTransactionView.ForecastTransferType,
+                                ForecastBalance = null
+                            };
+                        }
+                    }
+                    else
+                    {
+                        yield return new UnifiedTransactionView
+                        {
+                            Id = Guid.NewGuid(),
+                            ParentTransactionId = rule.Id,
+                            AccountId = accountId,
+                            Date = next,
+                            Description = rule.Description ?? "",
+                            Amount = amount,
+                            Category = rule.Category,
+                            CategoryId = rule.CategoryId,
+                            Type = UnifiedTransactionView.ForecastTransferType,
+                            ForecastBalance = null
+                        };
+                    }
                 }
 
                 next = next.AddFrequency(rule.Frequency);

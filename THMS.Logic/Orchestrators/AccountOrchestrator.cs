@@ -70,6 +70,9 @@ namespace THMS.Logic.Orchestrators.Finance
                     // so no direct posted balance update.
                     break;
 
+                case UntrackedAccount:
+                    break;
+
                 default:
                     throw new InvalidOperationException(
                         $"Unsupported account type: {account.GetType().Name}");
@@ -134,6 +137,9 @@ namespace THMS.Logic.Orchestrators.Finance
         // ------------------------------------------------------------
         private void Normalize(Account account)
         {
+            if (account is UntrackedAccount)
+                return;
+
             // Remove spaces, dashes, etc.
             account.AccountNumber = new string(
                 account.AccountNumber.Where(char.IsDigit).ToArray()

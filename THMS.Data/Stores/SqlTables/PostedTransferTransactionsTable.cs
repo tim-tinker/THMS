@@ -93,6 +93,50 @@ namespace THMS.Data.Stores.SqlTables
             return ReadAll(cmd);
         }
 
+        public IEnumerable<PostedTransferTransaction> GetByAccountAndDateRange(
+            SqliteConnection conn,
+            Guid accountId,
+            DateTime start,
+            DateTime end)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = SelectColumns + @"
+                FROM PostedTransferTransactions
+                WHERE AccountId = @AccountId
+                  AND Date >= @Start AND Date <= @End
+                ORDER BY Date;";
+            cmd.Parameters.AddWithValue("@AccountId", accountId.ToString());
+            cmd.Parameters.AddWithValue("@Start", start);
+            cmd.Parameters.AddWithValue("@End", end);
+            return ReadAll(cmd);
+        }
+
+        public decimal SumAmountBefore(SqliteConnection conn, Guid accountId, DateTime before)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT COALESCE(SUM(Amount), 0)
+                FROM PostedTransferTransactions
+                WHERE AccountId = @AccountId AND Date < @Before;";
+            cmd.Parameters.AddWithValue("@AccountId", accountId.ToString());
+            cmd.Parameters.AddWithValue("@Before", before);
+            var value = cmd.ExecuteScalar();
+            return value is null or DBNull ? 0 : Convert.ToDecimal(value);
+        }
+
+        public decimal SumAmountAfter(SqliteConnection conn, Guid accountId, DateTime after)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT COALESCE(SUM(Amount), 0)
+                FROM PostedTransferTransactions
+                WHERE AccountId = @AccountId AND Date > @After;";
+            cmd.Parameters.AddWithValue("@AccountId", accountId.ToString());
+            cmd.Parameters.AddWithValue("@After", after);
+            var value = cmd.ExecuteScalar();
+            return value is null or DBNull ? 0 : Convert.ToDecimal(value);
+        }
+
         public PostedTransferTransaction? GetLatest(SqliteConnection conn, Guid accountId)
         {
             using var cmd = conn.CreateCommand();

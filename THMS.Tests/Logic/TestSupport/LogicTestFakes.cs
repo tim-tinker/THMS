@@ -37,6 +37,51 @@ namespace THMS.Tests.Logic.TestSupport
         }
     }
 
+    public sealed class FakePlaidLinkSession : IPlaidLinkSession
+    {
+        public string LinkToken { get; set; } = "link-sandbox";
+        public string SandboxPublicToken { get; set; } = "public-sandbox";
+        public string AccessToken { get; set; } = "access-sandbox";
+        public string ItemId { get; set; } = "item-1";
+        public string InstitutionId { get; set; } = "ins_109508";
+        public string InstitutionName { get; set; } = "First Platypus Bank";
+        public string? LastPublicToken { get; private set; }
+        public bool CreatedSandboxToken { get; private set; }
+        public bool CreatedLinkToken { get; private set; }
+
+        public Task<string> CreateLinkTokenAsync(string userId)
+        {
+            CreatedLinkToken = true;
+            return Task.FromResult(LinkToken);
+        }
+
+        public Task<PlaidItemConnection> ExchangeForItemAsync(string publicToken)
+        {
+            LastPublicToken = publicToken;
+            return Task.FromResult(new PlaidItemConnection
+            {
+                AccessToken = AccessToken,
+                ItemId = ItemId
+            });
+        }
+
+        public Task<string> CreateSandboxPublicTokenAsync(string institutionId)
+        {
+            CreatedSandboxToken = true;
+            return Task.FromResult(SandboxPublicToken);
+        }
+
+        public Task<PlaidInstitutionInfo> GetInstitutionAsync(string accessToken)
+        {
+            return Task.FromResult(new PlaidInstitutionInfo
+            {
+                InstitutionId = InstitutionId,
+                ItemId = ItemId,
+                Name = InstitutionName
+            });
+        }
+    }
+
     public sealed class UnknownAccount : Account
     {
     }

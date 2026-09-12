@@ -16,6 +16,7 @@ namespace THMS.Data.Stores.SqliteStores
         private readonly ExpenseBudgetHistoryTable _expenseBudgetHistory = new();
         private readonly ExpenseCategoriesTable _categories = new();
         private readonly CategoryAssignmentHistoryTable _assignments = new();
+        private readonly SplitTransactionRowsTable _splits = new();
 
         public void InitializeSchema(SqliteConnection conn)
         {
@@ -29,6 +30,7 @@ namespace THMS.Data.Stores.SqliteStores
             _expenseBudgetHistory.InitializeSchema(conn);
             _categories.InitializeSchema(conn);
             _assignments.InitializeSchema(conn);
+            _splits.InitializeSchema(conn);
             _categories.MigrateLegacyCategoryStrings(conn);
         }
 
@@ -42,5 +44,6 @@ namespace THMS.Data.Stores.SqliteStores
         public ExpenseBudgetHistoryTable ExpenseBudgetHistory => _expenseBudgetHistory;
         public ExpenseCategoriesTable Categories => _categories;
         public CategoryAssignmentHistoryTable Assignments => _assignments;
+        public SplitTransactionRowsTable Splits => _splits;
     }
 }

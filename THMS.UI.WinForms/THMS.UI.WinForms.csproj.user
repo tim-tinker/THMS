@@ -10,8 +10,17 @@
     <Compile Update="ChargeCostEntryForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Controls\AccountDiagnosticsDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Controls\AccountEditForm.cs">
       <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\AccountImportPreviewDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\AccountsIngestionControl.cs">
+      <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\AccountUpdaterControl.cs">
       <SubType>UserControl</SubType>
@@ -27,6 +36,9 @@
     </Compile>
     <Compile Update="Controls\BudgetRuleEditor.cs">
       <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\CashFlowForecastControl.cs">
+      <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\CategoryEditor.cs">
       <SubType>Form</SubType>
@@ -46,7 +58,19 @@
     <Compile Update="Controls\EvChargeSessionManagerControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Update="Controls\FinanceDiagnosticsControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Update="Controls\HomeCircuitManagerControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\PlaidAccountSetupDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\PlaidLinkDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\PlannedPaymentsControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\RecurringRuleEditor.cs">
@@ -55,10 +79,25 @@
     <Compile Update="Controls\SolarIntervalManagerControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Update="Controls\SplitTransactionEditor.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\StatementEditorDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\ThmsButton.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="Controls\TransactionIngestionControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Update="Controls\TransactionManagerControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\TransactionUpdaterControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\UpcomingObligationsControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\VcrControl.cs">
@@ -85,9 +124,6 @@
     <Compile Update="FinanceDataCenterForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="ImportDataForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Update="ImporterForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -95,6 +131,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="MileageEntryForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="PlanningCenterForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="SettingsDashboardForm.cs">
