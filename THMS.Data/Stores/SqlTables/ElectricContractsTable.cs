@@ -72,11 +72,11 @@ namespace THMS.Data.Stores.SqlTables
                        BaseEnergyCharge, EnergyChargeRate,
                        BaseDeliveryCharge, DeliveryChargeRate, ExportCreditRate
                 FROM ElectricContracts
-                WHERE StartDate <= @Date AND EndDate >= @Date
+                WHERE date(StartDate) <= date(@Date) AND date(EndDate) >= date(@Date)
                 ORDER BY EndDate DESC
                 LIMIT 1;", conn);
 
-            cmd.Parameters.AddWithValue("@Date", date);
+            cmd.Parameters.AddWithValue("@Date", date.Date.ToString("yyyy-MM-dd"));
 
             using var reader = cmd.ExecuteReader();
             return reader.Read() ? Read(reader) : null;
@@ -122,8 +122,8 @@ namespace THMS.Data.Stores.SqlTables
         {
             cmd.Parameters.AddWithValue("@Id", contract.Id.ToString());
             cmd.Parameters.AddWithValue("@Name", (object?)contract.Name ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@StartDate", contract.StartDate);
-            cmd.Parameters.AddWithValue("@EndDate", contract.EndDate);
+            cmd.Parameters.AddWithValue("@StartDate", contract.StartDate.Date);
+            cmd.Parameters.AddWithValue("@EndDate", contract.EndDate.Date);
             cmd.Parameters.AddWithValue("@BaseEnergyCharge", contract.BaseEnergyCharge);
             cmd.Parameters.AddWithValue("@EnergyChargeRate", contract.EnergyChargeRate);
             cmd.Parameters.AddWithValue("@BaseDeliveryCharge", contract.BaseDeliveryCharge);
@@ -137,8 +137,8 @@ namespace THMS.Data.Stores.SqlTables
             {
                 Id = Guid.Parse(reader.GetString(0)),
                 Name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
-                StartDate = reader.GetDateTime(2),
-                EndDate = reader.GetDateTime(3),
+                StartDate = reader.GetDateTime(2).Date,
+                EndDate = reader.GetDateTime(3).Date,
                 BaseEnergyCharge = (decimal)(double)reader.GetDouble(4),
                 EnergyChargeRate = (decimal)(double)reader.GetDouble(5),
                 BaseDeliveryCharge = (decimal)(double)reader.GetDouble(6),

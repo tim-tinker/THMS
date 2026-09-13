@@ -31,6 +31,115 @@ namespace THMS.Logic.Orchestrators
             return _store.GetAllCategories();
         }
 
+        public int EnsureSuggestedRules(Guid accountId)
+        {
+            if (_store.GetExpenseBudgetRules(accountId).Any())
+                return 0;
+
+            _store.EnsureDefaultCategories();
+            var latest = _store.GetLatestPostedTransactionDate(accountId);
+            if (latest is null)
+                return 0;
+
+            var start = latest.Value.Date.AddMonths(-13);
+            var posted = _store.GetPostedTransactions(accountId, start, latest.Value.Date).ToList();
+            if (posted.Count == 0)
+                return 0;
+
+            var catalog = _store.GetAllCategories(includeInactive: true).ToList();
+            var suggestions = new List<(Guid CategoryId, string Name, decimal Amount)>();
+            foreach (var (categoryId, name) in CollectBudgetCategories(posted, catalog))
+            {
+                if (categoryId == DefaultExpenseCategories.PaymentId)
+                    continue;
+
+                var recommended = _detector.ComputeRecommendedAmount(
+                    [],
+                    BudgetFrequency.Monthly,
+                    posted,
+                    [categoryId],
+                    catalog);
+                if (recommended < 15m)
+                    continue;
+
+                suggestions.Add((categoryId, name, recommended));
+            }
+
+            var created = 0;
+            foreach (var suggestion in suggestions.OrderByDescending(s => s.Amount).Take(20))
+            {
+                _store.AddExpenseBudgetRule(new ExpenseBudgetRule
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = accountId,
+                    BudgetName = suggestion.Name,
+                    IncludedCategoryIds = [suggestion.CategoryId],
+                    BudgetFrequency = BudgetFrequency.Monthly,
+                    DefaultBudgetAmount = suggestion.Amount,
+                    IsActive = true
+                });
+                created++;
+            }
+
+            if (created > 0)
+                RefreshAccount(accountId);
+
+            return created;
+        }
+
+        private static Dictionary<Guid, string> CollectBudgetCategories(
+            IEnumerable<PostedTransaction> posted,
+            IReadOnlyList<ExpenseCategory> catalog)
+        {
+            var result = new Dictionary<Guid, string>();
+            foreach (var transaction in posted)
+            {
+                if (transaction.HasSplits)
+                {
+                    foreach (var split in transaction.Splits)
+                    {
+                        if (!SplitTransactionMath.AffectsBudget(split.Type))
+                            continue;
+                        TryAddCategory(result, split.CategoryId, split.Category, catalog);
+                    }
+
+                    continue;
+                }
+
+                TryAddCategory(result, transaction.CategoryId, transaction.Category, catalog);
+            }
+
+            return result;
+        }
+
+        private static void TryAddCategory(
+            Dictionary<Guid, string> result,
+            Guid? categoryId,
+            string? category,
+            IReadOnlyList<ExpenseCategory> catalog)
+        {
+            Guid resolved;
+            if (categoryId is Guid id && id != Guid.Empty)
+            {
+                resolved = id;
+            }
+            else
+            {
+                var canonical = DefaultExpenseCategories.CanonicalName(category);
+                var named = catalog.FirstOrDefault(c =>
+                    string.Equals(c.Name, canonical, StringComparison.OrdinalIgnoreCase));
+                if (named is null)
+                    return;
+                resolved = named.Id;
+            }
+
+            if (result.ContainsKey(resolved))
+                return;
+
+            result[resolved] = catalog.FirstOrDefault(c => c.Id == resolved)?.Name
+                ?? DefaultExpenseCategories.CanonicalName(category);
+        }
+
         public void AddRule(ExpenseBudgetRule rule)
         {
             ArgumentNullException.ThrowIfNull(rule);

@@ -8,6 +8,9 @@ namespace THMS.Data.Stores.InMemoryStores
 
         public void Upsert(ElectricContract contract)
         {
+            contract.StartDate = contract.StartDate.Date;
+            contract.EndDate = contract.EndDate.Date;
+
             var index = _items.FindIndex(c => c.Id == contract.Id);
             if (index < 0)
                 _items.Add(contract);
@@ -20,7 +23,7 @@ namespace THMS.Data.Stores.InMemoryStores
 
         public ElectricContract? GetForDate(DateTime date) =>
             _items
-                .Where(c => c.StartDate <= date && c.EndDate >= date)
+                .Where(c => c.StartDate.Date <= date.Date && c.EndDate.Date >= date.Date)
                 .OrderByDescending(c => c.EndDate)
                 .FirstOrDefault();
 

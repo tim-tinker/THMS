@@ -8,6 +8,7 @@ namespace THMS.UI.WinForms.Controls
     {
         private readonly SolarIntervalOrchestrator _orchestrator = new();
         private BindingList<SolarProductionInterval> _intervals;
+        private string _currentPeriod = "Month";
 
         public SolarIntervalManagerControl()
         {
@@ -22,13 +23,14 @@ namespace THMS.UI.WinForms.Controls
 
         public void SetGridDataSource(string period)
         {
+            _currentPeriod = period;
             _intervals = new BindingList<SolarProductionInterval>(_orchestrator.GetSolarIntervals(period).ToList());
             gridSolarIntervals.DataSource = _intervals;
         }
 
         private void OnLoad(object sender, EventArgs e)
         {
-            SetGridDataSource("Month");
+            SetGridDataSource(_currentPeriod);
         }
     }
 }

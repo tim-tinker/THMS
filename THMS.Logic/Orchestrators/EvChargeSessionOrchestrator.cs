@@ -86,13 +86,12 @@ namespace THMS.Logic.Orchestrators
             var end = latest.EndTime;
             var start = GetStartDate(end, period);
 
-            if (VehicleId != Guid.Empty)
-                return GetAndCompleteSessions(VehicleId, start, end);
+            IEnumerable<BaseEvChargeSession> sessions = VehicleId != Guid.Empty
+                ? GetAndCompleteSessions(VehicleId, start, end)
+                : _vehicleStore.GetAllVehicles()
+                    .SelectMany(v => GetAndCompleteSessions(v.Id, start, end));
 
-            return _vehicleStore.GetAllVehicles()
-                .SelectMany(v => GetAndCompleteSessions(v.Id, start, end))
-                .OrderBy(s => s.StartTime)
-                .ToArray();
+            return sessions.OrderByDescending(s => s.StartTime).ToArray();
         }
 
         private IEnumerable<BaseEvChargeSession> GetAndCompleteSessions(Guid vehicleId, DateTime start, DateTime end)
@@ -101,24 +100,22 @@ namespace THMS.Logic.Orchestrators
 
             foreach (var baseSession in baseSessions)
             {
-                switch (baseSession)
+                if (_vehicleStore.GetCommercialEvChargeSession(baseSession.Id) is { } commercial)
                 {
-                    case CommercialEvChargeSession commercial:
-                        yield return commercial;
-                        break;
-
-                    case HomeEvChargeSession home:
-                        if (home.Attribution is null || home.Billing is null)
-                        {
-                            CompleteHomeSession(home); 
-                        }
-                        yield return home;
-                        break;
-
-                    default:
-                        yield return baseSession;
-                        break;
+                    yield return commercial;
+                    continue;
                 }
+
+                var home = baseSession as HomeEvChargeSession
+                    ?? _vehicleStore.GetHomeEvChargeSession(baseSession.Id);
+                if (home is not null)
+                {
+                    CompleteHomeSession(home);
+                    yield return home;
+                    continue;
+                }
+
+                yield return baseSession;
             }
         }
 
@@ -138,21 +135,14 @@ namespace THMS.Logic.Orchestrators
                 ComputeAndStoreAttribution(session);
             }
 
-            // IMPORTANT:
-            // Re-check attribution AFTER attempting to compute it.
-            if (session.Attribution is not null)
-            {
-                // 2. Load existing billing (if any)
-                var existingBilling = _vehicleStore.GetHomeEvChargeBilling(session.Id);
-                if (existingBilling is not null)
-                {
-                    session.Billing = existingBilling;
-                }
-                else if (session.Attribution is not null)
-                {
-                    ComputeAndStoreBilling(session);
-                }
-            }
+            if (session.Attribution is null)
+                return;
+
+            var existingBilling = _vehicleStore.GetHomeEvChargeBilling(session.Id);
+            if (existingBilling is not null && existingBilling.SessionCost != 0)
+                session.Billing = existingBilling;
+            else
+                ComputeAndStoreBilling(session);
         }
 
         // ---------------------------------------------------------
@@ -182,7 +172,7 @@ namespace THMS.Logic.Orchestrators
         // ---------------------------------------------------------
         private void ComputeAndStoreBilling(HomeEvChargeSession session)
         {
-            var contract = _financeStore.GetElectricContractForDate(session.StartTime);
+            var contract = _financeStore.GetElectricContractForDate(session.StartTime.Date);
             if (contract == null)
                 return;
 

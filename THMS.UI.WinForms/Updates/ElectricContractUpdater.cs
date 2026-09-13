@@ -9,14 +9,17 @@ namespace THMS.UI.WinForms.Updates
 
         public IDataSourceStatus Status { get; private set; } = new ElectricContractDataSourceStatus();
 
-        public void UpdateDataSource()
+        public void UpdateDataSource() => UpdateDataSource(Form.ActiveForm);
+
+        public void UpdateDataSource(IWin32Window? owner)
         {
             using var dataEntryForm = new ElectricContractDataEntryForm();
+            var result = owner is null
+                ? dataEntryForm.ShowDialog()
+                : dataEntryForm.ShowDialog(owner);
 
-            if (DialogResult.OK == dataEntryForm.ShowDialog() && dataEntryForm.Contract is not null)
-            {
+            if (result == DialogResult.OK && dataEntryForm.Contract is not null)
                 _orchestrator.Save(dataEntryForm.Contract);
-            }
         }
     }
 }

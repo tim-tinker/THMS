@@ -65,7 +65,7 @@
             NameColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             NameColumn.DataPropertyName = "Name";
             NameColumn.HeaderText = "Contract Name";
-            NameColumn.MinimumWidth = 9;
+            NameColumn.MinimumWidth = 80;
             NameColumn.Name = "NameColumn";
             NameColumn.ReadOnly = true;
             // 
@@ -73,6 +73,7 @@
             // 
             StartColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             StartColumn.DataPropertyName = "StartDate";
+            StartColumn.DefaultCellStyle.Format = "d";
             StartColumn.HeaderText = "Effective";
             StartColumn.MinimumWidth = 9;
             StartColumn.Name = "StartColumn";
@@ -83,6 +84,7 @@
             // 
             EndColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             EndColumn.DataPropertyName = "EndDate";
+            EndColumn.DefaultCellStyle.Format = "d";
             EndColumn.HeaderText = "Expires";
             EndColumn.MinimumWidth = 9;
             EndColumn.Name = "EndColumn";

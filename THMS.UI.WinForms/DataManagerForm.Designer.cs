@@ -4,6 +4,8 @@
     {
         private System.ComponentModel.IContainer components = null;
         private System.Windows.Forms.Panel panelHost;
+        private Controls.HistoryPeriodBar historyBar;
+        private Controls.ThmsTabControl tabs;
 
         protected override void Dispose(bool disposing)
         {
@@ -17,25 +19,18 @@
         private void InitializeComponent()
         {
             panelHost = new Panel();
-            menuStrip1 = new MenuStrip();
-            dataTypeToolStripMenuItem = new ToolStripMenuItem();
-            viewToolStripMenuItem = new ToolStripMenuItem();
-            _menuViewMonth = new ToolStripMenuItem();
-            _menuViewYear = new ToolStripMenuItem();
-            _menuViewLifetime = new ToolStripMenuItem();
-            editToolStripMenuItem = new ToolStripMenuItem();
-            addToolStripMenuItem = new ToolStripMenuItem();
-            editToolStripMenuItem1 = new ToolStripMenuItem();
-            deleteToolStripMenuItem = new ToolStripMenuItem();
+            historyBar = new Controls.HistoryPeriodBar();
+            tabs = new Controls.ThmsTabControl();
             panelHost.SuspendLayout();
-            menuStrip1.SuspendLayout();
+            tabs.SuspendLayout();
             SuspendLayout();
             // 
             // panelHost
             // 
             panelHost.AutoScroll = true;
             panelHost.BorderStyle = BorderStyle.FixedSingle;
-            panelHost.Controls.Add(menuStrip1);
+            panelHost.Controls.Add(tabs);
+            panelHost.Controls.Add(historyBar);
             panelHost.Dock = DockStyle.Fill;
             panelHost.Location = new Point(0, 0);
             panelHost.Margin = new Padding(12);
@@ -44,77 +39,19 @@
             panelHost.Size = new Size(1320, 960);
             panelHost.TabIndex = 1;
             // 
-            // menuStrip1
+            // historyBar
             // 
-            menuStrip1.ImageScalingSize = new Size(28, 28);
-            menuStrip1.Items.AddRange(new ToolStripItem[] { dataTypeToolStripMenuItem, viewToolStripMenuItem, editToolStripMenuItem });
-            menuStrip1.Location = new Point(12, 12);
-            menuStrip1.Name = "menuStrip1";
-            menuStrip1.Size = new Size(1294, 42);
-            menuStrip1.TabIndex = 0;
-            menuStrip1.Text = "menuStrip1";
+            historyBar.Dock = DockStyle.Top;
+            historyBar.Name = "historyBar";
+            historyBar.Padding = new Padding(0, 4, 0, 8);
+            historyBar.TabIndex = 0;
             // 
-            // dataTypeToolStripMenuItem
+            // tabs
             // 
-            dataTypeToolStripMenuItem.Name = "dataTypeToolStripMenuItem";
-            dataTypeToolStripMenuItem.Size = new Size(124, 34);
-            dataTypeToolStripMenuItem.Text = "Data Type";
-            // 
-            // viewToolStripMenuItem
-            // 
-            viewToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { _menuViewMonth, _menuViewYear, _menuViewLifetime });
-            viewToolStripMenuItem.Name = "viewToolStripMenuItem";
-            viewToolStripMenuItem.Size = new Size(75, 34);
-            viewToolStripMenuItem.Text = "View";
-            // 
-            // _menuViewMonth
-            // 
-            _menuViewMonth.Name = "_menuViewMonth";
-            _menuViewMonth.Size = new Size(205, 40);
-            _menuViewMonth.Text = "Month";
-            _menuViewMonth.Click += OnClickViewMonth;
-            // 
-            // _menuViewYear
-            // 
-            _menuViewYear.Name = "_menuViewYear";
-            _menuViewYear.Size = new Size(205, 40);
-            _menuViewYear.Text = "Year";
-            _menuViewYear.Click += OnClickViewYear;
-            // 
-            // _menuViewLifetime
-            // 
-            _menuViewLifetime.Name = "_menuViewLifetime";
-            _menuViewLifetime.Size = new Size(205, 40);
-            _menuViewLifetime.Text = "Lifetime";
-            _menuViewLifetime.Click += OnClickViewLifetime;
-            // 
-            // editToolStripMenuItem
-            // 
-            editToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { addToolStripMenuItem, editToolStripMenuItem1, deleteToolStripMenuItem });
-            editToolStripMenuItem.Name = "editToolStripMenuItem";
-            editToolStripMenuItem.Size = new Size(66, 34);
-            editToolStripMenuItem.Text = "Edit";
-            // 
-            // addToolStripMenuItem
-            // 
-            addToolStripMenuItem.Name = "addToolStripMenuItem";
-            addToolStripMenuItem.Size = new Size(191, 40);
-            addToolStripMenuItem.Text = "Add";
-            addToolStripMenuItem.Click += OnClickEditAddAction;
-            // 
-            // editToolStripMenuItem1
-            // 
-            editToolStripMenuItem1.Name = "editToolStripMenuItem1";
-            editToolStripMenuItem1.Size = new Size(191, 40);
-            editToolStripMenuItem1.Text = "Edit";
-            editToolStripMenuItem1.Click += OnClickEditEditAction;
-            // 
-            // deleteToolStripMenuItem
-            // 
-            deleteToolStripMenuItem.Name = "deleteToolStripMenuItem";
-            deleteToolStripMenuItem.Size = new Size(191, 40);
-            deleteToolStripMenuItem.Text = "Delete";
-            deleteToolStripMenuItem.Click += OnClickEditDeleteAction;
+            tabs.Dock = DockStyle.Fill;
+            tabs.Multiline = true;
+            tabs.Name = "tabs";
+            tabs.TabIndex = 1;
             // 
             // DataManagerForm
             // 
@@ -122,7 +59,6 @@
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1320, 960);
             Controls.Add(panelHost);
-            MainMenuStrip = menuStrip1;
             Margin = new Padding(4);
             MinimumSize = new Size(1075, 707);
             Name = "DataManagerForm";
@@ -130,22 +66,10 @@
             Text = "Data Manager";
             panelHost.ResumeLayout(false);
             panelHost.PerformLayout();
-            menuStrip1.ResumeLayout(false);
-            menuStrip1.PerformLayout();
+            tabs.ResumeLayout(false);
             ResumeLayout(false);
         }
 
         #endregion
-
-        private MenuStrip menuStrip1;
-        private ToolStripMenuItem dataTypeToolStripMenuItem;
-        private ToolStripMenuItem viewToolStripMenuItem;
-        private ToolStripMenuItem _menuViewMonth;
-        private ToolStripMenuItem _menuViewYear;
-        private ToolStripMenuItem _menuViewLifetime;
-        private ToolStripMenuItem editToolStripMenuItem;
-        private ToolStripMenuItem addToolStripMenuItem;
-        private ToolStripMenuItem editToolStripMenuItem1;
-        private ToolStripMenuItem deleteToolStripMenuItem;
     }
 }

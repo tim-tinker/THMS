@@ -33,12 +33,14 @@ namespace THMS.Data.Stores.SQLite
             using var conn = OpenConnection();
             _store.Posted.Add(conn, transaction);
             PersistIncomingSplits(conn, transaction);
+            FinanceDataRevision.NoteChanged();
         }
 
         public void UpdatePostedTransaction(PostedTransaction transaction)
         {
             using var conn = OpenConnection();
             _store.Posted.Update(conn, transaction);
+            FinanceDataRevision.NoteChanged();
         }
 
         public void ReplacePostedTransaction(PostedTransaction replacement)
@@ -59,6 +61,7 @@ namespace THMS.Data.Stores.SQLite
                 _store.Posted.Add(conn, replacement);
 
             tx.Commit();
+            FinanceDataRevision.NoteChanged();
         }
 
         public void DeletePostedTransaction(Guid id)
@@ -66,6 +69,7 @@ namespace THMS.Data.Stores.SQLite
             using var conn = OpenConnection();
             _store.Posted.Delete(conn, id);
             _store.Splits.DeleteByParent(conn, id);
+            FinanceDataRevision.NoteChanged();
         }
 
         public PostedTransaction? GetPostedTransaction(Guid id)
@@ -119,12 +123,14 @@ namespace THMS.Data.Stores.SQLite
             using var conn = OpenConnection();
             _store.PostedTransfers.Add(conn, transaction);
             PersistIncomingSplits(conn, transaction);
+            FinanceDataRevision.NoteChanged();
         }
 
         public void UpdatePostedTransferTransaction(PostedTransferTransaction transaction)
         {
             using var conn = OpenConnection();
             _store.PostedTransfers.Update(conn, transaction);
+            FinanceDataRevision.NoteChanged();
         }
 
         public void DeletePostedTransferTransaction(Guid id)
@@ -132,6 +138,7 @@ namespace THMS.Data.Stores.SQLite
             using var conn = OpenConnection();
             _store.PostedTransfers.Delete(conn, id);
             _store.Splits.DeleteByParent(conn, id);
+            FinanceDataRevision.NoteChanged();
         }
 
         public PostedTransferTransaction? GetPostedTransferTransaction(Guid id)
@@ -670,6 +677,7 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _store.Splits.ReplaceAll(conn, parentId, splits);
+            FinanceDataRevision.NoteChanged();
         }
 
         public List<SplitTransactionRow> GetSplits(Guid parentId)
@@ -682,6 +690,7 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _store.Splits.DeleteByParent(conn, parentId);
+            FinanceDataRevision.NoteChanged();
         }
 
         private void PersistIncomingSplits(SqliteConnection conn, BaseTransaction item)

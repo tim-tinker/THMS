@@ -70,8 +70,13 @@ namespace THMS.Logic.Orchestrators.Finance
             {
                 var synthesized = SynthesizeObligation(account, asOfDate);
                 if (synthesized is not null)
+                {
+                    covered.Add(account.Id);
                     rows.Add(synthesized);
+                }
             }
+
+            AddRecurringForecastObligations(asOfDate, accounts, names, covered, rows);
 
             return rows.OrderBy(r => r.DueDate).ThenBy(r => r.AccountName).ToList();
         }
@@ -749,6 +754,81 @@ namespace THMS.Logic.Orchestrators.Finance
             return delta == 0 ? asOf : asOf.AddDays(delta);
         }
 
+        private void AddRecurringForecastObligations(
+            DateTime asOfDate,
+            List<Account> accounts,
+            Dictionary<Guid, string> names,
+            HashSet<Guid> coveredAccounts,
+            List<UpcomingObligation> rows)
+        {
+            var seen = rows
+                .Select(r => (r.AccountId, r.DueDate, r.AmountDue, r.Notes))
+                .ToHashSet();
+
+            foreach (var rule in _transactions.GetAllRecurringSingleRules().Where(r => r.IsActive && r.Amount < 0))
+            {
+                var due = rule.NextOccurrence.Date;
+                if (due < asOfDate)
+                    continue;
+
+                var amount = Math.Abs(rule.Amount);
+                var notes = string.IsNullOrWhiteSpace(rule.Description)
+                    ? "From recurring forecast"
+                    : rule.Description.Trim();
+                var key = (rule.AccountId, due, amount, notes);
+                if (seen.Contains(key))
+                    continue;
+
+                rows.Add(new UpcomingObligation
+                {
+                    AccountId = rule.AccountId,
+                    AccountName = names.GetValueOrDefault(rule.AccountId, ""),
+                    DueDate = due,
+                    MinimumPayment = amount,
+                    AmountDue = amount,
+                    PromotionalDue = 0,
+                    Notes = notes
+                });
+                seen.Add(key);
+            }
+
+            var liabilityIds = accounts
+                .Where(a => a is CreditAccount or LoanAccount or MortgageAccount)
+                .Select(a => a.Id)
+                .ToHashSet();
+
+            foreach (var rule in _transactions.GetAllRecurringTransferRules().Where(r => r.IsActive))
+            {
+                if (!liabilityIds.Contains(rule.ToAccountId) || coveredAccounts.Contains(rule.ToAccountId))
+                    continue;
+
+                var due = rule.NextOccurrence.Date;
+                if (due < asOfDate)
+                    continue;
+
+                var amount = Math.Abs(rule.Amount);
+                var notes = string.IsNullOrWhiteSpace(rule.Description)
+                    ? "From recurring forecast"
+                    : rule.Description.Trim();
+                var key = (rule.ToAccountId, due, amount, notes);
+                if (seen.Contains(key))
+                    continue;
+
+                rows.Add(new UpcomingObligation
+                {
+                    AccountId = rule.ToAccountId,
+                    AccountName = names.GetValueOrDefault(rule.ToAccountId, ""),
+                    DueDate = due,
+                    MinimumPayment = amount,
+                    AmountDue = amount,
+                    PromotionalDue = 0,
+                    Notes = notes
+                });
+                seen.Add(key);
+                coveredAccounts.Add(rule.ToAccountId);
+            }
+        }
+
         private UpcomingObligation? SynthesizeObligation(Account account, DateTime asOf)
         {
             DateTime? due = account switch
@@ -866,8 +946,20 @@ namespace THMS.Logic.Orchestrators.Finance
             {
                 MortgageAccount mortgage when mortgage.NextPaymentDate != default => mortgage.NextPaymentDate.Date,
                 CreditAccount credit when credit.DueDate != default => RollForward(credit.DueDate.Date, asOf),
-                _ => null
+                _ => NextRecurringDue(account.Id, asOf)
             };
+        }
+
+        private DateTime? NextRecurringDue(Guid accountId, DateTime asOf)
+        {
+            var dates = _transactions.GetRecurringSingleRules(accountId)
+                .Where(r => r.IsActive && r.Amount < 0 && r.NextOccurrence.Date >= asOf)
+                .Select(r => r.NextOccurrence.Date)
+                .Concat(_transactions.GetRecurringTransferRules(accountId)
+                    .Where(r => r.IsActive && r.NextOccurrence.Date >= asOf)
+                    .Select(r => r.NextOccurrence.Date))
+                .ToList();
+            return dates.Count == 0 ? null : dates.Min();
         }
 
         private Account RequireAccount(Guid accountId) =>

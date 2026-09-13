@@ -14,12 +14,13 @@ namespace THMS.UI.WinForms.Updates
             using var dialog = new OpenFileDialog
             {
                 Filter = "CSV Files (*.csv)|*.csv",
-                Title = "Import Enphase Solar Data"
+                Title = "Select Enphase Solar Data File(s)",
+                Multiselect = true
             };
 
             if (dialog.ShowDialog() == DialogResult.OK)
             {
-                _intervalOrchestrator.Update(dialog.FileName);
+                _intervalOrchestrator.Update(dialog.FileNames);
 
                 if (string.IsNullOrEmpty(_intervalOrchestrator.ErrorMessage))
                 {

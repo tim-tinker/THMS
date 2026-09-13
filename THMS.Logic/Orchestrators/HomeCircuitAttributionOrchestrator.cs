@@ -39,7 +39,9 @@ namespace THMS.Logic.Orchestrators
             {
                 var end = latest.Timestamp;
                 var start = GetStartDate(end, period);
-                readings = _energyStore.GetHomeCircuitAttribution(start, end).ToArray();
+                readings = _energyStore.GetHomeCircuitAttribution(start, end)
+                    .OrderByDescending(a => a.Timestamp)
+                    .ToArray();
             }
 
             return readings;

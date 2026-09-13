@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Text;
-using System.Windows.Forms;
-using THMS.Domain.Finance;
+﻿using THMS.Domain.Finance;
 
 namespace THMS.UI.WinForms
 {
@@ -16,6 +9,8 @@ namespace THMS.UI.WinForms
         public ElectricContractDataEntryForm()
         {
             InitializeComponent();
+            _dateStart.Value = DateTime.Today;
+            _dateEnd.Value = DateTime.Today;
         }
 
         private void OnClickCancel(object sender, EventArgs e)
@@ -31,8 +26,8 @@ namespace THMS.UI.WinForms
             {
                 Id = Guid.NewGuid(),
                 Name = _textName.Text,
-                StartDate = _dateStart.Value,
-                EndDate = _dateEnd.Value,
+                StartDate = _dateStart.Value.Date,
+                EndDate = _dateEnd.Value.Date,
                 BaseEnergyCharge = _numBaseEnergyCharge.Value,
                 EnergyChargeRate = _numEnergyRate.Value,
                 BaseDeliveryCharge = _numDeliveryBaseCharge.Value,

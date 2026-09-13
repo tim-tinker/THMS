@@ -23,6 +23,9 @@ namespace THMS.Logic.Orchestrators
             if (contract.Id == Guid.Empty)
                 contract.Id = Guid.NewGuid();
 
+            contract.StartDate = contract.StartDate.Date;
+            contract.EndDate = contract.EndDate.Date;
+
             _financeStore.UpsertElectricContract(contract);
         }
 
@@ -38,7 +41,8 @@ namespace THMS.Logic.Orchestrators
             var end = latest.EndDate;
             var start = GetStartDate(end, period);
 
-            return _financeStore.GetElectricContracts(start, end);
+            return _financeStore.GetElectricContracts(start, end)
+                .OrderByDescending(c => c.StartDate);
         }
 
     }

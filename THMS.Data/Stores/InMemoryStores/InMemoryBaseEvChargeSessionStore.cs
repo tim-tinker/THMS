@@ -33,6 +33,8 @@ namespace THMS.Data.Stores.InMemoryStores
             existing.LastSoc = session.LastSoc;
             existing.OdometerMiles = session.OdometerMiles;
             existing.KwhAdded = session.KwhAdded;
+            existing.KwhDrawn = session.KwhDrawn;
+            existing.SessionCost = session.SessionCost;
 
             _mileageStore.Upsert(existing);
         }

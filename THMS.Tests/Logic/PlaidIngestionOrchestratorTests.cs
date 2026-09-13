@@ -135,9 +135,14 @@ namespace THMS.Tests.Logic
                 }
             };
 
-            var imported = orchestrator.ImportTransactions(rows);
+            var reports = new List<TransactionImportProgress>();
+            var imported = orchestrator.ImportTransactions(
+                rows,
+                new CollectingProgress<TransactionImportProgress>(reports));
 
             Assert.That(imported, Is.EqualTo(1));
+            Assert.That(reports.Select(r => r.Total).Distinct().ToList(), Is.EqualTo(new[] { 1 }));
+            Assert.That(reports.Last().Completed, Is.EqualTo(imported));
             var posted = txs.GetPostedTransactions(checking.Id).ToList();
             Assert.That(posted, Has.Count.EqualTo(1));
             Assert.That(posted[0].Category, Is.EqualTo("Restaurants"));
@@ -227,5 +232,10 @@ namespace THMS.Tests.Logic
                 async () => await orchestrator.DownloadNewTransactions(DateTime.Today.AddDays(-30), DateTime.Today),
                 Throws.InvalidOperationException);
         }
+    }
+
+    file sealed class CollectingProgress<T>(List<T> items) : IProgress<T>
+    {
+        public void Report(T value) => items.Add(value);
     }
 }

@@ -16,7 +16,6 @@ namespace THMS.Data.Stores.InMemoryStores
             }
 
             existing.KiloWattHours = item.KiloWattHours;
-            existing.CircuitId = item.CircuitId;
             if (existing.Id == Guid.Empty && item.Id != Guid.Empty)
                 existing.Id = item.Id;
         }

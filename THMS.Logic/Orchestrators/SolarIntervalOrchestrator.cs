@@ -25,11 +25,14 @@ namespace THMS.Logic.Orchestrators
             _energyStore = energyStore;
         }
 
-        public void Update(string filePath)
+        public void Update(string[] filePaths)
         {
 
             var importer = new EnphaseSolarImporter(_energyStore);
-            importer.Import(filePath);
+            foreach (var filePath in filePaths)
+            {
+                importer.Import(filePath);
+            }
             StartDate = importer.StartDate;
             EndDate = importer.EndDate;
             IntervalCount = importer.IntervalCount;
@@ -68,7 +71,9 @@ namespace THMS.Logic.Orchestrators
             {
                 var end = latest.Timestamp;
                 var start = GetStartDate(end, period);
-                intervals = _energyStore.GetSolarProductionIntervals(start, end).ToArray();
+                intervals = _energyStore.GetSolarProductionIntervals(start, end)
+                    .OrderByDescending(i => i.Timestamp)
+                    .ToArray();
             }
 
             return intervals;

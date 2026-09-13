@@ -32,7 +32,7 @@ namespace THMS.Data.Stores.SqlTables
             ";
 
             cmd.Parameters.AddWithValue("@Id", session.Id.ToString());
-            cmd.Parameters.AddWithValue("@KwhDrawn", session.KwhDrawn);
+            cmd.Parameters.AddWithValue("@KwhDrawn", session.KwhDrawn ?? 0);
             cmd.Parameters.AddWithValue("@SessionCost", session.SessionCost);
             cmd.ExecuteNonQuery();
         }

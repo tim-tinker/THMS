@@ -29,9 +29,9 @@ namespace THMS.UI
 
             AddSectionLabel("Data Management");
             AddEmbeddedForm("Planning Center", new PlanningCenterForm());
-            AddEmbeddedForm("Register", new RegisterForm());
             AddEmbeddedForm("Data Manager", new DataManagerForm());
-            AddEmbeddedForm("Data Center", new DataCenterForm());
+            AddEmbeddedForm("Register", new RegisterForm());
+            AddEmbeddedForm("Energy", new DataCenterForm());
         }
 
         private void OnLoad(object sender, EventArgs e)
@@ -121,46 +121,73 @@ namespace THMS.UI
         {
             if (sender is not Button button) return;
 
-            ShowDashboard(button.Text);
+            ShowDashboard(button.Text, button);
         }
 
         private void OnClickNavigateToEmbedded(object? sender, EventArgs e)
         {
             if (sender is not Button button) return;
 
-            ShowFormInMainPanel(button.Text);
+            ShowFormInMainPanel(button.Text, button);
         }
 
-        private void ShowDashboard(string moduleName)
+        private void ShowDashboard(string moduleName, Button? navButton = null)
         {
-            HideAllEmbeddedForms();
+            dashboardHostPanel.SuspendLayout();
+            try
+            {
+                HideAllEmbeddedForms();
 
-            var dashboard = _dashboards[moduleName];
-            dashboard.Visible = true;
-            dashboard.RefreshDashboard();
-            HighlightNavButton(moduleName);
+                var dashboard = _dashboards[moduleName];
+                dashboard.Visible = true;
+                dashboard.RefreshDashboard();
+                HighlightNavButton(navButton ?? FindNavButton(moduleName));
+            }
+            finally
+            {
+                dashboardHostPanel.ResumeLayout(true);
+            }
         }
 
-        private void ShowFormInMainPanel(string formName)
+        private void ShowFormInMainPanel(string formName, Button? navButton = null)
         {
-            HideAllEmbeddedForms();
+            dashboardHostPanel.SuspendLayout();
+            try
+            {
+                HideAllEmbeddedForms();
 
-            var dashboard = _embeddedForms[formName];
-            dashboard.Visible = true;
-            HighlightNavButton(formName);
+                var dashboard = _embeddedForms[formName];
+                dashboard.Visible = true;
+                HighlightNavButton(navButton ?? FindNavButton(formName));
+            }
+            finally
+            {
+                dashboardHostPanel.ResumeLayout(true);
+            }
         }
 
-        private void HighlightNavButton(string label)
+        private Button? FindNavButton(string label)
+        {
+            foreach (Control control in navigationPanel.Controls)
+            {
+                if (control is Button button && string.Equals(button.Text, label, StringComparison.Ordinal))
+                    return button;
+            }
+
+            return null;
+        }
+
+        private void HighlightNavButton(Button? selected)
         {
             foreach (Control control in navigationPanel.Controls)
             {
                 if (control is not Button button)
                     continue;
 
-                var selected = string.Equals(button.Text, label, StringComparison.Ordinal);
-                button.BackColor = selected ? NavSelectedBack : NavIdleBack;
-                button.ForeColor = selected ? NavSelectedFore : NavIdleFore;
-                button.FlatAppearance.BorderColor = selected
+                var isSelected = selected is not null && ReferenceEquals(button, selected);
+                button.BackColor = isSelected ? NavSelectedBack : NavIdleBack;
+                button.ForeColor = isSelected ? NavSelectedFore : NavIdleFore;
+                button.FlatAppearance.BorderColor = isSelected
                     ? NavSelectedBack
                     : Color.FromArgb(200, 200, 200);
             }

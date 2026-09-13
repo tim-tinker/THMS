@@ -12,15 +12,7 @@ namespace THMS.UI.WinForms.Updates
 
         public void UpdateDataSource()
         {
-            var vehicles = _orchestrator.GetEvVehicles().ToList();
-
-            using var selectForm = new VehicleSelectionForm(vehicles);
-
-            if (selectForm.ShowDialog() != DialogResult.OK)
-                return;
-
-            var vehicle = selectForm.SelectedVehicle as VehicleEv;
-            if (vehicle == null)
+            if (ResolveEvVehicle() is not VehicleEv vehicle)
                 return;
 
             using var form = new EvChargeSessionForm(vehicle);
@@ -28,6 +20,26 @@ namespace THMS.UI.WinForms.Updates
             {
                 _orchestrator.Save(form.SavedSession);
             }
+        }
+
+        private VehicleEv? ResolveEvVehicle()
+        {
+            var vehicles = _orchestrator.GetEvVehicles().ToList();
+            if (vehicles.Count == 0)
+            {
+                MessageBox.Show("Add an EV before adding a charge session.",
+                    "Add EV Charge Session", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return null;
+            }
+
+            if (vehicles.Count == 1)
+                return vehicles[0];
+
+            using var selectForm = new VehicleSelectionForm(vehicles);
+            if (selectForm.ShowDialog() != DialogResult.OK)
+                return null;
+
+            return selectForm.SelectedVehicle as VehicleEv;
         }
     }
 }

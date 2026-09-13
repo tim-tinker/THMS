@@ -33,6 +33,17 @@ namespace THMS.Tests.Logic
             orchestrator.Save(contract);
             Assert.That(contract.Id, Is.Not.EqualTo(Guid.Empty));
 
+            var timed = new ElectricContract
+            {
+                Name = "Timed",
+                StartDate = new DateTime(2026, 8, 1, 15, 30, 0),
+                EndDate = new DateTime(2026, 8, 31, 22, 45, 0)
+            };
+            orchestrator.Save(timed);
+            Assert.That(timed.StartDate, Is.EqualTo(new DateTime(2026, 8, 1)));
+            Assert.That(timed.EndDate, Is.EqualTo(new DateTime(2026, 8, 31)));
+            Assert.That(store.GetElectricContract(timed.Id)!.StartDate.TimeOfDay, Is.EqualTo(TimeSpan.Zero));
+
             var existingId = Guid.NewGuid();
             orchestrator.Save(new ElectricContract
             {
@@ -66,7 +77,7 @@ namespace THMS.Tests.Logic
             Assert.That(orchestrator.GetSolarIntervals("Month"), Is.Empty);
 
             var bad = WriteTemp("solar-bad", "a,b\n1,2");
-            orchestrator.Update(bad);
+            orchestrator.Update([bad]);
             Assert.That(orchestrator.ErrorMessage, Is.Not.Empty);
             Assert.That(orchestrator.IntervalCount, Is.EqualTo(0));
 
@@ -79,7 +90,7 @@ namespace THMS.Tests.Logic
             var good = WriteTemp("solar-good",
                 "Date/Time,Energy Produced (Wh),Energy Consumed (Wh),Exported to Grid (Wh),Imported from Grid (Wh),Stored in batteries (Wh),Discharged from batteries (Wh)\n" +
                 "2026-01-01 12:00:00,1000,800,10,200,50,20\n");
-            orchestrator.Update(good);
+            orchestrator.Update([good]);
 
             Assert.That(orchestrator.ErrorMessage, Is.Empty);
             Assert.That(orchestrator.IntervalCount, Is.EqualTo(1));
@@ -96,13 +107,13 @@ namespace THMS.Tests.Logic
             Assert.That(orchestrator.GetHomeCircuitReadings("Month"), Is.Empty);
 
             var bad = WriteTemp("circuit-bad", "x,y,z\n1,2,3");
-            orchestrator.Update(bad);
+            orchestrator.Update([bad]);
             Assert.That(orchestrator.ErrorMessage, Is.Not.Empty);
 
             var good = WriteTemp("circuit-good",
                 "Local SPAN Panel time (America/Chicago),Energy Data (Wh)\n" +
                 "2026-02-01 08:00:00,1.25\n");
-            orchestrator.Update(good);
+            orchestrator.Update([good]);
             Assert.That(orchestrator.ReadingCount, Is.EqualTo(1));
             Assert.That(orchestrator.GetHomeCircuitReadings("Lifetime").Count(), Is.EqualTo(1));
         }
@@ -180,6 +191,7 @@ namespace THMS.Tests.Logic
             };
             orchestrator.Save(homeBare);
             var listed = orchestrator.GetEvChargeSessions("Year").ToList();
+            Assert.That(listed.Select(s => s.StartTime), Is.Ordered.Descending);
             Assert.That(listed.OfType<HomeEvChargeSession>().Any(s => s.Attribution is null), Is.True);
 
             energy.UpsertSolarProductionInterval(new SolarProductionInterval
@@ -215,6 +227,11 @@ namespace THMS.Tests.Logic
                 .First(s => s.Id == homeCompute.Id);
             Assert.That(completed.Attribution, Is.Not.Null);
             Assert.That(completed.Billing, Is.Not.Null);
+            Assert.That(completed.KwhDrawn, Is.EqualTo(completed.SolarKwh + completed.BatteryKwh + completed.GridKwh));
+            Assert.That(completed.KwhDrawn, Is.GreaterThan(0));
+            Assert.That(
+                completed.SessionCost,
+                Is.EqualTo(completed.GridKwh * (0.10m + 0.05m)));
 
             vehicles.UpsertHomeEvChargeAttribution(homeCompute.Id, completed.Attribution!);
             vehicles.UpsertHomeEvChargeBilling(homeCompute.Id, completed.Billing!);
@@ -240,6 +257,8 @@ namespace THMS.Tests.Logic
                 .First(s => s.Id == storedAttrib.Id);
             Assert.That(loaded.Attribution, Is.Not.Null);
             Assert.That(loaded.Billing, Is.Not.Null);
+            Assert.That(loaded.KwhDrawn, Is.EqualTo(1m));
+            Assert.That(loaded.SessionCost, Is.EqualTo(2m));
 
             var attribNoContract = new HomeEvChargeSession
             {
@@ -253,6 +272,53 @@ namespace THMS.Tests.Logic
                 .First(s => s.Id == attribNoContract.Id);
             Assert.That(noBill.Attribution, Is.Not.Null);
             Assert.That(noBill.Billing, Is.Null);
+
+            finance.UpsertElectricContract(new ElectricContract
+            {
+                Id = Guid.NewGuid(),
+                Name = "January 2027",
+                StartDate = new DateTime(2027, 1, 1, 15, 0, 0),
+                EndDate = new DateTime(2027, 1, 15, 0, 0, 0),
+                EnergyChargeRate = 0.12m,
+                DeliveryChargeRate = 0.06m
+            });
+            var importedZeros = new HomeEvChargeSession
+            {
+                VehicleId = ev.Id,
+                StartTime = new DateTime(2026, 8, 30, 13, 44, 0),
+                EndTime = new DateTime(2026, 8, 30, 17, 57, 0),
+                KwhDrawn = 0,
+                SessionCost = 0
+            };
+            orchestrator.Save(importedZeros);
+            vehicles.UpsertHomeEvChargeAttribution(importedZeros.Id, new HomeEvChargeAttribution
+            {
+                SolarKwh = 17.642m,
+                BatteryKwh = 0,
+                GridKwh = 23.868m
+            });
+            vehicles.UpsertHomeEvChargeBilling(importedZeros.Id, new HomeEvChargeBilling { SessionCost = 0 });
+            var derived = orchestrator.GetEvChargeSessions("Lifetime").OfType<HomeEvChargeSession>()
+                .First(s => s.Id == importedZeros.Id);
+            Assert.That(derived.KwhDrawn, Is.EqualTo(17.642m + 23.868m));
+            Assert.That(derived.SessionCost, Is.EqualTo(23.868m * (0.10m + 0.05m)));
+
+            var endDateMidnight = new HomeEvChargeSession
+            {
+                VehicleId = ev.Id,
+                StartTime = new DateTime(2027, 1, 15, 13, 44, 0),
+                EndTime = new DateTime(2027, 1, 15, 17, 0, 0),
+                KwhDrawn = 0,
+                SessionCost = 0
+            };
+            orchestrator.Save(endDateMidnight);
+            vehicles.UpsertHomeEvChargeAttribution(endDateMidnight.Id, new HomeEvChargeAttribution
+            {
+                GridKwh = 10m
+            });
+            var billedOnExpiry = orchestrator.GetEvChargeSessions("Lifetime").OfType<HomeEvChargeSession>()
+                .First(s => s.Id == endDateMidnight.Id);
+            Assert.That(billedOnExpiry.SessionCost, Is.EqualTo(10m * (0.12m + 0.06m)));
         }
     }
 
@@ -1048,6 +1114,53 @@ namespace THMS.Tests.Logic
             orchestrator.DeleteRule(rule.Id);
             Assert.That(orchestrator.GetRules(accountId), Is.Empty);
             Assert.That(store.GetExpenseBudgetHistory(rule.Id), Is.Empty);
+        }
+
+        [Test]
+        public void EnsureSuggestedRules_CreatesMonthlyBudgetsFromSpending()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            var month = DateTime.Today.AddMonths(-1);
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = new DateTime(month.Year, month.Month, 4),
+                Amount = -80,
+                Category = DefaultExpenseCategories.Groceries,
+                CategoryId = DefaultExpenseCategories.GroceriesId,
+                Description = "Market"
+            });
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 6),
+                Amount = -90,
+                Category = DefaultExpenseCategories.Groceries,
+                CategoryId = DefaultExpenseCategories.GroceriesId,
+                Description = "Market"
+            });
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = DateTime.Today,
+                Amount = -200,
+                Category = DefaultExpenseCategories.Payment,
+                CategoryId = DefaultExpenseCategories.PaymentId,
+                Description = "Card payment"
+            });
+
+            var created = orchestrator.EnsureSuggestedRules(accountId);
+
+            Assert.That(created, Is.GreaterThan(0));
+            var rules = orchestrator.GetRules(accountId);
+            Assert.That(rules, Has.Some.Matches<ExpenseBudgetRule>(r =>
+                r.BudgetName == DefaultExpenseCategories.Groceries &&
+                r.IncludedCategoryIds.Contains(DefaultExpenseCategories.GroceriesId)));
+            Assert.That(rules, Has.None.Matches<ExpenseBudgetRule>(r =>
+                r.IncludedCategoryIds.Contains(DefaultExpenseCategories.PaymentId)));
+            Assert.That(orchestrator.EnsureSuggestedRules(accountId), Is.EqualTo(0));
         }
 
         [Test]

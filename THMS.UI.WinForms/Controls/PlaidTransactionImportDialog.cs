@@ -243,10 +243,10 @@ namespace THMS.UI.WinForms.Controls
         {
             _progress.Maximum = Math.Max(1, progress.Total);
             _progress.Value = Math.Clamp(progress.Completed, 0, _progress.Maximum);
-            if (progress.Completed >= progress.Total)
-                _status.Text = "Finishing...";
-            else if (progress.Total > 0 && progress.Completed == progress.Total - 1)
+            if (progress.UpdatingLedger)
                 _status.Text = "Updating ledger...";
+            else if (progress.Total == 0 || progress.Completed >= progress.Total)
+                _status.Text = "Finishing...";
             else
                 _status.Text = $"Importing {progress.Completed:N0} of {progress.Total:N0}...";
             _progress.Update();

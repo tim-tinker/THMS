@@ -8,12 +8,12 @@ namespace THMS.UI.WinForms.Controls
         private DataGridView gridPayments;
         private Label lblStatus;
         private DateTimePicker dtUntil;
-        private Button btnAdd;
-        private Button btnDelete;
-        private Button btnMinimums;
-        private Button btnPromotions;
-        private Button btnExtra;
-        private Button btnPayAll;
+        private ThmsButton btnAdd;
+        private ThmsButton btnDelete;
+        private ThmsButton btnMinimums;
+        private ThmsButton btnPromotions;
+        private ThmsButton btnExtra;
+        private ThmsButton btnPayAll;
 
         protected override void Dispose(bool disposing)
         {
@@ -29,12 +29,12 @@ namespace THMS.UI.WinForms.Controls
             gridPayments = new DataGridView();
             lblStatus = new Label();
             dtUntil = new DateTimePicker();
-            btnAdd = new Button();
-            btnDelete = new Button();
-            btnMinimums = new Button();
-            btnPromotions = new Button();
-            btnExtra = new Button();
-            btnPayAll = new Button();
+            btnAdd = new ThmsButton();
+            btnDelete = new ThmsButton();
+            btnMinimums = new ThmsButton();
+            btnPromotions = new ThmsButton();
+            btnExtra = new ThmsButton();
+            btnPayAll = new ThmsButton();
             ((System.ComponentModel.ISupportInitialize)gridPayments).BeginInit();
             pnlRoot.SuspendLayout();
             SuspendLayout();
@@ -81,39 +81,42 @@ namespace THMS.UI.WinForms.Controls
             var toolbar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
-                Height = 40,
-                Name = "toolbar",
-                WrapContents = false,
-                AutoScroll = true
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(0, 4, 0, 4),
+                Name = "toolbar"
             };
             dtUntil.Format = DateTimePickerFormat.Short;
-            dtUntil.Width = 110;
+            dtUntil.Width = 120;
             dtUntil.Name = "dtUntil";
+            dtUntil.Margin = new Padding(0, 8, 8, 4);
             btnAdd.Text = "Add Planned Payment";
-            btnAdd.AutoSize = true;
             btnAdd.Name = "btnAdd";
+            btnAdd.Margin = new Padding(0, 4, 8, 4);
             btnAdd.Click += OnAdd;
             btnDelete.Text = "Delete Planned Payment";
-            btnDelete.AutoSize = true;
             btnDelete.Name = "btnDelete";
+            btnDelete.Destructive = true;
+            btnDelete.Margin = new Padding(0, 4, 8, 4);
             btnDelete.Click += OnDelete;
             btnMinimums.Text = "Generate Minimum Payments";
-            btnMinimums.AutoSize = true;
             btnMinimums.Name = "btnMinimums";
+            btnMinimums.Margin = new Padding(0, 4, 8, 4);
             btnMinimums.Click += OnGenerateMinimums;
             btnPromotions.Text = "Generate Promotion Payments";
-            btnPromotions.AutoSize = true;
             btnPromotions.Name = "btnPromotions";
+            btnPromotions.Margin = new Padding(0, 4, 8, 4);
             btnPromotions.Click += OnGeneratePromotions;
             btnExtra.Text = "Generate Extra Principal Payments";
-            btnExtra.AutoSize = true;
             btnExtra.Name = "btnExtra";
+            btnExtra.Margin = new Padding(0, 4, 8, 4);
             btnExtra.Click += OnGenerateExtra;
             btnPayAll.Text = "Generate Pay-All-Due";
-            btnPayAll.AutoSize = true;
             btnPayAll.Name = "btnPayAll";
+            btnPayAll.Margin = new Padding(0, 4, 8, 4);
             btnPayAll.Click += OnGeneratePayAll;
-            toolbar.Controls.Add(new Label { Text = "Plan until", AutoSize = true, Padding = new Padding(0, 8, 0, 0) });
+            toolbar.Controls.Add(new Label { Text = "Plan until", AutoSize = true, Margin = new Padding(0, 12, 8, 4) });
             toolbar.Controls.Add(dtUntil);
             toolbar.Controls.Add(btnAdd);
             toolbar.Controls.Add(btnDelete);

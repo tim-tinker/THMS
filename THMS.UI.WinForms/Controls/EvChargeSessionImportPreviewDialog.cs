@@ -1,40 +1,39 @@
 using System.ComponentModel;
 using THMS.Logic.Orchestrators;
-using THMS.Logic.ViewModels.Finance;
+using THMS.Logic.ViewModels.Transportation;
 
 namespace THMS.UI.WinForms.Controls
 {
-    public sealed class TransactionImportPreviewDialog : Form
+    public sealed class EvChargeSessionImportPreviewDialog : Form
     {
-        private readonly TransactionImportOrchestrator _orchestrator;
-        private readonly BindingList<TransactionImportPreview> _rows;
+        private readonly EvChargeSessionImportOrchestrator _orchestrator;
+        private readonly BindingList<EvChargeSessionImportPreview> _rows;
         private readonly DataGridView _grid = new();
         private readonly Label _status = new();
-        private readonly ProgressBar _progress = new();
         private readonly Button _btnOk = new();
         private readonly Button _btnCancel = new();
         private readonly Button _btnDelete = new();
 
         public int ImportedCount { get; private set; }
 
-        public TransactionImportPreviewDialog(IList<TransactionImportPreview> rows)
-            : this(rows, new TransactionImportOrchestrator())
+        public EvChargeSessionImportPreviewDialog(IList<EvChargeSessionImportPreview> rows)
+            : this(rows, new EvChargeSessionImportOrchestrator())
         {
         }
 
-        public TransactionImportPreviewDialog(
-            IList<TransactionImportPreview> rows,
-            TransactionImportOrchestrator orchestrator)
+        public EvChargeSessionImportPreviewDialog(
+            IList<EvChargeSessionImportPreview> rows,
+            EvChargeSessionImportOrchestrator orchestrator)
         {
             _orchestrator = orchestrator;
-            _rows = new BindingList<TransactionImportPreview>(rows.ToList());
+            _rows = new BindingList<EvChargeSessionImportPreview>(rows.ToList());
 
-            Text = "Import Transactions";
+            Text = "Import EV Charge Sessions";
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false;
             ShowInTaskbar = false;
-            Size = new Size(980, 520);
-            MinimumSize = new Size(640, 360);
+            Size = new Size(1100, 520);
+            MinimumSize = new Size(720, 360);
 
             var heading = new Label
             {
@@ -42,7 +41,7 @@ namespace THMS.UI.WinForms.Controls
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 Height = 36,
                 Padding = new Padding(8, 8, 8, 0),
-                Text = "Transactions to Import (Preview)",
+                Text = "EV Charge Sessions to Import (Preview)",
                 TextAlign = ContentAlignment.MiddleLeft
             };
 
@@ -73,24 +72,11 @@ namespace THMS.UI.WinForms.Controls
             _status.Dock = DockStyle.Bottom;
             _status.Height = 24;
             _status.Padding = new Padding(8, 0, 8, 0);
-            _status.Text = $"{_rows.Count:N0} transaction{(_rows.Count == 1 ? "" : "s")} loaded. Edit cells or delete rows, then click OK to import.";
+            _status.Text = $"{_rows.Count:N0} session{(_rows.Count == 1 ? "" : "s")} loaded. Edit cells or delete rows, then click OK to import.";
             _status.TextAlign = ContentAlignment.MiddleLeft;
-
-            var progressHost = new Panel
-            {
-                Dock = DockStyle.Bottom,
-                Height = 28,
-                Padding = new Padding(8, 4, 8, 4)
-            };
-            _progress.Dock = DockStyle.Fill;
-            _progress.Minimum = 0;
-            _progress.Maximum = Math.Max(1, _rows.Count);
-            _progress.Style = ProgressBarStyle.Continuous;
-            progressHost.Controls.Add(_progress);
 
             Controls.Add(_grid);
             Controls.Add(_status);
-            Controls.Add(progressHost);
             Controls.Add(buttons);
             Controls.Add(heading);
             AcceptButton = _btnOk;
@@ -109,11 +95,19 @@ namespace THMS.UI.WinForms.Controls
             _grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             _grid.DataError += (_, e) => e.ThrowException = false;
             _grid.Columns.AddRange(
-                DateColumn(nameof(TransactionImportPreview.Date), "Date"),
-                TextColumn(nameof(TransactionImportPreview.Description), "Description", readOnly: false),
-                AmountColumn(nameof(TransactionImportPreview.Amount), "Amount"),
-                TextColumn(nameof(TransactionImportPreview.Account), "Account", readOnly: true),
-                TextColumn(nameof(TransactionImportPreview.Category), "Category", readOnly: false));
+                DateTimeColumn(nameof(EvChargeSessionImportPreview.StartTime), "Start"),
+                DateTimeColumn(nameof(EvChargeSessionImportPreview.EndTime), "End"),
+                TextColumn(nameof(EvChargeSessionImportPreview.VehicleName), "Vehicle", readOnly: true),
+                TextColumn(nameof(EvChargeSessionImportPreview.ChargeType), "Type", readOnly: true),
+                TextColumn(nameof(EvChargeSessionImportPreview.Charger), "Charger", readOnly: true),
+                NumberColumn(nameof(EvChargeSessionImportPreview.OdometerMiles), "Odometer", "N1"),
+                NumberColumn(nameof(EvChargeSessionImportPreview.StartSoc), "Start SOC", "0'%'"),
+                NumberColumn(nameof(EvChargeSessionImportPreview.EndSoc), "End SOC", "0'%'"),
+                NumberColumn(nameof(EvChargeSessionImportPreview.KwhAdded), "Charge kWh", "N2"),
+                NumberColumn(nameof(EvChargeSessionImportPreview.KwhDrawn), "Drawn kWh", "N2"),
+                AmountColumn(nameof(EvChargeSessionImportPreview.SessionCost), "Cost"),
+                NumberColumn(nameof(EvChargeSessionImportPreview.LastOdometer), "Last Odo", "N1"),
+                NumberColumn(nameof(EvChargeSessionImportPreview.LastSoc), "Last SOC", "0'%'"));
             _grid.DataSource = _rows;
         }
 
@@ -126,31 +120,40 @@ namespace THMS.UI.WinForms.Controls
                 ReadOnly = readOnly
             };
 
-        private static DataGridViewTextBoxColumn DateColumn(string property, string header)
+        private static DataGridViewTextBoxColumn DateTimeColumn(string property, string header)
         {
             var column = TextColumn(property, header, readOnly: false);
-            column.DefaultCellStyle.Format = "d";
+            column.DefaultCellStyle.Format = "g";
+            return column;
+        }
+
+        private static DataGridViewTextBoxColumn NumberColumn(string property, string header, string format)
+        {
+            var column = TextColumn(property, header, readOnly: false);
+            column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            column.DefaultCellStyle.Format = format;
             return column;
         }
 
         private static DataGridViewTextBoxColumn AmountColumn(string property, string header)
         {
             var column = TextColumn(property, header, readOnly: false);
+            column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             column.DefaultCellStyle.Format = "c2";
             return column;
         }
 
         private void OnDeleteRow(object? sender, EventArgs e)
         {
-            if (_grid.CurrentRow?.DataBoundItem is not TransactionImportPreview row)
+            if (_grid.CurrentRow?.DataBoundItem is not EvChargeSessionImportPreview row)
             {
-                MessageBox.Show(this, "Select a row to delete.", "Import Transactions",
+                MessageBox.Show(this, "Select a row to delete.", "Import EV Charge Sessions",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             _rows.Remove(row);
-            _status.Text = $"{_rows.Count:N0} transaction{(_rows.Count == 1 ? "" : "s")} remaining.";
+            _status.Text = $"{_rows.Count:N0} session{(_rows.Count == 1 ? "" : "s")} remaining.";
         }
 
         private void OnImport(object? sender, EventArgs e)
@@ -158,7 +161,7 @@ namespace THMS.UI.WinForms.Controls
             _grid.EndEdit();
             if (_rows.Count == 0)
             {
-                MessageBox.Show(this, "There are no transactions to import.", "Import Transactions",
+                MessageBox.Show(this, "There are no charge sessions to import.", "Import EV Charge Sessions",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -166,31 +169,15 @@ namespace THMS.UI.WinForms.Controls
             SetBusy(true);
             try
             {
-                var snapshot = _rows.ToList();
-                var progress = new ActionProgress<TransactionImportProgress>(ShowProgress);
-                ImportedCount = _orchestrator.ImportTransactions(snapshot, progress);
+                ImportedCount = _orchestrator.ImportSessions(_rows.ToList());
                 DialogResult = DialogResult.OK;
             }
             catch (Exception ex)
             {
                 SetBusy(false);
-                MessageBox.Show(this, $"Import failed.\n{ex.Message}", "Import Transactions",
+                MessageBox.Show(this, $"Import failed.\n{ex.Message}", "Import EV Charge Sessions",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
-        }
-
-        private void ShowProgress(TransactionImportProgress progress)
-        {
-            _progress.Maximum = Math.Max(1, progress.Total);
-            _progress.Value = Math.Clamp(progress.Completed, 0, _progress.Maximum);
-            if (progress.UpdatingLedger)
-                _status.Text = "Updating ledger...";
-            else if (progress.Total == 0 || progress.Completed >= progress.Total)
-                _status.Text = "Finishing...";
-            else
-                _status.Text = $"Importing {progress.Completed:N0} of {progress.Total:N0}...";
-            _progress.Update();
-            Application.DoEvents();
         }
 
         private void SetBusy(bool busy)
@@ -202,10 +189,5 @@ namespace THMS.UI.WinForms.Controls
             _grid.Enabled = !busy;
             CancelButton = busy ? null : _btnCancel;
         }
-    }
-
-    internal sealed class ActionProgress<T>(Action<T> action) : IProgress<T>
-    {
-        public void Report(T value) => action(value);
     }
 }

@@ -60,7 +60,7 @@
             _dateStart.Location = new Point(226, 53);
             _dateStart.Name = "_dateStart";
             _dateStart.Size = new Size(212, 35);
-            _dateStart.TabIndex = 0;
+            _dateStart.TabIndex = 1;
             // 
             // label1
             // 
@@ -68,7 +68,7 @@
             label1.Location = new Point(12, 58);
             label1.Name = "label1";
             label1.Size = new Size(142, 30);
-            label1.TabIndex = 1;
+            label1.TabIndex = 10;
             label1.Text = "Effective Date";
             // 
             // _textName
@@ -77,7 +77,7 @@
             _textName.Location = new Point(226, 12);
             _textName.Name = "_textName";
             _textName.Size = new Size(212, 35);
-            _textName.TabIndex = 2;
+            _textName.TabIndex = 0;
             // 
             // label2
             // 
@@ -85,7 +85,7 @@
             label2.Location = new Point(12, 15);
             label2.Name = "label2";
             label2.Size = new Size(154, 30);
-            label2.TabIndex = 3;
+            label2.TabIndex = 11;
             label2.Text = "Contract Name";
             // 
             // _dateEnd
@@ -95,7 +95,7 @@
             _dateEnd.Location = new Point(226, 94);
             _dateEnd.Name = "_dateEnd";
             _dateEnd.Size = new Size(212, 35);
-            _dateEnd.TabIndex = 4;
+            _dateEnd.TabIndex = 2;
             // 
             // label3
             // 
@@ -103,7 +103,7 @@
             label3.Location = new Point(12, 98);
             label3.Name = "label3";
             label3.Size = new Size(155, 30);
-            label3.TabIndex = 5;
+            label3.TabIndex = 12;
             label3.Text = "Expiration Date";
             // 
             // _numBaseEnergyCharge
@@ -113,7 +113,7 @@
             _numBaseEnergyCharge.Location = new Point(226, 135);
             _numBaseEnergyCharge.Name = "_numBaseEnergyCharge";
             _numBaseEnergyCharge.Size = new Size(212, 35);
-            _numBaseEnergyCharge.TabIndex = 6;
+            _numBaseEnergyCharge.TabIndex = 3;
             // 
             // label4
             // 
@@ -121,7 +121,7 @@
             label4.Location = new Point(12, 137);
             label4.Name = "label4";
             label4.Size = new Size(197, 30);
-            label4.TabIndex = 7;
+            label4.TabIndex = 13;
             label4.Text = "Base Energy Charge";
             // 
             // _numEnergyRate
@@ -131,7 +131,7 @@
             _numEnergyRate.Location = new Point(226, 176);
             _numEnergyRate.Name = "_numEnergyRate";
             _numEnergyRate.Size = new Size(212, 35);
-            _numEnergyRate.TabIndex = 8;
+            _numEnergyRate.TabIndex = 4;
             // 
             // label5
             // 
@@ -139,7 +139,7 @@
             label5.Location = new Point(12, 178);
             label5.Name = "label5";
             label5.Size = new Size(124, 30);
-            label5.TabIndex = 9;
+            label5.TabIndex = 14;
             label5.Text = "Energy Rate";
             // 
             // _numSolarCreditRate
@@ -149,7 +149,7 @@
             _numSolarCreditRate.Location = new Point(226, 217);
             _numSolarCreditRate.Name = "_numSolarCreditRate";
             _numSolarCreditRate.Size = new Size(212, 35);
-            _numSolarCreditRate.TabIndex = 10;
+            _numSolarCreditRate.TabIndex = 5;
             // 
             // label6
             // 
@@ -157,7 +157,7 @@
             label6.Location = new Point(12, 219);
             label6.Name = "label6";
             label6.Size = new Size(168, 30);
-            label6.TabIndex = 11;
+            label6.TabIndex = 15;
             label6.Text = "Solar Credit Rate";
             // 
             // _numDeliveryBaseCharge
@@ -167,7 +167,7 @@
             _numDeliveryBaseCharge.Location = new Point(226, 258);
             _numDeliveryBaseCharge.Name = "_numDeliveryBaseCharge";
             _numDeliveryBaseCharge.Size = new Size(212, 35);
-            _numDeliveryBaseCharge.TabIndex = 12;
+            _numDeliveryBaseCharge.TabIndex = 6;
             // 
             // label7
             // 
@@ -175,7 +175,7 @@
             label7.Location = new Point(12, 260);
             label7.Name = "label7";
             label7.Size = new Size(208, 30);
-            label7.TabIndex = 13;
+            label7.TabIndex = 16;
             label7.Text = "Delivery Base Charge";
             // 
             // _numDeliveryRate
@@ -185,7 +185,7 @@
             _numDeliveryRate.Location = new Point(226, 299);
             _numDeliveryRate.Name = "_numDeliveryRate";
             _numDeliveryRate.Size = new Size(212, 35);
-            _numDeliveryRate.TabIndex = 14;
+            _numDeliveryRate.TabIndex = 7;
             // 
             // label8
             // 
@@ -193,7 +193,7 @@
             label8.Location = new Point(12, 301);
             label8.Name = "label8";
             label8.Size = new Size(135, 30);
-            label8.TabIndex = 15;
+            label8.TabIndex = 17;
             label8.Text = "Delivery Rate";
             // 
             // _btnCancel
@@ -202,7 +202,7 @@
             _btnCancel.Location = new Point(307, 370);
             _btnCancel.Name = "_btnCancel";
             _btnCancel.Size = new Size(131, 40);
-            _btnCancel.TabIndex = 16;
+            _btnCancel.TabIndex = 9;
             _btnCancel.Text = "Cancel";
             _btnCancel.UseVisualStyleBackColor = true;
             _btnCancel.Click += OnClickCancel;
@@ -213,15 +213,17 @@
             _btnSave.Location = new Point(170, 370);
             _btnSave.Name = "_btnSave";
             _btnSave.Size = new Size(131, 40);
-            _btnSave.TabIndex = 16;
+            _btnSave.TabIndex = 8;
             _btnSave.Text = "Save";
             _btnSave.UseVisualStyleBackColor = true;
             _btnSave.Click += OnClickSave;
             // 
             // ElectricContractDataEntryForm
             // 
+            AcceptButton = _btnSave;
             AutoScaleDimensions = new SizeF(12F, 30F);
             AutoScaleMode = AutoScaleMode.Font;
+            CancelButton = _btnCancel;
             ClientSize = new Size(450, 422);
             Controls.Add(_btnSave);
             Controls.Add(_btnCancel);
@@ -241,7 +243,13 @@
             Controls.Add(_textName);
             Controls.Add(label1);
             Controls.Add(_dateStart);
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
             Name = "ElectricContractDataEntryForm";
+            ShowIcon = false;
+            ShowInTaskbar = false;
+            StartPosition = FormStartPosition.CenterParent;
             Text = "Electric Contract Data";
             ((System.ComponentModel.ISupportInitialize)_numBaseEnergyCharge).EndInit();
             ((System.ComponentModel.ISupportInitialize)_numEnergyRate).EndInit();

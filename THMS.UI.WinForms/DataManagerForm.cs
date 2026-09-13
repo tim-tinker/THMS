@@ -1,108 +1,111 @@
-﻿using THMS.UI.WinForms.Controls;
+﻿using THMS.Data.Stores;
+using THMS.UI.WinForms.Controls;
 
 namespace THMS.UI.WinForms
 {
     public partial class DataManagerForm : BaseEmbeddedForm
     {
-        private IDataManagerControl? _currentControl;
-        private Control? _hostedControl;
-        private readonly TransactionManagerControl _transactionManagerControl = new();
+        private static readonly string[] TabLabels =
+        [
+            "Money",
+            "EV Charge",
+            "Home Circuit",
+            "Solar",
+            "Circuit Attribution",
+            "Electric Contracts"
+        ];
 
-        private Dictionary<string, Control> _controls = [];
+        private readonly Func<UserControl>[] _tabFactories =
+        [
+            () =>
+            {
+                var money = new TransactionManagerControl();
+                money.HostProvidesHistory = true;
+                return money;
+            },
+            () => new EvChargeSessionManagerControl(),
+            () => new HomeCircuitManagerControl(),
+            () => new SolarIntervalManagerControl(),
+            () => new HomeCircuitAttributionManagerControl(),
+            () => new ElectricContractManagerControl()
+        ];
+
+        private string? _appliedTab;
+        private string? _appliedPeriod;
+        private int _appliedRevision = int.MinValue;
 
         public DataManagerForm()
         {
             InitializeComponent();
-            CreateControlDictionary();
+            CreateTabs();
+            historyBar.SelectedPeriodChanged += (_, _) => ApplyHistoryToCurrentTab();
+            tabs.SelectedIndexChanged += OnTabSelected;
         }
 
-        private void CreateControlDictionary()
+        private void CreateTabs()
         {
-            AddControl(new SolarIntervalManagerControl(), "Solar");
-            AddControl(new HomeCircuitManagerControl(), "Home Circuit");
-            AddControl(new HomeCircuitAttributionManagerControl(), "Circuit Attribution");
-            AddControl(new EvChargeSessionManagerControl(), "EV Charge Session");
-            AddControl(new ElectricContractManagerControl(), "Electric Contracts");
-            AddControl(_transactionManagerControl, "Accounts and Transactions");
-        }
+            foreach (var label in TabLabels)
+            {
+                tabs.TabPages.Add(new TabPage(label)
+                {
+                    Padding = new Padding(4),
+                    UseVisualStyleBackColor = false
+                });
+            }
 
-        private void AddControl(UserControl control, string label)
-        {
-            control.Dock = DockStyle.Fill;
-            _controls[label] = control;
-            var menuItem = dataTypeToolStripMenuItem.DropDownItems.Add(label);
-            menuItem.Click += OnClickTypeMenuItem;
-        }
-
-        private void ClearControls()
-        {
-            if (_hostedControl != null)
-                panelHost.Controls.Remove(_hostedControl);
-
-            _hostedControl = null;
-            _currentControl = null;
-        }
-
-        private void OnClickTypeMenuItem(object sender, EventArgs e)
-        {
-            var menuItem = sender as ToolStripMenuItem;
-            var menuLabel = menuItem?.Text;
-            if (string.IsNullOrEmpty(menuLabel)) return;
-
-            DisplayControl(menuLabel);
+            tabs.RecalculateItemSize();
         }
 
         protected override void OnVisibleChanged(EventArgs e)
         {
             base.OnVisibleChanged(e);
-            if (Visible && !Disposing && _hostedControl is TransactionManagerControl ledger)
-                ledger.RefreshAll();
+            if (Visible && !Disposing)
+                ApplyHistoryToCurrentTab();
         }
 
-        private void DisplayControl(string label)
+        private void OnTabSelected(object? sender, EventArgs e)
         {
-            if (!_controls.ContainsKey(label))
-                return;
-            ClearControls();
-            var control = _controls[label];
-            _hostedControl = control;
-            _currentControl = control as IDataManagerControl;
-            panelHost.Controls.Add(control);
-            control.BringToFront();
-            if (control is TransactionManagerControl ledger)
-                ledger.RefreshAll();
+            if (IsHandleCreated)
+                BeginInvoke(ApplyHistoryToCurrentTab);
             else
-                _currentControl?.SetGridDataSource("Month");
+                ApplyHistoryToCurrentTab();
         }
 
-        private void OnClickViewMonth(object sender, EventArgs e)
+        private bool EnsureCurrentTabControl()
         {
-            _currentControl?.SetGridDataSource("Month");
+            var page = tabs.SelectedTab;
+            if (page is null || tabs.SelectedIndex < 0 || tabs.SelectedIndex >= _tabFactories.Length)
+                return false;
+            if (page.Controls.Count > 0)
+                return false;
+
+            var control = _tabFactories[tabs.SelectedIndex]();
+            control.Dock = DockStyle.Fill;
+            page.Controls.Add(control);
+            return true;
         }
 
-        private void OnClickViewYear(object sender, EventArgs e)
+        private void ApplyHistoryToCurrentTab()
         {
-            _currentControl?.SetGridDataSource("Year");
-        }
+            var created = EnsureCurrentTabControl();
+            var page = tabs.SelectedTab;
+            if (page?.Controls.Count is not > 0 || page.Controls[0] is not IDataManagerControl manager)
+                return;
 
-        private void OnClickViewLifetime(object sender, EventArgs e)
-        {
-            _currentControl?.SetGridDataSource("Lifetime");
-        }
+            var period = historyBar.SelectedPeriod;
+            var revision = FinanceDataRevision.Current;
+            if (!created
+                && _appliedTab == page.Text
+                && _appliedPeriod == period
+                && _appliedRevision == revision)
+            {
+                return;
+            }
 
-        private void OnClickEditAddAction(object sender, EventArgs e)
-        {
-
-        }
-
-        private void OnClickEditEditAction(object sender, EventArgs e)
-        {
-
-        }
-
-        private void OnClickEditDeleteAction(object sender, EventArgs e)
-        {
-
+            manager.SetGridDataSource(period);
+            _appliedTab = page.Text;
+            _appliedPeriod = period;
+            _appliedRevision = revision;
         }
     }
 }

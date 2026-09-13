@@ -17,6 +17,7 @@ namespace THMS.UI.WinForms.Controls
         public AccountUpdaterControl()
         {
             InitializeComponent();
+            DataGridViewUtil.EnableDoubleBuffering(gridAccounts);
             gridAccounts.SelectionChanged += (_, _) => OnAccountSelectionChanged();
             gridAccounts.DataBindingComplete += (_, _) => OnAccountSelectionChanged();
             LoadAccounts();
@@ -79,7 +80,7 @@ namespace THMS.UI.WinForms.Controls
         {
             using var fileDialog = new OpenFileDialog
             {
-                Filter = "CSV files (*.csv)|*.csv|Excel files (*.xlsx)|*.xlsx|All files (*.*)|*.*",
+                Filter = "Excel files (*.xlsx)|*.xlsx|All files (*.*)|*.*",
                 Title = "Select account spreadsheet"
             };
             if (fileDialog.ShowDialog(FindForm()) != DialogResult.OK)

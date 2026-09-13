@@ -3,7 +3,7 @@
     partial class FinanceDataCenterForm
     {
         private System.ComponentModel.IContainer components = null;
-        private TabControl tabs;
+        private Controls.ThmsTabControl tabs;
         private TabPage tabAccounts;
         private TabPage tabTransactions;
         private TabPage tabDiagnostics;
@@ -20,7 +20,7 @@
 
         private void InitializeComponent()
         {
-            tabs = new TabControl();
+            tabs = new Controls.ThmsTabControl();
             tabAccounts = new TabPage();
             tabTransactions = new TabPage();
             tabDiagnostics = new TabPage();

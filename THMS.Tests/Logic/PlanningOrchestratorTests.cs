@@ -89,6 +89,86 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void GetUpcomingObligations_IncludesRecurringOutgoingForecasts()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var transactions = new InMemoryTransactionDataStore();
+            var statements = new InMemoryAccountStatementDataStore();
+            var checking = new BankAccount
+            {
+                Name = "Checking",
+                Institution = "X",
+                AccountNumber = "1",
+                WebsiteUrl = ""
+            };
+            accounts.UpsertAccount(checking);
+            transactions.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = checking.Id,
+                Description = "Rent",
+                Amount = -1850,
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = DateTime.Today.AddDays(5),
+                IsActive = true
+            });
+            transactions.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = checking.Id,
+                Description = "Paycheck",
+                Amount = 2400,
+                Frequency = RecurrenceFrequency.BiWeekly,
+                NextOccurrence = DateTime.Today.AddDays(2),
+                IsActive = true
+            });
+
+            var rows = new PlanningOrchestrator(accounts, transactions, statements).GetUpcomingObligations(DateTime.Today);
+
+            Assert.That(rows, Has.Some.Matches<THMS.Logic.ViewModels.Finance.UpcomingObligation>(o =>
+                o.AccountName == "Checking" && o.AmountDue == 1850 && o.Notes == "Rent"));
+            Assert.That(rows, Has.None.Matches<THMS.Logic.ViewModels.Finance.UpcomingObligation>(o =>
+                o.Notes.Contains("Paycheck")));
+        }
+
+        [Test]
+        public void GetUpcomingObligations_UsesRecurringTransferToCreditWhenNoStatement()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var transactions = new InMemoryTransactionDataStore();
+            var statements = new InMemoryAccountStatementDataStore();
+            var checking = new BankAccount
+            {
+                Name = "Checking",
+                Institution = "X",
+                AccountNumber = "1",
+                WebsiteUrl = ""
+            };
+            var card = new CreditAccount
+            {
+                Name = "Card",
+                Institution = "X",
+                AccountNumber = "2",
+                WebsiteUrl = ""
+            };
+            accounts.UpsertAccount(checking);
+            accounts.UpsertAccount(card);
+            transactions.AddRecurringTransferRule(new RecurringTransferRule
+            {
+                FromAccountId = checking.Id,
+                ToAccountId = card.Id,
+                Description = "Card payment",
+                Amount = 125,
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = DateTime.Today.AddDays(6),
+                IsActive = true
+            });
+
+            var rows = new PlanningOrchestrator(accounts, transactions, statements).GetUpcomingObligations(DateTime.Today);
+
+            Assert.That(rows, Has.Some.Matches<THMS.Logic.ViewModels.Finance.UpcomingObligation>(o =>
+                o.AccountName == "Card" && o.AmountDue == 125 && o.Notes == "Card payment"));
+        }
+
+        [Test]
         public void GetAllStatements_IncludesBankStatements()
         {
             var accounts = new InMemoryAccountDataStore();

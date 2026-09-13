@@ -31,11 +31,13 @@ namespace THMS.UI.WinForms
             layout.Dock = DockStyle.Fill;
             layout.Name = "layout";
             layout.RowCount = 3;
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 34F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 38F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 28F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 42F));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             upcomingObligations.Dock = DockStyle.Fill;
             plannedPayments.Dock = DockStyle.Fill;
+            cashFlowForecast.AutoSize = true;
+            cashFlowForecast.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             cashFlowForecast.Dock = DockStyle.Fill;
             ClientSize = new Size(1100, 760);
             Controls.Add(layout);

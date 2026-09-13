@@ -65,7 +65,7 @@
             VehicleColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             VehicleColumn.DataPropertyName = "VehicleName";
             VehicleColumn.HeaderText = "Vehicle";
-            VehicleColumn.MinimumWidth = 9;
+            VehicleColumn.MinimumWidth = 80;
             VehicleColumn.Name = "VehicleColumn";
             VehicleColumn.ReadOnly = true;
             // 
@@ -93,6 +93,11 @@
             // 
             StartSocColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             StartSocColumn.DataPropertyName = "StartSoc";
+            StartSocColumn.DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Alignment = DataGridViewContentAlignment.MiddleRight,
+                Format = "0'%'"
+            };
             StartSocColumn.HeaderText = "Start SOC";
             StartSocColumn.MinimumWidth = 9;
             StartSocColumn.Name = "StartSocColumn";
@@ -113,6 +118,11 @@
             // 
             EndSocColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             EndSocColumn.DataPropertyName = "EndSoc";
+            EndSocColumn.DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Alignment = DataGridViewContentAlignment.MiddleRight,
+                Format = "0'%'"
+            };
             EndSocColumn.HeaderText = "End SOC";
             EndSocColumn.MinimumWidth = 9;
             EndSocColumn.Name = "EndSocColumn";
@@ -185,6 +195,11 @@
             // 
             CostColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             CostColumn.DataPropertyName = "SessionCost";
+            CostColumn.DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Alignment = DataGridViewContentAlignment.MiddleRight,
+                Format = "c2"
+            };
             CostColumn.HeaderText = "Cost";
             CostColumn.MinimumWidth = 9;
             CostColumn.Name = "CostColumn";

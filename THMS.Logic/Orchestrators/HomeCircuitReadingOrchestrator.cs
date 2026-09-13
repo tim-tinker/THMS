@@ -24,10 +24,13 @@ namespace THMS.Logic.Orchestrators
             _energyStore = energyStore;
         }
 
-        public void Update(string filePath)
+        public void Update(string[] filePaths)
         {
             var importer = new HomeCircuitImporter(_energyStore);
-            importer.Import(filePath);
+            foreach (var filePath in filePaths)
+            {
+                importer.Import(filePath);
+            }
             StartDate = importer.StartDate;
             EndDate = importer.EndDate;
             ReadingCount = importer.ReadingCount;
@@ -63,7 +66,9 @@ namespace THMS.Logic.Orchestrators
             {
                 var end = latest.Timestamp;
                 var start = GetStartDate(end, period);
-                readings = _energyStore.GetHomeCircuitReadings(start, end).ToArray();
+                readings = _energyStore.GetHomeCircuitReadings(start, end)
+                    .OrderByDescending(r => r.Timestamp)
+                    .ToArray();
             }
 
             return readings;

@@ -16,14 +16,23 @@ namespace THMS.Data.Stores
         // Posted Transactions
         // ------------------------------------------------------------
 
-        public void AddPostedTransaction(PostedTransaction transaction) =>
+        public void AddPostedTransaction(PostedTransaction transaction)
+        {
             _store.AddPosted(transaction);
+            FinanceDataRevision.NoteChanged();
+        }
 
-        public void UpdatePostedTransaction(PostedTransaction transaction) =>
+        public void UpdatePostedTransaction(PostedTransaction transaction)
+        {
             _store.UpdatePosted(transaction);
+            FinanceDataRevision.NoteChanged();
+        }
 
-        public void DeletePostedTransaction(Guid id) =>
+        public void DeletePostedTransaction(Guid id)
+        {
             _store.DeletePosted(id);
+            FinanceDataRevision.NoteChanged();
+        }
 
         public PostedTransaction? GetPostedTransaction(Guid id) =>
             _store.GetPosted(id);
@@ -46,20 +55,33 @@ namespace THMS.Data.Stores
         public DateTime? GetLatestPostedTransactionDate(Guid accountId) =>
             _store.GetLatestPosted(accountId)?.Date;
 
-        public void ReplacePostedTransaction(PostedTransaction replacement) => _store.ReplacePostedTransaction(replacement);
+        public void ReplacePostedTransaction(PostedTransaction replacement)
+        {
+            _store.ReplacePostedTransaction(replacement);
+            FinanceDataRevision.NoteChanged();
+        }
 
         // ------------------------------------------------------------
         // Posted Transfer Transactions
         // ------------------------------------------------------------
 
-        public void AddPostedTransferTransaction(PostedTransferTransaction transaction) =>
+        public void AddPostedTransferTransaction(PostedTransferTransaction transaction)
+        {
             _store.AddPostedTransfer(transaction);
+            FinanceDataRevision.NoteChanged();
+        }
 
-        public void UpdatePostedTransferTransaction(PostedTransferTransaction transaction) =>
+        public void UpdatePostedTransferTransaction(PostedTransferTransaction transaction)
+        {
             _store.UpdatePostedTransfer(transaction);
+            FinanceDataRevision.NoteChanged();
+        }
 
-        public void DeletePostedTransferTransaction(Guid id) =>
+        public void DeletePostedTransferTransaction(Guid id)
+        {
             _store.DeletePostedTransfer(id);
+            FinanceDataRevision.NoteChanged();
+        }
 
         public PostedTransferTransaction? GetPostedTransferTransaction(Guid id) =>
             _store.GetPostedTransfer(id);
@@ -265,14 +287,20 @@ namespace THMS.Data.Stores
         public IEnumerable<ExpenseBudgetRule> GetAllExpenseBudgetRules() =>
             _store.GetAllExpenseBudgets();
 
-        public void SaveSplits(Guid parentId, IEnumerable<SplitTransactionRow> splits) =>
+        public void SaveSplits(Guid parentId, IEnumerable<SplitTransactionRow> splits)
+        {
             _store.SaveSplits(parentId, splits);
+            FinanceDataRevision.NoteChanged();
+        }
 
         public List<SplitTransactionRow> GetSplits(Guid parentId) =>
             _store.GetSplits(parentId);
 
-        public void DeleteSplits(Guid parentId) =>
+        public void DeleteSplits(Guid parentId)
+        {
             _store.DeleteSplits(parentId);
+            FinanceDataRevision.NoteChanged();
+        }
 
         // ------------------------------------------------------------
         // Utility Queries

@@ -42,6 +42,7 @@ namespace THMS.UI.WinForms.Controls
         private bool _suspendAccountChange;
         private bool _suspendHistoryChange;
         private decimal _postedBalanceBeforeEdit;
+        private bool _hostProvidesHistory;
 
         public TransactionManagerControl()
         {
@@ -52,8 +53,21 @@ namespace THMS.UI.WinForms.Controls
             InitializeShowFilter();
             InitializeGrids();
             HostBudgetUi();
-            LoadAccounts();
             _ready = true;
+        }
+
+        [DefaultValue(false)]
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public bool HostProvidesHistory
+        {
+            get => _hostProvidesHistory;
+            set
+            {
+                _hostProvidesHistory = value;
+                lblHistory.Visible = !value;
+                cmbHistory.Visible = !value;
+            }
         }
 
         public Control GetControl() => this;
@@ -64,9 +78,18 @@ namespace THMS.UI.WinForms.Controls
             RefreshAll();
         }
 
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            if (!_hostProvidesHistory)
+                LoadAccounts();
+        }
+
         protected override void OnVisibleChanged(EventArgs e)
         {
             base.OnVisibleChanged(e);
+            if (_hostProvidesHistory)
+                return;
             if (_ready && Visible && IsHandleCreated && Parent != null && !Disposing)
                 RefreshAll();
         }
@@ -116,6 +139,8 @@ namespace THMS.UI.WinForms.Controls
 
         private void InitializeGrids()
         {
+            DataGridViewUtil.EnableDoubleBuffering(masterGrid);
+            DataGridViewUtil.EnableDoubleBuffering(detailGrid);
             masterGrid.AutoGenerateColumns = false;
             detailGrid.AutoGenerateColumns = false;
             detailGrid.ReadOnly = true;
@@ -149,7 +174,7 @@ namespace THMS.UI.WinForms.Controls
         {
             if (LicenseManager.UsageMode == LicenseUsageMode.Designtime)
                 return;
-            var tabDetails = new TabControl { Dock = DockStyle.Fill, Name = "tabDetails" };
+            var tabDetails = new ThmsTabControl { Dock = DockStyle.Fill, Name = "tabDetails" };
             var transactionsPage = new TabPage("Transactions");
             var budgetsPage = new TabPage("Budgets");
 
@@ -202,13 +227,13 @@ namespace THMS.UI.WinForms.Controls
                 Padding = new Padding(8, 6, 8, 6),
                 WrapContents = true
             };
-            var btnAddBudget = new Button { Text = "Add Budget", AutoSize = true };
-            var btnEditBudget = new Button { Text = "Edit Budget", AutoSize = true };
-            var btnDeleteBudget = new Button { Text = "Delete Budget", AutoSize = true };
-            var btnViewHistory = new Button { Text = "View History", AutoSize = true };
-            var btnOpenPeriod = new Button { Text = "Open Current Period", AutoSize = true };
-            var btnTransferBalance = new Button { Text = "Transfer Balance", AutoSize = true };
-            var btnManageCategories = new Button { Text = "Manage Categories", AutoSize = true };
+            var btnAddBudget = new ThmsButton { Text = "Add Budget" };
+            var btnEditBudget = new ThmsButton { Text = "Edit Budget" };
+            var btnDeleteBudget = new ThmsButton { Text = "Delete Budget", Destructive = true };
+            var btnViewHistory = new ThmsButton { Text = "View History" };
+            var btnOpenPeriod = new ThmsButton { Text = "Open Current Period" };
+            var btnTransferBalance = new ThmsButton { Text = "Transfer Balance" };
+            var btnManageCategories = new ThmsButton { Text = "Manage Categories" };
             btnAddBudget.Click += (_, _) => OpenBudgetRuleEditor(existing: false);
             btnEditBudget.Click += (_, _) => OpenBudgetRuleEditor(existing: true);
             btnDeleteBudget.Click += (_, _) => DeleteSelectedBudget();
@@ -235,6 +260,7 @@ namespace THMS.UI.WinForms.Controls
                 RowHeadersVisible = false,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect
             };
+            DataGridViewUtil.EnableDoubleBuffering(budgetGrid);
             budgetGrid.Columns.AddRange(
                 TextColumn("BudgetName", "Budget"),
                 TextColumn("Frequency", "Frequency"),
@@ -1032,6 +1058,7 @@ namespace THMS.UI.WinForms.Controls
 
         private void LoadBudgetsForAccount(Guid accountId)
         {
+            _budgetOrchestrator.EnsureSuggestedRules(accountId);
             _budgetOrchestrator.RefreshAccount(accountId);
 
             var views = new List<UnifiedBudgetView>();

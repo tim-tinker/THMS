@@ -13,8 +13,7 @@ namespace THMS.Data.Stores.SqlTables
             CREATE TABLE IF NOT EXISTS HomeCircuitReadings (
                 Id TEXT PRIMARY KEY,
                 Timestamp TEXT NOT NULL,
-                WattHours REAL NOT NULL,
-                CircuitId TEXT
+                WattHours REAL NOT NULL
             );
             CREATE UNIQUE INDEX IF NOT EXISTS IX_HomeCircuitReadings_Timestamp
                 ON HomeCircuitReadings (Timestamp);
@@ -26,17 +25,15 @@ namespace THMS.Data.Stores.SqlTables
         {
             using var cmd = new SqliteCommand(@"
                 INSERT INTO HomeCircuitReadings
-                (Id, Timestamp, WattHours, CircuitId)
+                (Id, Timestamp, WattHours)
                 VALUES
-                (@Id, @Timestamp, @WattHours, @CircuitId)
+                (@Id, @Timestamp, @WattHours)
                 ON CONFLICT(Timestamp) DO UPDATE SET
-                    WattHours = excluded.WattHours,
-                    CircuitId = excluded.CircuitId;", conn);
+                    WattHours = excluded.WattHours;", conn);
 
             cmd.Parameters.AddWithValue("@Id", reading.Id.ToString());
             cmd.Parameters.AddWithValue("@Timestamp", reading.Timestamp);
             cmd.Parameters.AddWithValue("@WattHours", reading.KiloWattHours);
-            cmd.Parameters.AddWithValue("@CircuitId", reading.CircuitId ?? (object)DBNull.Value);
 
             cmd.ExecuteNonQuery();
         }
@@ -44,7 +41,7 @@ namespace THMS.Data.Stores.SqlTables
         public IEnumerable<HomeCircuitReading> GetRange(SqliteConnection conn, DateTime start, DateTime end)
         {
             using var cmd = new SqliteCommand(@"
-                SELECT Id, Timestamp, WattHours, CircuitId
+                SELECT Id, Timestamp, WattHours
                 FROM HomeCircuitReadings
                 WHERE Timestamp >= @Start AND Timestamp <= @End
                 ORDER BY Timestamp;", conn);
@@ -64,7 +61,7 @@ namespace THMS.Data.Stores.SqlTables
         public HomeCircuitReading? GetLatest(SqliteConnection conn)
         {
             using var cmd = new SqliteCommand(@"
-                SELECT Id, Timestamp, WattHours, CircuitId
+                SELECT Id, Timestamp, WattHours
                 FROM HomeCircuitReadings
                 ORDER BY Timestamp DESC
                 LIMIT 1;", conn);
@@ -79,8 +76,7 @@ namespace THMS.Data.Stores.SqlTables
             {
                 Id = Guid.Parse(reader.GetString(0)),
                 Timestamp = reader.GetDateTime(1),
-                KiloWattHours = reader.GetDecimal(2),
-                CircuitId = reader.IsDBNull(3) ? null : reader.GetString(3)
+                KiloWattHours = reader.GetDecimal(2)
             };
         }
     }

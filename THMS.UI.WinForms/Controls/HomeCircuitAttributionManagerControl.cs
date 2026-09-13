@@ -8,6 +8,7 @@ namespace THMS.UI.WinForms.Controls
     {
         private readonly HomeCircuitAttributionOrchestrator _orchestrator = new();
         private BindingList<HomeCircuitAttribution> _attributions;
+        private string _currentPeriod = "Month";
 
         public HomeCircuitAttributionManagerControl()
         {
@@ -22,13 +23,14 @@ namespace THMS.UI.WinForms.Controls
 
         public void SetGridDataSource(string period)
         {
+            _currentPeriod = period;
             _attributions = new BindingList<HomeCircuitAttribution>(_orchestrator.GetHomeCircuitAttributions(period).ToList());
             gridHomeCircuit.DataSource = _attributions;
         }
 
         private void OnLoad(object sender, EventArgs e)
         {
-            SetGridDataSource("Month");
+            SetGridDataSource(_currentPeriod);
         }
     }
 }

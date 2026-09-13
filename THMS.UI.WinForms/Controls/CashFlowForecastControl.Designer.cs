@@ -13,9 +13,9 @@ namespace THMS.UI.WinForms.Controls
         private TextBox txtTwoPaydays;
         private Label lblAfterPlanned;
         private TextBox txtAfterPlanned;
-        private Button btnRefresh;
-        private Button btnCommit;
-        private Button btnReconcile;
+        private ThmsButton btnRefresh;
+        private ThmsButton btnCommit;
+        private ThmsButton btnReconcile;
 
         protected override void Dispose(bool disposing)
         {
@@ -36,9 +36,9 @@ namespace THMS.UI.WinForms.Controls
             txtTwoPaydays = new TextBox();
             lblAfterPlanned = new Label();
             txtAfterPlanned = new TextBox();
-            btnRefresh = new Button();
-            btnCommit = new Button();
-            btnReconcile = new Button();
+            btnRefresh = new ThmsButton();
+            btnCommit = new ThmsButton();
+            btnReconcile = new ThmsButton();
             pnlRoot.SuspendLayout();
             SuspendLayout();
             pnlRoot.Controls.Add(CreateFields());
@@ -57,7 +57,8 @@ namespace THMS.UI.WinForms.Controls
             AutoScaleMode = AutoScaleMode.Dpi;
             Controls.Add(pnlRoot);
             Name = "CashFlowForecastControl";
-            Size = new Size(1000, 200);
+            MinimumSize = new Size(0, 240);
+            Size = new Size(1000, 240);
             pnlRoot.ResumeLayout(false);
             ResumeLayout(false);
         }
@@ -96,20 +97,23 @@ namespace THMS.UI.WinForms.Controls
             var toolbar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Bottom,
-                Height = 40,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(0, 4, 0, 4),
                 Name = "buttons"
             };
             btnRefresh.Text = "Refresh Forecast";
-            btnRefresh.AutoSize = true;
             btnRefresh.Name = "btnRefresh";
+            btnRefresh.Margin = new Padding(0, 4, 8, 4);
             btnRefresh.Click += OnRefresh;
             btnCommit.Text = "Commit Planned Payments";
-            btnCommit.AutoSize = true;
             btnCommit.Name = "btnCommit";
+            btnCommit.Margin = new Padding(0, 4, 8, 4);
             btnCommit.Click += OnCommit;
             btnReconcile.Text = "Manual Reconcile Payment";
-            btnReconcile.AutoSize = true;
             btnReconcile.Name = "btnReconcile";
+            btnReconcile.Margin = new Padding(0, 4, 8, 4);
             btnReconcile.Click += OnReconcile;
             toolbar.Controls.Add(btnRefresh);
             toolbar.Controls.Add(btnCommit);

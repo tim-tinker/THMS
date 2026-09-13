@@ -94,52 +94,71 @@ namespace THMS.Logic.Orchestrators
         {
             ArgumentNullException.ThrowIfNull(previewRows);
             var rows = previewRows as IReadOnlyList<TransactionImportPreview> ?? previewRows.ToList();
-            var imported = 0;
             var existingByAccount = new Dictionary<Guid, List<PostedTransaction>>();
-            var steps = rows.Count + 1;
-            Report(progress, 0, steps);
+            var toImport = new List<TransactionImportPreview>();
 
-            for (var i = 0; i < rows.Count; i++)
+            foreach (var row in rows)
             {
-                var row = rows[i];
-                if (row.AccountId != Guid.Empty && !IsDuplicate(row, existingByAccount))
-                {
-                    var posted = new PostedTransaction
-                    {
-                        AccountId = row.AccountId,
-                        Date = row.Date,
-                        Amount = row.Amount,
-                        Description = row.Description ?? ""
-                    };
+                if (row.AccountId == Guid.Empty || IsDuplicate(row, existingByAccount))
+                    continue;
 
-                    if (!string.IsNullOrWhiteSpace(row.Category))
-                        posted.ApplyCategory(_categorizer.GetOrCreate(row.Category));
-                    else
-                        _categorizer.ApplySuggestion(posted);
-
-                    _txStore.AddPostedTransaction(posted);
-                    existingByAccount[row.AccountId].Add(posted);
-                    imported++;
-                }
-
-                Report(progress, i + 1, steps);
+                toImport.Add(row);
+                existingByAccount[row.AccountId].Add(ToPosted(row, categorize: false));
             }
 
-            if (imported > 0)
-                _ledgerUpdater.RunLedgerUpdate();
+            var total = toImport.Count;
+            Report(progress, 0, total);
 
-            Report(progress, steps, steps);
-            return imported;
+            for (var i = 0; i < toImport.Count; i++)
+            {
+                var posted = ToPosted(toImport[i], categorize: true);
+                _txStore.AddPostedTransaction(posted);
+                Report(progress, i + 1, total);
+            }
+
+            if (total > 0)
+            {
+                Report(progress, total, total, updatingLedger: true);
+                _ledgerUpdater.RunLedgerUpdate();
+            }
+
+            Report(progress, total, total);
+            return total;
         }
 
-        private static void Report(IProgress<TransactionImportProgress>? progress, int completed, int total)
+        private PostedTransaction ToPosted(TransactionImportPreview row, bool categorize)
+        {
+            var posted = new PostedTransaction
+            {
+                AccountId = row.AccountId,
+                Date = row.Date,
+                Amount = row.Amount,
+                Description = row.Description ?? ""
+            };
+
+            if (!categorize)
+                return posted;
+
+            if (!string.IsNullOrWhiteSpace(row.Category))
+                posted.ApplyCategory(_categorizer.GetOrCreate(row.Category));
+            else
+                _categorizer.ApplySuggestion(posted);
+
+            return posted;
+        }
+
+        private static void Report(
+            IProgress<TransactionImportProgress>? progress,
+            int completed,
+            int total,
+            bool updatingLedger = false)
         {
             if (progress is null)
                 return;
-            if (completed != 0 && completed != total && completed % 25 != 0)
+            if (!updatingLedger && completed != 0 && completed != total && completed % 25 != 0)
                 return;
 
-            progress.Report(new TransactionImportProgress(completed, total));
+            progress.Report(new TransactionImportProgress(completed, total, updatingLedger));
         }
 
         public async Task<TransactionImportResult> ImportAsync(Account account)
@@ -332,5 +351,5 @@ namespace THMS.Logic.Orchestrators
         }
     }
 
-    public readonly record struct TransactionImportProgress(int Completed, int Total);
+    public readonly record struct TransactionImportProgress(int Completed, int Total, bool UpdatingLedger = false);
 }

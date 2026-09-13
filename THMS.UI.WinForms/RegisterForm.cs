@@ -1,3 +1,4 @@
+using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Categories;
@@ -16,6 +17,7 @@ namespace THMS.UI.WinForms
         private readonly CategoryOrchestrator _categoryOrchestrator = new();
         private readonly TransactionImportOrchestrator _importOrchestrator = new();
         private readonly BindingSource _transactionsSource = new();
+        private int _loadedRevision = int.MinValue;
 
         public RegisterForm()
         {
@@ -28,12 +30,18 @@ namespace THMS.UI.WinForms
         protected override void OnVisibleChanged(EventArgs e)
         {
             base.OnVisibleChanged(e);
-            if (Visible && !Disposing)
-                accountUpdater.RefreshAccounts();
+            if (!Visible || Disposing)
+                return;
+
+            if (FinanceDataRevision.Current == _loadedRevision)
+                return;
+
+            accountUpdater.RefreshAccounts();
         }
 
         private void ConfigureTransactionGrid()
         {
+            DataGridViewUtil.EnableDoubleBuffering(gridTransactions);
             gridTransactions.DataSource = _transactionsSource;
             gridTransactions.SelectionChanged += (_, _) => UpdateSplitButton();
             gridTransactions.CellDoubleClick += OnTransactionCellDoubleClick;
@@ -49,6 +57,7 @@ namespace THMS.UI.WinForms
                 _transactionsSource.DataSource = new List<UnifiedTransactionView>();
                 lblTxStatus.Text = "Select an account to view posted transactions.";
                 UpdateSplitButton();
+                _loadedRevision = FinanceDataRevision.Current;
                 return;
             }
 
@@ -60,6 +69,7 @@ namespace THMS.UI.WinForms
             _transactionsSource.DataSource = display;
             lblTxStatus.Text = $"{display.Count} posted transaction{(display.Count == 1 ? "" : "s")} for {account.Name}.";
             UpdateSplitButton();
+            _loadedRevision = FinanceDataRevision.Current;
         }
 
         private void ApplyRunningBalances(IEnumerable<UnifiedTransactionView> chronological, Account account)
@@ -110,7 +120,7 @@ namespace THMS.UI.WinForms
 
                 accountUpdater.RefreshAccounts();
                 LoadTransactionsForSelectedAccount();
-                lblTxStatus.Text = $"Imported {preview.ImportedCount} transaction{(preview.ImportedCount == 1 ? "" : "s")}.";
+                lblTxStatus.Text = $"Imported {preview.ImportedCount:N0} transaction{(preview.ImportedCount == 1 ? "" : "s")}.";
             }
             catch (Exception ex)
             {
@@ -127,7 +137,7 @@ namespace THMS.UI.WinForms
 
             accountUpdater.RefreshAccounts();
             LoadTransactionsForSelectedAccount();
-            lblTxStatus.Text = $"Imported {dialog.ImportedCount} Plaid transaction{(dialog.ImportedCount == 1 ? "" : "s")}.";
+            lblTxStatus.Text = $"Imported {dialog.ImportedCount:N0} Plaid transaction{(dialog.ImportedCount == 1 ? "" : "s")}.";
         }
 
         private void OnSplitTransaction(object? sender, EventArgs e)

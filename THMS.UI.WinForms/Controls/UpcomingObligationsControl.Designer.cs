@@ -5,10 +5,10 @@ namespace THMS.UI.WinForms.Controls
         private System.ComponentModel.IContainer components = null;
         private Panel pnlRoot;
         private Label lblHeader;
-        private Button btnRefresh;
-        private Button btnAddStatement;
-        private Button btnEditStatement;
-        private Button btnDeleteStatement;
+        private ThmsButton btnRefresh;
+        private ThmsButton btnAddStatement;
+        private ThmsButton btnEditStatement;
+        private ThmsButton btnDeleteStatement;
         private DataGridView gridObligations;
         private Label lblStatus;
 
@@ -23,10 +23,10 @@ namespace THMS.UI.WinForms.Controls
         {
             pnlRoot = new Panel();
             lblHeader = new Label();
-            btnRefresh = new Button();
-            btnAddStatement = new Button();
-            btnEditStatement = new Button();
-            btnDeleteStatement = new Button();
+            btnRefresh = new ThmsButton();
+            btnAddStatement = new ThmsButton();
+            btnEditStatement = new ThmsButton();
+            btnDeleteStatement = new ThmsButton();
             gridObligations = new DataGridView();
             lblStatus = new Label();
             ((System.ComponentModel.ISupportInitialize)gridObligations).BeginInit();
@@ -75,26 +75,28 @@ namespace THMS.UI.WinForms.Controls
             var toolbar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
-                Height = 40,
-                Name = "toolbar",
-                WrapContents = false,
-                AutoScroll = true
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true,
+                Padding = new Padding(0, 4, 0, 4),
+                Name = "toolbar"
             };
             btnRefresh.Text = "Refresh Obligations";
-            btnRefresh.AutoSize = true;
             btnRefresh.Name = "btnRefresh";
+            btnRefresh.Margin = new Padding(0, 4, 8, 4);
             btnRefresh.Click += OnRefresh;
             btnAddStatement.Text = "Add Statement";
-            btnAddStatement.AutoSize = true;
             btnAddStatement.Name = "btnAddStatement";
+            btnAddStatement.Margin = new Padding(0, 4, 8, 4);
             btnAddStatement.Click += OnAddStatement;
             btnEditStatement.Text = "Edit Statement";
-            btnEditStatement.AutoSize = true;
             btnEditStatement.Name = "btnEditStatement";
+            btnEditStatement.Margin = new Padding(0, 4, 8, 4);
             btnEditStatement.Click += OnEditStatement;
             btnDeleteStatement.Text = "Delete Statement";
-            btnDeleteStatement.AutoSize = true;
             btnDeleteStatement.Name = "btnDeleteStatement";
+            btnDeleteStatement.Destructive = true;
+            btnDeleteStatement.Margin = new Padding(0, 4, 8, 4);
             btnDeleteStatement.Click += OnDeleteStatement;
             toolbar.Controls.Add(btnRefresh);
             toolbar.Controls.Add(btnAddStatement);

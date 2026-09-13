@@ -161,7 +161,10 @@ namespace THMS.Logic.Orchestrators
             }
 
             foreach (var account in accounts)
+            {
+                _budgetOrchestrator.EnsureSuggestedRules(account.Id);
                 _budgetOrchestrator.RefreshAccount(account.Id);
+            }
 
             return result;
         }

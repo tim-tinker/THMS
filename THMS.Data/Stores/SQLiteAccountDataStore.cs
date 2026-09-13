@@ -27,6 +27,7 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _accountStore.Upsert(conn, account);
+            FinanceDataRevision.NoteChanged();
         }
 
         public Account? GetAccount(string name)
@@ -47,6 +48,7 @@ namespace THMS.Data.Stores.SQLite
             using var tx = conn.BeginTransaction();
             _accountStore.Delete(conn, id);
             tx.Commit();
+            FinanceDataRevision.NoteChanged();
         }
     }
 }

@@ -7,8 +7,11 @@ namespace THMS.Data.Stores
     {
         private readonly InMemoryAccountStore _accountStore = new();
 
-        public void UpsertAccount(Account account) =>
+        public void UpsertAccount(Account account)
+        {
             _accountStore.Upsert(account);
+            FinanceDataRevision.NoteChanged();
+        }
 
         public Account? GetAccount(string name) =>
             _accountStore.Get(name);
@@ -16,7 +19,10 @@ namespace THMS.Data.Stores
         public IEnumerable<Account> GetAllAccounts() =>
             _accountStore.GetAll();
 
-        public void DeleteAccount(Guid id) =>
+        public void DeleteAccount(Guid id)
+        {
             _accountStore.Delete(id);
+            FinanceDataRevision.NoteChanged();
+        }
     }
 }

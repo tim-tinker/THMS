@@ -28,6 +28,13 @@ namespace THMS.UI.WinForms
             upcomingObligations.DeleteStatementClicked += (_, _) => DeleteStatement();
         }
 
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            base.OnVisibleChanged(e);
+            if (Visible && !Disposing && IsHandleCreated)
+                RefreshAll();
+        }
+
         private void AddStatement()
         {
             try

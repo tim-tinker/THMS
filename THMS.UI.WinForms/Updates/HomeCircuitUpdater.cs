@@ -9,14 +9,18 @@ namespace THMS.UI.WinForms.Updates
 
         public void UpdateDataSource()
         {
-            using var dialog = new OpenFileDialog();
-            dialog.Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*";
+            using var dialog = new OpenFileDialog()
+            {
+                Title = "Select Home Circuit Reading File(s)",
+                Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*",
+                Multiselect = true
+            };
 
             if (dialog.ShowDialog() != DialogResult.OK)
                 return;
 
             var orchestrator = new HomeCircuitReadingOrchestrator();
-            orchestrator.Update(dialog.FileName);
+            orchestrator.Update(dialog.FileNames);
         }
     }
 }
