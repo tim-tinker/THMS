@@ -31,6 +31,11 @@
         }
 
         public bool IsHomeCharge => this is HomeEvChargeSession;
+        public bool HasCircuitData { get; set; }
+        public bool HasSolarData { get; set; }
+        public bool HasElectricContract { get; set; }
+        public bool DrawnKwhIsUnavailable => IsHomeCharge && !HasCircuitData;
+        public bool SourceSplitIsEstimated => IsHomeCharge && HasCircuitData && !HasSolarData;
         public decimal SolarKwh => (this as HomeEvChargeSession)?.Attribution?.SolarKwh ?? 0;
         public decimal BatteryKwh => (this as HomeEvChargeSession)?.Attribution?.BatteryKwh ?? 0;
         public decimal GridKwh => (this as HomeEvChargeSession)?.Attribution?.GridKwh ?? 0;

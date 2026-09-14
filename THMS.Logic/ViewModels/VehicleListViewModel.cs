@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using THMS.Data.Stores;
 using THMS.Domain.Transportation;
+using THMS.Logic.Orchestrators;
 using THMS.Logic.Transportation;
 
 namespace THMS.Logic.ViewModels
@@ -10,11 +11,27 @@ namespace THMS.Logic.ViewModels
         private readonly IVehicleDataStore _vehicleStore;
         private readonly IFinanceDataStore _financeStore;
         private readonly TransportationCostAggregator _aggregator;
+        private string _historyPeriod = "Month";
 
         public BindingList<VehicleListItemViewModel> Vehicles { get; } = new();
 
         public DateTime PeriodStart { get; set; }
         public DateTime PeriodEnd { get; set; }
+
+        public string HistoryPeriod
+        {
+            get => _historyPeriod;
+            set
+            {
+                var period = string.IsNullOrWhiteSpace(value) ? "Month" : value;
+                if (_historyPeriod == period)
+                    return;
+
+                _historyPeriod = period;
+                ApplyPeriod();
+                Load();
+            }
+        }
 
         public VehicleListViewModel()
             : this(
@@ -32,17 +49,20 @@ namespace THMS.Logic.ViewModels
 
         public override void Initialize()
         {
-            PeriodStart = DateTime.Today.AddDays(-30);
-
-            // Store queries filter on Date <= PeriodEnd, so this has to be the end
-            // of today rather than midnight or entries made today are excluded.
-            PeriodEnd = DateTime.Today.AddDays(1).AddTicks(-1);
+            ApplyPeriod();
             Load();
         }
 
         public override void Activate()
         {
             Load();
+        }
+
+        private void ApplyPeriod()
+        {
+            var (start, end) = BaseOrchestrator.GetHistoryRange(HistoryPeriod);
+            PeriodStart = start;
+            PeriodEnd = end;
         }
 
         private void Load()

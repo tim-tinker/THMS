@@ -59,7 +59,6 @@ namespace THMS.Logic.Orchestrators.Finance
                     StatementId = statement.Id,
                     AccountName = names.GetValueOrDefault(statement.AccountId, ""),
                     DueDate = statement.DueDate.Date,
-                    MinimumPayment = statement.MinimumPayment,
                     AmountDue = statement.AmountDue,
                     PromotionalDue = promoDue,
                     Notes = ObligationNote(statement, promoDue)
@@ -233,9 +232,6 @@ namespace THMS.Logic.Orchestrators.Finance
             _transactions.DeleteFutureTransferTransaction(futureTransactionId);
         }
 
-        public List<FutureSingleTransaction> GenerateMinimumPayments(DateTime until) =>
-            GenerateFromObligations(until, obligation => obligation.MinimumPayment, "Minimum payment");
-
         public List<FutureSingleTransaction> GeneratePayAllDue(DateTime until) =>
             GenerateFromObligations(until, obligation => obligation.AmountDue, "Full Payment");
 
@@ -249,6 +245,21 @@ namespace THMS.Logic.Orchestrators.Finance
                 .OrderByDescending(s => s.StatementDate)
                 .ThenBy(s => s.Type.ToString())
                 .ToList();
+
+        public List<AccountStatementListRow> GetStatementListRows(Guid accountId)
+        {
+            var statements = _statements.GetForAccount(accountId);
+            var posted = _transactions.GetPostedTransactions(accountId).ToList();
+            return statements
+                .OrderByDescending(s => s.StatementDate)
+                .ThenByDescending(s => s.DueDate)
+                .Select(statement => AccountStatementListRow.From(
+                    statement,
+                    StatementPeriodInterest.Applies(statement)
+                        ? StatementPeriodInterest.Compute(statement, statements, posted)
+                        : null))
+                .ToList();
+        }
 
         public void DeleteStatement(Guid id)
         {
@@ -460,13 +471,6 @@ namespace THMS.Logic.Orchestrators.Finance
                 CategoryId = planned.CategoryId
             };
 
-            if (planned.StatementId is Guid statementId)
-            {
-                var splits = LoanPaymentSplits(_statements.Get(statementId), planned.Amount);
-                if (splits.Count > 0)
-                    posted.Splits = splits;
-            }
-
             _transactions.AddPostedTransaction(posted);
             planned.IsRealized = true;
             planned.PostedTransactionId = posted.Id;
@@ -491,12 +495,6 @@ namespace THMS.Logic.Orchestrators.Finance
                 Category = planned.Category,
                 CategoryId = planned.CategoryId
             };
-            if (planned.StatementId is Guid statementId)
-            {
-                var splits = LoanPaymentSplits(_statements.Get(statementId), incomingAmount);
-                if (splits.Count > 0)
-                    incoming.Splits = splits;
-            }
 
             var outgoing = new PostedTransferTransaction(
                 new PostedTransaction
@@ -559,52 +557,6 @@ namespace THMS.Logic.Orchestrators.Finance
             if (account is not BankAccount and not CreditAccount)
                 throw new InvalidOperationException("Pay-from account must be a bank or credit account.");
             return account;
-        }
-
-        private static List<SplitTransactionRow> LoanPaymentSplits(
-            AccountStatement? statement,
-            decimal plannedAmount)
-        {
-            if (statement is not LoanStatement and not MortgageStatement)
-                return [];
-
-            var interestCharged = statement switch
-            {
-                LoanStatement loan => loan.InterestCharged,
-                MortgageStatement mortgage => mortgage.InterestCharged,
-                _ => 0m
-            };
-            var payment = Math.Abs(plannedAmount);
-            if (payment <= 0)
-                return [];
-
-            var interest = Math.Min(Math.Max(0, interestCharged), payment);
-            var principal = payment - interest;
-            var sign = plannedAmount < 0 ? -1m : 1m;
-            var splits = new List<SplitTransactionRow>();
-            if (principal > 0)
-            {
-                splits.Add(new SplitTransactionRow
-                {
-                    Amount = principal * sign,
-                    Type = SplitType.Principal,
-                    Category = DefaultExpenseCategories.Payment,
-                    CategoryId = DefaultExpenseCategories.PaymentId
-                });
-            }
-
-            if (interest > 0)
-            {
-                splits.Add(new SplitTransactionRow
-                {
-                    Amount = interest * sign,
-                    Type = SplitType.Interest,
-                    Category = DefaultExpenseCategories.Payment,
-                    CategoryId = DefaultExpenseCategories.PaymentId
-                });
-            }
-
-            return splits;
         }
 
         private FutureSingleTransaction NewPlannedPayment(
@@ -784,7 +736,6 @@ namespace THMS.Logic.Orchestrators.Finance
                     AccountId = rule.AccountId,
                     AccountName = names.GetValueOrDefault(rule.AccountId, ""),
                     DueDate = due,
-                    MinimumPayment = amount,
                     AmountDue = amount,
                     PromotionalDue = 0,
                     Notes = notes
@@ -819,7 +770,6 @@ namespace THMS.Logic.Orchestrators.Finance
                     AccountId = rule.ToAccountId,
                     AccountName = names.GetValueOrDefault(rule.ToAccountId, ""),
                     DueDate = due,
-                    MinimumPayment = amount,
                     AmountDue = amount,
                     PromotionalDue = 0,
                     Notes = notes
@@ -852,7 +802,6 @@ namespace THMS.Logic.Orchestrators.Finance
                 AccountId = account.Id,
                 AccountName = account.Name,
                 DueDate = due.Value,
-                MinimumPayment = 0,
                 AmountDue = amountDue,
                 PromotionalDue = 0,
                 Notes = "From account metadata"
@@ -874,9 +823,6 @@ namespace THMS.Logic.Orchestrators.Finance
 
             return statement switch
             {
-                BankStatement bank when bank.InterestEarned > 0 => $"Interest earned {bank.InterestEarned:c2}",
-                CreditCardStatement card when card.InterestCharged > 0 => $"Interest {card.InterestCharged:c2}",
-                LoanStatement loan when loan.InterestCharged > 0 => $"Interest {loan.InterestCharged:c2}",
                 MortgageStatement mortgage => MortgageNote(mortgage),
                 UtilityStatement utility when utility.Usage.Count > 0 =>
                     string.Join(", ", utility.Usage.Select(u => $"{u.Amount:0.##} {u.Type}")),
@@ -884,15 +830,10 @@ namespace THMS.Logic.Orchestrators.Finance
             };
         }
 
-        private static string MortgageNote(MortgageStatement mortgage)
-        {
-            var parts = new List<string>();
-            if (mortgage.EscrowBalance > 0)
-                parts.Add($"Escrow {mortgage.EscrowBalance:c2}");
-            if (mortgage.InterestCharged > 0)
-                parts.Add($"Interest {mortgage.InterestCharged:c2}");
-            return parts.Count > 0 ? string.Join("; ", parts) : (mortgage.Notes ?? "");
-        }
+        private static string MortgageNote(MortgageStatement mortgage) =>
+            mortgage.EscrowBalance > 0
+                ? $"Escrow {mortgage.EscrowBalance:c2}"
+                : (mortgage.Notes ?? "");
 
         private static IReadOnlyList<PromotionalBalance> Promotions(AccountStatement statement) =>
             statement is CreditCardStatement card ? card.Promotions : [];

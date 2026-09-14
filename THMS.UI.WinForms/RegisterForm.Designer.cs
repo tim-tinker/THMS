@@ -6,8 +6,11 @@ namespace THMS.UI.WinForms
         private SplitContainer split;
         private Label lblAccounts;
         private Controls.AccountUpdaterControl accountUpdater;
+        private Controls.ThmsTabControl tabs;
+        private TabPage tabPosted;
+        private TabPage tabStatements;
+        private TabPage tabCategories;
         private Panel pnlTransactions;
-        private Label lblTransactions;
         private DataGridView gridTransactions;
         private DataGridViewTextBoxColumn DateColumn;
         private DataGridViewTextBoxColumn AmountColumn;
@@ -20,6 +23,13 @@ namespace THMS.UI.WinForms
         private Controls.ThmsButton btnImportPlaid;
         private Controls.ThmsButton btnSplit;
         private Label lblTxStatus;
+        private Panel pnlStatements;
+        private DataGridView gridStatements;
+        private FlowLayoutPanel pnlStatementButtons;
+        private Controls.ThmsButton btnAddStatement;
+        private Controls.ThmsButton btnImportStatements;
+        private Label lblStatementStatus;
+        private Controls.CategoryManagerControl categoryManager;
 
         protected override void Dispose(bool disposing)
         {
@@ -33,8 +43,11 @@ namespace THMS.UI.WinForms
             split = new SplitContainer();
             lblAccounts = new Label();
             accountUpdater = new Controls.AccountUpdaterControl();
+            tabs = new Controls.ThmsTabControl();
+            tabPosted = new TabPage();
+            tabStatements = new TabPage();
+            tabCategories = new TabPage();
             pnlTransactions = new Panel();
-            lblTransactions = new Label();
             gridTransactions = new DataGridView();
             DateColumn = new DataGridViewTextBoxColumn();
             AmountColumn = new DataGridViewTextBoxColumn();
@@ -47,13 +60,27 @@ namespace THMS.UI.WinForms
             btnImportPlaid = new Controls.ThmsButton();
             btnSplit = new Controls.ThmsButton();
             lblTxStatus = new Label();
+            pnlStatements = new Panel();
+            gridStatements = new DataGridView();
+            pnlStatementButtons = new FlowLayoutPanel();
+            btnAddStatement = new Controls.ThmsButton();
+            btnImportStatements = new Controls.ThmsButton();
+            lblStatementStatus = new Label();
+            categoryManager = new Controls.CategoryManagerControl();
             ((System.ComponentModel.ISupportInitialize)split).BeginInit();
             split.Panel1.SuspendLayout();
             split.Panel2.SuspendLayout();
             split.SuspendLayout();
+            tabs.SuspendLayout();
+            tabPosted.SuspendLayout();
+            tabStatements.SuspendLayout();
+            tabCategories.SuspendLayout();
             pnlTransactions.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)gridTransactions).BeginInit();
             pnlTxButtons.SuspendLayout();
+            pnlStatements.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)gridStatements).BeginInit();
+            pnlStatementButtons.SuspendLayout();
             SuspendLayout();
             //
             // split
@@ -67,7 +94,7 @@ namespace THMS.UI.WinForms
             split.SplitterDistance = 260;
             split.Panel1.Controls.Add(accountUpdater);
             split.Panel1.Controls.Add(lblAccounts);
-            split.Panel2.Controls.Add(pnlTransactions);
+            split.Panel2.Controls.Add(tabs);
             //
             // lblAccounts
             //
@@ -84,24 +111,52 @@ namespace THMS.UI.WinForms
             accountUpdater.Dock = DockStyle.Fill;
             accountUpdater.Name = "accountUpdater";
             //
+            // tabs
+            //
+            tabs.Dock = DockStyle.Fill;
+            tabs.MaxTabWidth = 220;
+            tabs.Name = "tabs";
+            tabs.TabPages.Add(tabPosted);
+            tabs.TabPages.Add(tabStatements);
+            tabs.TabPages.Add(tabCategories);
+            //
+            // tabPosted
+            //
+            tabPosted.Controls.Add(pnlTransactions);
+            tabPosted.Name = "tabPosted";
+            tabPosted.Padding = new Padding(4);
+            tabPosted.Text = "Posted Transactions";
+            tabPosted.UseVisualStyleBackColor = false;
+            //
+            // tabStatements
+            //
+            tabStatements.Controls.Add(pnlStatements);
+            tabStatements.Name = "tabStatements";
+            tabStatements.Padding = new Padding(4);
+            tabStatements.Text = "Statements";
+            tabStatements.UseVisualStyleBackColor = false;
+            //
+            // tabCategories
+            //
+            tabCategories.Controls.Add(categoryManager);
+            tabCategories.Name = "tabCategories";
+            tabCategories.Padding = new Padding(4);
+            tabCategories.Text = "Categories";
+            tabCategories.UseVisualStyleBackColor = false;
+            //
+            // categoryManager
+            //
+            categoryManager.Dock = DockStyle.Fill;
+            categoryManager.Name = "categoryManager";
+            categoryManager.ShowCloseButton = false;
+            //
             // pnlTransactions
             //
             pnlTransactions.Controls.Add(gridTransactions);
             pnlTransactions.Controls.Add(lblTxStatus);
             pnlTransactions.Controls.Add(pnlTxButtons);
-            pnlTransactions.Controls.Add(lblTransactions);
             pnlTransactions.Dock = DockStyle.Fill;
             pnlTransactions.Name = "pnlTransactions";
-            //
-            // lblTransactions
-            //
-            lblTransactions.Dock = DockStyle.Top;
-            lblTransactions.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            lblTransactions.Height = 32;
-            lblTransactions.Name = "lblTransactions";
-            lblTransactions.Padding = new Padding(8, 4, 8, 0);
-            lblTransactions.Text = "Posted Transactions";
-            lblTransactions.TextAlign = ContentAlignment.MiddleLeft;
             //
             // gridTransactions
             //
@@ -210,6 +265,62 @@ namespace THMS.UI.WinForms
             lblTxStatus.Text = "Select an account to view posted transactions.";
             lblTxStatus.TextAlign = ContentAlignment.MiddleLeft;
             //
+            // pnlStatements
+            //
+            pnlStatements.Controls.Add(gridStatements);
+            pnlStatements.Controls.Add(lblStatementStatus);
+            pnlStatements.Controls.Add(pnlStatementButtons);
+            pnlStatements.Dock = DockStyle.Fill;
+            pnlStatements.Name = "pnlStatements";
+            //
+            // gridStatements
+            //
+            gridStatements.AllowUserToAddRows = false;
+            gridStatements.AllowUserToDeleteRows = false;
+            gridStatements.AllowUserToResizeRows = false;
+            gridStatements.AutoGenerateColumns = false;
+            gridStatements.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+            gridStatements.ScrollBars = ScrollBars.Both;
+            gridStatements.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            gridStatements.Dock = DockStyle.Fill;
+            gridStatements.MultiSelect = false;
+            gridStatements.Name = "gridStatements";
+            gridStatements.ReadOnly = true;
+            gridStatements.RowHeadersVisible = false;
+            gridStatements.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            //
+            // pnlStatementButtons
+            //
+            pnlStatementButtons.AutoSize = true;
+            pnlStatementButtons.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            pnlStatementButtons.Controls.Add(btnAddStatement);
+            pnlStatementButtons.Controls.Add(btnImportStatements);
+            pnlStatementButtons.Dock = DockStyle.Bottom;
+            pnlStatementButtons.Name = "pnlStatementButtons";
+            pnlStatementButtons.Padding = new Padding(8);
+            pnlStatementButtons.WrapContents = true;
+            //
+            // btnAddStatement
+            //
+            btnAddStatement.Name = "btnAddStatement";
+            btnAddStatement.Text = "Add";
+            btnAddStatement.Click += OnAddStatement;
+            //
+            // btnImportStatements
+            //
+            btnImportStatements.Name = "btnImportStatements";
+            btnImportStatements.Text = "Import";
+            btnImportStatements.Click += OnImportStatements;
+            //
+            // lblStatementStatus
+            //
+            lblStatementStatus.Dock = DockStyle.Bottom;
+            lblStatementStatus.Height = 24;
+            lblStatementStatus.Name = "lblStatementStatus";
+            lblStatementStatus.Padding = new Padding(8, 0, 8, 0);
+            lblStatementStatus.Text = "Select an account to view statements.";
+            lblStatementStatus.TextAlign = ContentAlignment.MiddleLeft;
+            //
             // RegisterForm
             //
             ClientSize = new Size(1100, 760);
@@ -220,10 +331,18 @@ namespace THMS.UI.WinForms
             split.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)split).EndInit();
             split.ResumeLayout(false);
+            tabPosted.ResumeLayout(false);
+            tabStatements.ResumeLayout(false);
+            tabCategories.ResumeLayout(false);
+            tabs.ResumeLayout(false);
             pnlTransactions.ResumeLayout(false);
             pnlTransactions.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)gridTransactions).EndInit();
             pnlTxButtons.ResumeLayout(false);
+            pnlStatements.ResumeLayout(false);
+            pnlStatements.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)gridStatements).EndInit();
+            pnlStatementButtons.ResumeLayout(false);
             ResumeLayout(false);
         }
     }

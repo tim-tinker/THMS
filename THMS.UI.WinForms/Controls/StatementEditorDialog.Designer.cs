@@ -18,8 +18,6 @@ namespace THMS.UI.WinForms.Controls
         private DateTimePicker dtDueDate;
         private Label lblAmountDue;
         private TextBox txtAmountDue;
-        private Label lblMinimumPayment;
-        private TextBox txtMinimumPayment;
         private Label lblNotes;
         private TextBox txtNotes;
         private Label lblPayFrom;
@@ -53,8 +51,6 @@ namespace THMS.UI.WinForms.Controls
             dtDueDate = new DateTimePicker();
             lblAmountDue = new Label();
             txtAmountDue = new TextBox();
-            lblMinimumPayment = new Label();
-            txtMinimumPayment = new TextBox();
             lblNotes = new Label();
             txtNotes = new TextBox();
             lblPayFrom = new Label();
@@ -150,8 +146,7 @@ namespace THMS.UI.WinForms.Controls
             pnlCommon.Controls.Add(dtDueDate, 3, 0);
             pnlCommon.Controls.Add(lblAmountDue, 0, 1);
             pnlCommon.Controls.Add(txtAmountDue, 1, 1);
-            pnlCommon.Controls.Add(lblMinimumPayment, 2, 1);
-            pnlCommon.Controls.Add(txtMinimumPayment, 3, 1);
+            pnlCommon.SetColumnSpan(txtAmountDue, 3);
             pnlCommon.Controls.Add(lblPayFrom, 0, 2);
             pnlCommon.Controls.Add(cboPayFrom, 1, 2);
             pnlCommon.SetColumnSpan(cboPayFrom, 3);
@@ -183,16 +178,8 @@ namespace THMS.UI.WinForms.Controls
             lblAmountDue.Text = "Amount Due";
             lblAmountDue.TextAlign = ContentAlignment.MiddleLeft;
             txtAmountDue.Dock = DockStyle.Fill;
-            txtAmountDue.Margin = new Padding(0, 4, 8, 4);
+            txtAmountDue.Margin = new Padding(0, 4, 0, 4);
             txtAmountDue.Name = "txtAmountDue";
-            lblMinimumPayment.AutoSize = false;
-            lblMinimumPayment.Dock = DockStyle.Fill;
-            lblMinimumPayment.Name = "lblMinimumPayment";
-            lblMinimumPayment.Text = "Minimum Payment";
-            lblMinimumPayment.TextAlign = ContentAlignment.MiddleLeft;
-            txtMinimumPayment.Dock = DockStyle.Fill;
-            txtMinimumPayment.Margin = new Padding(0, 4, 0, 4);
-            txtMinimumPayment.Name = "txtMinimumPayment";
             lblPayFrom.AutoSize = false;
             lblPayFrom.Dock = DockStyle.Fill;
             lblPayFrom.Name = "lblPayFrom";

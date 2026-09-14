@@ -26,8 +26,16 @@
             vehicleGrid = new DataGridView();
             btnAddVehicle = new Button();
             btnDetails = new Button();
+            historyBar = new Controls.HistoryPeriodBar();
             ((System.ComponentModel.ISupportInitialize)vehicleGrid).BeginInit();
             SuspendLayout();
+            // 
+            // historyBar
+            // 
+            historyBar.Location = new Point(18, 8);
+            historyBar.Name = "historyBar";
+            historyBar.Padding = new Padding(0, 4, 0, 4);
+            historyBar.TabIndex = 0;
             // 
             // vehicleGrid
             // 
@@ -36,7 +44,7 @@
             vehicleGrid.AllowUserToResizeRows = false;
             vehicleGrid.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             vehicleGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            vehicleGrid.Location = new Point(18, 18);
+            vehicleGrid.Location = new Point(18, 56);
             vehicleGrid.Margin = new Padding(4, 4, 4, 4);
             vehicleGrid.MultiSelect = false;
             vehicleGrid.Name = "vehicleGrid";
@@ -44,8 +52,8 @@
             vehicleGrid.RowHeadersVisible = false;
             vehicleGrid.RowHeadersWidth = 72;
             vehicleGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            vehicleGrid.Size = new Size(944, 544);
-            vehicleGrid.TabIndex = 0;
+            vehicleGrid.Size = new Size(944, 506);
+            vehicleGrid.TabIndex = 1;
             // 
             // btnAddVehicle
             // 
@@ -54,7 +62,7 @@
             btnAddVehicle.Margin = new Padding(4, 4, 4, 4);
             btnAddVehicle.Name = "btnAddVehicle";
             btnAddVehicle.Size = new Size(180, 52);
-            btnAddVehicle.TabIndex = 1;
+            btnAddVehicle.TabIndex = 2;
             btnAddVehicle.Text = "Add Vehicle";
             btnAddVehicle.UseVisualStyleBackColor = true;
             btnAddVehicle.Click += btnAddVehicle_Click;
@@ -66,7 +74,7 @@
             btnDetails.Margin = new Padding(4, 4, 4, 4);
             btnDetails.Name = "btnDetails";
             btnDetails.Size = new Size(180, 52);
-            btnDetails.TabIndex = 2;
+            btnDetails.TabIndex = 3;
             btnDetails.Text = "Details";
             btnDetails.UseVisualStyleBackColor = true;
             btnDetails.Click += btnDetails_Click;
@@ -79,6 +87,7 @@
             Controls.Add(btnDetails);
             Controls.Add(btnAddVehicle);
             Controls.Add(vehicleGrid);
+            Controls.Add(historyBar);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             Margin = new Padding(4, 4, 4, 4);
             Name = "VehicleListDashboardForm";
@@ -86,7 +95,7 @@
             Text = "Vehicles";
             ((System.ComponentModel.ISupportInitialize)vehicleGrid).EndInit();
             ResumeLayout(false);
-
+            PerformLayout();
         }
 
         #endregion
@@ -94,5 +103,6 @@
         private System.Windows.Forms.DataGridView vehicleGrid;
         private System.Windows.Forms.Button btnAddVehicle;
         private System.Windows.Forms.Button btnDetails;
+        private Controls.HistoryPeriodBar historyBar;
     }
 }

@@ -12,8 +12,7 @@ namespace THMS.Logic.Finance.Categories
             var ids = visible.Select(c => c.Id).ToHashSet();
             return visible
                 .Where(c => c.ParentCategoryId is null || !ids.Contains(c.ParentCategoryId.Value))
-                .OrderBy(c => c.DisplayOrder)
-                .ThenBy(c => c.Name);
+                .OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase);
         }
 
         public static IEnumerable<ExpenseCategory> Children(
@@ -22,8 +21,7 @@ namespace THMS.Logic.Finance.Categories
             bool includeInactive = false) =>
             Visible(categories, includeInactive)
                 .Where(c => c.ParentCategoryId == parentId)
-                .OrderBy(c => c.DisplayOrder)
-                .ThenBy(c => c.Name);
+                .OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase);
 
         public static List<ExpenseCategory> Flatten(
             IEnumerable<ExpenseCategory> categories,
@@ -46,7 +44,9 @@ namespace THMS.Logic.Finance.Categories
             foreach (var root in Roots(all, includeInactive))
                 Visit(root);
 
-            foreach (var leftover in Visible(all, includeInactive).Where(c => !seen.Contains(c.Id)))
+            foreach (var leftover in Visible(all, includeInactive)
+                         .Where(c => !seen.Contains(c.Id))
+                         .OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase))
                 Visit(leftover);
 
             return result;

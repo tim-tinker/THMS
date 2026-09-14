@@ -28,6 +28,8 @@ namespace THMS.UI.WinForms.Controls
             gridSolarIntervals.DataSource = _intervals;
         }
 
+        public void SetImportStatus(string message) => lblStatus.Text = message;
+
         private void OnLoad(object sender, EventArgs e)
         {
             SetGridDataSource(_currentPeriod);

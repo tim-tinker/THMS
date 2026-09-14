@@ -15,7 +15,6 @@ namespace THMS.Data.Stores.SqlTables
                     StatementDate TEXT NOT NULL,
                     DueDate TEXT NOT NULL,
                     AmountDue REAL NOT NULL,
-                    MinimumPayment REAL NOT NULL,
                     Notes TEXT,
                     StatementType TEXT NOT NULL
                 );
@@ -25,6 +24,7 @@ namespace THMS.Data.Stores.SqlTables
                     ON AccountStatements (DueDate);";
             cmd.ExecuteNonQuery();
             EnsureColumn(conn, "StatementType", "TEXT NOT NULL DEFAULT 'CreditCard'");
+            DropColumnIfExists(conn, "MinimumPayment");
         }
 
         public void Upsert(SqliteConnection conn, AccountStatement statement)
@@ -32,15 +32,14 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO AccountStatements
-                (Id, AccountId, StatementDate, DueDate, AmountDue, MinimumPayment, Notes, StatementType)
+                (Id, AccountId, StatementDate, DueDate, AmountDue, Notes, StatementType)
                 VALUES
-                (@Id, @AccountId, @StatementDate, @DueDate, @AmountDue, @MinimumPayment, @Notes, @StatementType)
+                (@Id, @AccountId, @StatementDate, @DueDate, @AmountDue, @Notes, @StatementType)
                 ON CONFLICT(Id) DO UPDATE SET
                     AccountId = excluded.AccountId,
                     StatementDate = excluded.StatementDate,
                     DueDate = excluded.DueDate,
                     AmountDue = excluded.AmountDue,
-                    MinimumPayment = excluded.MinimumPayment,
                     Notes = excluded.Notes,
                     StatementType = excluded.StatementType;";
             cmd.Parameters.AddWithValue("@Id", statement.Id.ToString());
@@ -48,7 +47,6 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@StatementDate", statement.StatementDate);
             cmd.Parameters.AddWithValue("@DueDate", statement.DueDate);
             cmd.Parameters.AddWithValue("@AmountDue", statement.AmountDue);
-            cmd.Parameters.AddWithValue("@MinimumPayment", statement.MinimumPayment);
             cmd.Parameters.AddWithValue("@Notes", (object?)statement.Notes ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@StatementType", statement.Type.ToString());
             cmd.ExecuteNonQuery();
@@ -94,7 +92,7 @@ namespace THMS.Data.Stores.SqlTables
         }
 
         private const string SelectColumns =
-            "SELECT Id, AccountId, StatementDate, DueDate, AmountDue, MinimumPayment, Notes, StatementType";
+            "SELECT Id, AccountId, StatementDate, DueDate, AmountDue, Notes, StatementType";
 
         private static List<AccountStatementRow> ReadAll(SqliteCommand cmd)
         {
@@ -113,9 +111,8 @@ namespace THMS.Data.Stores.SqlTables
                 reader.GetDateTime(2),
                 reader.GetDateTime(3),
                 (decimal)(double)reader.GetDouble(4),
-                (decimal)(double)reader.GetDouble(5),
-                reader.IsDBNull(6) ? null : reader.GetString(6),
-                reader.IsDBNull(7) ? nameof(StatementType.CreditCard) : reader.GetString(7));
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.IsDBNull(6) ? nameof(StatementType.CreditCard) : reader.GetString(6));
         }
 
         private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
@@ -141,6 +138,23 @@ namespace THMS.Data.Stores.SqlTables
 
             return false;
         }
+
+        private static void DropColumnIfExists(SqliteConnection conn, string columnName)
+        {
+            if (!ColumnExists(conn, "AccountStatements", columnName))
+                return;
+
+            try
+            {
+                using var alter = conn.CreateCommand();
+                alter.CommandText = $"ALTER TABLE AccountStatements DROP COLUMN {columnName};";
+                alter.ExecuteNonQuery();
+            }
+            catch (SqliteException)
+            {
+                // Older SQLite builds may not support DROP COLUMN.
+            }
+        }
     }
 
     public sealed record AccountStatementRow(
@@ -149,7 +163,6 @@ namespace THMS.Data.Stores.SqlTables
         DateTime StatementDate,
         DateTime DueDate,
         decimal AmountDue,
-        decimal MinimumPayment,
         string? Notes,
         string StatementType);
 }

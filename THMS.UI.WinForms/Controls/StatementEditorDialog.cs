@@ -11,22 +11,13 @@ namespace THMS.UI.WinForms.Controls
         private readonly IAccountStatementDataStore _statementStore;
         private readonly PlanningOrchestrator? _orchestrator;
         private readonly AccountStatement? _existingStatement;
+        private readonly Account? _lockedAccount;
         private readonly List<Account> _accounts;
         private Guid? _pendingPayFromId;
         private bool _loading;
 
-        private NumericUpDown? numPrincipalBalance;
-        private NumericUpDown? numInterestBalance;
         private NumericUpDown? numEscrowBalance;
-        private NumericUpDown? numInterestCharged;
-        private NumericUpDown? numFees;
         private NumericUpDown? numStatementBalance;
-        private NumericUpDown? numPremium;
-        private NumericUpDown? numBeginningBalance;
-        private NumericUpDown? numDeposits;
-        private NumericUpDown? numWithdrawals;
-        private NumericUpDown? numInterestEarned;
-        private DateTimePicker? dtPeriodStart;
         private DataGridView? gridPromotions;
         private DataGridView? gridUsage;
         private DataGridView? gridCharges;
@@ -37,10 +28,19 @@ namespace THMS.UI.WinForms.Controls
         public StatementEditorDialog(
             PlanningOrchestrator orchestrator,
             AccountStatement? existingStatement)
+            : this(orchestrator, existingStatement, lockedAccount: null)
+        {
+        }
+
+        public StatementEditorDialog(
+            PlanningOrchestrator orchestrator,
+            AccountStatement? existingStatement,
+            Account? lockedAccount)
             : this(
                 orchestrator.GetStatementStore(),
                 existingStatement,
-                orchestrator.GetAccounts())
+                orchestrator.GetAccounts(),
+                lockedAccount)
         {
             _orchestrator = orchestrator;
             if (existingStatement is not null)
@@ -60,15 +60,21 @@ namespace THMS.UI.WinForms.Controls
         public StatementEditorDialog(
             IAccountStatementDataStore statementStore,
             AccountStatement? existingStatement,
-            IReadOnlyList<Account> accounts)
+            IReadOnlyList<Account> accounts,
+            Account? lockedAccount = null)
         {
             _statementStore = statementStore;
             _existingStatement = existingStatement;
+            _lockedAccount = lockedAccount;
             _accounts = accounts.ToList();
+            if (_lockedAccount is not null && _accounts.All(a => a.Id != _lockedAccount.Id))
+                _accounts.Add(_lockedAccount);
+
             InitializeComponent();
             _loading = true;
             BindStatementTypes();
             LoadExisting();
+            ApplyLockedAccountUi();
         }
 
         protected override void OnShown(EventArgs e)
@@ -126,6 +132,20 @@ namespace THMS.UI.WinForms.Controls
             BindPayFrom();
         }
 
+        private void ApplyLockedAccountUi()
+        {
+            if (_lockedAccount is null)
+                return;
+
+            lblStatementType.Visible = false;
+            cboStatementType.Visible = false;
+            btnNewAccount.Visible = false;
+            cboAccount.Enabled = false;
+            typeSelectorLayout.RowStyles[0].SizeType = SizeType.Absolute;
+            typeSelectorLayout.RowStyles[0].Height = 0;
+            layout.RowStyles[0].Height = 40F;
+        }
+
         private void BindStatementTypes()
         {
             cboStatementType.DisplayMember = nameof(StatementTypeOption.Name);
@@ -149,10 +169,19 @@ namespace THMS.UI.WinForms.Controls
             dtStatementDate.Value = DateTime.Today.AddDays(-15);
             dtDueDate.Value = DateTime.Today.AddDays(15);
             txtAmountDue.Text = "0.00";
-            txtMinimumPayment.Text = "0.00";
 
             if (_existingStatement is null)
             {
+                if (_lockedAccount is Account locked
+                    && StatementAccountMatch.ForAccount(locked) is StatementType lockedType)
+                {
+                    SelectType(lockedType);
+                    BindAccounts(locked.Id);
+                    _loading = false;
+                    LoadTypePanel(lockedType);
+                    return;
+                }
+
                 cboStatementType.SelectedIndex = -1;
                 BindAccounts();
                 _loading = false;
@@ -169,7 +198,6 @@ namespace THMS.UI.WinForms.Controls
             if (_existingStatement is not BankStatement)
             {
                 txtAmountDue.Text = _existingStatement.AmountDue.ToString("0.00");
-                txtMinimumPayment.Text = _existingStatement.MinimumPayment.ToString("0.00");
             }
 
             _loading = false;
@@ -290,18 +318,8 @@ namespace THMS.UI.WinForms.Controls
         {
             pnlTypeSpecific.SuspendLayout();
             pnlTypeSpecific.Controls.Clear();
-            numPrincipalBalance = null;
-            numInterestBalance = null;
             numEscrowBalance = null;
-            numInterestCharged = null;
-            numFees = null;
             numStatementBalance = null;
-            numPremium = null;
-            numBeginningBalance = null;
-            numDeposits = null;
-            numWithdrawals = null;
-            numInterestEarned = null;
-            dtPeriodStart = null;
             gridPromotions = null;
             gridUsage = null;
             gridCharges = null;
@@ -317,7 +335,6 @@ namespace THMS.UI.WinForms.Controls
                 StatementType.CreditCard => BuildCreditCardPanel(),
                 StatementType.Utility => BuildUtilityPanel(),
                 StatementType.Service => BuildServicePanel(),
-                StatementType.Insurance => BuildInsurancePanel(),
                 _ => new Panel()
             };
             panel.Dock = UsesFixedFields(type) ? DockStyle.Top : DockStyle.Fill;
@@ -327,9 +344,7 @@ namespace THMS.UI.WinForms.Controls
         }
 
         private static bool UsesFixedFields(StatementType type) =>
-            type is StatementType.Bank or StatementType.Loan or StatementType.Mortgage or StatementType.Insurance;
-
-        private void ShowBankPanel() => LoadTypePanel(StatementType.Bank);
+            type is StatementType.Bank or StatementType.Loan or StatementType.Mortgage;
 
         private void ShowObligationFields(bool visible)
         {
@@ -337,8 +352,6 @@ namespace THMS.UI.WinForms.Controls
             dtDueDate.Visible = visible;
             lblAmountDue.Visible = visible;
             txtAmountDue.Visible = visible;
-            lblMinimumPayment.Visible = visible;
-            txtMinimumPayment.Visible = visible;
             lblPayFrom.Visible = visible;
             cboPayFrom.Visible = visible;
 
@@ -351,80 +364,28 @@ namespace THMS.UI.WinForms.Controls
 
         private Control BuildBankPanel()
         {
-            var layout = FieldLayout(7);
+            var layout = FieldLayout(1);
             layout.Name = "pnlBankStatement";
-            dtPeriodStart = new DateTimePicker
-            {
-                Format = DateTimePickerFormat.Short,
-                Value = DateTime.Today.AddMonths(-1)
-            };
-            numBeginningBalance = MoneyBox();
-            numDeposits = MoneyBox();
-            numWithdrawals = MoneyBox();
-            numInterestEarned = MoneyBox();
-            numFees = MoneyBox();
-            numStatementBalance = MoneyBox(allowNegative: true);
-            numStatementBalance.Enabled = false;
-            numBeginningBalance.ValueChanged += OnBankAmountsChanged;
-            numDeposits.ValueChanged += OnBankAmountsChanged;
-            numWithdrawals.ValueChanged += OnBankAmountsChanged;
-            numInterestEarned.ValueChanged += OnBankAmountsChanged;
-            numFees.ValueChanged += OnBankAmountsChanged;
-            AddField(layout, 0, "Period Start", dtPeriodStart);
-            AddField(layout, 1, "Beginning Balance", numBeginningBalance);
-            AddField(layout, 2, "Deposits", numDeposits);
-            AddField(layout, 3, "Withdrawals", numWithdrawals);
-            AddField(layout, 4, "Interest Earned", numInterestEarned);
-            AddField(layout, 5, "Fees", numFees);
-            AddField(layout, 6, "Ending Balance", numStatementBalance);
-            UpdateComputedEnding();
+            numStatementBalance = MoneyBox();
+            AddField(layout, 0, "Statement Balance", numStatementBalance);
             return layout;
-        }
-
-        private void OnBankAmountsChanged(object? sender, EventArgs e) => UpdateComputedEnding();
-
-        private void UpdateComputedEnding()
-        {
-            if (numStatementBalance is null)
-                return;
-
-            SetMoney(
-                numStatementBalance,
-                BankStatement.ComputeEnding(
-                    ValueOf(numBeginningBalance),
-                    ValueOf(numDeposits),
-                    ValueOf(numInterestEarned),
-                    ValueOf(numWithdrawals),
-                    ValueOf(numFees)));
         }
 
         private Control BuildLoanPanel()
         {
-            var layout = FieldLayout(4);
-            numPrincipalBalance = MoneyBox();
-            numInterestBalance = MoneyBox();
-            numInterestCharged = MoneyBox();
-            numFees = MoneyBox();
-            AddField(layout, 0, "Principal Balance", numPrincipalBalance);
-            AddField(layout, 1, "Interest Balance", numInterestBalance);
-            AddField(layout, 2, "Interest Charged", numInterestCharged);
-            AddField(layout, 3, "Fees", numFees);
+            var layout = FieldLayout(1);
+            numStatementBalance = MoneyBox();
+            AddField(layout, 0, "Statement Balance", numStatementBalance);
             return layout;
         }
 
         private Control BuildMortgagePanel()
         {
-            var layout = FieldLayout(5);
-            numPrincipalBalance = MoneyBox();
-            numInterestBalance = MoneyBox();
+            var layout = FieldLayout(2);
+            numStatementBalance = MoneyBox();
             numEscrowBalance = MoneyBox();
-            numInterestCharged = MoneyBox();
-            numFees = MoneyBox();
-            AddField(layout, 0, "Principal Balance", numPrincipalBalance);
-            AddField(layout, 1, "Interest Balance", numInterestBalance);
-            AddField(layout, 2, "Escrow Balance", numEscrowBalance);
-            AddField(layout, 3, "Interest Charged", numInterestCharged);
-            AddField(layout, 4, "Fees", numFees);
+            AddField(layout, 0, "Statement Balance", numStatementBalance);
+            AddField(layout, 1, "Escrow Balance", numEscrowBalance);
             return layout;
         }
 
@@ -440,15 +401,11 @@ namespace THMS.UI.WinForms.Controls
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            var fields = FieldLayout(3);
+            var fields = FieldLayout(1);
             numStatementBalance = MoneyBox();
-            numInterestCharged = MoneyBox();
-            numFees = MoneyBox();
             AddField(fields, 0, "Statement Balance", numStatementBalance);
-            AddField(fields, 1, "Interest Charged", numInterestCharged);
-            AddField(fields, 2, "Fees", numFees);
             fields.Dock = DockStyle.Top;
-            fields.Height = 108;
+            fields.Height = 36;
 
             gridPromotions = CreateGrid();
             gridPromotions.Columns.Add(AmountColumn(nameof(PromotionEditRow.Amount), "Amount"));
@@ -517,40 +474,22 @@ namespace THMS.UI.WinForms.Controls
             return layout;
         }
 
-        private Control BuildInsurancePanel()
-        {
-            var layout = FieldLayout(2);
-            numPremium = MoneyBox();
-            numFees = MoneyBox();
-            AddField(layout, 0, "Premium", numPremium);
-            AddField(layout, 1, "Fees", numFees);
-            return layout;
-        }
-
         private void BindTypeSpecific(AccountStatement statement)
         {
             switch (statement)
             {
                 case BankStatement bank:
-                    LoadBankStatement(bank);
+                    SetMoney(numStatementBalance, bank.StatementBalance);
                     break;
                 case LoanStatement loan:
-                    SetMoney(numPrincipalBalance, loan.PrincipalBalance);
-                    SetMoney(numInterestBalance, loan.InterestBalance);
-                    SetMoney(numInterestCharged, loan.InterestCharged);
-                    SetMoney(numFees, loan.Fees);
+                    SetMoney(numStatementBalance, loan.StatementBalance);
                     break;
                 case MortgageStatement mortgage:
-                    SetMoney(numPrincipalBalance, mortgage.PrincipalBalance);
-                    SetMoney(numInterestBalance, mortgage.InterestBalance);
+                    SetMoney(numStatementBalance, mortgage.StatementBalance);
                     SetMoney(numEscrowBalance, mortgage.EscrowBalance);
-                    SetMoney(numInterestCharged, mortgage.InterestCharged);
-                    SetMoney(numFees, mortgage.Fees);
                     break;
                 case CreditCardStatement card:
                     SetMoney(numStatementBalance, card.StatementBalance);
-                    SetMoney(numInterestCharged, card.InterestCharged);
-                    SetMoney(numFees, card.Fees);
                     foreach (var promo in card.Promotions)
                     {
                         _promotions.Add(new PromotionEditRow
@@ -573,23 +512,7 @@ namespace THMS.UI.WinForms.Controls
                     foreach (var charge in service.Charges)
                         _charges.Add(new ChargeEditRow { Description = charge.Description, Amount = charge.Amount });
                     break;
-                case InsuranceStatement insurance:
-                    SetMoney(numPremium, insurance.Premium);
-                    SetMoney(numFees, insurance.Fees);
-                    break;
             }
-        }
-
-        private void LoadBankStatement(BankStatement bank)
-        {
-            if (dtPeriodStart is not null)
-                dtPeriodStart.Value = SafeDate(bank.PeriodStart);
-            SetMoney(numBeginningBalance, bank.BeginningBalance);
-            SetMoney(numDeposits, bank.Deposits);
-            SetMoney(numWithdrawals, bank.Withdrawals);
-            SetMoney(numInterestEarned, bank.InterestEarned);
-            SetMoney(numFees, bank.Fees);
-            UpdateComputedEnding();
         }
 
         private void OnAddPromotion(object? sender, EventArgs e) =>
@@ -675,10 +598,8 @@ namespace THMS.UI.WinForms.Controls
             }
 
             decimal amountDue = 0;
-            decimal minimumPayment = 0;
             if (type != StatementType.Bank &&
-                (!TryParseMoney(txtAmountDue.Text, "Amount due", out amountDue, out error) ||
-                 !TryParseMoney(txtMinimumPayment.Text, "Minimum payment", out minimumPayment, out error)))
+                !TryParseMoney(txtAmountDue.Text, "Amount due", out amountDue, out error))
                 return false;
 
             if (type != StatementType.Bank && amountDue > 0 && SelectedPayFrom() is null)
@@ -691,39 +612,20 @@ namespace THMS.UI.WinForms.Controls
             {
                 StatementType.Bank => new BankStatement
                 {
-                    PeriodStart = dtPeriodStart?.Value.Date ?? dtStatementDate.Value.Date,
-                    BeginningBalance = ValueOf(numBeginningBalance),
-                    Deposits = ValueOf(numDeposits),
-                    Withdrawals = ValueOf(numWithdrawals),
-                    InterestEarned = ValueOf(numInterestEarned),
-                    Fees = ValueOf(numFees),
-                    EndingBalance = BankStatement.ComputeEnding(
-                        ValueOf(numBeginningBalance),
-                        ValueOf(numDeposits),
-                        ValueOf(numInterestEarned),
-                        ValueOf(numWithdrawals),
-                        ValueOf(numFees))
+                    StatementBalance = ValueOf(numStatementBalance)
                 },
                 StatementType.Loan => new LoanStatement
                 {
-                    PrincipalBalance = ValueOf(numPrincipalBalance),
-                    InterestBalance = ValueOf(numInterestBalance),
-                    InterestCharged = ValueOf(numInterestCharged),
-                    Fees = ValueOf(numFees)
+                    StatementBalance = ValueOf(numStatementBalance)
                 },
                 StatementType.Mortgage => new MortgageStatement
                 {
-                    PrincipalBalance = ValueOf(numPrincipalBalance),
-                    InterestBalance = ValueOf(numInterestBalance),
-                    EscrowBalance = ValueOf(numEscrowBalance),
-                    InterestCharged = ValueOf(numInterestCharged),
-                    Fees = ValueOf(numFees)
+                    StatementBalance = ValueOf(numStatementBalance),
+                    EscrowBalance = ValueOf(numEscrowBalance)
                 },
                 StatementType.CreditCard => new CreditCardStatement
                 {
                     StatementBalance = ValueOf(numStatementBalance),
-                    InterestCharged = ValueOf(numInterestCharged),
-                    Fees = ValueOf(numFees),
                     Promotions = _promotions.Select(p => new PromotionalBalance
                     {
                         Id = p.Id == Guid.Empty ? Guid.NewGuid() : p.Id,
@@ -755,11 +657,7 @@ namespace THMS.UI.WinForms.Controls
                         Amount = c.Amount
                     }).ToList()
                 },
-                StatementType.Insurance => new InsuranceStatement
-                {
-                    Premium = ValueOf(numPremium),
-                    Fees = ValueOf(numFees)
-                },
+                StatementType.Insurance => new InsuranceStatement(),
                 _ => null
             };
 
@@ -776,7 +674,6 @@ namespace THMS.UI.WinForms.Controls
                 ? statement.StatementDate
                 : dtDueDate.Value.Date;
             statement.AmountDue = amountDue;
-            statement.MinimumPayment = minimumPayment;
             statement.Notes = string.IsNullOrWhiteSpace(txtNotes.Text) ? null : txtNotes.Text.Trim();
             return true;
         }

@@ -28,6 +28,18 @@ namespace THMS.Tests.Logic
             Assert.That(orchestrator.CallGetStartDate(end, "Month"), Is.EqualTo(end.AddMonths(-1)));
             Assert.That(orchestrator.CallGetStartDate(end, "whatever"), Is.EqualTo(end.AddMonths(-1)));
         }
+
+        [Test]
+        public void GetHistoryRange_UsesTodayAndEndOfDay()
+        {
+            var (start, end) = BaseOrchestrator.GetHistoryRange("Month");
+            Assert.That(start, Is.EqualTo(DateTime.Today.AddMonths(-1)));
+            Assert.That(end, Is.EqualTo(DateTime.Today.AddDays(1).AddTicks(-1)));
+
+            var lifetime = BaseOrchestrator.GetHistoryRange("Lifetime");
+            Assert.That(lifetime.Start, Is.EqualTo(DateTime.MinValue));
+            Assert.That(lifetime.End, Is.EqualTo(end));
+        }
     }
 
     [TestFixture]
@@ -113,14 +125,14 @@ namespace THMS.Tests.Logic
                 Id = Guid.NewGuid(),
                 AccountId = bank.Id,
                 StatementDate = new DateTime(2026, 1, 31),
-                EndingBalance = 800
+                StatementBalance = 800
             };
             var latest = new BankStatement
             {
                 Id = Guid.NewGuid(),
                 AccountId = bank.Id,
                 StatementDate = new DateTime(2026, 8, 31),
-                EndingBalance = 1250
+                StatementBalance = 1250
             };
 
             Assert.That(PostedBalanceCalculator.TryResolveAnchor(bank, [older, latest], out var anchor), Is.True);
@@ -161,7 +173,7 @@ namespace THMS.Tests.Logic
             {
                 AccountId = bank.Id,
                 StatementDate = new DateTime(2026, 8, 31),
-                EndingBalance = 1000
+                StatementBalance = 1000
             };
 
             Assert.That(PostedBalanceCalculator.HasUsablePostedBalance(bank, []), Is.False);

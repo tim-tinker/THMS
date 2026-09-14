@@ -98,7 +98,7 @@ namespace THMS.Tests.Logic
                 Assert.That(commercial.KwhAdded, Is.EqualTo(12.5m));
                 Assert.That(commercial.SessionCost, Is.EqualTo(18.50m));
 
-                Assert.That(orchestrator.ImportSessions(preview), Is.EqualTo(2));
+                Assert.That(orchestrator.ImportSessions(preview).Count, Is.EqualTo(2));
                 var stored = vehicles.GetBaseEvChargeSessions(vehicle.Id, DateTime.MinValue, DateTime.MaxValue).ToList();
                 Assert.That(stored, Has.Count.EqualTo(2));
                 Assert.That(stored[0].IsHomeCharge, Is.True);
@@ -112,7 +112,7 @@ namespace THMS.Tests.Logic
                 Assert.That(vehicles.GetCommercialEvChargeSession(stored[1].Id)!.SessionCost, Is.EqualTo(18.50m));
 
                 var again = orchestrator.LoadSessionsFromFiles([path], vehicle);
-                Assert.That(orchestrator.ImportSessions(again), Is.EqualTo(0));
+                Assert.That(orchestrator.ImportSessions(again).Count, Is.EqualTo(0));
                 Assert.That(
                     vehicles.GetBaseEvChargeSessions(vehicle.Id, DateTime.MinValue, DateTime.MaxValue).Count(),
                     Is.EqualTo(2));

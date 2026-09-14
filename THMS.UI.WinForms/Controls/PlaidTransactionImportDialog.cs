@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
+using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.UI.WinForms.Controls
@@ -14,12 +15,14 @@ namespace THMS.UI.WinForms.Controls
         private readonly DateTimePicker _dtEnd = new();
         private readonly Label _status = new();
         private readonly ProgressBar _progress = new();
+        private readonly Panel _progressHost = new();
         private readonly Button _btnDownload = new();
         private readonly Button _btnOk = new();
         private readonly Button _btnCancel = new();
         private readonly Button _btnDelete = new();
 
-        public int ImportedCount { get; private set; }
+        public ImportResult Result { get; private set; } = ImportResult.Empty;
+        public int ImportedCount => Result.Count;
 
         public PlaidTransactionImportDialog()
             : this(new PlaidTransactionOrchestrator())
@@ -107,19 +110,17 @@ namespace THMS.UI.WinForms.Controls
             _status.Text = "Choose a date range and click Download.";
             _status.TextAlign = ContentAlignment.MiddleLeft;
 
-            var progressHost = new Panel
-            {
-                Dock = DockStyle.Bottom,
-                Height = 28,
-                Padding = new Padding(8, 4, 8, 4)
-            };
+            _progressHost.Dock = DockStyle.Bottom;
+            _progressHost.Height = 28;
+            _progressHost.Padding = new Padding(8, 4, 8, 4);
+            _progressHost.Visible = false;
             _progress.Dock = DockStyle.Fill;
             _progress.Style = ProgressBarStyle.Continuous;
-            progressHost.Controls.Add(_progress);
+            _progressHost.Controls.Add(_progress);
 
             Controls.Add(_grid);
             Controls.Add(_status);
-            Controls.Add(progressHost);
+            Controls.Add(_progressHost);
             Controls.Add(buttons);
             Controls.Add(toolbar);
             Controls.Add(heading);
@@ -224,31 +225,28 @@ namespace THMS.UI.WinForms.Controls
             }
 
             SetBusy(true);
+            _progressHost.Visible = true;
             try
             {
                 var snapshot = _rows.ToList();
-                var progress = new ActionProgress<TransactionImportProgress>(ShowProgress);
-                ImportedCount = _orchestrator.ImportTransactions(snapshot, progress);
+                var progress = new ActionProgress<ImportProgress>(ShowProgress);
+                Result = _orchestrator.ImportTransactions(snapshot, progress);
                 DialogResult = DialogResult.OK;
             }
             catch (Exception ex)
             {
                 SetBusy(false);
+                _progressHost.Visible = false;
                 MessageBox.Show(this, $"Plaid import failed.\n{ex.Message}", "Import from Plaid",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
-        private void ShowProgress(TransactionImportProgress progress)
+        private void ShowProgress(ImportProgress progress)
         {
             _progress.Maximum = Math.Max(1, progress.Total);
             _progress.Value = Math.Clamp(progress.Completed, 0, _progress.Maximum);
-            if (progress.UpdatingLedger)
-                _status.Text = "Updating ledger...";
-            else if (progress.Total == 0 || progress.Completed >= progress.Total)
-                _status.Text = "Finishing...";
-            else
-                _status.Text = $"Importing {progress.Completed:N0} of {progress.Total:N0}...";
+            _status.Text = ImportStatusText.Importing(progress);
             _progress.Update();
             Application.DoEvents();
         }

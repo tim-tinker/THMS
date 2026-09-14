@@ -75,16 +75,16 @@ namespace THMS.Logic.Finance.Model
             switch (statement)
             {
                 case BankStatement bank when account is BankAccount:
-                    anchor = new PostedBalanceAnchor(bank.EndingBalance, bank.StatementDate);
+                    anchor = new PostedBalanceAnchor(bank.StatementBalance, bank.StatementDate);
                     return true;
                 case CreditCardStatement card when account is CreditAccount credit:
                     anchor = new PostedBalanceAnchor(ToLedgerBalance(credit, card.StatementBalance), card.StatementDate);
                     return true;
                 case LoanStatement loan when account is LoanAccount:
-                    anchor = new PostedBalanceAnchor(loan.PrincipalBalance, loan.StatementDate);
+                    anchor = new PostedBalanceAnchor(loan.StatementBalance, loan.StatementDate);
                     return true;
                 case MortgageStatement mortgage when account is MortgageAccount:
-                    anchor = new PostedBalanceAnchor(mortgage.PrincipalBalance, mortgage.StatementDate);
+                    anchor = new PostedBalanceAnchor(mortgage.StatementBalance, mortgage.StatementDate);
                     return true;
                 default:
                     anchor = default;

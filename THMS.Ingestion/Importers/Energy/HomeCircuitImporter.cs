@@ -7,61 +7,75 @@ namespace THMS.Ingestion.Importers.Energy
 {
     public class HomeCircuitImporter
     {
-        private readonly IEnergyDataStore _store;
         private readonly List<HomeCircuitReading> _readings = [];
 
         public IEnumerable<HomeCircuitReading> Readings => _readings;
         public DateTime StartDate { get; private set; } = DateTime.MinValue;
         public DateTime EndDate { get; private set; } = DateTime.MinValue;
         public int ReadingCount => _readings.Count;
-        public string ErrorMessage { get; private set; }
+        public string ErrorMessage { get; private set; } = "";
 
-        public HomeCircuitImporter(IEnergyDataStore store)
+        public HomeCircuitImporter()
         {
-            _store = store;
         }
 
-        public void Import(string csvPath)
+        public HomeCircuitImporter(IEnergyDataStore _)
+        {
+        }
+
+        public List<HomeCircuitReading> Parse(string csvPath)
         {
             using var reader = new StreamReader(csvPath);
             using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
 
             csv.Read();
             csv.ReadHeader();
-            if (2 != csv.HeaderRecord.Length)
+            if (csv.HeaderRecord is null || csv.HeaderRecord.Length != 2)
+                throw new InvalidDataException("Unexpected number of columns in CSV file.");
+            if (csv.HeaderRecord[0] != "Local SPAN Panel time (America/Chicago)"
+                || csv.HeaderRecord[1] != "Energy Data (Wh)")
+                throw new InvalidDataException("Unexpected column names in CSV file.");
+
+            var readings = new List<HomeCircuitReading>();
+            while (csv.Read())
             {
-                ErrorMessage = "Unexpected number of columns in CSV file.";
-            }
-            else if ("Local SPAN Panel time (America/Chicago)" != csv.HeaderRecord[0]
-                || "Energy Data (Wh)" != csv.HeaderRecord[1])
-            {
-                ErrorMessage = "Unexpected column names in CSV file.";
-            }
-            else
-            {
-                while (csv.Read())
+                var kiloWattHours = csv.GetField<decimal>(1);
+                if (kiloWattHours == 0)
+                    continue;
+
+                readings.Add(new HomeCircuitReading
                 {
-                    var timeStamp = csv.GetField<DateTime>(0);
+                    Timestamp = csv.GetField<DateTime>(0),
+                    KiloWattHours = kiloWattHours
+                });
+            }
 
-                    var circuitEnergyKwh = csv.GetField<decimal>(1);
+            return readings;
+        }
 
-                    var reading = new HomeCircuitReading
-                    {
-                        Timestamp = timeStamp,
-                        KiloWattHours = circuitEnergyKwh,
-                    };
-
-                    if (StartDate == DateTime.MinValue)
-                    {
-                        StartDate = timeStamp;
-                    }
-
-                    EndDate = timeStamp;
-
-                    _readings.Add(reading);
+        public void Import(string csvPath)
+        {
+            try
+            {
+                var parsed = Parse(csvPath);
+                _readings.AddRange(parsed);
+                if (parsed.Count > 0)
+                {
+                    var start = parsed.Min(r => r.Timestamp);
+                    var end = parsed.Max(r => r.Timestamp);
+                    StartDate = StartDate == DateTime.MinValue ? start : Min(StartDate, start);
+                    EndDate = EndDate == DateTime.MinValue ? end : Max(EndDate, end);
                 }
+
+                ErrorMessage = "";
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = ex.Message;
             }
         }
+
+        private static DateTime Min(DateTime left, DateTime right) => left <= right ? left : right;
+        private static DateTime Max(DateTime left, DateTime right) => left >= right ? right : left;
     }
 }
-

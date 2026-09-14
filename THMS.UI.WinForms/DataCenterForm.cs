@@ -33,8 +33,8 @@ namespace THMS.UI.WinForms
 
         private readonly EvChargeSessionUpdater _evChargeUpdater = new();
         private readonly EvChargeSessionImportOrchestrator _evChargeImport = new();
-        private readonly HomeCircuitUpdater _homeCircuitUpdater = new();
-        private readonly SolarDataUpdater _solarUpdater = new();
+        private readonly HomeCircuitReadingOrchestrator _homeCircuitImport = new();
+        private readonly SolarIntervalOrchestrator _solarImport = new();
         private readonly ElectricContractUpdater _electricContractUpdater = new();
 
         private string? _appliedTab;
@@ -141,11 +141,11 @@ namespace THMS.UI.WinForms
                 ],
                 TabHomeCircuit =>
                 [
-                    ActionButton("Import", () => _homeCircuitUpdater.UpdateDataSource())
+                    ActionButton("Import", OnHomeCircuitImport, reload: false)
                 ],
                 TabSolar =>
                 [
-                    ActionButton("Import", () => _solarUpdater.UpdateDataSource())
+                    ActionButton("Import", OnSolarImport, reload: false)
                 ],
                 TabElectricContracts =>
                 [
@@ -196,6 +196,8 @@ namespace THMS.UI.WinForms
                     return;
 
                 ReloadCurrentTab();
+                SetCurrentImportStatus(ImportStatusText.Imported(
+                    preview.Result, "EV charge session", "EV charge sessions", includeTime: true));
             }
             catch (Exception ex)
             {
@@ -222,6 +224,94 @@ namespace THMS.UI.WinForms
                 return null;
 
             return selectForm.SelectedVehicle as VehicleEv;
+        }
+
+        private void OnHomeCircuitImport()
+        {
+            using var fileDialog = new OpenFileDialog
+            {
+                Title = "Select Home Circuit Reading File(s)",
+                Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*",
+                Multiselect = true
+            };
+            if (fileDialog.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            try
+            {
+                var rows = _homeCircuitImport.LoadReadingsFromFiles(fileDialog.FileNames);
+                if (rows.Count == 0)
+                {
+                    MessageBox.Show(this, "The selected file(s) did not contain any circuit intervals.",
+                        "Import Circuit Intervals", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                using var preview = new HomeCircuitImportPreviewDialog(rows, _homeCircuitImport);
+                if (preview.ShowDialog(this) != DialogResult.OK)
+                    return;
+
+                ReloadCurrentTab();
+                SetCurrentImportStatus(ImportStatusText.Imported(
+                    preview.Result, "circuit interval", "circuit intervals", includeTime: true));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Could not parse the file(s).\n{ex.Message}",
+                    "Import Circuit Intervals", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void OnSolarImport()
+        {
+            using var fileDialog = new OpenFileDialog
+            {
+                Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*",
+                Title = "Select Enphase Solar Data File(s)",
+                Multiselect = true
+            };
+            if (fileDialog.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            try
+            {
+                var rows = _solarImport.LoadIntervalsFromFiles(fileDialog.FileNames);
+                if (rows.Count == 0)
+                {
+                    MessageBox.Show(this, "The selected file(s) did not contain any solar intervals.",
+                        "Import Solar Intervals", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                using var preview = new SolarIntervalImportPreviewDialog(rows, _solarImport);
+                if (preview.ShowDialog(this) != DialogResult.OK)
+                    return;
+
+                ReloadCurrentTab();
+                SetCurrentImportStatus(ImportStatusText.Imported(
+                    preview.Result, "solar interval", "solar intervals", includeTime: true));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Could not parse the file(s).\n{ex.Message}",
+                    "Import Solar Intervals", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void SetCurrentImportStatus(string message)
+        {
+            switch (FindManager(tabs.SelectedTab))
+            {
+                case EvChargeSessionManagerControl ev:
+                    ev.SetImportStatus(message);
+                    break;
+                case HomeCircuitManagerControl circuit:
+                    circuit.SetImportStatus(message);
+                    break;
+                case SolarIntervalManagerControl solar:
+                    solar.SetImportStatus(message);
+                    break;
+            }
         }
 
         private void ReloadCurrentTab()

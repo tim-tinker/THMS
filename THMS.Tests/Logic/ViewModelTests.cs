@@ -529,9 +529,17 @@ namespace THMS.Tests.Logic
             var extra = new VehicleIce { Id = Guid.NewGuid(), Name = "Spare" };
             vm.AddVehicle(extra);
             Assert.That(vm.Vehicles.Any(v => v.VehicleId == extra.Id), Is.True);
+            Assert.That(vm.HistoryPeriod, Is.EqualTo("Month"));
+            Assert.That(vm.PeriodStart, Is.EqualTo(DateTime.Today.AddMonths(-1)));
+
+            vm.HistoryPeriod = "Year";
+            Assert.That(vm.PeriodStart, Is.EqualTo(DateTime.Today.AddYears(-1)));
+            vm.HistoryPeriod = "Lifetime";
+            Assert.That(vm.PeriodStart, Is.EqualTo(DateTime.MinValue));
 
             var noMileage = new VehicleDetailViewModel(Guid.NewGuid(), new InMemoryVehicleDataStore());
-            Assert.That(noMileage.StartTime, Is.EqualTo(DateTime.MinValue));
+            Assert.That(noMileage.HistoryPeriod, Is.EqualTo("Month"));
+            Assert.That(noMileage.StartTime, Is.EqualTo(DateTime.Today.AddMonths(-1)));
         }
 
         [Test]
@@ -561,8 +569,14 @@ namespace THMS.Tests.Logic
             });
 
             var vm = new VehicleDetailViewModel(ev.Id, store);
-            Assert.That(vm.StartTime, Is.EqualTo(new DateTime(2026, 1, 1)));
+            Assert.That(vm.HistoryPeriod, Is.EqualTo("Month"));
             Assert.That(vm.GetLatestChargeSession(), Is.Not.Null);
+
+            vm.HistoryPeriod = "Lifetime";
+            Assert.That(vm.StartTime, Is.EqualTo(DateTime.MinValue));
+            Assert.That(vm.ChargeCostRows, Has.Count.EqualTo(1));
+            Assert.That(vm.ChargeCostRows[0].MilesDriven, Is.EqualTo(20));
+            Assert.That(vm.ChargeCostRows[0].Cost, Is.EqualTo(0));
 
             var changed = false;
             vm.PropertyChanged += (_, _) => changed = true;
@@ -589,6 +603,32 @@ namespace THMS.Tests.Logic
                 StartTime = new DateTime(1990, 1, 1)
             });
             Assert.That(vm.ChargeSessions.Any(s => s.Id == inRange.Id), Is.False);
+        }
+
+        [Test]
+        public void VehicleChargeCostRow_FromSession_ComputesMilesAndCostPerMile()
+        {
+            var row = VehicleChargeCostRow.FromSession(new CommercialEvChargeSession
+            {
+                StartTime = new DateTime(2026, 2, 1, 12, 0, 0),
+                LastOdometer = 100,
+                OdometerMiles = 140,
+                SessionCost = 10
+            });
+
+            Assert.That(row.StartTime, Is.EqualTo(new DateTime(2026, 2, 1, 12, 0, 0)));
+            Assert.That(row.MilesDriven, Is.EqualTo(40));
+            Assert.That(row.Cost, Is.EqualTo(10));
+            Assert.That(row.CostPerMile, Is.EqualTo(0.25m));
+
+            var noMiles = VehicleChargeCostRow.FromSession(new CommercialEvChargeSession
+            {
+                LastOdometer = 200,
+                OdometerMiles = 150,
+                SessionCost = 8
+            });
+            Assert.That(noMiles.MilesDriven, Is.EqualTo(0));
+            Assert.That(noMiles.CostPerMile, Is.EqualTo(0));
         }
 
         [Test]
@@ -628,24 +668,9 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void TransportationDashboardMileageAndChargeEntry()
+        public void MileageAndChargeEntry_SavesAgainstVehicleStore()
         {
-            var emptyStore = new InMemoryVehicleDataStore();
-            foreach (var v in emptyStore.GetAllVehicles().ToList())
-            {
-                // cannot delete vehicles; use a fresh store that still seeds two.
-            }
-
             var store = new InMemoryVehicleDataStore();
-            var withVehicles = new TransportationDashboardViewModel(store);
-            withVehicles.Refresh(2026, 1);
-            Assert.That(withVehicles.SelectedVehicle, Is.Not.Null);
-
-            withVehicles.SelectedVehicle = null;
-            withVehicles.Refresh(2026, 1);
-            Assert.That(withVehicles.MonthlySummary, Is.Null);
-            Assert.That(withVehicles.LifetimeCostPerMile, Is.EqualTo(0));
-
             var ice = store.GetAllVehicles().OfType<VehicleIce>().First();
             var mileage = new MileageEntryViewModel(ice.Id, store)
             {

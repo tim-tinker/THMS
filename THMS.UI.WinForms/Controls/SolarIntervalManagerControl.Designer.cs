@@ -26,6 +26,7 @@
             ColumnImported = new DataGridViewTextBoxColumn();
             ColumnCharged = new DataGridViewTextBoxColumn();
             ColumnDischarged = new DataGridViewTextBoxColumn();
+            lblStatus = new Label();
             ((System.ComponentModel.ISupportInitialize)gridSolarIntervals).BeginInit();
             SuspendLayout();
             // 
@@ -109,11 +110,20 @@
             ColumnDischarged.Name = "ColumnDischarged";
             ColumnDischarged.Width = 158;
             // 
+            // lblStatus
+            // 
+            lblStatus.Dock = DockStyle.Bottom;
+            lblStatus.Height = 24;
+            lblStatus.Name = "lblStatus";
+            lblStatus.Padding = new Padding(8, 0, 8, 0);
+            lblStatus.TextAlign = ContentAlignment.MiddleLeft;
+            // 
             // SolarIntervalManagerControl
             // 
             AutoScaleDimensions = new SizeF(12F, 30F);
             AutoScaleMode = AutoScaleMode.Font;
             Controls.Add(gridSolarIntervals);
+            Controls.Add(lblStatus);
             Margin = new Padding(4);
             Name = "SolarIntervalManagerControl";
             Size = new Size(1080, 792);
@@ -131,5 +141,6 @@
         private DataGridViewTextBoxColumn ColumnImported;
         private DataGridViewTextBoxColumn ColumnCharged;
         private DataGridViewTextBoxColumn ColumnDischarged;
+        private Label lblStatus;
     }
 }

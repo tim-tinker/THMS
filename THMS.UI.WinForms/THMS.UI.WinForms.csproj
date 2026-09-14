@@ -52,6 +52,9 @@
     <Compile Update="Controls\AccountImportPreviewDialog.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Controls\CategoryImportPreviewDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Controls\PlaidAccountSetupDialog.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -114,6 +117,9 @@
     </Compile>
     <Compile Update="Controls\BudgetHistoryViewer.cs">
       <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\CategoryManagerControl.cs">
+      <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\CategoryManager.cs">
       <SubType>Form</SubType>

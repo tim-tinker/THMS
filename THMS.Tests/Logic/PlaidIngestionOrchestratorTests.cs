@@ -4,6 +4,7 @@ using THMS.Domain.Finance.Transactions;
 using THMS.External;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
+using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Finance;
 using THMS.Tests.Logic.TestSupport;
 
@@ -135,14 +136,16 @@ namespace THMS.Tests.Logic
                 }
             };
 
-            var reports = new List<TransactionImportProgress>();
+            var reports = new List<ImportProgress>();
             var imported = orchestrator.ImportTransactions(
                 rows,
-                new CollectingProgress<TransactionImportProgress>(reports));
+                new CollectingProgress<ImportProgress>(reports));
 
-            Assert.That(imported, Is.EqualTo(1));
+            Assert.That(imported.Count, Is.EqualTo(1));
+            Assert.That(imported.Start, Is.EqualTo(new DateTime(2026, 3, 1)));
+            Assert.That(imported.End, Is.EqualTo(new DateTime(2026, 3, 1)));
             Assert.That(reports.Select(r => r.Total).Distinct().ToList(), Is.EqualTo(new[] { 1 }));
-            Assert.That(reports.Last().Completed, Is.EqualTo(imported));
+            Assert.That(reports.Last().Completed, Is.EqualTo(imported.Count));
             var posted = txs.GetPostedTransactions(checking.Id).ToList();
             Assert.That(posted, Has.Count.EqualTo(1));
             Assert.That(posted[0].Category, Is.EqualTo("Restaurants"));
@@ -216,7 +219,7 @@ namespace THMS.Tests.Logic
             Assert.That(preview.Any(r => r.Description == "Other bank"), Is.False);
 
             var imported = orchestrator.ImportTransactions(preview);
-            Assert.That(imported, Is.EqualTo(1));
+            Assert.That(imported.Count, Is.EqualTo(1));
             Assert.That(txs.GetPostedTransactions(checking.Id).Single().Description, Is.EqualTo("Market"));
         }
 

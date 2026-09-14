@@ -3,6 +3,7 @@ using THMS.Domain.Finance.Accounts;
 using THMS.External;
 using THMS.Logic.Mapping;
 using THMS.Logic.Orchestrators;
+using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Logic.Orchestrators.Finance
@@ -85,12 +86,12 @@ namespace THMS.Logic.Orchestrators.Finance
             return results.OrderBy(r => r.Date).ThenBy(r => r.Description).ToList();
         }
 
-        public int ImportTransactions(IEnumerable<PlaidTransactionViewModel> previewRows) =>
+        public ImportResult ImportTransactions(IEnumerable<PlaidTransactionViewModel> previewRows) =>
             ImportTransactions(previewRows, progress: null);
 
-        public int ImportTransactions(
+        public ImportResult ImportTransactions(
             IEnumerable<PlaidTransactionViewModel> previewRows,
-            IProgress<TransactionImportProgress>? progress)
+            IProgress<ImportProgress>? progress)
         {
             ArgumentNullException.ThrowIfNull(previewRows);
             var mapped = previewRows

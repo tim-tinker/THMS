@@ -233,21 +233,18 @@ namespace THMS.UI.WinForms.Controls
             var btnViewHistory = new ThmsButton { Text = "View History" };
             var btnOpenPeriod = new ThmsButton { Text = "Open Current Period" };
             var btnTransferBalance = new ThmsButton { Text = "Transfer Balance" };
-            var btnManageCategories = new ThmsButton { Text = "Manage Categories" };
             btnAddBudget.Click += (_, _) => OpenBudgetRuleEditor(existing: false);
             btnEditBudget.Click += (_, _) => OpenBudgetRuleEditor(existing: true);
             btnDeleteBudget.Click += (_, _) => DeleteSelectedBudget();
             btnViewHistory.Click += (_, _) => OpenBudgetHistory();
             btnOpenPeriod.Click += (_, _) => OpenBudgetPeriod();
             btnTransferBalance.Click += (_, _) => OpenBudgetTransfer();
-            btnManageCategories.Click += (_, _) => OpenCategoryManager();
             toolbar.Controls.Add(btnAddBudget);
             toolbar.Controls.Add(btnEditBudget);
             toolbar.Controls.Add(btnDeleteBudget);
             toolbar.Controls.Add(btnViewHistory);
             toolbar.Controls.Add(btnOpenPeriod);
             toolbar.Controls.Add(btnTransferBalance);
-            toolbar.Controls.Add(btnManageCategories);
 
             budgetGrid = new DataGridView
             {

@@ -47,7 +47,6 @@ namespace THMS.UI.WinForms.Controls
             gridObligations.Columns.AddRange(
                 TextColumn(nameof(UpcomingObligation.AccountName), "Account"),
                 DateColumn(nameof(UpcomingObligation.DueDate), "Due Date"),
-                AmountColumn(nameof(UpcomingObligation.MinimumPayment), "Minimum"),
                 AmountColumn(nameof(UpcomingObligation.AmountDue), "Amount Due"),
                 AmountColumn(nameof(UpcomingObligation.PromotionalDue), "Promotional Due"),
                 TextColumn(nameof(UpcomingObligation.Notes), "Notes"));

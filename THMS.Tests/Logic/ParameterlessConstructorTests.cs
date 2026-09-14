@@ -27,7 +27,6 @@ namespace THMS.Tests.Logic
             Assert.That(new EvChargeSessionOrchestrator(), Is.Not.Null);
             Assert.That(new TransactionUpdaterOrchestrator(), Is.Not.Null);
             Assert.That(new VehicleListViewModel(), Is.Not.Null);
-            Assert.That(new TransportationDashboardViewModel(), Is.Not.Null);
             Assert.That(new MileageEntryViewModel(Guid.NewGuid()), Is.Not.Null);
             Assert.That(new ChargeCostEntryViewModel(Guid.NewGuid()), Is.Not.Null);
             Assert.That(new FinanceDashboardViewModel(), Is.Not.Null);

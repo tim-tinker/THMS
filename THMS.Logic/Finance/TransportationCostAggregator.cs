@@ -4,21 +4,32 @@ using System.Linq;
 using THMS.Data.Stores;
 using THMS.Domain.Finance;
 using THMS.Domain.Transportation;
-using static System.Collections.Specialized.BitVector32;
+using THMS.Logic.Orchestrators;
 
 namespace THMS.Logic.Transportation
 {
     public class TransportationCostAggregator
     {
         private readonly IVehicleDataStore _vehicleStore;
-        private readonly IFinanceDataStore _financeStore;
+        private readonly EvChargeSessionOrchestrator _sessionOrchestrator;
 
         public TransportationCostAggregator(
             IVehicleDataStore vehicleStore,
             IFinanceDataStore financeStore)
+            : this(vehicleStore, financeStore, new DataStoreFactory().GetEnergyStore())
+        {
+        }
+
+        public TransportationCostAggregator(
+            IVehicleDataStore vehicleStore,
+            IFinanceDataStore financeStore,
+            IEnergyDataStore energyStore)
         {
             _vehicleStore = vehicleStore;
-            _financeStore = financeStore;
+            _sessionOrchestrator = new EvChargeSessionOrchestrator(
+                vehicleStore,
+                energyStore,
+                financeStore);
         }
 
         // ---------------------------------------------------------
@@ -50,26 +61,13 @@ namespace THMS.Logic.Transportation
             DateTime start,
             DateTime end)
         {
-            // 1. Get enriched EV charging sessions
-            var sessions = _vehicleStore.GetBaseEvChargeSessions(vehicle.Id, start, end)
-                .ToList();
+            var sessions = _sessionOrchestrator
+                .GetCompletedSessions(vehicle.Id, start, end);
 
-            // 2. Split home vs commercial
-            var homeSessions = sessions.Where(s => s is HomeEvChargeSession).Select(s => s as HomeEvChargeSession).ToList();
-            var commercialSessions = sessions.Where(s => s is CommercialEvChargeSession).Select(s => s as CommercialEvChargeSession).ToList();
-
-            // 3. Home charging cost attribution
-            var homeCost = ComputeHomeChargeCost(homeSessions, start, end);
-
-            // 4. Commercial charging cost (direct)
-            var commercialCost = commercialSessions
-                .Sum(s => s.SessionCost);
-
-            // 5. Total EV miles
+            var homeCost = sessions.OfType<HomeEvChargeSession>().Sum(s => s.SessionCost);
+            var commercialCost = sessions.OfType<CommercialEvChargeSession>().Sum(s => s.SessionCost);
+            var totalCost = sessions.Sum(s => s.SessionCost);
             var miles = ComputeEvMiles(sessions);
-
-            // 6. Cost per mile
-            var totalCost = homeCost + commercialCost;
             var costPerMile = miles > 0 ? totalCost / miles : 0;
 
             return new EvTransportationCostSummary
@@ -124,66 +122,28 @@ namespace THMS.Logic.Transportation
         }
 
         // ---------------------------------------------------------
-        // HOME CHARGING COST ATTRIBUTION
-        // ---------------------------------------------------------
-
-        private decimal ComputeHomeChargeCost(
-            IEnumerable<HomeEvChargeSession> homeSessions,
-            DateTime start,
-            DateTime end)
-        {
-            // 1. Get utility bills for the period
-            var bills = _financeStore.GetElectricUtilityBills(start, end).ToList();
-            if (!bills.Any())
-                return 0;
-
-            // 2. Compute cost per kWh for each bill
-            var costPerKwh = bills.Select(b =>
-                b.TotalCost / (b.KwhUsage == 0 ? 1 : b.KwhUsage)).ToList();
-
-            // 3. Compute average cost per kWh
-            var avgCostPerKwh = costPerKwh.Average();
-
-            // 4. Compute total kWh added
-            var totalKwh = homeSessions.Sum(s => s.KwhDrawn ?? 0);
-
-            // 5. Cost = kWh * avg cost per kWh
-            return totalKwh * avgCostPerKwh;
-        }
-
-        // ---------------------------------------------------------
         // EV MILES
         // ---------------------------------------------------------
 
-        private decimal ComputeEvMiles(IEnumerable<BaseEvChargeSession> sessions)
+        private static decimal ComputeEvMiles(IReadOnlyList<BaseEvChargeSession> sessions)
         {
-            decimal miles = 0;
+            if (sessions.Count == 0)
+                return 0;
 
-            var validSessions = (from session in sessions
-                                 orderby session.EndTime
-                                 select session).ToArray();
+            var ordered = sessions
+                .OrderBy(s => s.StartTime)
+                .ThenBy(s => s.EndTime)
+                .ToList();
 
-            var startSession = validSessions.FirstOrDefault();
-            var endSession = validSessions.LastOrDefault();
-            if (startSession != null && endSession != null)
-            {
-                miles = GetOdometer(endSession) - GetOdometer(startSession);
-            }
-
-            return miles;
-        }
-
-        private decimal GetOdometer(BaseEvChargeSession session)
-        {
-            decimal odometer = session.OdometerMiles;
-            return odometer;
+            var miles = ordered[^1].OdometerMiles - ordered[0].LastOdometer;
+            return miles > 0 ? miles : 0;
         }
 
         // ---------------------------------------------------------
         // ICE MILES
         // ---------------------------------------------------------
 
-        private decimal ComputeIceMiles(IEnumerable<IceMileageRecord> records)
+        private static decimal ComputeIceMiles(IEnumerable<IceMileageRecord> records)
         {
             if (!records.Any())
                 return 0;

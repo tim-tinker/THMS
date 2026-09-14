@@ -97,34 +97,20 @@ namespace THMS.Data.Stores.SqliteStores
             {
                 StatementType.Bank => new BankStatement
                 {
-                    PeriodStart = details.PeriodStart ?? row.StatementDate,
-                    BeginningBalance = details.BeginningBalance,
-                    Deposits = details.Deposits,
-                    Withdrawals = details.Withdrawals,
-                    InterestEarned = details.InterestEarned,
-                    Fees = details.Fees,
-                    EndingBalance = details.StatementBalance
+                    StatementBalance = details.StatementBalance
                 },
                 StatementType.Loan => new LoanStatement
                 {
-                    PrincipalBalance = details.PrincipalBalance,
-                    InterestBalance = details.InterestBalance,
-                    InterestCharged = details.InterestCharged,
-                    Fees = details.Fees
+                    StatementBalance = details.StatementBalance
                 },
                 StatementType.Mortgage => new MortgageStatement
                 {
-                    PrincipalBalance = details.PrincipalBalance,
-                    InterestBalance = details.InterestBalance,
-                    EscrowBalance = details.EscrowBalance,
-                    InterestCharged = details.InterestCharged,
-                    Fees = details.Fees
+                    StatementBalance = details.StatementBalance,
+                    EscrowBalance = details.EscrowBalance
                 },
                 StatementType.CreditCard => new CreditCardStatement
                 {
                     StatementBalance = details.StatementBalance,
-                    InterestCharged = details.InterestCharged,
-                    Fees = details.Fees,
                     Promotions = _promotions.GetByStatement(conn, row.Id)
                 },
                 StatementType.Utility => new UtilityStatement
@@ -136,11 +122,7 @@ namespace THMS.Data.Stores.SqliteStores
                 {
                     Charges = _charges.GetService(conn, row.Id)
                 },
-                StatementType.Insurance => new InsuranceStatement
-                {
-                    Premium = details.Premium,
-                    Fees = details.Fees
-                },
+                StatementType.Insurance => new InsuranceStatement(),
                 _ => null
             };
 
@@ -152,7 +134,6 @@ namespace THMS.Data.Stores.SqliteStores
             statement.StatementDate = row.StatementDate;
             statement.DueDate = row.DueDate;
             statement.AmountDue = row.AmountDue;
-            statement.MinimumPayment = row.MinimumPayment;
             statement.Notes = row.Notes;
             return statement;
         }

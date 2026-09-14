@@ -9,6 +9,7 @@ namespace THMS.Domain.Finance.Transactions
         public static readonly Guid GroceriesId = Guid.Parse("11111111-1111-1111-1111-111111111005");
         public static readonly Guid RestaurantsId = Guid.Parse("11111111-1111-1111-1111-111111111006");
         public static readonly Guid PaymentId = Guid.Parse("11111111-1111-1111-1111-111111111007");
+        public static readonly Guid InterestId = Guid.Parse("11111111-1111-1111-1111-111111111009");
         public static readonly Guid UncategorizedId = Guid.Parse("11111111-1111-1111-1111-111111111008");
 
         public const string Utility = "Utility";
@@ -18,6 +19,7 @@ namespace THMS.Domain.Finance.Transactions
         public const string Groceries = "Groceries";
         public const string Restaurants = "Restaurants";
         public const string Payment = "Payment";
+        public const string Interest = "Interest";
         public const string Uncategorized = "Uncategorized";
 
         public static readonly Guid[] UtilityMemberIds = [UtilityId, ElectricId, WaterId, GasId];
@@ -31,6 +33,7 @@ namespace THMS.Domain.Finance.Transactions
             new() { Id = GroceriesId, Name = Groceries, DisplayOrder = 20 },
             new() { Id = RestaurantsId, Name = Restaurants, DisplayOrder = 30 },
             new() { Id = PaymentId, Name = Payment, DisplayOrder = 40 },
+            new() { Id = InterestId, Name = Interest, DisplayOrder = 50 },
             new() { Id = UncategorizedId, Name = Uncategorized, DisplayOrder = 90 }
         ];
 
@@ -49,6 +52,7 @@ namespace THMS.Domain.Finance.Transactions
                 _ when Matches(name, "Groceries") => Groceries,
                 _ when Matches(name, "Shopping") => Restaurants,
                 _ when Matches(name, "Payment") => Payment,
+                _ when Matches(name, "Interest") => Interest,
                 _ when Matches(name, "Uncategorized") => Uncategorized,
                 _ => name.Trim()
             };

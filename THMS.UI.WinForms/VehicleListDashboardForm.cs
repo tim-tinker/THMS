@@ -1,4 +1,5 @@
 ﻿using THMS.Logic.ViewModels;
+using THMS.UI.WinForms.Controls;
 
 namespace THMS.UI.WinForms
 {
@@ -14,14 +15,30 @@ namespace THMS.UI.WinForms
         public VehicleListDashboardForm()
         {
             InitializeComponent();
+            historyBar.SelectedPeriodChanged += (_, _) =>
+            {
+                if (ViewModel is null)
+                    return;
+
+                ViewModel.HistoryPeriod = historyBar.SelectedPeriod;
+            };
         }
 
         public override void InitializeDashboard()
         {
             ViewModel = new VehicleListViewModel();
             ViewModel.Initialize();
+            historyBar.SelectPeriod(ViewModel.HistoryPeriod);
+            vehicleGrid.DataBindingComplete += (_, _) => HideVehicleIdColumn();
             vehicleGrid.DataSource = ViewModel.Vehicles;
+            HideVehicleIdColumn();
             RefreshDashboard();
+        }
+
+        private void HideVehicleIdColumn()
+        {
+            if (vehicleGrid.Columns[nameof(VehicleListItemViewModel.VehicleId)] is DataGridViewColumn column)
+                column.Visible = false;
         }
 
         public override void RefreshDashboard()
@@ -41,7 +58,7 @@ namespace THMS.UI.WinForms
         {
             if (SelectedVehicle != null)
             {
-                var form = new VehicleDetailForm(SelectedVehicle.VehicleId);
+                var form = new VehicleDetailForm(SelectedVehicle.VehicleId, historyBar.SelectedPeriod);
 
                 form.ShowDialog(this);
 

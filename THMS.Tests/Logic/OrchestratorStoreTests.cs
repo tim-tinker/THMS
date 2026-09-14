@@ -97,6 +97,13 @@ namespace THMS.Tests.Logic
             Assert.That(orchestrator.GetSolarIntervals("Month").Count(), Is.EqualTo(1));
             Assert.That(orchestrator.GetSolarIntervals("Year").Count(), Is.EqualTo(1));
             Assert.That(store.GetHomeCircuitAttribution(DateTime.MinValue, DateTime.MaxValue), Is.Not.Empty);
+
+            var preview = orchestrator.LoadIntervalsFromFiles([good]);
+            Assert.That(preview, Has.Count.EqualTo(1));
+            var imported = orchestrator.ImportIntervals(preview);
+            Assert.That(imported.Count, Is.EqualTo(1));
+            Assert.That(imported.Start, Is.EqualTo(new DateTime(2026, 1, 1, 12, 0, 0)));
+            Assert.That(imported.End, Is.EqualTo(new DateTime(2026, 1, 1, 12, 0, 0)));
         }
 
         [Test]
@@ -112,10 +119,19 @@ namespace THMS.Tests.Logic
 
             var good = WriteTemp("circuit-good",
                 "Local SPAN Panel time (America/Chicago),Energy Data (Wh)\n" +
-                "2026-02-01 08:00:00,1.25\n");
+                "2026-02-01 08:00:00,1.25\n" +
+                "2026-02-01 08:15:00,0\n");
             orchestrator.Update([good]);
+            Assert.That(orchestrator.ErrorMessage, Is.Empty);
             Assert.That(orchestrator.ReadingCount, Is.EqualTo(1));
             Assert.That(orchestrator.GetHomeCircuitReadings("Lifetime").Count(), Is.EqualTo(1));
+
+            var preview = orchestrator.LoadReadingsFromFiles([good]);
+            Assert.That(preview, Has.Count.EqualTo(1));
+            var imported = orchestrator.ImportReadings(preview);
+            Assert.That(imported.Count, Is.EqualTo(1));
+            Assert.That(imported.Start, Is.EqualTo(new DateTime(2026, 2, 1, 8, 0, 0)));
+            Assert.That(imported.End, Is.EqualTo(new DateTime(2026, 2, 1, 8, 0, 0)));
         }
 
         [Test]
@@ -319,6 +335,84 @@ namespace THMS.Tests.Logic
             var billedOnExpiry = orchestrator.GetEvChargeSessions("Lifetime").OfType<HomeEvChargeSession>()
                 .First(s => s.Id == endDateMidnight.Id);
             Assert.That(billedOnExpiry.SessionCost, Is.EqualTo(10m * (0.12m + 0.06m)));
+        }
+
+        [Test]
+        public void CompleteHomeSession_WithoutSolar_ChargesCircuitToGrid()
+        {
+            var vehicles = new InMemoryVehicleDataStore();
+            var energy = new InMemoryEnergyDataStore();
+            var finance = new InMemoryFinanceDataStore();
+            var ev = vehicles.GetAllVehicles().OfType<VehicleEv>().First();
+            var orchestrator = new EvChargeSessionOrchestrator(vehicles, energy, finance)
+            {
+                VehicleId = ev.Id
+            };
+
+            finance.UpsertElectricContract(new ElectricContract
+            {
+                Id = Guid.NewGuid(),
+                Name = "Contract",
+                StartDate = new DateTime(2026, 1, 1),
+                EndDate = new DateTime(2026, 12, 31),
+                EnergyChargeRate = 0.10m,
+                DeliveryChargeRate = 0.05m
+            });
+            energy.UpsertHomeCircuitReading(new HomeCircuitReading
+            {
+                Timestamp = new DateTime(2026, 9, 8, 20, 19, 0),
+                KiloWattHours = 2m
+            });
+
+            var session = new HomeEvChargeSession
+            {
+                VehicleId = ev.Id,
+                StartTime = new DateTime(2026, 9, 8, 20, 19, 0),
+                EndTime = new DateTime(2026, 9, 9, 1, 34, 0)
+            };
+            orchestrator.Save(session);
+
+            var completed = orchestrator.GetEvChargeSessions("Lifetime").OfType<HomeEvChargeSession>()
+                .First(s => s.Id == session.Id);
+            Assert.That(completed.HasCircuitData, Is.True);
+            Assert.That(completed.HasSolarData, Is.False);
+            Assert.That(completed.HasElectricContract, Is.True);
+            Assert.That(completed.SourceSplitIsEstimated, Is.True);
+            Assert.That(completed.DrawnKwhIsUnavailable, Is.False);
+            Assert.That(completed.GridKwh, Is.EqualTo(2m));
+            Assert.That(completed.SolarKwh, Is.EqualTo(0m));
+            Assert.That(completed.BatteryKwh, Is.EqualTo(0m));
+            Assert.That(completed.KwhDrawn, Is.EqualTo(2m));
+            Assert.That(completed.SessionCost, Is.EqualTo(2m * 0.15m));
+        }
+
+        [Test]
+        public void CompleteHomeSession_WithoutCircuit_MarksDrawnUnavailable()
+        {
+            var vehicles = new InMemoryVehicleDataStore();
+            var energy = new InMemoryEnergyDataStore();
+            var finance = new InMemoryFinanceDataStore();
+            var ev = vehicles.GetAllVehicles().OfType<VehicleEv>().First();
+            var orchestrator = new EvChargeSessionOrchestrator(vehicles, energy, finance)
+            {
+                VehicleId = ev.Id
+            };
+
+            var session = new HomeEvChargeSession
+            {
+                VehicleId = ev.Id,
+                StartTime = new DateTime(2026, 9, 1, 12, 52, 0),
+                EndTime = new DateTime(2026, 9, 1, 15, 48, 0)
+            };
+            orchestrator.Save(session);
+
+            var completed = orchestrator.GetEvChargeSessions("Lifetime").OfType<HomeEvChargeSession>()
+                .First(s => s.Id == session.Id);
+            Assert.That(completed.HasCircuitData, Is.False);
+            Assert.That(completed.HasElectricContract, Is.False);
+            Assert.That(completed.DrawnKwhIsUnavailable, Is.True);
+            Assert.That(completed.SourceSplitIsEstimated, Is.False);
+            Assert.That(completed.Attribution, Is.Null);
         }
     }
 
@@ -677,8 +771,7 @@ namespace THMS.Tests.Logic
             {
                 AccountId = account.Id,
                 StatementDate = statementDate,
-                PeriodStart = new DateTime(2026, 8, 1),
-                EndingBalance = 1000
+                StatementBalance = 1000
             });
 
             txs.AddPostedTransaction(new PostedTransaction

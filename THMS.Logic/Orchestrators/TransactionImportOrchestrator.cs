@@ -4,6 +4,7 @@ using THMS.Domain.Finance.Transactions;
 using THMS.External;
 using THMS.Ingestion.Importers.Finance;
 using THMS.Logic.Mapping;
+using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Logic.Orchestrators
@@ -85,12 +86,12 @@ namespace THMS.Logic.Orchestrators
             return rows;
         }
 
-        public int ImportTransactions(IEnumerable<TransactionImportPreview> previewRows) =>
+        public ImportResult ImportTransactions(IEnumerable<TransactionImportPreview> previewRows) =>
             ImportTransactions(previewRows, progress: null);
 
-        public int ImportTransactions(
+        public ImportResult ImportTransactions(
             IEnumerable<TransactionImportPreview> previewRows,
-            IProgress<TransactionImportProgress>? progress)
+            IProgress<ImportProgress>? progress)
         {
             ArgumentNullException.ThrowIfNull(previewRows);
             var rows = previewRows as IReadOnlyList<TransactionImportPreview> ?? previewRows.ToList();
@@ -107,23 +108,23 @@ namespace THMS.Logic.Orchestrators
             }
 
             var total = toImport.Count;
-            Report(progress, 0, total);
+            ImportProgressReporter.Report(progress, 0, total);
 
             for (var i = 0; i < toImport.Count; i++)
             {
                 var posted = ToPosted(toImport[i], categorize: true);
                 _txStore.AddPostedTransaction(posted);
-                Report(progress, i + 1, total);
+                ImportProgressReporter.Report(progress, i + 1, total);
             }
 
             if (total > 0)
             {
-                Report(progress, total, total, updatingLedger: true);
+                ImportProgressReporter.Report(progress, total, total, ImportProgress.LedgerPhase);
                 _ledgerUpdater.RunLedgerUpdate();
             }
 
-            Report(progress, total, total);
-            return total;
+            ImportProgressReporter.Report(progress, total, total);
+            return ImportResult.FromDates(total, toImport.Select(row => row.Date));
         }
 
         private PostedTransaction ToPosted(TransactionImportPreview row, bool categorize)
@@ -145,20 +146,6 @@ namespace THMS.Logic.Orchestrators
                 _categorizer.ApplySuggestion(posted);
 
             return posted;
-        }
-
-        private static void Report(
-            IProgress<TransactionImportProgress>? progress,
-            int completed,
-            int total,
-            bool updatingLedger = false)
-        {
-            if (progress is null)
-                return;
-            if (!updatingLedger && completed != 0 && completed != total && completed % 25 != 0)
-                return;
-
-            progress.Report(new TransactionImportProgress(completed, total, updatingLedger));
         }
 
         public async Task<TransactionImportResult> ImportAsync(Account account)
@@ -350,6 +337,4 @@ namespace THMS.Logic.Orchestrators
             public int TransfersDetected { get; set; }
         }
     }
-
-    public readonly record struct TransactionImportProgress(int Completed, int Total, bool UpdatingLedger = false);
 }

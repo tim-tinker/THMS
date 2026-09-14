@@ -21,6 +21,7 @@
             gridHomeCircuit = new DataGridView();
             ColumnTimestamp = new DataGridViewTextBoxColumn();
             ColumnEnergy = new DataGridViewTextBoxColumn();
+            lblStatus = new Label();
             ((System.ComponentModel.ISupportInitialize)gridHomeCircuit).BeginInit();
             SuspendLayout();
             // 
@@ -58,11 +59,20 @@
             ColumnEnergy.MinimumWidth = 9;
             ColumnEnergy.Name = "ColumnEnergy";
             // 
+            // lblStatus
+            // 
+            lblStatus.Dock = DockStyle.Bottom;
+            lblStatus.Height = 24;
+            lblStatus.Name = "lblStatus";
+            lblStatus.Padding = new Padding(8, 0, 8, 0);
+            lblStatus.TextAlign = ContentAlignment.MiddleLeft;
+            // 
             // HomeCircuitManagerControl
             // 
             AutoScaleDimensions = new SizeF(12F, 30F);
             AutoScaleMode = AutoScaleMode.Font;
             Controls.Add(gridHomeCircuit);
+            Controls.Add(lblStatus);
             Margin = new Padding(4);
             Name = "HomeCircuitManagerControl";
             Size = new Size(1080, 792);
@@ -75,5 +85,6 @@
 
         private DataGridViewTextBoxColumn ColumnTimestamp;
         private DataGridViewTextBoxColumn ColumnEnergy;
+        private Label lblStatus;
     }
 }

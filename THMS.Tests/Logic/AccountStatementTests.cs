@@ -2,8 +2,10 @@ using THMS.Data.Stores;
 using THMS.Data.Stores.SQLite;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
+using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Planning;
 using THMS.Logic.Orchestrators.Finance;
+using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Tests.Logic
 {
@@ -37,36 +39,29 @@ namespace THMS.Tests.Logic
             {
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today,
-                PeriodStart = DateTime.Today.AddDays(1),
-                BeginningBalance = 100,
-                Deposits = 10,
-                Withdrawals = 5,
-                EndingBalance = 90
-            }), Has.Some.Contains("Period start").And.Some.Contains("Ending balance"));
+                StatementBalance = -1
+            }), Has.Some.Contains("Statement balance"));
 
             Assert.That(AccountStatementValidator.Validate(new BankStatement
             {
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today,
-                BeginningBalance = -1,
-                EndingBalance = 0
-            }), Has.Some.Contains("Beginning balance"));
+                StatementBalance = 0
+            }), Is.Empty);
 
             Assert.That(AccountStatementValidator.Validate(new LoanStatement
             {
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today.AddDays(-1),
                 AmountDue = 10,
-                MinimumPayment = 20,
-                PrincipalBalance = -1
-            }), Has.Some.Contains("Due date").And.Some.Contains("minimum payment").And.Some.Contains("principal"));
+                StatementBalance = -1
+            }), Has.Some.Contains("Due date").And.Some.Contains("Statement balance"));
 
             Assert.That(AccountStatementValidator.Validate(new MortgageStatement
             {
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today,
                 AmountDue = 100,
-                MinimumPayment = 100,
                 EscrowBalance = -5
             }), Has.Some.Contains("escrow"));
 
@@ -75,17 +70,15 @@ namespace THMS.Tests.Logic
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today,
                 AmountDue = 50,
-                MinimumPayment = 25,
                 StatementBalance = -1,
                 Promotions = [new() { Amount = 10, Deadline = default }]
-            }), Has.Some.Contains("statement balance").And.Some.Contains("deadline"));
+            }), Has.Some.Contains("Statement balance").And.Some.Contains("deadline"));
 
             Assert.That(AccountStatementValidator.Validate(new UtilityStatement
             {
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today,
                 AmountDue = 50,
-                MinimumPayment = 50,
                 Usage = [new() { Type = "kWh", Amount = 0 }],
                 Charges = [new() { Description = "Energy", Amount = 40 }]
             }), Has.Some.Contains("positive amount").And.Some.Contains("must equal amount due"));
@@ -95,7 +88,6 @@ namespace THMS.Tests.Logic
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today,
                 AmountDue = 15,
-                MinimumPayment = 15,
                 Charges = [new() { Description = "Base", Amount = 10 }]
             }), Has.Some.Contains("must equal amount due"));
 
@@ -103,51 +95,15 @@ namespace THMS.Tests.Logic
             {
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today,
-                AmountDue = 100,
-                MinimumPayment = 100,
-                Premium = 80,
-                Fees = 10
-            }), Has.Some.Contains("must equal amount due"));
+                AmountDue = 100
+            }), Is.Empty);
 
             Assert.That(AccountStatementValidator.Validate(ValidUtility()), Is.Empty);
             Assert.That(AccountStatementValidator.Validate(new BankStatement
             {
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today,
-                PeriodStart = DateTime.Today.AddDays(-30),
-                BeginningBalance = 100,
-                Deposits = 50,
-                Withdrawals = 20,
-                InterestEarned = 1.25m,
-                EndingBalance = 131.25m
-            }), Is.Empty);
-            Assert.That(AccountStatementValidator.Validate(new BankStatement
-            {
-                StatementDate = DateTime.Today,
-                DueDate = DateTime.Today,
-                BeginningBalance = 100,
-                Deposits = 50,
-                Withdrawals = 20,
-                Fees = 4,
-                EndingBalance = 126
-            }), Is.Empty);
-            Assert.That(AccountStatementValidator.Validate(new BankStatement
-            {
-                StatementDate = DateTime.Today,
-                DueDate = DateTime.Today,
-                BeginningBalance = 100,
-                Deposits = 50,
-                Withdrawals = 20,
-                InterestEarned = 1.25m,
-                Fees = 4,
-                EndingBalance = 130
-            }), Has.Some.Contains("Ending balance"));
-            Assert.That(AccountStatementValidator.Validate(new BankStatement
-            {
-                StatementDate = DateTime.Today,
-                DueDate = DateTime.Today,
-                BeginningBalance = 1090.73m,
-                EndingBalance = 1090.73m
+                StatementBalance = 131.25m
             }), Is.Empty);
         }
 
@@ -193,7 +149,6 @@ namespace THMS.Tests.Logic
                 StatementDate = DateTime.Today.AddDays(-20),
                 DueDate = DateTime.Today.AddDays(10),
                 AmountDue = 350,
-                MinimumPayment = 35,
                 StatementBalance = 350
             });
             statements.Save(new BankStatement
@@ -201,11 +156,7 @@ namespace THMS.Tests.Logic
                 AccountId = checking.Id,
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today,
-                PeriodStart = DateTime.Today.AddDays(-30),
-                BeginningBalance = 400,
-                Deposits = 200,
-                Withdrawals = 0,
-                EndingBalance = 600
+                StatementBalance = 600
             });
 
             var findings = new AccountDiagnosticsOrchestrator(accounts, transactions, statements).Run();
@@ -220,7 +171,6 @@ namespace THMS.Tests.Logic
             StatementDate = DateTime.Today,
             DueDate = DateTime.Today,
             AmountDue = 80,
-            MinimumPayment = 80,
             Usage = [new() { Type = "kWh", Amount = 400, Rate = 0.20m }],
             Charges = [new() { Description = "Energy", Amount = 80 }]
         };
@@ -235,13 +185,7 @@ namespace THMS.Tests.Logic
                     AccountId = accountId,
                     StatementDate = DateTime.Today,
                     DueDate = DateTime.Today,
-                    PeriodStart = DateTime.Today.AddDays(-30),
-                    BeginningBalance = 3777.56m,
-                    Deposits = 16859.24m,
-                    Withdrawals = 19546.07m,
-                    InterestEarned = 1.25m,
-                    Fees = 0,
-                    EndingBalance = 1090.73m
+                    StatementBalance = 1090.73m
                 },
                 new LoanStatement
                 {
@@ -249,9 +193,7 @@ namespace THMS.Tests.Logic
                     StatementDate = DateTime.Today.AddDays(-20),
                     DueDate = DateTime.Today.AddDays(5),
                     AmountDue = 200,
-                    MinimumPayment = 200,
-                    PrincipalBalance = 5000,
-                    InterestCharged = 22.5m
+                    StatementBalance = 5000
                 },
                 new MortgageStatement
                 {
@@ -259,8 +201,7 @@ namespace THMS.Tests.Logic
                     StatementDate = DateTime.Today.AddDays(-20),
                     DueDate = DateTime.Today.AddDays(6),
                     AmountDue = 1800,
-                    MinimumPayment = 1800,
-                    PrincipalBalance = 200000,
+                    StatementBalance = 200000,
                     EscrowBalance = 1200
                 },
                 new CreditCardStatement
@@ -269,7 +210,6 @@ namespace THMS.Tests.Logic
                     StatementDate = DateTime.Today.AddDays(-15),
                     DueDate = DateTime.Today.AddDays(10),
                     AmountDue = 300,
-                    MinimumPayment = 35,
                     StatementBalance = 300,
                     Promotions = [new() { AccountId = accountId, Amount = 50, Deadline = DateTime.Today.AddDays(8), Type = PromoType.LumpSum }]
                 },
@@ -279,7 +219,6 @@ namespace THMS.Tests.Logic
                     StatementDate = DateTime.Today.AddDays(-10),
                     DueDate = DateTime.Today.AddDays(12),
                     AmountDue = 80,
-                    MinimumPayment = 80,
                     Usage = [new() { Type = "kWh", Amount = 400, Rate = 0.20m }],
                     Charges = [new() { Description = "Energy", Amount = 80 }]
                 },
@@ -289,7 +228,6 @@ namespace THMS.Tests.Logic
                     StatementDate = DateTime.Today.AddDays(-5),
                     DueDate = DateTime.Today.AddDays(15),
                     AmountDue = 15,
-                    MinimumPayment = 15,
                     Charges = [new() { Description = "Streaming", Amount = 15 }]
                 },
                 new InsuranceStatement
@@ -297,10 +235,7 @@ namespace THMS.Tests.Logic
                     AccountId = accountId,
                     StatementDate = DateTime.Today.AddDays(-8),
                     DueDate = DateTime.Today.AddDays(20),
-                    AmountDue = 110,
-                    MinimumPayment = 110,
-                    Premium = 100,
-                    Fees = 10
+                    AmountDue = 110
                 }
             ];
 
@@ -310,10 +245,11 @@ namespace THMS.Tests.Logic
             Assert.That(store.GetForAccount(accountId), Has.Count.EqualTo(7));
             Assert.That(store.GetUpcoming(DateTime.Today), Has.Count.EqualTo(7));
             var bank = (BankStatement)store.Get(statements[0].Id)!;
-            Assert.That(bank.EndingBalance, Is.EqualTo(1090.73m));
-            Assert.That(bank.InterestEarned, Is.EqualTo(1.25m));
-            Assert.That(((LoanStatement)store.Get(statements[1].Id)!).PrincipalBalance, Is.EqualTo(5000m));
-            Assert.That(((MortgageStatement)store.Get(statements[2].Id)!).EscrowBalance, Is.EqualTo(1200m));
+            Assert.That(bank.StatementBalance, Is.EqualTo(1090.73m));
+            Assert.That(((LoanStatement)store.Get(statements[1].Id)!).StatementBalance, Is.EqualTo(5000m));
+            var mortgage = (MortgageStatement)store.Get(statements[2].Id)!;
+            Assert.That(mortgage.StatementBalance, Is.EqualTo(200000m));
+            Assert.That(mortgage.EscrowBalance, Is.EqualTo(1200m));
             var card = (CreditCardStatement)store.Get(statements[3].Id)!;
             Assert.That(card.Promotions, Has.Count.EqualTo(1));
             Assert.That(card.Promotions[0].Amount, Is.EqualTo(50m));
@@ -321,7 +257,7 @@ namespace THMS.Tests.Logic
             Assert.That(utility.Usage[0].Amount, Is.EqualTo(400m));
             Assert.That(utility.Charges[0].Amount, Is.EqualTo(80m));
             Assert.That(((ServiceStatement)store.Get(statements[5].Id)!).Charges[0].Description, Is.EqualTo("Streaming"));
-            Assert.That(((InsuranceStatement)store.Get(statements[6].Id)!).Premium, Is.EqualTo(100m));
+            Assert.That(((InsuranceStatement)store.Get(statements[6].Id)!).AmountDue, Is.EqualTo(110m));
 
             store.Delete(statements[2].Id);
             Assert.That(store.Get(statements[2].Id), Is.Null);
@@ -376,6 +312,149 @@ namespace THMS.Tests.Logic
             {
                 TryDelete(path);
             }
+        }
+
+        [Test]
+        public void AccountStatementListRow_MapsCommonAndTypeSpecificFields()
+        {
+            var card = new CreditCardStatement
+            {
+                Id = Guid.NewGuid(),
+                StatementDate = new DateTime(2026, 8, 15),
+                DueDate = new DateTime(2026, 9, 10),
+                AmountDue = 220.50m,
+                StatementBalance = 400,
+                Notes = "August",
+                Promotions =
+                [
+                    new() { Amount = 50, Deadline = new DateTime(2026, 9, 1), Type = PromoType.LumpSum }
+                ]
+            };
+
+            var row = AccountStatementListRow.From(card, -12.25m);
+            Assert.That(row.Id, Is.EqualTo(card.Id));
+            Assert.That(row.Type, Is.EqualTo("Credit Card"));
+            Assert.That(row.StatementDate, Is.EqualTo(card.StatementDate.ToString("d")));
+            Assert.That(row.DueDate, Is.EqualTo(card.DueDate.ToString("d")));
+            Assert.That(row.AmountDue, Is.EqualTo(220.50m.ToString("c2")));
+            Assert.That(row.StatementBalance, Is.EqualTo(400m.ToString("c2")));
+            Assert.That(row.Interest, Is.EqualTo((-12.25m).ToString("c2")));
+            Assert.That(row.Promotions, Does.Contain("Lump sum").And.Contain(50m.ToString("c2")));
+            Assert.That(row.Usage, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(row.Notes, Is.EqualTo("August"));
+            Assert.That(AccountStatementListRow.DisplayType(StatementType.Bank), Is.EqualTo("Bank"));
+        }
+
+        [Test]
+        public void AccountStatementListRow_BankLeavesObligationFieldsNotApplicable()
+        {
+            var bank = new BankStatement
+            {
+                StatementDate = new DateTime(2026, 8, 31),
+                DueDate = new DateTime(2026, 8, 31),
+                StatementBalance = 1148.25m,
+                Notes = "August checking"
+            };
+
+            var row = AccountStatementListRow.From(bank, 1.25m);
+            Assert.That(row.Type, Is.EqualTo("Bank"));
+            Assert.That(row.DueDate, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(row.AmountDue, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(row.Interest, Is.EqualTo(1.25m.ToString("c2")));
+            Assert.That(row.StatementBalance, Is.EqualTo(1148.25m.ToString("c2")));
+            Assert.That(row.Promotions, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(row.Notes, Is.EqualTo("August checking"));
+        }
+
+        [Test]
+        public void AccountStatementListRow_EmptyApplicableCollectionsAreBlank()
+        {
+            var card = AccountStatementListRow.From(new CreditCardStatement
+            {
+                StatementDate = new DateTime(2026, 8, 15),
+                DueDate = new DateTime(2026, 9, 10)
+            });
+            Assert.That(card.Promotions, Is.EqualTo(""));
+            Assert.That(card.Usage, Is.EqualTo(AccountStatementListRow.NotApplicable));
+
+            var utility = AccountStatementListRow.From(new UtilityStatement
+            {
+                StatementDate = new DateTime(2026, 8, 15),
+                DueDate = new DateTime(2026, 9, 10),
+                AmountDue = 80
+            });
+            Assert.That(utility.Usage, Is.EqualTo(""));
+            Assert.That(utility.Charges, Is.EqualTo(""));
+            Assert.That(utility.Promotions, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(utility.Interest, Is.EqualTo(AccountStatementListRow.NotApplicable));
+        }
+
+        [Test]
+        public void StatementPeriodInterest_SumsInterestCategoryInStatementWindow()
+        {
+            var accountId = Guid.NewGuid();
+            var older = new BankStatement
+            {
+                AccountId = accountId,
+                StatementDate = new DateTime(2026, 7, 31)
+            };
+            var current = new BankStatement
+            {
+                AccountId = accountId,
+                StatementDate = new DateTime(2026, 8, 31)
+            };
+            PostedTransaction[] posted =
+            [
+                new()
+                {
+                    AccountId = accountId,
+                    Date = new DateTime(2026, 7, 31),
+                    Amount = 0.40m,
+                    CategoryId = DefaultExpenseCategories.InterestId,
+                    Category = DefaultExpenseCategories.Interest
+                },
+                new()
+                {
+                    AccountId = accountId,
+                    Date = new DateTime(2026, 8, 15),
+                    Amount = 1.25m,
+                    CategoryId = DefaultExpenseCategories.InterestId,
+                    Category = DefaultExpenseCategories.Interest
+                },
+                new()
+                {
+                    AccountId = accountId,
+                    Date = new DateTime(2026, 8, 20),
+                    Amount = 50,
+                    CategoryId = DefaultExpenseCategories.PaymentId,
+                    Category = DefaultExpenseCategories.Payment
+                },
+                new()
+                {
+                    AccountId = accountId,
+                    Date = new DateTime(2026, 8, 22),
+                    Amount = -200,
+                    Splits =
+                    [
+                        new() { Amount = -160, Type = SplitType.Principal, CategoryId = DefaultExpenseCategories.PaymentId, Category = DefaultExpenseCategories.Payment },
+                        new() { Amount = -40, Type = SplitType.Interest, CategoryId = DefaultExpenseCategories.InterestId, Category = DefaultExpenseCategories.Interest }
+                    ]
+                },
+                new()
+                {
+                    AccountId = accountId,
+                    Date = new DateTime(2026, 9, 1),
+                    Amount = 0.10m,
+                    CategoryId = DefaultExpenseCategories.InterestId,
+                    Category = DefaultExpenseCategories.Interest
+                }
+            ];
+
+            Assert.That(StatementPeriodInterest.Compute(current, [older, current], posted), Is.EqualTo(-38.75m));
+            Assert.That(StatementPeriodInterest.Compute(older, [older, current], posted), Is.EqualTo(0.40m));
+            Assert.That(
+                AccountStatementListRow.From(new UtilityStatement { StatementDate = DateTime.Today }).Interest,
+                Is.EqualTo(AccountStatementListRow.NotApplicable));
         }
 
         private static void TryDelete(string path)

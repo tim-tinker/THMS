@@ -1,6 +1,5 @@
 using THMS.Data.Stores;
 using THMS.Domain.Energy;
-using THMS.Domain.Finance.Billing;
 using THMS.Domain.Transportation;
 using THMS.Logic.Transportation;
 using THMS.Tests.Logic.TestSupport;
@@ -283,7 +282,7 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void GetCostSummary_EvUsesBillsAndSessions()
+        public void GetCostSummary_EvUsesSessionCostAndOdometerSpan()
         {
             var vehicles = new InMemoryVehicleDataStore();
             var finance = new InMemoryFinanceDataStore();
@@ -291,15 +290,15 @@ namespace THMS.Tests.Logic
             var start = new DateTime(2026, 6, 17);
             var end = new DateTime(2026, 7, 17);
 
-            var homeId = Guid.NewGuid();
             vehicles.UpsertBaseEvChargeSession(new HomeEvChargeSession
             {
-                Id = homeId,
+                Id = Guid.NewGuid(),
                 VehicleId = ev.Id,
                 StartTime = start.AddDays(1),
                 EndTime = start.AddDays(1).AddHours(2),
-                OdometerMiles = 1000,
-                KwhDrawn = 20
+                LastOdometer = 1000,
+                OdometerMiles = 1050,
+                SessionCost = 10
             });
             vehicles.UpsertBaseEvChargeSession(new CommercialEvChargeSession
             {
@@ -307,21 +306,24 @@ namespace THMS.Tests.Logic
                 VehicleId = ev.Id,
                 StartTime = start.AddDays(2),
                 EndTime = start.AddDays(2).AddHours(1),
+                LastOdometer = 1050,
                 OdometerMiles = 1100,
                 SessionCost = 15
             });
 
             var summary = (THMS.Domain.Finance.EvTransportationCostSummary)
-                new TransportationCostAggregator(vehicles, finance)
+                new TransportationCostAggregator(vehicles, finance, new InMemoryEnergyDataStore())
                     .GetCostSummary(ev.Id, start, end);
 
+            Assert.That(summary.HomeChargeCost, Is.EqualTo(10));
             Assert.That(summary.CommercialChargeCost, Is.EqualTo(15));
-            Assert.That(summary.HomeChargeCost, Is.GreaterThan(0));
+            Assert.That(summary.TotalCost, Is.EqualTo(25));
             Assert.That(summary.TotalMiles, Is.EqualTo(100));
+            Assert.That(summary.CostPerMile, Is.EqualTo(0.25m));
         }
 
         [Test]
-        public void GetCostSummary_EvWithoutBills_HomeCostIsZero()
+        public void GetCostSummary_EvWithNoSessions_ZeroMiles()
         {
             var vehicles = new InMemoryVehicleDataStore();
             var finance = new InMemoryFinanceDataStore();
@@ -329,46 +331,13 @@ namespace THMS.Tests.Logic
             vehicles.UpsertVehicle(ev);
 
             var summary = (THMS.Domain.Finance.EvTransportationCostSummary)
-                new TransportationCostAggregator(vehicles, finance)
+                new TransportationCostAggregator(vehicles, finance, new InMemoryEnergyDataStore())
                     .GetCostSummary(ev.Id, new DateTime(2020, 1, 1), new DateTime(2020, 1, 31));
 
             Assert.That(summary.HomeChargeCost, Is.EqualTo(0));
+            Assert.That(summary.TotalCost, Is.EqualTo(0));
             Assert.That(summary.TotalMiles, Is.EqualTo(0));
             Assert.That(summary.CostPerMile, Is.EqualTo(0));
-        }
-
-        [Test]
-        public void GetCostSummary_EvBillWithZeroKwh_DoesNotDivideByZero()
-        {
-            var vehicles = new InMemoryVehicleDataStore();
-            var finance = new InMemoryFinanceDataStore();
-            var ev = new VehicleEv { Id = Guid.NewGuid(), Name = "Zero kWh EV" };
-            vehicles.UpsertVehicle(ev);
-            var start = new DateTime(2026, 11, 1);
-            var end = new DateTime(2026, 11, 30);
-
-            finance.UpsertElectricUtilityBill(new ElectricUtilityBill
-            {
-                Id = Guid.NewGuid(),
-                StartDate = start,
-                EndDate = end,
-                KwhUsage = 0,
-                EnergyCharge = 10,
-                BaseCharge = 0
-            });
-            vehicles.UpsertBaseEvChargeSession(new HomeEvChargeSession
-            {
-                VehicleId = ev.Id,
-                StartTime = start.AddDays(1),
-                EndTime = start.AddDays(1).AddHours(1),
-                KwhDrawn = 5
-            });
-
-            var summary = (THMS.Domain.Finance.EvTransportationCostSummary)
-                new TransportationCostAggregator(vehicles, finance)
-                    .GetCostSummary(ev.Id, start, end);
-
-            Assert.That(summary.HomeChargeCost, Is.EqualTo(50));
         }
     }
 

@@ -10,7 +10,6 @@ namespace THMS.UI.WinForms.Controls
         private DateTimePicker dtUntil;
         private ThmsButton btnAdd;
         private ThmsButton btnDelete;
-        private ThmsButton btnMinimums;
         private ThmsButton btnPromotions;
         private ThmsButton btnExtra;
         private ThmsButton btnPayAll;
@@ -31,7 +30,6 @@ namespace THMS.UI.WinForms.Controls
             dtUntil = new DateTimePicker();
             btnAdd = new ThmsButton();
             btnDelete = new ThmsButton();
-            btnMinimums = new ThmsButton();
             btnPromotions = new ThmsButton();
             btnExtra = new ThmsButton();
             btnPayAll = new ThmsButton();
@@ -100,10 +98,6 @@ namespace THMS.UI.WinForms.Controls
             btnDelete.Destructive = true;
             btnDelete.Margin = new Padding(0, 4, 8, 4);
             btnDelete.Click += OnDelete;
-            btnMinimums.Text = "Generate Minimum Payments";
-            btnMinimums.Name = "btnMinimums";
-            btnMinimums.Margin = new Padding(0, 4, 8, 4);
-            btnMinimums.Click += OnGenerateMinimums;
             btnPromotions.Text = "Generate Promotion Payments";
             btnPromotions.Name = "btnPromotions";
             btnPromotions.Margin = new Padding(0, 4, 8, 4);
@@ -120,7 +114,6 @@ namespace THMS.UI.WinForms.Controls
             toolbar.Controls.Add(dtUntil);
             toolbar.Controls.Add(btnAdd);
             toolbar.Controls.Add(btnDelete);
-            toolbar.Controls.Add(btnMinimums);
             toolbar.Controls.Add(btnPromotions);
             toolbar.Controls.Add(btnExtra);
             toolbar.Controls.Add(btnPayAll);

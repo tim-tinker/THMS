@@ -42,6 +42,7 @@
             BatteryColumn = new DataGridViewTextBoxColumn();
             GridColumn = new DataGridViewTextBoxColumn();
             CostColumn = new DataGridViewTextBoxColumn();
+            lblStatus = new Label();
             ((System.ComponentModel.ISupportInitialize)_gridSessions).BeginInit();
             SuspendLayout();
             // 
@@ -206,11 +207,20 @@
             CostColumn.ReadOnly = true;
             CostColumn.Width = 95;
             // 
+            // lblStatus
+            // 
+            lblStatus.Dock = DockStyle.Bottom;
+            lblStatus.Height = 24;
+            lblStatus.Name = "lblStatus";
+            lblStatus.Padding = new Padding(8, 0, 8, 0);
+            lblStatus.TextAlign = ContentAlignment.MiddleLeft;
+            // 
             // EvChargingSessionManagerControl
             // 
             AutoScaleDimensions = new SizeF(12F, 30F);
             AutoScaleMode = AutoScaleMode.Font;
             Controls.Add(_gridSessions);
+            Controls.Add(lblStatus);
             Name = "EvChargingSessionManagerControl";
             Size = new Size(1887, 881);
             Load += OnLoad;
@@ -234,5 +244,6 @@
         private DataGridViewTextBoxColumn BatteryColumn;
         private DataGridViewTextBoxColumn GridColumn;
         private DataGridViewTextBoxColumn CostColumn;
+        private Label lblStatus;
     }
 }

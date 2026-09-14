@@ -10,6 +10,8 @@ public class HomeCircuitAttributionEngine
 
     public IEnumerable<HomeCircuitAttribution> Results => _results;
     public int ResultCount => _results.Count;
+    public bool HadSolarIntervals { get; private set; }
+    public bool HadPositiveCircuitDraw { get; private set; }
 
     public HomeCircuitAttributionEngine(IEnergyDataStore store)
     {
@@ -23,6 +25,8 @@ public class HomeCircuitAttributionEngine
         // Raw data
         var intervals = _store.GetSolarProductionIntervals(start, end).ToList();
         var readings = _store.GetHomeCircuitReadings(start, end).ToList();
+        HadSolarIntervals = intervals.Count > 0;
+        HadPositiveCircuitDraw = readings.Any(r => r.KiloWattHours > 0);
 
         // Half-hour buckets
         var buckets = HalfHourBucketJoin(intervals, readings).ToList();
@@ -34,25 +38,32 @@ public class HomeCircuitAttributionEngine
             if (circuitKwh <= 0)
                 continue;
 
-            var otherHomeConsumptionKwh = b.HomeConsumptionKwh - circuitKwh;
-            // Available sources
-            decimal solarAvailable =
-                b.SolarKwh
-                - otherHomeConsumptionKwh
-                - b.BatteryChargeKwh;
+            decimal gridToCircuit;
+            decimal solarToCircuit;
+            decimal batteryToCircuit;
+            if (!b.HasSolarInterval)
+            {
+                // Without solar vendor data, sources cannot be split. Charge the
+                // whole circuit draw to the grid so session cost is non-zero.
+                gridToCircuit = circuitKwh;
+                solarToCircuit = 0;
+                batteryToCircuit = 0;
+            }
+            else
+            {
+                var otherHomeConsumptionKwh = Math.Max(0, b.HomeConsumptionKwh - circuitKwh);
+                decimal solarAvailable =
+                    b.SolarKwh
+                    - otherHomeConsumptionKwh
+                    - b.BatteryChargeKwh;
+                if (solarAvailable < 0)
+                    solarAvailable = 0;
 
-            if (solarAvailable < 0)
-                solarAvailable = 0;
-
-            decimal gridAvailable = b.GridImportKwh;
-
-            // Attribution
-            decimal gridToCircuit = Math.Min(circuitKwh, gridAvailable);
-            decimal remaining = circuitKwh - gridToCircuit;
-
-            decimal solarToCircuit = Math.Min(remaining, solarAvailable);
-            remaining -= solarToCircuit;
-            decimal batteryToCircuit = remaining;
+                gridToCircuit = Math.Min(circuitKwh, b.GridImportKwh);
+                var remaining = circuitKwh - gridToCircuit;
+                solarToCircuit = Math.Min(remaining, solarAvailable);
+                batteryToCircuit = remaining - solarToCircuit;
+            }
 
             // Store result
             var result = new HomeCircuitAttribution
@@ -87,12 +98,13 @@ public class HomeCircuitAttributionEngine
 
         foreach (var key in keys)
         {
-            solarBuckets.TryGetValue(key, out var interval);
+            var hasSolar = solarBuckets.TryGetValue(key, out var interval);
             circuitBuckets.TryGetValue(key, out var reading);
 
             yield return new HalfHourBucket
             {
                 Timestamp = key,
+                HasSolarInterval = hasSolar,
                 SolarKwh = interval?.SolarKwh ?? 0,
                 HomeConsumptionKwh = interval?.HomeConsumptionKwh ?? 0,
                 BatteryChargeKwh = interval?.BatteryChargeKwh ?? 0,
@@ -136,6 +148,7 @@ public class HomeCircuitAttributionEngine
     private class HalfHourBucket
     {
         public DateTime Timestamp { get; set; }
+        public bool HasSolarInterval { get; set; }
         public decimal SolarKwh { get; set; }
         public decimal HomeConsumptionKwh { get; set; }
         public decimal BatteryChargeKwh { get; set; }

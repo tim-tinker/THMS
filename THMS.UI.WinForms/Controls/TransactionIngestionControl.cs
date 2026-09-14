@@ -134,7 +134,7 @@ namespace THMS.UI.WinForms.Controls
             try
             {
                 var imported = _importOrchestrator.ImportTransactions(_filePreviewRows);
-                SetFileStatus($"Imported {imported} transaction{(imported == 1 ? "" : "s")}.");
+                SetFileStatus(ImportStatusText.Imported(imported, "transaction", "transactions"));
             }
             catch (Exception ex)
             {
@@ -177,7 +177,7 @@ namespace THMS.UI.WinForms.Controls
             try
             {
                 var imported = _plaidTransactionOrchestrator.ImportTransactions(_plaidPreviewRows);
-                SetPlaidStatus($"Imported {imported} Plaid transaction{(imported == 1 ? "" : "s")}.");
+                SetPlaidStatus(ImportStatusText.Imported(imported, "Plaid transaction", "Plaid transactions"));
             }
             catch (Exception ex)
             {

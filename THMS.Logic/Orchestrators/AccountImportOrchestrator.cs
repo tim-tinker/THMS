@@ -1,6 +1,7 @@
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Ingestion.Importers.Finance;
+using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Logic.Orchestrators.Finance
@@ -36,25 +37,32 @@ namespace THMS.Logic.Orchestrators.Finance
             return _importer.Parse(path).Select(AccountImportPreview.FromAccount).ToList();
         }
 
-        public int ImportAccounts(IEnumerable<AccountImportPreview> previewRows)
+        public ImportResult ImportAccounts(IEnumerable<AccountImportPreview> previewRows) =>
+            ImportAccounts(previewRows, progress: null);
+
+        public ImportResult ImportAccounts(
+            IEnumerable<AccountImportPreview> previewRows,
+            IProgress<ImportProgress>? progress)
         {
             ArgumentNullException.ThrowIfNull(previewRows);
+            var rows = previewRows as IReadOnlyList<AccountImportPreview> ?? previewRows.ToList();
             var existing = _accounts.GetAllAccounts().ToList();
-            var imported = 0;
+            var total = rows.Count;
+            ImportProgressReporter.Report(progress, 0, total, stride: 1);
 
-            foreach (var row in previewRows)
+            for (var i = 0; i < rows.Count; i++)
             {
-                var account = row.ApplyToAccount();
+                var account = rows[i].ApplyToAccount();
                 var match = existing.FirstOrDefault(a =>
                     string.Equals(a.Name, account.Name, StringComparison.OrdinalIgnoreCase));
                 if (match is not null)
                     account.Id = match.Id;
 
                 _accounts.UpsertAccount(account);
-                imported++;
+                ImportProgressReporter.Report(progress, i + 1, total, stride: 1);
             }
 
-            return imported;
+            return ImportResult.CountOnly(total);
         }
 
         public IReadOnlyList<Account> GetAllAccounts() =>

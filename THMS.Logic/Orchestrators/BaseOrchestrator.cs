@@ -11,5 +11,11 @@
                 _ => end.AddMonths(-1)
             };
         }
+
+        public static (DateTime Start, DateTime End) GetHistoryRange(string period)
+        {
+            var today = DateTime.Today;
+            return (GetStartDate(today, period), today.AddDays(1).AddTicks(-1));
+        }
     }
 }

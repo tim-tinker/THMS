@@ -113,9 +113,6 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
-        private void OnGenerateMinimums(object sender, EventArgs e) =>
-            RunGenerate("Minimum payments", () => _orchestrator.GenerateMinimumPayments(dtUntil.Value.Date));
-
         private void OnGeneratePromotions(object sender, EventArgs e) =>
             RunGenerate("Promotion payments", () => _orchestrator.GeneratePromotionPayments(dtUntil.Value.Date));
 

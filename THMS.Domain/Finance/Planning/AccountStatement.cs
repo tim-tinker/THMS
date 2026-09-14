@@ -9,7 +9,6 @@ namespace THMS.Domain.Finance.Planning
         public DateTime DueDate { get; set; }
 
         public decimal AmountDue { get; set; }
-        public decimal MinimumPayment { get; set; }
 
         public string? Notes { get; set; }
 

@@ -1,6 +1,7 @@
 using THMS.Data.Stores;
 using THMS.Domain.Transportation;
 using THMS.Ingestion.Importers.Transportation;
+using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Transportation;
 
 namespace THMS.Logic.Orchestrators
@@ -61,28 +62,38 @@ namespace THMS.Logic.Orchestrators
             return rows.OrderByDescending(row => row.StartTime).ToList();
         }
 
-        public int ImportSessions(IEnumerable<EvChargeSessionImportPreview> previewRows)
+        public ImportResult ImportSessions(IEnumerable<EvChargeSessionImportPreview> previewRows) =>
+            ImportSessions(previewRows, progress: null);
+
+        public ImportResult ImportSessions(
+            IEnumerable<EvChargeSessionImportPreview> previewRows,
+            IProgress<ImportProgress>? progress)
         {
             ArgumentNullException.ThrowIfNull(previewRows);
             var rows = previewRows.Where(row => row.VehicleId != Guid.Empty).ToList();
             foreach (var group in rows.GroupBy(row => row.VehicleId))
                 ApplyPreviousSessionContext(group.ToList(), group.Key);
 
-            var imported = 0;
             var existingByVehicle = new Dictionary<Guid, List<BaseEvChargeSession>>();
+            var imported = new List<EvChargeSessionImportPreview>();
+            var ordered = rows.OrderBy(r => r.StartTime).ToList();
+            ImportProgressReporter.Report(progress, 0, ordered.Count, stride: 1);
 
-            foreach (var row in rows.OrderBy(r => r.StartTime))
+            for (var i = 0; i < ordered.Count; i++)
             {
-                if (IsDuplicate(row, existingByVehicle))
-                    continue;
+                var row = ordered[i];
+                if (!IsDuplicate(row, existingByVehicle))
+                {
+                    var session = ToSession(row);
+                    _sessions.Save(session);
+                    existingByVehicle[row.VehicleId].Add(session);
+                    imported.Add(row);
+                }
 
-                var session = ToSession(row);
-                _sessions.Save(session);
-                existingByVehicle[row.VehicleId].Add(session);
-                imported++;
+                ImportProgressReporter.Report(progress, i + 1, ordered.Count, stride: 1);
             }
 
-            return imported;
+            return ImportResult.FromDates(imported.Count, imported.Select(row => row.StartTime));
         }
 
         private void ApplyPreviousSessionContext(List<EvChargeSessionImportPreview> rows, Guid vehicleId)

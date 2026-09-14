@@ -39,7 +39,6 @@ namespace THMS.Tests.Logic
                 StatementDate = DateTime.Today.AddDays(-20),
                 DueDate = DateTime.Today.AddDays(10),
                 AmountDue = 300,
-                MinimumPayment = 35,
                 StatementBalance = 300,
                 Promotions =
                 [
@@ -50,7 +49,7 @@ namespace THMS.Tests.Logic
             var rows = new PlanningOrchestrator(accounts, transactions, statements).GetUpcomingObligations(DateTime.Today);
 
             Assert.That(rows, Has.Some.Matches<THMS.Logic.ViewModels.Finance.UpcomingObligation>(o =>
-                o.AccountName == "Store Card" && o.MinimumPayment == 35 && o.PromotionalDue == 50));
+                o.AccountName == "Store Card" && o.AmountDue == 300 && o.PromotionalDue == 50));
             Assert.That(rows, Has.Some.Matches<THMS.Logic.ViewModels.Finance.UpcomingObligation>(o =>
                 o.AccountName == "Card" && o.AmountDue == 400 && o.Notes.Contains("account metadata")));
         }
@@ -75,12 +74,7 @@ namespace THMS.Tests.Logic
                 AccountId = checking.Id,
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today,
-                PeriodStart = DateTime.Today.AddDays(-30),
-                BeginningBalance = 3777.56m,
-                Deposits = 16859.24m,
-                Withdrawals = 19546.07m,
-                InterestEarned = 1.25m,
-                EndingBalance = 1090.73m
+                StatementBalance = 1090.73m
             });
 
             var rows = new PlanningOrchestrator(accounts, transactions, statements).GetUpcomingObligations(DateTime.Today);
@@ -187,14 +181,43 @@ namespace THMS.Tests.Logic
                 AccountId = checking.Id,
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today,
-                BeginningBalance = 100,
-                EndingBalance = 100
+                StatementBalance = 100
             });
 
             var all = new PlanningOrchestrator(accounts, transactions, statements).GetAllStatements();
 
             Assert.That(all, Has.Count.EqualTo(1));
             Assert.That(all[0], Is.TypeOf<BankStatement>());
+        }
+
+        [Test]
+        public void GetStatementListRows_ComputesInterestFromCategorizedTransactions()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var transactions = new InMemoryTransactionDataStore();
+            var statements = new InMemoryAccountStatementDataStore();
+            var checking = new BankAccount { Name = "Checking", Institution = "X", AccountNumber = "1", WebsiteUrl = "" };
+            accounts.UpsertAccount(checking);
+            statements.Save(new BankStatement
+            {
+                AccountId = checking.Id,
+                StatementDate = new DateTime(2026, 8, 31),
+                DueDate = new DateTime(2026, 8, 31),
+                StatementBalance = 101.25m
+            });
+            transactions.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = checking.Id,
+                Date = new DateTime(2026, 8, 15),
+                Amount = 1.25m,
+                CategoryId = DefaultExpenseCategories.InterestId,
+                Category = DefaultExpenseCategories.Interest
+            });
+
+            var rows = new PlanningOrchestrator(accounts, transactions, statements).GetStatementListRows(checking.Id);
+
+            Assert.That(rows, Has.Count.EqualTo(1));
+            Assert.That(rows[0].Interest, Is.EqualTo(1.25m.ToString("c2")));
         }
 
         [Test]
@@ -219,7 +242,6 @@ namespace THMS.Tests.Logic
                 StatementDate = DateTime.Today.AddDays(-10),
                 DueDate = DateTime.Today.AddDays(8),
                 AmountDue = 80,
-                MinimumPayment = 80,
                 Charges = [new() { Description = "Energy", Amount = 80 }]
             };
             statements.Save(statement);
@@ -268,8 +290,7 @@ namespace THMS.Tests.Logic
                 AccountId = checking.Id,
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today,
-                BeginningBalance = 100,
-                EndingBalance = 100
+                StatementBalance = 100
             };
             statements.Save(statement);
             var orchestrator = new PlanningOrchestrator(accounts, transactions, statements);
@@ -302,7 +323,6 @@ namespace THMS.Tests.Logic
                 StatementDate = DateTime.Today,
                 DueDate = DateTime.Today.AddDays(5),
                 AmountDue = 40,
-                MinimumPayment = 40,
                 Charges = [new() { Description = "Energy", Amount = 40 }]
             };
             statements.Save(statement);
@@ -316,18 +336,18 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void GenerateMinimumPayments_CreatesUnrealizedPlannedTransactions()
+        public void GeneratePayAllDue_CreatesUnrealizedPlannedTransactions()
         {
             var (accounts, transactions, statements, card) = SeedCardStatement();
             var orchestrator = new PlanningOrchestrator(accounts, transactions, statements);
 
-            var created = orchestrator.GenerateMinimumPayments(DateTime.Today.AddDays(30));
+            var created = orchestrator.GeneratePayAllDue(DateTime.Today.AddDays(30));
 
             Assert.That(created, Has.Count.EqualTo(1));
             Assert.That(created[0].IsPlannedPayment, Is.True);
-            Assert.That(created[0].Amount, Is.EqualTo(35m));
+            Assert.That(created[0].Amount, Is.EqualTo(220m));
             Assert.That(created[0].IsRealized, Is.False);
-            Assert.That(orchestrator.GenerateMinimumPayments(DateTime.Today.AddDays(30)), Is.Empty);
+            Assert.That(orchestrator.GeneratePayAllDue(DateTime.Today.AddDays(30)), Is.Empty);
         }
 
         [Test]
@@ -473,14 +493,13 @@ namespace THMS.Tests.Logic
                     StatementDate = DateTime.Today,
                     DueDate = DateTime.Today.AddDays(-1),
                     AmountDue = 50,
-                    MinimumPayment = 25,
                     StatementBalance = 50
                 }),
                 Throws.InvalidOperationException.With.Message.Contains("Due date"));
         }
 
         [Test]
-        public void ReconcileManualPayment_SplitsLoanInterestAndPrincipal()
+        public void ReconcileManualPayment_PostsLoanPaymentWithoutSplits()
         {
             var accounts = new InMemoryAccountDataStore();
             var transactions = new InMemoryTransactionDataStore();
@@ -502,9 +521,7 @@ namespace THMS.Tests.Logic
                 StatementDate = DateTime.Today.AddDays(-20),
                 DueDate = DateTime.Today.AddDays(5),
                 AmountDue = 200,
-                MinimumPayment = 200,
-                PrincipalBalance = 8000,
-                InterestCharged = 40
+                StatementBalance = 8000
             };
             statements.Save(statement);
             var orchestrator = new PlanningOrchestrator(accounts, transactions, statements);
@@ -513,9 +530,8 @@ namespace THMS.Tests.Logic
             orchestrator.ReconcileManualPayment(planned.Id, DateTime.Today);
 
             var posted = transactions.GetPostedTransactions(loan.Id).Single();
-            Assert.That(posted.HasSplits, Is.True);
-            Assert.That(posted.Splits.Single(s => s.Type == SplitType.Principal).Amount, Is.EqualTo(-160m));
-            Assert.That(posted.Splits.Single(s => s.Type == SplitType.Interest).Amount, Is.EqualTo(-40m));
+            Assert.That(posted.Amount, Is.EqualTo(-200m));
+            Assert.That(posted.HasSplits, Is.False);
         }
 
         [Test]
@@ -539,7 +555,6 @@ namespace THMS.Tests.Logic
                 StatementDate = DateTime.Today.AddDays(-10),
                 DueDate = DateTime.Today.AddDays(4),
                 AmountDue = 80,
-                MinimumPayment = 80,
                 Usage = [new() { Type = "kWh", Amount = 400, Rate = 0.20m }],
                 Charges = [new() { Description = "Energy", Amount = 80 }]
             });
@@ -569,7 +584,6 @@ namespace THMS.Tests.Logic
                 StatementDate = DateTime.Today.AddDays(-15),
                 DueDate = DateTime.Today.AddDays(7),
                 AmountDue = 220,
-                MinimumPayment = 35,
                 StatementBalance = 220,
                 Promotions =
                 [

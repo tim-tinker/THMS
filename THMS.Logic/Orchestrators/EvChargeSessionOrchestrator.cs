@@ -94,6 +94,12 @@ namespace THMS.Logic.Orchestrators
             return sessions.OrderByDescending(s => s.StartTime).ToArray();
         }
 
+        public IReadOnlyList<BaseEvChargeSession> GetCompletedSessions(
+            Guid vehicleId,
+            DateTime start,
+            DateTime end) =>
+            GetAndCompleteSessions(vehicleId, start, end).ToList();
+
         private IEnumerable<BaseEvChargeSession> GetAndCompleteSessions(Guid vehicleId, DateTime start, DateTime end)
         {
             var baseSessions = _vehicleStore.GetBaseEvChargeSessions(vehicleId, start, end);
@@ -124,20 +130,25 @@ namespace THMS.Logic.Orchestrators
         // ---------------------------------------------------------
         private void CompleteHomeSession(HomeEvChargeSession session)
         {
-            // 1. Load existing attribution (if any)
-            var existingAttrib = _vehicleStore.GetHomeEvChargeAttribution(session.Id);
-            if (existingAttrib is not null)
+            var engine = new HomeCircuitAttributionEngine(_energyStore);
+            engine.Compute(session.StartTime, session.EndTime);
+            session.HasCircuitData = engine.HadPositiveCircuitDraw;
+            session.HasSolarData = engine.HadSolarIntervals;
+            session.HasElectricContract =
+                _financeStore.GetElectricContractForDate(session.StartTime.Date) is not null;
+
+            if (session.HasCircuitData)
             {
-                session.Attribution = existingAttrib;
-            }
-            else
-            {
-                ComputeAndStoreAttribution(session);
+                StoreAttribution(session, engine);
+                ComputeAndStoreBilling(session);
+                return;
             }
 
-            if (session.Attribution is null)
+            var existingAttrib = _vehicleStore.GetHomeEvChargeAttribution(session.Id);
+            if (existingAttrib is null)
                 return;
 
+            session.Attribution = existingAttrib;
             var existingBilling = _vehicleStore.GetHomeEvChargeBilling(session.Id);
             if (existingBilling is not null && existingBilling.SessionCost != 0)
                 session.Billing = existingBilling;
@@ -145,17 +156,8 @@ namespace THMS.Logic.Orchestrators
                 ComputeAndStoreBilling(session);
         }
 
-        // ---------------------------------------------------------
-        // ENERGY ATTRIBUTION
-        // ---------------------------------------------------------
-        private void ComputeAndStoreAttribution(HomeEvChargeSession session)
+        private void StoreAttribution(HomeEvChargeSession session, HomeCircuitAttributionEngine engine)
         {
-            var engine = new HomeCircuitAttributionEngine(_energyStore);
-            engine.Compute(session.StartTime, session.EndTime);
-
-            if (engine.ResultCount == 0)
-                return;
-
             var attrib = new HomeEvChargeAttribution
             {
                 GridKwh = engine.Results.Sum(r => r.GridWh) / 1000m,

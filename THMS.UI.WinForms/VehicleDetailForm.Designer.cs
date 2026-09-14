@@ -27,11 +27,7 @@
             label3 = new Label();
             label4 = new Label();
             label2 = new Label();
-            _dateStart = new DateTimePicker();
-            groupBox1 = new GroupBox();
-            label5 = new Label();
-            _dateEnd = new DateTimePicker();
-            label1 = new Label();
+            historyBar = new Controls.HistoryPeriodBar();
             ((System.ComponentModel.ISupportInitialize)chargingGrid).BeginInit();
             ((System.ComponentModel.ISupportInitialize)fuelGrid).BeginInit();
             ((System.ComponentModel.ISupportInitialize)maintenanceGrid).BeginInit();
@@ -43,7 +39,6 @@
             _splitFuelCharge.Panel1.SuspendLayout();
             _splitFuelCharge.Panel2.SuspendLayout();
             _splitFuelCharge.SuspendLayout();
-            groupBox1.SuspendLayout();
             SuspendLayout();
             // 
             // lblName
@@ -105,7 +100,7 @@
             // _splitFuelMaintenance
             // 
             _splitFuelMaintenance.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            _splitFuelMaintenance.Location = new Point(12, 186);
+            _splitFuelMaintenance.Location = new Point(12, 148);
             _splitFuelMaintenance.Name = "_splitFuelMaintenance";
             _splitFuelMaintenance.Orientation = Orientation.Horizontal;
             // 
@@ -117,7 +112,7 @@
             // 
             _splitFuelMaintenance.Panel2.Controls.Add(maintenanceGrid);
             _splitFuelMaintenance.Panel2.Controls.Add(label2);
-            _splitFuelMaintenance.Size = new Size(1330, 758);
+            _splitFuelMaintenance.Size = new Size(1330, 796);
             _splitFuelMaintenance.SplitterDistance = 502;
             _splitFuelMaintenance.TabIndex = 19;
             // 
@@ -171,60 +166,18 @@
             label2.TabIndex = 12;
             label2.Text = "Maintenance";
             // 
-            // _dateStart
+            // historyBar
             // 
-            _dateStart.Format = DateTimePickerFormat.Short;
-            _dateStart.Location = new Point(77, 34);
-            _dateStart.Name = "_dateStart";
-            _dateStart.Size = new Size(183, 35);
-            _dateStart.TabIndex = 20;
-            _dateStart.ValueChanged += OnValueChangedStart;
-            // 
-            // groupBox1
-            // 
-            groupBox1.Controls.Add(label5);
-            groupBox1.Controls.Add(_dateEnd);
-            groupBox1.Controls.Add(label1);
-            groupBox1.Controls.Add(_dateStart);
-            groupBox1.Location = new Point(12, 91);
-            groupBox1.Name = "groupBox1";
-            groupBox1.Size = new Size(516, 89);
-            groupBox1.TabIndex = 21;
-            groupBox1.TabStop = false;
-            groupBox1.Text = "Date Range";
-            // 
-            // label5
-            // 
-            label5.AutoSize = true;
-            label5.Location = new Point(266, 39);
-            label5.Name = "label5";
-            label5.Size = new Size(39, 30);
-            label5.TabIndex = 22;
-            label5.Text = "To:";
-            // 
-            // _dateEnd
-            // 
-            _dateEnd.Format = DateTimePickerFormat.Short;
-            _dateEnd.Location = new Point(311, 35);
-            _dateEnd.Name = "_dateEnd";
-            _dateEnd.Size = new Size(183, 35);
-            _dateEnd.TabIndex = 21;
-            _dateEnd.ValueChanged += OnValueChangedEnd;
-            // 
-            // label1
-            // 
-            label1.AutoSize = true;
-            label1.Location = new Point(6, 38);
-            label1.Name = "label1";
-            label1.Size = new Size(65, 30);
-            label1.TabIndex = 0;
-            label1.Text = "From:";
+            historyBar.Location = new Point(12, 96);
+            historyBar.Name = "historyBar";
+            historyBar.Padding = new Padding(0, 4, 0, 4);
+            historyBar.TabIndex = 20;
             // 
             // VehicleDetailForm
             // 
             ClientSize = new Size(1354, 956);
-            Controls.Add(groupBox1);
             Controls.Add(_splitFuelMaintenance);
+            Controls.Add(historyBar);
             Controls.Add(lblName);
             Controls.Add(lblMakeModelYear);
             Name = "VehicleDetailForm";
@@ -245,8 +198,6 @@
             _splitFuelCharge.Panel2.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)_splitFuelCharge).EndInit();
             _splitFuelCharge.ResumeLayout(false);
-            groupBox1.ResumeLayout(false);
-            groupBox1.PerformLayout();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -264,10 +215,6 @@
         private SplitContainer _splitFuelCharge;
         private Label label3;
         private Label label4;
-        private DateTimePicker _dateStart;
-        private GroupBox groupBox1;
-        private Label label5;
-        private DateTimePicker _dateEnd;
-        private Label label1;
+        private Controls.HistoryPeriodBar historyBar;
     }
 }

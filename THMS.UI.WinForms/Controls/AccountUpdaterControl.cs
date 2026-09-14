@@ -45,6 +45,8 @@ namespace THMS.UI.WinForms.Controls
             SelectedAccountChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        public void SetImportStatus(string message) => lblStatus.Text = message;
+
         private void SelectAccount(Guid? id)
         {
             if (id is null)
@@ -97,8 +99,11 @@ namespace THMS.UI.WinForms.Controls
                 }
 
                 using var preview = new AccountImportPreviewDialog(rows, _importOrchestrator);
-                if (preview.ShowDialog(FindForm()) == DialogResult.OK)
-                    LoadAccounts();
+                if (preview.ShowDialog(FindForm()) != DialogResult.OK)
+                    return;
+
+                LoadAccounts();
+                SetImportStatus(ImportStatusText.Imported(preview.Result, "account", "accounts"));
             }
             catch (Exception ex)
             {

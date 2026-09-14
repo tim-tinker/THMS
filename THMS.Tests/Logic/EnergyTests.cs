@@ -253,7 +253,32 @@ namespace THMS.Tests.Logic
 
             var circuitBucket = engine.Results.First(r => r.Timestamp.Hour == 9);
             Assert.That(circuitBucket.TotalWh, Is.EqualTo(250m));
-            Assert.That(circuitBucket.SolarWh + circuitBucket.BatteryWh + circuitBucket.GridWh, Is.EqualTo(250m));
+            Assert.That(circuitBucket.GridWh, Is.EqualTo(250m));
+            Assert.That(circuitBucket.SolarWh, Is.EqualTo(0m));
+            Assert.That(circuitBucket.BatteryWh, Is.EqualTo(0m));
+        }
+
+        [Test]
+        public void Compute_WithoutSolar_AttributesAllCircuitToGrid()
+        {
+            var store = new InMemoryEnergyDataStore();
+            var ts = new DateTime(2026, 9, 8, 20, 19, 0);
+            store.UpsertHomeCircuitReading(new HomeCircuitReading
+            {
+                Timestamp = ts,
+                KiloWattHours = 1.5m
+            });
+
+            var engine = new HomeCircuitAttributionEngine(store);
+            engine.Compute(new DateTime(2026, 9, 8), new DateTime(2026, 9, 9));
+
+            Assert.That(engine.HadPositiveCircuitDraw, Is.True);
+            Assert.That(engine.HadSolarIntervals, Is.False);
+            var result = engine.Results.Single();
+            Assert.That(result.TotalWh, Is.EqualTo(1500m));
+            Assert.That(result.GridWh, Is.EqualTo(1500m));
+            Assert.That(result.SolarWh, Is.EqualTo(0m));
+            Assert.That(result.BatteryWh, Is.EqualTo(0m));
         }
 
         [Test]

@@ -23,7 +23,6 @@ namespace THMS.UI
         {
             AddSectionLabel("Dashboards");
             AddDashboard("Finance", new FinanceDashboardForm());
-            AddDashboard("Transportation", new TransportationDashboardForm());
             AddDashboard("Vehicles", new VehicleListDashboardForm());
             AddDashboard("Energy", new EnergyDashboardForm());
 

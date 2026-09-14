@@ -32,7 +32,7 @@ namespace THMS.Tests.Logic
 
             var imported = orchestrator.ImportAccounts([AccountImportPreview.FromAccount(incoming)]);
 
-            Assert.That(imported, Is.EqualTo(1));
+            Assert.That(imported.Count, Is.EqualTo(1));
             var accounts = store.GetAllAccounts().ToList();
             Assert.That(accounts, Has.Count.EqualTo(1));
             Assert.That(accounts[0].Id, Is.EqualTo(existing.Id));

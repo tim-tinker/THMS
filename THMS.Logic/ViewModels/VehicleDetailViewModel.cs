@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using THMS.Data.Stores;
 using THMS.Domain.Transportation;
+using THMS.Logic.Orchestrators;
 
 namespace THMS.Logic.ViewModels.Transportation
 {
@@ -9,6 +10,24 @@ namespace THMS.Logic.ViewModels.Transportation
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private readonly IVehicleDataStore _vehicleStore;
+        private readonly EvChargeSessionOrchestrator? _sessionOrchestrator;
+
+        private string _historyPeriod = "Month";
+        public string HistoryPeriod
+        {
+            get => _historyPeriod;
+            set
+            {
+                var period = string.IsNullOrWhiteSpace(value) ? "Month" : value;
+                if (_historyPeriod == period)
+                    return;
+
+                _historyPeriod = period;
+                ApplyHistoryRange();
+                RaiseChanged(nameof(HistoryPeriod));
+                Refresh();
+            }
+        }
 
         private DateTime _startTime;
         public DateTime StartTime
@@ -41,21 +60,28 @@ namespace THMS.Logic.ViewModels.Transportation
         }
 
         public VehicleDetailViewModel(Guid vehicleId)
-            : this(vehicleId, new DataStoreFactory().GetVehicleStore())
+            : this(
+                vehicleId,
+                new DataStoreFactory().GetVehicleStore(),
+                new EvChargeSessionOrchestrator())
         {
         }
 
         public VehicleDetailViewModel(Guid vehicleId, IVehicleDataStore vehicleStore)
+            : this(vehicleId, vehicleStore, orchestrator: null)
+        {
+        }
+
+        public VehicleDetailViewModel(
+            Guid vehicleId,
+            IVehicleDataStore vehicleStore,
+            EvChargeSessionOrchestrator? orchestrator)
         {
             _vehicleStore = vehicleStore;
+            _sessionOrchestrator = orchestrator;
             VehicleId = vehicleId;
 
-            // Assign the backing fields so the range is complete before the first
-            // Refresh; the setters would each trigger a redundant load.
-            _startTime = _vehicleStore.GetEarliestIceMileageRecord(VehicleId)?.EndTime
-                ?? DateTime.MinValue;
-            _endTime = DateTime.MaxValue;
-
+            ApplyHistoryRange();
             Refresh();
         }
 
@@ -64,6 +90,7 @@ namespace THMS.Logic.ViewModels.Transportation
         public VehicleBase? Vehicle { get; private set; }
         public decimal Mileage { get; private set; } = 0m;
         public BindingList<BaseEvChargeSession> ChargeSessions { get; } = new();
+        public BindingList<VehicleChargeCostRow> ChargeCostRows { get; } = new();
         public IReadOnlyCollection<IceMileageRecord> FuelReceipts { get; private set; } = Array.Empty<IceMileageRecord>();
         public IReadOnlyCollection<MaintenanceInvoiceRecord> MaintenanceInvoices { get; private set; } = Array.Empty<MaintenanceInvoiceRecord>();
 
@@ -73,8 +100,12 @@ namespace THMS.Logic.ViewModels.Transportation
             Mileage = _vehicleStore.GetMilesDrivenInPeriod(VehicleId, StartTime, EndTime);
 
             ChargeSessions.Clear();
-            foreach (var session in _vehicleStore.GetBaseEvChargeSessions(VehicleId, StartTime, EndTime))
+            var sessions = _sessionOrchestrator is not null
+                ? _sessionOrchestrator.GetCompletedSessions(VehicleId, StartTime, EndTime)
+                : _vehicleStore.GetBaseEvChargeSessions(VehicleId, StartTime, EndTime);
+            foreach (var session in sessions)
                 ChargeSessions.Add(session);
+            RebuildChargeCostRows();
 
             FuelReceipts = _vehicleStore.GetIceMileageRecords(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
             MaintenanceInvoices = _vehicleStore.GetMaintenanceInvoices(VehicleId, StartTime, EndTime).ToList().AsReadOnly();
@@ -108,6 +139,22 @@ namespace THMS.Logic.ViewModels.Transportation
             {
                 ChargeSessions.Add(session);
             }
+
+            RebuildChargeCostRows();
+        }
+
+        private void ApplyHistoryRange()
+        {
+            var (start, end) = BaseOrchestrator.GetHistoryRange(_historyPeriod);
+            _startTime = start;
+            _endTime = end;
+        }
+
+        private void RebuildChargeCostRows()
+        {
+            ChargeCostRows.Clear();
+            foreach (var session in ChargeSessions)
+                ChargeCostRows.Add(VehicleChargeCostRow.FromSession(session));
         }
 
         private int IndexOfSession(Guid sessionId)

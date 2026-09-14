@@ -1,15 +1,14 @@
-﻿using System;
-using System.Linq;
-using System.Windows.Forms;
+﻿using System.Linq;
 using THMS.Domain.Transportation;
 using THMS.Logic.ViewModels.Transportation;
+using THMS.UI.WinForms.Controls;
 
 namespace THMS.UI.WinForms
 {
     public partial class VehicleDetailForm : Form
     {
-        private readonly VehicleDetailViewModel _vm;
-        private bool _syncingDates;
+        private readonly VehicleDetailViewModel _vm = null!;
+        private readonly string _initialPeriod = HistoryPeriodBar.Month;
         private bool _chargingGridBound;
 
         public VehicleDetailForm()
@@ -19,36 +18,35 @@ namespace THMS.UI.WinForms
             _splitFuelMaintenance.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         }
 
-        public VehicleDetailForm(Guid vehicleId)
+        public VehicleDetailForm(Guid vehicleId, string? historyPeriod = null)
             : this()
         {
-            _vm = new VehicleDetailViewModel(vehicleId) ?? throw new ArgumentOutOfRangeException(nameof(vehicleId));
+            _vm = new VehicleDetailViewModel(vehicleId);
+            _initialPeriod = string.IsNullOrWhiteSpace(historyPeriod)
+                ? HistoryPeriodBar.Month
+                : historyPeriod;
         }
 
         private void OnLoad(object sender, EventArgs e)
         {
-            var start = ClampToPicker(_vm.StartTime);
-            var end = ClampToPicker(_vm.EndTime);
+            if (_vm is null)
+                return;
 
-            _syncingDates = true;
-            try
-            {
-                _dateStart.Value = start;
-                _dateEnd.Value = end;
-            }
-            finally
-            {
-                _syncingDates = false;
-            }
-
-            // Align the VM with picker-safe values so the query matches what the
-            // user sees (DateTimePicker cannot represent MinValue/MaxValue).
-            _vm.StartTime = start.Date;
-            _vm.EndTime = EndOfDay(end);
-
+            historyBar.SelectPeriod(_initialPeriod);
+            ApplyHistoryPeriod();
             LoadVehicle();
             BindChargeGrid();
             LoadGrids();
+            historyBar.SelectedPeriodChanged += (_, _) =>
+            {
+                ApplyHistoryPeriod();
+                LoadGrids();
+            };
+        }
+
+        private void ApplyHistoryPeriod()
+        {
+            _vm.HistoryPeriod = historyBar.SelectedPeriod;
         }
 
         private void LoadVehicle()
@@ -72,18 +70,38 @@ namespace THMS.UI.WinForms
             if (_chargingGridBound)
                 return;
 
-            chargingGrid.AutoGenerateColumns = true;
-            chargingGrid.DataSource = _vm.ChargeSessions;
-            HideChargeGridColumn("Id");
-            HideChargeGridColumn("VehicleId");
+            chargingGrid.AutoGenerateColumns = false;
+            chargingGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            chargingGrid.Columns.Clear();
+            chargingGrid.Columns.Add(DateColumn(nameof(VehicleChargeCostRow.StartTime), "Date/Time", "g"));
+            chargingGrid.Columns.Add(NumberColumn(nameof(VehicleChargeCostRow.MilesDriven), "Miles Driven", "N1"));
+            chargingGrid.Columns.Add(NumberColumn(nameof(VehicleChargeCostRow.Cost), "Cost", "c2"));
+            chargingGrid.Columns.Add(NumberColumn(nameof(VehicleChargeCostRow.CostPerMile), "Cost per Mile", "c2"));
+            chargingGrid.DataSource = _vm.ChargeCostRows;
             _chargingGridBound = true;
         }
 
-        private void HideChargeGridColumn(string dataPropertyName)
-        {
-            if (chargingGrid.Columns[dataPropertyName] is DataGridViewColumn column)
-                column.Visible = false;
-        }
+        private static DataGridViewTextBoxColumn DateColumn(string property, string header, string format) =>
+            new()
+            {
+                DataPropertyName = property,
+                HeaderText = header,
+                Name = property,
+                DefaultCellStyle = new DataGridViewCellStyle { Format = format }
+            };
+
+        private static DataGridViewTextBoxColumn NumberColumn(string property, string header, string format) =>
+            new()
+            {
+                DataPropertyName = property,
+                HeaderText = header,
+                Name = property,
+                DefaultCellStyle = new DataGridViewCellStyle
+                {
+                    Alignment = DataGridViewContentAlignment.MiddleRight,
+                    Format = format
+                }
+            };
 
         private void LoadGrids()
         {
@@ -106,38 +124,6 @@ namespace THMS.UI.WinForms
                     m.Cost
                 })
                 .ToList();
-        }
-
-        private void OnValueChangedStart(object sender, EventArgs e)
-        {
-            if (_syncingDates)
-                return;
-
-            _vm.StartTime = _dateStart.Value.Date;
-            LoadGrids();
-        }
-
-        private void OnValueChangedEnd(object sender, EventArgs e)
-        {
-            if (_syncingDates)
-                return;
-
-            _vm.EndTime = EndOfDay(_dateEnd.Value);
-            LoadGrids();
-        }
-
-        private static DateTime EndOfDay(DateTime value) =>
-            value.Date.AddDays(1).AddTicks(-1);
-
-        private static DateTime ClampToPicker(DateTime value)
-        {
-            if (value < DateTimePicker.MinimumDateTime)
-                return DateTimePicker.MinimumDateTime;
-
-            if (value > DateTimePicker.MaximumDateTime || value.Date > DateTime.Today)
-                return DateTime.Today;
-
-            return value.Date;
         }
     }
 }

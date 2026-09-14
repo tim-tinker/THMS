@@ -2,17 +2,20 @@
 using THMS.Domain.Energy;
 using THMS.Ingestion.Importers.Energy;
 using THMS.Logic.Energy;
+using THMS.Logic.ViewModels;
+using THMS.Logic.ViewModels.Energy;
 
 namespace THMS.Logic.Orchestrators
 {
     public class HomeCircuitReadingOrchestrator : BaseOrchestrator
     {
         private readonly IEnergyDataStore _energyStore;
+        private readonly HomeCircuitImporter _importer = new();
 
         public DateTime StartDate { get; private set; } = DateTime.MinValue;
         public DateTime EndDate { get; private set; } = DateTime.MinValue;
         public int ReadingCount { get; private set; }
-        public string ErrorMessage { get; private set; }
+        public string ErrorMessage { get; private set; } = "";
 
         public HomeCircuitReadingOrchestrator()
             : this(new DataStoreFactory().GetEnergyStore())
@@ -24,26 +27,75 @@ namespace THMS.Logic.Orchestrators
             _energyStore = energyStore;
         }
 
+        public List<HomeCircuitReadingImportPreview> LoadReadingsFromFiles(IEnumerable<string> paths)
+        {
+            ArgumentNullException.ThrowIfNull(paths);
+            var rows = new List<HomeCircuitReadingImportPreview>();
+            foreach (var path in paths)
+            {
+                if (string.IsNullOrWhiteSpace(path))
+                    throw new ArgumentException("A file path is required.");
+                if (!File.Exists(path))
+                    throw new FileNotFoundException("The selected file was not found.", path);
+
+                foreach (var reading in _importer.Parse(path))
+                {
+                    rows.Add(new HomeCircuitReadingImportPreview
+                    {
+                        Timestamp = reading.Timestamp,
+                        KiloWattHours = reading.KiloWattHours
+                    });
+                }
+            }
+
+            return rows.OrderBy(row => row.Timestamp).ToList();
+        }
+
+        public ImportResult ImportReadings(IEnumerable<HomeCircuitReadingImportPreview> previewRows) =>
+            ImportReadings(previewRows, progress: null);
+
+        public ImportResult ImportReadings(
+            IEnumerable<HomeCircuitReadingImportPreview> previewRows,
+            IProgress<ImportProgress>? progress)
+        {
+            ArgumentNullException.ThrowIfNull(previewRows);
+            var rows = previewRows as IReadOnlyList<HomeCircuitReadingImportPreview> ?? previewRows.ToList();
+            ImportProgressReporter.Report(progress, 0, rows.Count, stride: 50);
+
+            for (var i = 0; i < rows.Count; i++)
+            {
+                _energyStore.UpsertHomeCircuitReading(ToReading(rows[i]));
+                ImportProgressReporter.Report(progress, i + 1, rows.Count, stride: 50);
+            }
+
+            var result = ImportResult.FromDates(rows.Count, rows.Select(row => row.Timestamp));
+            if (result.Start is DateTime start && result.End is DateTime end)
+            {
+                ImportProgressReporter.Report(progress, rows.Count, rows.Count, ImportProgress.AttributionPhase);
+                CalculateEvAttribution(start, end);
+            }
+
+            ImportProgressReporter.Report(progress, rows.Count, rows.Count);
+            return result;
+        }
+
         public void Update(string[] filePaths)
         {
-            var importer = new HomeCircuitImporter(_energyStore);
-            foreach (var filePath in filePaths)
+            try
             {
-                importer.Import(filePath);
+                var preview = LoadReadingsFromFiles(filePaths);
+                var result = ImportReadings(preview);
+                ReadingCount = result.Count;
+                StartDate = result.Start ?? DateTime.MinValue;
+                EndDate = result.End ?? DateTime.MinValue;
+                ErrorMessage = "";
             }
-            StartDate = importer.StartDate;
-            EndDate = importer.EndDate;
-            ReadingCount = importer.ReadingCount;
-            ErrorMessage = importer.ErrorMessage;
-
-            if (string.IsNullOrEmpty(importer.ErrorMessage) && 0 < importer.ReadingCount)
+            catch (Exception ex)
             {
-                foreach (var reading in importer.Readings)
-                {
-                    _energyStore.UpsertHomeCircuitReading(reading);
-                }
-
-                CalculateEvAttribution(StartDate, EndDate);
+                ReadingCount = 0;
+                StartDate = DateTime.MinValue;
+                EndDate = DateTime.MinValue;
+                ErrorMessage = ex.Message;
             }
         }
 
@@ -73,5 +125,12 @@ namespace THMS.Logic.Orchestrators
 
             return readings;
         }
+
+        private static HomeCircuitReading ToReading(HomeCircuitReadingImportPreview row) =>
+            new()
+            {
+                Timestamp = row.Timestamp,
+                KiloWattHours = row.KiloWattHours
+            };
     }
 }
