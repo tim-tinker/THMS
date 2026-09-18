@@ -841,7 +841,7 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void RunLedgerUpdate_PersistsNewlyDetectedRecurringRules()
+        public void RunLedgerUpdate_DoesNotAutoDetectRecurringRules()
         {
             var accounts = new InMemoryAccountDataStore();
             var txs = new InMemoryTransactionDataStore();
@@ -876,17 +876,9 @@ namespace THMS.Tests.Logic
             }
 
             var result = orchestrator.RunLedgerUpdate();
-            Assert.That(result.RecurringRulesUpdated, Is.EqualTo(2));
-
-            var singleRules = txs.GetRecurringSingleRules(account.Id).ToList();
-            Assert.That(singleRules, Has.Count.EqualTo(1));
-            Assert.That(singleRules[0].Description, Is.EqualTo("Netflix"));
-
-            var transferRules = txs.GetRecurringTransferRules(account.Id).ToList();
-            Assert.That(transferRules, Has.Count.EqualTo(1));
-            Assert.That(transferRules[0].Description, Is.EqualTo("Sweep"));
-            Assert.That(singleRules[0].IsUserCreated, Is.False);
-            Assert.That(transferRules[0].IsUserCreated, Is.False);
+            Assert.That(result.RecurringRulesUpdated, Is.EqualTo(0));
+            Assert.That(txs.GetRecurringSingleRules(account.Id), Is.Empty);
+            Assert.That(txs.GetRecurringTransferRules(account.Id), Is.Empty);
         }
 
         [Test]
@@ -976,10 +968,7 @@ namespace THMS.Tests.Logic
             orchestrator.RunLedgerUpdate();
             orchestrator.RunLedgerUpdate();
 
-            var rules = txs.GetRecurringSingleRules(checking.Id).ToList();
-            Assert.That(rules, Has.Count.EqualTo(1));
-            Assert.That(rules[0].Description, Is.EqualTo("LESLIES POOLMART"));
-            Assert.That(rules[0].NextOccurrence, Is.EqualTo(new DateTime(2026, 6, 20)));
+            Assert.That(txs.GetRecurringSingleRules(checking.Id), Is.Empty);
         }
 
         [Test]

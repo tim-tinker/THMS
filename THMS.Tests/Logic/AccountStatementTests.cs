@@ -282,6 +282,8 @@ namespace THMS.Tests.Logic
             Assert.That(StatementAccountMatch.ForAccount(utility), Is.EqualTo(StatementType.Utility));
             Assert.That(StatementAccountMatch.CreateAccount(StatementType.Utility), Is.TypeOf<UntrackedAccount>());
             Assert.That(StatementAccountMatch.CreateAccount(StatementType.Utility).Type, Is.EqualTo(AccountType.Utility));
+            Assert.That(StatementAccountMatch.CreateStatement(StatementType.Bank), Is.TypeOf<BankStatement>());
+            Assert.That(StatementAccountMatch.CreateStatement(StatementType.Utility), Is.TypeOf<UtilityStatement>());
         }
 
         [Test]

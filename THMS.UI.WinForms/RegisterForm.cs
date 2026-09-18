@@ -19,16 +19,24 @@ namespace THMS.UI.WinForms
         private readonly TransactionImportOrchestrator _importOrchestrator = new();
         private readonly PlanningOrchestrator _planningOrchestrator = new();
         private readonly BindingSource _transactionsSource = new();
+        private readonly BindingSource _categorySource = new();
         private readonly BindingSource _statementsSource = new();
         private int _loadedRevision = int.MinValue;
+        private bool _suspendCategoryFilter;
 
         public RegisterForm()
         {
             InitializeComponent();
             categoryManager.Bind(_categoryOrchestrator);
-            categoryManager.CatalogChanged += (_, _) => LoadTransactionsForSelectedAccount();
+            categoryManager.CatalogChanged += (_, _) =>
+            {
+                BindCategoryFilter();
+                LoadTransactionsForSelectedAccount();
+            };
             ConfigureTransactionGrid();
+            ConfigureCategoryGrid();
             ConfigureStatementGrid();
+            BindCategoryFilter();
             tabs.RecalculateItemSize();
             tabs.SelectedIndexChanged += (_, _) =>
             {
@@ -64,6 +72,43 @@ namespace THMS.UI.WinForms
             gridTransactions.CellDoubleClick += OnTransactionCellDoubleClick;
             gridTransactions.CellMouseClick += OnCategoryCellMouseClick;
             gridTransactions.KeyDown += OnTransactionGridKeyDown;
+        }
+
+        private void ConfigureCategoryGrid()
+        {
+            DataGridViewUtil.EnableDoubleBuffering(gridCategory);
+            gridCategory.DataSource = _categorySource;
+            gridCategory.SelectionChanged += (_, _) => UpdateCategorySplitButton();
+            gridCategory.CellDoubleClick += OnCategoryViewCellDoubleClick;
+            gridCategory.CellMouseClick += OnCategoryViewCellMouseClick;
+            gridCategory.KeyDown += OnCategoryViewKeyDown;
+            cmbCategoryFilter.SelectedIndexChanged += OnCategoryFilterChanged;
+        }
+
+        private void BindCategoryFilter()
+        {
+            var selected = cmbCategoryFilter.SelectedItem as CategoryFilterChoice;
+            var items = CategoryFilterChoice.ForCategories(_categoryOrchestrator.GetActiveCategories());
+            _suspendCategoryFilter = true;
+            cmbCategoryFilter.DisplayMember = nameof(CategoryFilterChoice.Name);
+            cmbCategoryFilter.DataSource = items;
+            if (selected is not null)
+            {
+                var match = items.FirstOrDefault(i =>
+                    i.UncategorizedOnly == selected.UncategorizedOnly && i.CategoryId == selected.CategoryId);
+                if (match is not null)
+                    cmbCategoryFilter.SelectedItem = match;
+            }
+
+            _suspendCategoryFilter = false;
+        }
+
+        private void OnCategoryFilterChanged(object? sender, EventArgs e)
+        {
+            if (_suspendCategoryFilter)
+                return;
+
+            LoadCategoryRowsForSelectedAccount();
         }
 
         private void ConfigureStatementGrid()
@@ -152,21 +197,61 @@ namespace THMS.UI.WinForms
             if (account is null)
             {
                 _transactionsSource.DataSource = new List<UnifiedTransactionView>();
+                _categorySource.DataSource = new List<UnifiedTransactionView>();
                 lblTxStatus.Text = "Select an account to view posted transactions.";
+                lblCategoryStatus.Text = "Select an account to view transactions by category.";
+                btnImport.Enabled = false;
+                btnImportPlaid.Enabled = false;
                 UpdateSplitButton();
+                UpdateCategorySplitButton();
                 _loadedRevision = FinanceDataRevision.Current;
                 return;
             }
 
+            btnImport.Enabled = true;
+            btnImportPlaid.Enabled = true;
+
             var txs = _txOrchestrator.GetTransactionsForAccount(account.Id);
-            var views = UnifiedTransactionViewBuilder.Build(txs.Posted, txs.PostedTransfers);
+            var views = UnifiedTransactionViewBuilder.Build(
+                txs.Posted,
+                txs.PostedTransfers,
+                forAccountId: account.Id,
+                incomingPostedSplitSources: txs.IncomingTransferSplitPosted);
             ApplyCategoryDisplayNames(views);
             ApplyRunningBalances(views, account);
             var display = UnifiedTransactionView.OrderForDisplay(views).ToList();
             _transactionsSource.DataSource = display;
             lblTxStatus.Text = $"{display.Count} posted transaction{(display.Count == 1 ? "" : "s")} for {account.Name}.";
             UpdateSplitButton();
+            LoadCategoryRowsForSelectedAccount();
             _loadedRevision = FinanceDataRevision.Current;
+        }
+
+        private void LoadCategoryRowsForSelectedAccount()
+        {
+            var account = accountUpdater.SelectedAccount;
+            if (account is null)
+            {
+                _categorySource.DataSource = new List<UnifiedTransactionView>();
+                lblCategoryStatus.Text = "Select an account to view transactions by category.";
+                UpdateCategorySplitButton();
+                return;
+            }
+
+            var txs = _txOrchestrator.GetTransactionsForAccount(account.Id);
+            var rows = UnifiedTransactionViewBuilder.BuildCategoryRows(txs.Posted, txs.PostedTransfers);
+            ApplyCategoryDisplayNames(rows);
+            var filtered = UnifiedTransactionViewBuilder.FilterCategoryRows(
+                rows,
+                cmbCategoryFilter.SelectedItem as CategoryFilterChoice ?? CategoryFilterChoice.All,
+                _categoryOrchestrator.GetAllCategories(includeInactive: true));
+            var display = UnifiedTransactionView.OrderForDisplay(filtered).ToList();
+            _categorySource.DataSource = display;
+            var total = display.Sum(r => r.Amount);
+            lblCategoryStatus.Text = display.Count == 0
+                ? $"No category rows for {account.Name}."
+                : $"{display.Count} category row{(display.Count == 1 ? "" : "s")} totaling {total:c2} for {account.Name}.";
+            UpdateCategorySplitButton();
         }
 
         private void ApplyRunningBalances(IEnumerable<UnifiedTransactionView> chronological, Account account)
@@ -192,6 +277,9 @@ namespace THMS.UI.WinForms
 
         private void OnImportFromFile(object? sender, EventArgs e)
         {
+            if (accountUpdater.SelectedAccount is null)
+                return;
+
             using var fileDialog = new OpenFileDialog
             {
                 Filter = "Excel files (*.xlsx)|*.xlsx|CSV files (*.csv)|*.csv|All files (*.*)|*.*",
@@ -228,6 +316,9 @@ namespace THMS.UI.WinForms
 
         private void OnImportFromPlaid(object? sender, EventArgs e)
         {
+            if (accountUpdater.SelectedAccount is null)
+                return;
+
             using var dialog = new PlaidTransactionImportDialog();
             if (dialog.ShowDialog(this) != DialogResult.OK)
                 return;
@@ -271,8 +362,42 @@ namespace THMS.UI.WinForms
 
         private void OnImportStatements(object? sender, EventArgs e)
         {
-            MessageBox.Show(this, "Statement import is not implemented yet.", "Import Statements",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (accountUpdater.SelectedAccount is null)
+                return;
+
+            using var fileDialog = new OpenFileDialog
+            {
+                Filter = "Excel files (*.xlsx)|*.xlsx|CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                Title = "Select statement spreadsheet"
+            };
+            if (fileDialog.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            try
+            {
+                var import = new StatementImportOrchestrator();
+                var rows = import.LoadStatementsFromFile(fileDialog.FileName);
+                if (rows.Count == 0)
+                {
+                    MessageBox.Show(this,
+                        "The selected file did not contain any statements for accounts that already exist.",
+                        "Import Statements",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                using var preview = new StatementImportPreviewDialog(rows, import);
+                if (preview.ShowDialog(this) != DialogResult.OK)
+                    return;
+
+                LoadStatementsForSelectedAccount();
+                lblStatementStatus.Text = ImportStatusText.Imported(preview.Result, "statement", "statements");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Could not parse the file.\n{ex.Message}", "Import Statements",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private void OnSplitTransaction(object? sender, EventArgs e)
@@ -287,6 +412,58 @@ namespace THMS.UI.WinForms
             OpenSplitEditor(view);
         }
 
+        private void OnCategorySplitTransaction(object? sender, EventArgs e)
+        {
+            if (GetSelectedCategoryRow() is not UnifiedTransactionView view)
+            {
+                MessageBox.Show(this, "Select a category row to split its posted transaction.", "Split Transaction",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            OpenSplitEditor(view);
+        }
+
+        private void OnCategoryViewCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0)
+                return;
+
+            if (IsCategoryViewCategoryColumn(e.ColumnIndex))
+            {
+                ShowCategoryMenu(gridCategory, CategoryCategoryColumn, e.RowIndex);
+                return;
+            }
+
+            if (gridCategory.Rows[e.RowIndex].DataBoundItem is UnifiedTransactionView view && CanSplit(view))
+                OpenSplitEditor(view);
+        }
+
+        private void OnCategoryViewCellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
+        {
+            if (e.RowIndex < 0 || !IsCategoryViewCategoryColumn(e.ColumnIndex))
+                return;
+            if (e.Button is not (MouseButtons.Left or MouseButtons.Right))
+                return;
+            if (!CanEditCategoryRow(gridCategory, e.RowIndex))
+                return;
+
+            gridCategory.CurrentCell = gridCategory[e.ColumnIndex, e.RowIndex];
+            ShowCategoryMenu(gridCategory, CategoryCategoryColumn, e.RowIndex);
+        }
+
+        private void OnCategoryViewKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (gridCategory.CurrentCell is { RowIndex: >= 0 } cell
+                && IsCategoryViewCategoryColumn(cell.ColumnIndex)
+                && e.KeyCode is Keys.F2 or Keys.Enter or Keys.Space
+                && CanEditCategoryRow(gridCategory, cell.RowIndex))
+            {
+                ShowCategoryMenu(gridCategory, CategoryCategoryColumn, cell.RowIndex);
+                e.Handled = true;
+            }
+        }
+
         private void OnTransactionCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0)
@@ -294,7 +471,7 @@ namespace THMS.UI.WinForms
 
             if (IsCategoryColumn(e.ColumnIndex))
             {
-                ShowCategoryMenu(e.RowIndex);
+                ShowCategoryMenu(gridTransactions, CategoryColumn, e.RowIndex);
                 return;
             }
 
@@ -315,7 +492,7 @@ namespace THMS.UI.WinForms
                 return;
 
             gridTransactions.CurrentCell = gridTransactions[e.ColumnIndex, e.RowIndex];
-            ShowCategoryMenu(e.RowIndex);
+            ShowCategoryMenu(gridTransactions, CategoryColumn, e.RowIndex);
         }
 
         private void OnTransactionGridKeyDown(object? sender, KeyEventArgs e)
@@ -325,7 +502,7 @@ namespace THMS.UI.WinForms
                 && e.KeyCode is Keys.F2 or Keys.Enter or Keys.Space
                 && CanEditCategory(cell.RowIndex))
             {
-                ShowCategoryMenu(cell.RowIndex);
+                ShowCategoryMenu(gridTransactions, CategoryColumn, cell.RowIndex);
                 e.Handled = true;
             }
         }
@@ -333,9 +510,14 @@ namespace THMS.UI.WinForms
         private bool IsCategoryColumn(int columnIndex) =>
             columnIndex >= 0 && gridTransactions.Columns[columnIndex] == CategoryColumn;
 
-        private bool CanEditCategory(int rowIndex)
+        private bool IsCategoryViewCategoryColumn(int columnIndex) =>
+            columnIndex >= 0 && gridCategory.Columns[columnIndex] == CategoryCategoryColumn;
+
+        private bool CanEditCategory(int rowIndex) => CanEditCategoryRow(gridTransactions, rowIndex);
+
+        private static bool CanEditCategoryRow(DataGridView grid, int rowIndex)
         {
-            if (gridTransactions.Rows[rowIndex].DataBoundItem is not UnifiedTransactionView view)
+            if (grid.Rows[rowIndex].DataBoundItem is not UnifiedTransactionView view)
                 return false;
             return CanSplit(view);
         }
@@ -343,10 +525,10 @@ namespace THMS.UI.WinForms
         private static bool CanSplit(UnifiedTransactionView view) =>
             view.Type is UnifiedTransactionView.PostedType or UnifiedTransactionView.PostedTransferType;
 
-        private void ShowCategoryMenu(int rowIndex)
+        private void ShowCategoryMenu(DataGridView grid, DataGridViewColumn categoryColumn, int rowIndex)
         {
-            if (gridTransactions.Rows[rowIndex].DataBoundItem is not UnifiedTransactionView view
-                || !CanEditCategory(rowIndex))
+            if (grid.Rows[rowIndex].DataBoundItem is not UnifiedTransactionView view
+                || !CanEditCategoryRow(grid, rowIndex))
                 return;
 
             var posted = view.Type == UnifiedTransactionView.PostedType
@@ -375,9 +557,9 @@ namespace THMS.UI.WinForms
             manageItem.Click += (_, _) => OpenCategoryManager();
             menu.Items.Add(manageItem);
 
-            var cell = gridTransactions.GetCellDisplayRectangle(CategoryColumn.Index, rowIndex, cutOverflow: false);
+            var cell = grid.GetCellDisplayRectangle(categoryColumn.Index, rowIndex, cutOverflow: false);
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
-            menu.Show(gridTransactions, new Point(cell.Left, cell.Bottom));
+            menu.Show(grid, new Point(cell.Left, cell.Bottom));
         }
 
         private void AssignCategory(UnifiedTransactionView view, Guid categoryId)
@@ -406,10 +588,7 @@ namespace THMS.UI.WinForms
                 return;
 
             var parentId = view.LookupId;
-            var txs = _txOrchestrator.GetTransactionsForAccount(view.AccountId);
-            BaseTransaction? parent =
-                (BaseTransaction?)txs.Posted.FirstOrDefault(t => t.Id == parentId) ??
-                txs.PostedTransfers.FirstOrDefault(t => t.Id == parentId);
+            var parent = _txOrchestrator.GetParent(parentId);
             if (parent is null)
                 return;
 
@@ -437,9 +616,17 @@ namespace THMS.UI.WinForms
         private UnifiedTransactionView? GetSelectedTransaction() =>
             gridTransactions.CurrentRow?.DataBoundItem as UnifiedTransactionView;
 
+        private UnifiedTransactionView? GetSelectedCategoryRow() =>
+            gridCategory.CurrentRow?.DataBoundItem as UnifiedTransactionView;
+
         private void UpdateSplitButton()
         {
             btnSplit.Enabled = GetSelectedTransaction() is UnifiedTransactionView view && CanSplit(view);
+        }
+
+        private void UpdateCategorySplitButton()
+        {
+            btnCategorySplit.Enabled = GetSelectedCategoryRow() is UnifiedTransactionView view && CanSplit(view);
         }
     }
 }

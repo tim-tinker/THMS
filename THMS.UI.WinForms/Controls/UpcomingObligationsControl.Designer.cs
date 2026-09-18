@@ -6,9 +6,6 @@ namespace THMS.UI.WinForms.Controls
         private Panel pnlRoot;
         private Label lblHeader;
         private ThmsButton btnRefresh;
-        private ThmsButton btnAddStatement;
-        private ThmsButton btnEditStatement;
-        private ThmsButton btnDeleteStatement;
         private DataGridView gridObligations;
         private Label lblStatus;
 
@@ -24,9 +21,6 @@ namespace THMS.UI.WinForms.Controls
             pnlRoot = new Panel();
             lblHeader = new Label();
             btnRefresh = new ThmsButton();
-            btnAddStatement = new ThmsButton();
-            btnEditStatement = new ThmsButton();
-            btnDeleteStatement = new ThmsButton();
             gridObligations = new DataGridView();
             lblStatus = new Label();
             ((System.ComponentModel.ISupportInitialize)gridObligations).BeginInit();
@@ -85,23 +79,7 @@ namespace THMS.UI.WinForms.Controls
             btnRefresh.Name = "btnRefresh";
             btnRefresh.Margin = new Padding(0, 4, 8, 4);
             btnRefresh.Click += OnRefresh;
-            btnAddStatement.Text = "Add Statement";
-            btnAddStatement.Name = "btnAddStatement";
-            btnAddStatement.Margin = new Padding(0, 4, 8, 4);
-            btnAddStatement.Click += OnAddStatement;
-            btnEditStatement.Text = "Edit Statement";
-            btnEditStatement.Name = "btnEditStatement";
-            btnEditStatement.Margin = new Padding(0, 4, 8, 4);
-            btnEditStatement.Click += OnEditStatement;
-            btnDeleteStatement.Text = "Delete Statement";
-            btnDeleteStatement.Name = "btnDeleteStatement";
-            btnDeleteStatement.Destructive = true;
-            btnDeleteStatement.Margin = new Padding(0, 4, 8, 4);
-            btnDeleteStatement.Click += OnDeleteStatement;
             toolbar.Controls.Add(btnRefresh);
-            toolbar.Controls.Add(btnAddStatement);
-            toolbar.Controls.Add(btnEditStatement);
-            toolbar.Controls.Add(btnDeleteStatement);
             return toolbar;
         }
     }

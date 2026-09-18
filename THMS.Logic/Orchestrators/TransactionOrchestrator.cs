@@ -32,7 +32,9 @@ namespace THMS.Logic.Orchestrators
                 FutureSingles = _store.GetFutureSingleTransactions(accountId).Where(f => f.IsUserCreated),
                 FutureTransfers = _store.GetFutureTransferTransactions(accountId).Where(f => f.IsUserCreated),
                 RecurringSingles = _store.GetRecurringSingleRules(accountId),
-                RecurringTransfers = _store.GetRecurringTransferRules(accountId)
+                RecurringTransfers = _store.GetRecurringTransferRules(accountId),
+                IncomingTransferSplitPosted = IncomingPostedSplitSources(accountId, DateTime.MinValue, DateTime.MaxValue),
+                IncomingTransferSplitFutures = IncomingFutureSplitSources(accountId)
             };
         }
 
@@ -50,7 +52,10 @@ namespace THMS.Logic.Orchestrators
                 FutureTransfers = _store.GetFutureTransferTransactions(accountId)
                     .Where(f => f.IsUserCreated && InRange(f.Date, start, end)),
                 RecurringSingles = _store.GetRecurringSingleRules(accountId),
-                RecurringTransfers = _store.GetRecurringTransferRules(accountId)
+                RecurringTransfers = _store.GetRecurringTransferRules(accountId),
+                IncomingTransferSplitPosted = IncomingPostedSplitSources(accountId, start, end),
+                IncomingTransferSplitFutures = IncomingFutureSplitSources(accountId)
+                    .Where(f => InRange(f.Date, start, end))
             };
         }
 
@@ -60,7 +65,8 @@ namespace THMS.Logic.Orchestrators
                 return 0;
 
             return _store.SumPostedAmountsBefore(accountId, before)
-                + _store.SumPostedTransferAmountsBefore(accountId, before);
+                + _store.SumPostedTransferAmountsBefore(accountId, before)
+                + SumIncomingTransferSplits(accountId, before);
         }
 
         private static bool InRange(DateTime date, DateTime start, DateTime end) =>
@@ -72,8 +78,8 @@ namespace THMS.Logic.Orchestrators
                 accountId,
                 from,
                 to,
-                _store.GetRecurringSingleRules(accountId),
-                _store.GetRecurringTransferRules(accountId));
+                _store.GetAllRecurringSingleRules(),
+                _store.GetAllRecurringTransferRules());
         }
 
         public decimal ComputePostedBalance(Guid accountId, decimal startingBalance)
@@ -81,8 +87,11 @@ namespace THMS.Logic.Orchestrators
             return PostedBalanceCalculator.Compute(
                 startingBalance,
                 _store.GetPostedTransactions(accountId),
-                _store.GetPostedTransferTransactions(accountId));
+                _store.GetPostedTransferTransactions(accountId))
+                + SumIncomingTransferSplits(accountId, before: null);
         }
+
+        public BaseTransaction? GetParent(Guid transactionId) => FindParent(transactionId);
 
         public void ReconcileRules(Guid accountId)
         {
@@ -128,6 +137,40 @@ namespace THMS.Logic.Orchestrators
             }
         }
 
+        private IEnumerable<PostedTransaction> IncomingPostedSplitSources(Guid accountId, DateTime start, DateTime end) =>
+            _store.GetPostedTransactions(start, end)
+                .Concat(_store.GetPostedTransferTransactions(start, end))
+                .Where(t => t.AccountId != accountId && HasTransferTo(t, accountId));
+
+        private IEnumerable<FutureSingleTransaction> IncomingFutureSplitSources(Guid accountId) =>
+            _store.GetAllFutureSingleTransactions()
+                .Where(t => t.AccountId != accountId && HasTransferTo(t, accountId));
+
+        private decimal SumIncomingTransferSplits(Guid accountId, DateTime? before)
+        {
+            var posted = _store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue)
+                .Concat(_store.GetPostedTransferTransactions(DateTime.MinValue, DateTime.MaxValue));
+            decimal sum = 0;
+            foreach (var transaction in posted)
+            {
+                if (transaction.AccountId == accountId)
+                    continue;
+                if (before is DateTime cutoff && transaction.Date >= cutoff)
+                    continue;
+                sum += IncomingTransferAmount(transaction, accountId);
+            }
+
+            return sum;
+        }
+
+        private static bool HasTransferTo(BaseTransaction transaction, Guid accountId) =>
+            transaction.Splits.Any(s => SplitTransactionMath.IsTransferTo(s, accountId));
+
+        private static decimal IncomingTransferAmount(BaseTransaction transaction, Guid accountId) =>
+            transaction.Splits
+                .Where(s => SplitTransactionMath.IsTransferTo(s, accountId))
+                .Sum(SplitTransactionMath.CounterpartAmount);
+
         private BaseTransaction? FindParent(Guid transactionId) =>
             (BaseTransaction?)_store.GetPostedTransaction(transactionId) ??
             _store.GetPostedTransferTransaction(transactionId) ??
@@ -160,6 +203,8 @@ namespace THMS.Logic.Orchestrators
             {
                 case BaseSingleAccountTransaction single:
                     budgets.RefreshAccount(single.AccountId);
+                    foreach (var dest in Destinations(single))
+                        budgets.RefreshAccount(dest);
                     break;
                 case TransferTransaction transfer:
                     budgets.RefreshAccount(transfer.FromAccountId);
@@ -167,6 +212,12 @@ namespace THMS.Logic.Orchestrators
                     break;
             }
         }
+
+        private static IEnumerable<Guid> Destinations(BaseTransaction parent) =>
+            parent.Splits
+                .Where(s => s.Type == SplitType.Transfer && s.TransferAccountId is Guid id && id != Guid.Empty)
+                .Select(s => s.TransferAccountId!.Value)
+                .Distinct();
     }
 
     public class AccountTransactions
@@ -177,5 +228,7 @@ namespace THMS.Logic.Orchestrators
         public IEnumerable<FutureTransferTransaction> FutureTransfers { get; init; } = [];
         public IEnumerable<RecurringSingleTransactionRule> RecurringSingles { get; init; } = [];
         public IEnumerable<RecurringTransferRule> RecurringTransfers { get; init; } = [];
+        public IEnumerable<PostedTransaction> IncomingTransferSplitPosted { get; init; } = [];
+        public IEnumerable<FutureSingleTransaction> IncomingTransferSplitFutures { get; init; } = [];
     }
 }

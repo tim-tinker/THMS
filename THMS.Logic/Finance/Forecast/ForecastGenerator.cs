@@ -16,8 +16,13 @@ namespace THMS.Logic.Finance.Forecast
         {
             var results = new List<UnifiedTransactionView>();
 
-            foreach (var rule in singleRules.Where(r => r.IsActive && r.AccountId == accountId))
-                results.AddRange(ExpandSingleRule(rule, from, to));
+            foreach (var rule in singleRules.Where(r => r.IsActive))
+            {
+                if (rule.AccountId == accountId)
+                    results.AddRange(ExpandSingleRule(rule, from, to));
+                else
+                    results.AddRange(ExpandIncomingTransferSplits(rule, accountId, from, to));
+            }
 
             foreach (var rule in transferRules.Where(r => r.IsActive &&
                          (r.FromAccountId == accountId || r.ToAccountId == accountId)))
@@ -38,48 +43,53 @@ namespace THMS.Logic.Finance.Forecast
             {
                 if (next >= from)
                 {
-                    var amount = rule.IsFinalPaymentDifferent &&
-                                 rule.EndDate.HasValue &&
-                                 next == rule.EndDate.Value
-                        ? rule.FinalPaymentAmount ?? rule.Amount
-                        : rule.Amount;
+                    yield return UnifiedTransactionViewBuilder.ForLedgerRow(
+                        rule,
+                        rule.AccountId,
+                        UnifiedTransactionView.ForecastType,
+                        next,
+                        OccurrenceAmount(rule.Amount, rule.IsFinalPaymentDifferent, rule.EndDate, rule.FinalPaymentAmount, next),
+                        Guid.NewGuid());
+                }
 
-                    if (rule.HasSplits && amount == rule.Amount)
+                next = next.AddFrequency(rule.Frequency);
+                count++;
+            }
+        }
+
+        private static IEnumerable<UnifiedTransactionView> ExpandIncomingTransferSplits(
+            RecurringSingleTransactionRule rule,
+            Guid accountId,
+            DateTime from,
+            DateTime to)
+        {
+            var splits = rule.Splits
+                .Where(s => SplitTransactionMath.IsTransferTo(s, accountId))
+                .ToList();
+            if (splits.Count == 0)
+                yield break;
+
+            var next = rule.NextOccurrence;
+            var count = 0;
+
+            while (next <= to && (rule.EndDate == null || next <= rule.EndDate.Value) && count < MaxOccurrencesPerRule)
+            {
+                if (next >= from)
+                {
+                    var amount = OccurrenceAmount(
+                        rule.Amount, rule.IsFinalPaymentDifferent, rule.EndDate, rule.FinalPaymentAmount, next);
+                    if (Math.Abs(amount) == Math.Abs(rule.Amount))
                     {
-                        foreach (var split in rule.Splits)
+                        foreach (var split in splits)
                         {
-                            yield return new UnifiedTransactionView
-                            {
-                                Id = Guid.NewGuid(),
-                                ParentTransactionId = rule.Id,
-                                SplitRowId = split.Id,
-                                SplitKind = split.Type.ToString(),
-                                AccountId = rule.AccountId,
-                                Date = next,
-                                Description = rule.Description ?? "",
-                                Amount = split.Amount,
-                                Category = split.Category,
-                                CategoryId = split.CategoryId,
-                                Type = UnifiedTransactionView.ForecastType,
-                                ForecastBalance = null
-                            };
+                            yield return UnifiedTransactionViewBuilder.ForTransferSplit(
+                                rule,
+                                split,
+                                accountId,
+                                UnifiedTransactionView.ForecastTransferType,
+                                next,
+                                Guid.NewGuid());
                         }
-                    }
-                    else
-                    {
-                        yield return new UnifiedTransactionView
-                        {
-                            Id = Guid.NewGuid(),
-                            ParentTransactionId = rule.Id,
-                            AccountId = rule.AccountId,
-                            Date = next,
-                            Description = rule.Description ?? "",
-                            Amount = amount,
-                            Category = rule.Category,
-                            CategoryId = rule.CategoryId,
-                            Type = UnifiedTransactionView.ForecastType,
-                            ForecastBalance = null
-                        };
                     }
                 }
 
@@ -101,58 +111,33 @@ namespace THMS.Logic.Finance.Forecast
             {
                 if (next >= from)
                 {
-                    var amount = rule.IsFinalPaymentDifferent &&
-                                 rule.EndDate.HasValue &&
-                                 next == rule.EndDate.Value
-                        ? rule.FinalPaymentAmount ?? rule.Amount
-                        : rule.Amount;
-
+                    var amount = OccurrenceAmount(
+                        rule.Amount, rule.IsFinalPaymentDifferent, rule.EndDate, rule.FinalPaymentAmount, next);
                     if (rule.FromAccountId != rule.ToAccountId && rule.ToAccountId == accountId)
                         amount = -amount;
 
-                    if (rule.HasSplits && Math.Abs(amount) == Math.Abs(rule.Amount))
-                    {
-                        var sign = amount < 0 && rule.Amount >= 0 || amount >= 0 && rule.Amount < 0 ? -1m : 1m;
-                        foreach (var split in rule.Splits)
-                        {
-                            yield return new UnifiedTransactionView
-                            {
-                                Id = Guid.NewGuid(),
-                                ParentTransactionId = rule.Id,
-                                SplitRowId = split.Id,
-                                SplitKind = split.Type.ToString(),
-                                AccountId = accountId,
-                                Date = next,
-                                Description = rule.Description ?? "",
-                                Amount = split.Amount * sign,
-                                Category = split.Category,
-                                CategoryId = split.CategoryId,
-                                Type = UnifiedTransactionView.ForecastTransferType,
-                                ForecastBalance = null
-                            };
-                        }
-                    }
-                    else
-                    {
-                        yield return new UnifiedTransactionView
-                        {
-                            Id = Guid.NewGuid(),
-                            ParentTransactionId = rule.Id,
-                            AccountId = accountId,
-                            Date = next,
-                            Description = rule.Description ?? "",
-                            Amount = amount,
-                            Category = rule.Category,
-                            CategoryId = rule.CategoryId,
-                            Type = UnifiedTransactionView.ForecastTransferType,
-                            ForecastBalance = null
-                        };
-                    }
+                    yield return UnifiedTransactionViewBuilder.ForLedgerRow(
+                        rule,
+                        accountId,
+                        UnifiedTransactionView.ForecastTransferType,
+                        next,
+                        amount,
+                        Guid.NewGuid());
                 }
 
                 next = next.AddFrequency(rule.Frequency);
                 count++;
             }
         }
+
+        private static decimal OccurrenceAmount(
+            decimal amount,
+            bool isFinalPaymentDifferent,
+            DateTime? endDate,
+            decimal? finalPaymentAmount,
+            DateTime next) =>
+            isFinalPaymentDifferent && endDate.HasValue && next == endDate.Value
+                ? finalPaymentAmount ?? amount
+                : amount;
     }
 }

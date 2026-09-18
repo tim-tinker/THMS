@@ -49,6 +49,18 @@ namespace THMS.Domain.Finance.Planning
             _ => null
         };
 
+        public static AccountStatement CreateStatement(StatementType type) => type switch
+        {
+            StatementType.Bank => new BankStatement(),
+            StatementType.Loan => new LoanStatement(),
+            StatementType.Mortgage => new MortgageStatement(),
+            StatementType.CreditCard => new CreditCardStatement(),
+            StatementType.Utility => new UtilityStatement(),
+            StatementType.Service => new ServiceStatement(),
+            StatementType.Insurance => new InsuranceStatement(),
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported statement type.")
+        };
+
         private static bool IsUntracked(Account account, AccountType type) =>
             account is UntrackedAccount && account.Type == type;
     }

@@ -17,6 +17,7 @@ namespace THMS.UI.WinForms.Controls
         private const string ShowPosted = "Posted";
         private const string ShowForecast = "Forecast";
         private const string ShowRecurringRules = "Recurring Rules";
+        private const string ShowByCategory = "By Category";
         private const string HistoryMonth = "Month";
         private const string HistoryYear = "Year";
         private const string HistoryLifetime = "Lifetime";
@@ -41,6 +42,9 @@ namespace THMS.UI.WinForms.Controls
         private bool _ready;
         private bool _suspendAccountChange;
         private bool _suspendHistoryChange;
+        private bool _suspendCategoryFilter;
+        private Label lblCategoryFilter = null!;
+        private ComboBox cmbCategoryFilter = null!;
         private decimal _postedBalanceBeforeEdit;
         private bool _hostProvidesHistory;
 
@@ -51,6 +55,7 @@ namespace THMS.UI.WinForms.Controls
             InitializeHistory();
             InitializeForecastPeriod();
             InitializeShowFilter();
+            InitializeCategoryFilter();
             InitializeGrids();
             HostBudgetUi();
             _ready = true;
@@ -105,6 +110,9 @@ namespace THMS.UI.WinForms.Controls
             cmbShow.Width = 200;
             cmbShow.DropDownWidth = 220;
             cmbShow.IntegralHeight = false;
+            cmbCategoryFilter.Width = 220;
+            cmbCategoryFilter.DropDownWidth = 280;
+            cmbCategoryFilter.IntegralHeight = false;
             btnAddRule.AutoSize = true;
             btnDeleteRule.AutoSize = true;
             btnSplitTransaction.AutoSize = true;
@@ -129,12 +137,61 @@ namespace THMS.UI.WinForms.Controls
         private void InitializeShowFilter()
         {
             cmbShow.Items.Clear();
-            cmbShow.Items.AddRange([ShowAll, ShowPosted, ShowForecast, ShowRecurringRules]);
+            cmbShow.Items.AddRange([ShowAll, ShowPosted, ShowForecast, ShowRecurringRules, ShowByCategory]);
             cmbShow.SelectedIndex = 0;
             cmbShow.SelectedIndexChanged += OnShowFilterChanged;
             btnAddRule.Click += OnAddRuleClicked;
             btnDeleteRule.Click += OnDeleteRuleClicked;
             btnSplitTransaction.Click += OnSplitTransactionClicked;
+        }
+
+        private void InitializeCategoryFilter()
+        {
+            lblCategoryFilter = new Label
+            {
+                Anchor = AnchorStyles.Left,
+                AutoSize = true,
+                Margin = new Padding(12, 8, 8, 4),
+                Text = "Category:",
+                Visible = false
+            };
+            cmbCategoryFilter = new ComboBox
+            {
+                Anchor = AnchorStyles.Left,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Margin = new Padding(4, 4, 8, 4),
+                Visible = false
+            };
+            cmbCategoryFilter.SelectedIndexChanged += OnCategoryFilterChanged;
+            forecastPanel.Controls.Add(lblCategoryFilter);
+            forecastPanel.Controls.Add(cmbCategoryFilter);
+            BindCategoryFilter();
+        }
+
+        private void BindCategoryFilter()
+        {
+            var selected = cmbCategoryFilter.SelectedItem as CategoryFilterChoice;
+            var items = CategoryFilterChoice.ForCategories(_categoryOrchestrator.GetActiveCategories());
+            _suspendCategoryFilter = true;
+            cmbCategoryFilter.DisplayMember = nameof(CategoryFilterChoice.Name);
+            cmbCategoryFilter.DataSource = items;
+            if (selected is not null)
+            {
+                var match = items.FirstOrDefault(i =>
+                    i.UncategorizedOnly == selected.UncategorizedOnly && i.CategoryId == selected.CategoryId);
+                if (match is not null)
+                    cmbCategoryFilter.SelectedItem = match;
+            }
+
+            _suspendCategoryFilter = false;
+        }
+
+        private void OnCategoryFilterChanged(object? sender, EventArgs e)
+        {
+            if (_suspendCategoryFilter || !_ready || SelectedShowMode() != ShowByCategory)
+                return;
+
+            RefreshCurrentAccount();
         }
 
         private void InitializeGrids()
@@ -168,6 +225,7 @@ namespace THMS.UI.WinForms.Controls
             detailGrid.CellDoubleClick += OnTransactionCellDoubleClick;
             detailGrid.KeyDown += OnTransactionGridKeyDown;
             detailGrid.CellMouseClick += OnCategoryCellMouseClick;
+            detailGrid.SelectionChanged += (_, _) => UpdateRuleActionButtons();
         }
 
         private void HostBudgetUi()
@@ -348,9 +406,11 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             _filterApplied = SelectedShowMode() == ShowPosted;
-            var showingRules = SelectedShowMode() == ShowRecurringRules;
+            var showingCategory = SelectedShowMode() == ShowByCategory;
             cmbForecastPeriod.Enabled = SelectedShowMode() is ShowAll or ShowForecast;
-            btnDeleteRule.Enabled = showingRules;
+            lblCategoryFilter.Visible = cmbCategoryFilter.Visible = showingCategory;
+            ForecastColumn.Visible = !showingCategory;
+            UpdateRuleActionButtons();
             RefreshCurrentAccount();
         }
 
@@ -376,18 +436,23 @@ namespace THMS.UI.WinForms.Controls
             var show = SelectedShowMode();
             var history = SelectedHistory();
             var forecastEnd = GetForecastEnd();
+            var categoryFilter = cmbCategoryFilter.SelectedItem as CategoryFilterChoice ?? CategoryFilterChoice.All;
+            var categories = show == ShowByCategory
+                ? _categoryOrchestrator.GetAllCategories(includeInactive: true)
+                : [];
             ShowLoadProgress($"Loading {history.ToLowerInvariant()} history...");
 
             try
             {
                 var views = await Task.Run(
-                    () => BuildTransactionViews(accountId, show, history, forecastEnd, token),
+                    () => BuildTransactionViews(accountId, show, history, forecastEnd, categoryFilter, categories, token),
                     token);
                 if (token.IsCancellationRequested || CurrentAccountId != accountId)
                     return;
 
                 ShowLoadProgress("Updating grid...");
                 _transactionsSource.DataSource = views;
+                UpdateRuleActionButtons();
             }
             catch (OperationCanceledException)
             {
@@ -399,14 +464,30 @@ namespace THMS.UI.WinForms.Controls
             string show,
             string history,
             DateTime forecastEnd,
+            CategoryFilterChoice categoryFilter,
+            IReadOnlyList<ExpenseCategory> categories,
             CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
+            if (show == ShowByCategory)
+            {
+                var start = BaseOrchestrator.GetStartDate(DateTime.Today, history);
+                var txs = history == HistoryLifetime
+                    ? _txOrchestrator.GetTransactionsForAccount(accountId)
+                    : _txOrchestrator.GetTransactionsForAccount(accountId, start, DateTime.Today);
+                var rows = UnifiedTransactionViewBuilder.BuildCategoryRows(txs.Posted, txs.PostedTransfers);
+                ApplyCategoryDisplayNames(rows);
+                var filtered = UnifiedTransactionViewBuilder.FilterCategoryRows(rows, categoryFilter, categories);
+                ClearForecastBalances(filtered);
+                return UnifiedTransactionView.OrderForDisplay(filtered).ToList();
+            }
+
             if (show == ShowRecurringRules)
             {
                 var rules = UnifiedTransactionViewBuilder.BuildRecurringRules(
-                    _ruleOrchestrator.GetSingleRules(accountId),
-                    _ruleOrchestrator.GetTransferRules(accountId));
+                    _ruleOrchestrator.GetAllSingleRules(),
+                    _ruleOrchestrator.GetTransferRules(accountId),
+                    accountId);
                 ApplyCategoryDisplayNames(rules);
                 return rules;
             }
@@ -442,7 +523,10 @@ namespace THMS.UI.WinForms.Controls
                 txs.Posted,
                 txs.PostedTransfers,
                 txs.FutureSingles,
-                txs.FutureTransfers);
+                txs.FutureTransfers,
+                accountId,
+                txs.IncomingTransferSplitPosted,
+                txs.IncomingTransferSplitFutures);
 
             if (show == ShowPosted)
                 return posted;
@@ -696,7 +780,7 @@ namespace THMS.UI.WinForms.Controls
             if (detailGrid.Rows[e.RowIndex].DataBoundItem is not UnifiedTransactionView view)
                 return;
 
-            if (view.IsRecurringRule)
+            if (TryGetRule(view, out _, out _))
             {
                 OpenRuleEditor(view);
                 return;
@@ -810,7 +894,7 @@ namespace THMS.UI.WinForms.Controls
                 return;
             }
 
-            if (e.KeyCode != Keys.Delete || SelectedShowMode() != ShowRecurringRules)
+            if (e.KeyCode != Keys.Delete || GetSelectedRuleView() is null)
                 return;
 
             DeleteSelectedRule();
@@ -834,6 +918,12 @@ namespace THMS.UI.WinForms.Controls
                 return;
             }
 
+            if (TryGetRule(view, out _, out _))
+            {
+                OpenRuleEditor(view);
+                return;
+            }
+
             OpenSplitEditor(view);
         }
 
@@ -841,11 +931,7 @@ namespace THMS.UI.WinForms.Controls
             view.Type is UnifiedTransactionView.PostedType
                 or UnifiedTransactionView.PostedTransferType
                 or UnifiedTransactionView.FutureType
-                or UnifiedTransactionView.FutureTransferType
-                or UnifiedTransactionView.RecurringRuleType
-                or UnifiedTransactionView.RecurringTransferRuleType
-                or UnifiedTransactionView.ForecastType
-                or UnifiedTransactionView.ForecastTransferType;
+                or UnifiedTransactionView.FutureTransferType;
 
         private void OpenSplitEditor(UnifiedTransactionView view)
         {
@@ -853,40 +939,13 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             var parentId = view.LookupId;
-            decimal amount;
-            string description;
-            List<SplitTransactionRow> existing;
+            var parent = _txOrchestrator.GetParent(parentId);
+            if (parent is null)
+                return;
 
-            if (view.IsRecurringRule || view.IsForecasted)
-            {
-                var single = _ruleOrchestrator.GetSingleRule(parentId);
-                var transfer = single is null ? _ruleOrchestrator.GetTransferRule(parentId) : null;
-                if (single is null && transfer is null)
-                {
-                    MessageBox.Show(FindForm(), "Splits on forecast rows are edited on the recurring rule.",
-                        "Split Transaction", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
-
-                amount = single?.Amount ?? transfer!.Amount;
-                description = single?.Description ?? transfer!.Description ?? view.Description;
-                existing = _txOrchestrator.GetSplits(parentId);
-            }
-            else
-            {
-                var txs = _txOrchestrator.GetTransactionsForAccount(view.AccountId);
-                BaseTransaction? parent =
-                    (BaseTransaction?)txs.Posted.FirstOrDefault(t => t.Id == parentId) ??
-                    txs.PostedTransfers.FirstOrDefault(t => t.Id == parentId) ??
-                    (BaseTransaction?)txs.FutureSingles.FirstOrDefault(t => t.Id == parentId) ??
-                    txs.FutureTransfers.FirstOrDefault(t => t.Id == parentId);
-                if (parent is null)
-                    return;
-
-                amount = parent.Amount;
-                description = parent.Description ?? view.Description;
-                existing = parent.Splits.Select(s => s.Clone()).ToList();
-            }
+            var amount = parent.Amount;
+            var description = parent.Description ?? view.Description;
+            var existing = parent.Splits.Select(s => s.Clone()).ToList();
 
             using var editor = new SplitTransactionEditor(
                 description,
@@ -914,42 +973,46 @@ namespace THMS.UI.WinForms.Controls
             DeleteSelectedRule();
         }
 
+        private void UpdateRuleActionButtons()
+        {
+            btnDeleteRule.Enabled = GetSelectedRuleView() is not null;
+        }
+
         private UnifiedTransactionView? GetSelectedRuleView()
         {
-            if (detailGrid.CurrentRow?.DataBoundItem is UnifiedTransactionView view && view.IsRecurringRule)
+            if (detailGrid.CurrentRow?.DataBoundItem is UnifiedTransactionView view
+                && TryGetRule(view, out _, out _))
                 return view;
 
             return null;
         }
 
+        private bool TryGetRule(
+            UnifiedTransactionView view,
+            out RecurringSingleTransactionRule? single,
+            out RecurringTransferRule? transfer)
+        {
+            single = _ruleOrchestrator.GetSingleRule(view.LookupId);
+            transfer = single is null ? _ruleOrchestrator.GetTransferRule(view.LookupId) : null;
+            return single is not null || transfer is not null;
+        }
+
         private void OpenRuleEditor(UnifiedTransactionView view)
         {
-            if (view.Type == UnifiedTransactionView.RecurringRuleType)
-            {
-                var rule = _ruleOrchestrator.GetSingleRule(view.LookupId);
-                if (rule is null)
-                    return;
-
-                using var editor = new RecurringRuleEditor(view.AccountId, rule);
-                if (editor.ShowDialog(FindForm()) == DialogResult.OK)
-                    RefreshAll();
-                return;
-            }
-
-            var transfer = _ruleOrchestrator.GetTransferRule(view.LookupId);
-            if (transfer is null)
+            if (!TryGetRule(view, out var single, out var transfer))
                 return;
 
-            using (var editor = new RecurringRuleEditor(view.AccountId, existingTransfer: transfer))
-            {
-                if (editor.ShowDialog(FindForm()) == DialogResult.OK)
-                    RefreshAll();
-            }
+            using var editor = single is not null
+                ? new RecurringRuleEditor(view.AccountId, single)
+                : new RecurringRuleEditor(view.AccountId, existingTransfer: transfer!);
+            if (editor.ShowDialog(FindForm()) == DialogResult.OK)
+                RefreshAll();
         }
 
         private void DeleteSelectedRule()
         {
-            if (GetSelectedRuleView() is not UnifiedTransactionView view)
+            if (GetSelectedRuleView() is not UnifiedTransactionView view
+                || !TryGetRule(view, out var single, out var transfer))
                 return;
 
             if (MessageBox.Show(
@@ -960,10 +1023,10 @@ namespace THMS.UI.WinForms.Controls
                     MessageBoxIcon.Warning) != DialogResult.Yes)
                 return;
 
-            if (view.Type == UnifiedTransactionView.RecurringRuleType)
-                _ruleOrchestrator.DeleteSingleRule(view.LookupId);
+            if (single is not null)
+                _ruleOrchestrator.DeleteSingleRule(single.Id);
             else
-                _ruleOrchestrator.DeleteTransferRule(view.LookupId);
+                _ruleOrchestrator.DeleteTransferRule(transfer!.Id);
 
             RefreshAll();
         }
@@ -990,6 +1053,7 @@ namespace THMS.UI.WinForms.Controls
 
         public void RefreshAll()
         {
+            BindCategoryFilter();
             LoadAccounts();
             RefreshCurrentAccount();
         }

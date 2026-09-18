@@ -11,6 +11,7 @@
         public const string ForecastBudgetType = "ForecastBudget";
         public const string RecurringRuleType = "RecurringRule";
         public const string RecurringTransferRuleType = "RecurringTransferRule";
+        public const string SplitCategory = "Split";
 
         public Guid Id { get; set; }
         public Guid AccountId { get; set; }

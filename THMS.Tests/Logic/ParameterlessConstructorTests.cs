@@ -45,6 +45,7 @@ namespace THMS.Tests.Logic
             Assert.That(new TransactionImportOrchestrator(), Is.Not.Null);
             Assert.That(new EvChargeSessionImportOrchestrator(), Is.Not.Null);
             Assert.That(new AccountImportOrchestrator(), Is.Not.Null);
+            Assert.That(new StatementImportOrchestrator(), Is.Not.Null);
             Assert.That(new AccountDiagnosticsOrchestrator(), Is.Not.Null);
             Assert.That(new TransactionDiagnosticsOrchestrator(), Is.Not.Null);
             Assert.That(new SplitDiagnosticsOrchestrator(), Is.Not.Null);

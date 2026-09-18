@@ -1,4 +1,3 @@
-using THMS.Domain.Finance.Planning;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
 
@@ -9,9 +8,6 @@ namespace THMS.UI.WinForms.Controls
         private PlanningOrchestrator _orchestrator = new();
 
         public event EventHandler? DataChanged;
-        public event EventHandler? AddStatementClicked;
-        public event EventHandler? EditStatementClicked;
-        public event EventHandler? DeleteStatementClicked;
 
         public UpcomingObligationsControl()
         {
@@ -31,15 +27,6 @@ namespace THMS.UI.WinForms.Controls
             SetStatus($"Loaded {gridObligations.Rows.Count} obligation{(gridObligations.Rows.Count == 1 ? "" : "s")}.");
         }
 
-        public AccountStatement? GetSelectedStatement()
-        {
-            if (gridObligations.CurrentRow?.DataBoundItem is not UpcomingObligation row)
-                return null;
-            if (row.StatementId is not Guid statementId)
-                return null;
-            return _orchestrator.GetStatement(statementId);
-        }
-
         private void ConfigureGrid()
         {
             gridObligations.AutoGenerateColumns = false;
@@ -50,7 +37,6 @@ namespace THMS.UI.WinForms.Controls
                 AmountColumn(nameof(UpcomingObligation.AmountDue), "Amount Due"),
                 AmountColumn(nameof(UpcomingObligation.PromotionalDue), "Promotional Due"),
                 TextColumn(nameof(UpcomingObligation.Notes), "Notes"));
-            gridObligations.CellDoubleClick += (_, _) => EditStatementClicked?.Invoke(this, EventArgs.Empty);
         }
 
         private static DataGridViewTextBoxColumn TextColumn(string property, string header) =>
@@ -84,15 +70,6 @@ namespace THMS.UI.WinForms.Controls
             RefreshObligations();
             DataChanged?.Invoke(this, EventArgs.Empty);
         }
-
-        private void OnAddStatement(object sender, EventArgs e) =>
-            AddStatementClicked?.Invoke(this, EventArgs.Empty);
-
-        private void OnEditStatement(object sender, EventArgs e) =>
-            EditStatementClicked?.Invoke(this, EventArgs.Empty);
-
-        private void OnDeleteStatement(object sender, EventArgs e) =>
-            DeleteStatementClicked?.Invoke(this, EventArgs.Empty);
 
         private void SetStatus(string message) => lblStatus.Text = message;
     }

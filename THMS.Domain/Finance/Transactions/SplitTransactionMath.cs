@@ -13,6 +13,11 @@ namespace THMS.Domain.Finance.Transactions
         public static bool AmountsMatch(decimal parentAmount, IEnumerable<SplitTransactionRow> splits) =>
             Math.Abs(parentAmount - splits.Sum(s => s.Amount)) <= SumTolerance;
 
+        public static bool IsTransferTo(SplitTransactionRow split, Guid accountId) =>
+            split.Type == SplitType.Transfer && split.TransferAccountId == accountId;
+
+        public static decimal CounterpartAmount(SplitTransactionRow split) => -split.Amount;
+
         public static decimal Remaining(decimal parentAmount, IEnumerable<SplitTransactionRow> splits) =>
             parentAmount - splits.Sum(s => s.Amount);
 

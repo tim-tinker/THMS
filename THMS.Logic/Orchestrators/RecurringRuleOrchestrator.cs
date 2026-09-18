@@ -20,6 +20,9 @@ namespace THMS.Logic.Orchestrators
         public List<RecurringSingleTransactionRule> GetSingleRules(Guid accountId) =>
             _store.GetRecurringSingleRules(accountId).ToList();
 
+        public List<RecurringSingleTransactionRule> GetAllSingleRules() =>
+            _store.GetAllRecurringSingleRules().ToList();
+
         public List<RecurringTransferRule> GetTransferRules(Guid accountId) =>
             _store.GetRecurringTransferRules(accountId).ToList();
 
@@ -37,8 +40,9 @@ namespace THMS.Logic.Orchestrators
 
         public DateTime? GetNextPaymentDate(Guid accountId)
         {
-            var dates = GetSingleRules(accountId)
-                .Where(r => r.IsActive)
+            var dates = GetAllSingleRules()
+                .Where(r => r.IsActive &&
+                    (r.AccountId == accountId || r.Splits.Any(s => SplitTransactionMath.IsTransferTo(s, accountId))))
                 .Select(r => r.NextOccurrence)
                 .Concat(GetTransferRules(accountId).Where(r => r.IsActive).Select(r => r.NextOccurrence))
                 .ToList();
