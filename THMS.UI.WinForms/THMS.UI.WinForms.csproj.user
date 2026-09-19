@@ -106,6 +106,9 @@
     <Compile Update="Controls\StatementEditorDialog.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Controls\StatementEntryGrid.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Update="Controls\StatementImportPreviewDialog.cs">
       <SubType>Form</SubType>
     </Compile>

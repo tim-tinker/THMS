@@ -77,8 +77,10 @@ namespace THMS.Logic.Finance.Planning
                 findings.Add("Statement balance cannot be negative.");
             foreach (var promo in card.Promotions)
             {
-                if (promo.Amount < 0)
-                    findings.Add("Promotional balance cannot be negative.");
+                if (promo.CurrentBalance < 0)
+                    findings.Add("Promotional current balance cannot be negative.");
+                if (promo.InitialAmount < 0)
+                    findings.Add("Promotional initial amount cannot be negative.");
                 if (promo.Deadline == default)
                     findings.Add("Promotional balance is missing a deadline.");
                 else if (promo.Deadline.Date < card.StatementDate.Date)

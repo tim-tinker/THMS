@@ -2,6 +2,7 @@ using System.ComponentModel;
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
+using THMS.Logic.Finance.Planning;
 using THMS.Logic.Orchestrators.Finance;
 
 namespace THMS.UI.WinForms.Controls
@@ -71,6 +72,7 @@ namespace THMS.UI.WinForms.Controls
                 _accounts.Add(_lockedAccount);
 
             InitializeComponent();
+            WireComboDrawing();
             _loading = true;
             BindStatementTypes();
             LoadExisting();
@@ -80,16 +82,77 @@ namespace THMS.UI.WinForms.Controls
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
+            SizeDialogInputs();
             FitToWorkingArea();
             ShowObligationFields(SelectedType() is StatementType type && type != StatementType.Bank);
+        }
+
+        private void WireComboDrawing()
+        {
+            foreach (var combo in new[] { cboAccount, cboStatementType, cboPayFrom })
+            {
+                combo.DrawMode = DrawMode.OwnerDrawFixed;
+                combo.IntegralHeight = false;
+                combo.DrawItem -= OnComboDrawItem;
+                combo.DrawItem += OnComboDrawItem;
+            }
+        }
+
+        private void SizeDialogInputs()
+        {
+            var comboHeight = Math.Max(LogicalToDeviceUnits(32), Font.Height + LogicalToDeviceUnits(14));
+            var itemHeight = Math.Max(LogicalToDeviceUnits(20), Font.Height);
+            foreach (var combo in new[] { cboAccount, cboStatementType, cboPayFrom })
+            {
+                combo.ItemHeight = itemHeight;
+                combo.Height = comboHeight;
+            }
+
+            var typeRows = cboStatementType.Visible ? 2 : 1;
+            typeSelectorLayout.RowStyles[0].SizeType = SizeType.Absolute;
+            typeSelectorLayout.RowStyles[0].Height = cboStatementType.Visible ? comboHeight : 0;
+            typeSelectorLayout.RowStyles[1].SizeType = SizeType.Absolute;
+            typeSelectorLayout.RowStyles[1].Height = comboHeight;
+            layout.RowStyles[0].SizeType = SizeType.Absolute;
+            layout.RowStyles[0].Height = comboHeight * typeRows + LogicalToDeviceUnits(8);
+
+            var fieldHeight = Math.Max(LogicalToDeviceUnits(36), Font.Height + LogicalToDeviceUnits(16));
+            pnlCommon.RowStyles[0].Height = fieldHeight;
+            if (txtAmountDue.Visible)
+            {
+                pnlCommon.RowStyles[1].Height = fieldHeight;
+                pnlCommon.RowStyles[2].Height = fieldHeight;
+            }
+        }
+
+        private static void OnComboDrawItem(object? sender, DrawItemEventArgs e)
+        {
+            if (sender is not ComboBox combo)
+                return;
+
+            e.DrawBackground();
+            if (e.Index >= 0 && e.Index < combo.Items.Count)
+            {
+                var selected = (e.State & DrawItemState.Selected) != 0;
+                var color = selected ? SystemColors.HighlightText : combo.ForeColor;
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    combo.GetItemText(combo.Items[e.Index]),
+                    combo.Font,
+                    e.Bounds,
+                    color,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            }
+
+            e.DrawFocusRectangle();
         }
 
         private void FitToWorkingArea()
         {
             var area = Screen.FromControl(this).WorkingArea;
             var margin = LogicalToDeviceUnits(48);
-            var maxWidth = Math.Max(LogicalToDeviceUnits(480), area.Width - margin);
-            var maxHeight = Math.Max(LogicalToDeviceUnits(360), area.Height - margin);
+            var maxWidth = Math.Max(LogicalToDeviceUnits(560), area.Width - margin);
+            var maxHeight = Math.Max(LogicalToDeviceUnits(420), area.Height - margin);
 
             MinimumSize = new Size(
                 Math.Min(MinimumSize.Width, maxWidth),
@@ -143,7 +206,10 @@ namespace THMS.UI.WinForms.Controls
             cboAccount.Enabled = false;
             typeSelectorLayout.RowStyles[0].SizeType = SizeType.Absolute;
             typeSelectorLayout.RowStyles[0].Height = 0;
-            layout.RowStyles[0].Height = 40F;
+            if (IsHandleCreated)
+                SizeDialogInputs();
+            else
+                layout.RowStyles[0].Height = 44F;
         }
 
         private void BindStatementTypes()
@@ -168,7 +234,7 @@ namespace THMS.UI.WinForms.Controls
             _loading = true;
             dtStatementDate.Value = DateTime.Today.AddDays(-15);
             dtDueDate.Value = DateTime.Today.AddDays(15);
-            txtAmountDue.Text = "0.00";
+            txtAmountDue.Text = "";
 
             if (_existingStatement is null)
             {
@@ -179,6 +245,7 @@ namespace THMS.UI.WinForms.Controls
                     BindAccounts(locked.Id);
                     _loading = false;
                     LoadTypePanel(lockedType);
+                    CopyPreviousPromotions();
                     return;
                 }
 
@@ -232,6 +299,7 @@ namespace THMS.UI.WinForms.Controls
             }
 
             LoadTypePanel(type);
+            CopyPreviousPromotions();
         }
 
         private void OnNewAccount(object? sender, EventArgs e)
@@ -265,7 +333,10 @@ namespace THMS.UI.WinForms.Controls
             if (dlg.Account is BankAccount or CreditAccount)
                 BindPayFrom(dlg.Account.Id);
             if (SelectedType() is StatementType selected)
+            {
                 LoadTypePanel(selected);
+                CopyPreviousPromotions();
+            }
         }
 
         private StatementType? SelectedType() =>
@@ -279,6 +350,7 @@ namespace THMS.UI.WinForms.Controls
             if (_loading)
                 return;
             BindPayFrom();
+            CopyPreviousPromotions();
         }
 
         private void BindPayFrom(Guid? selectedId = null)
@@ -355,11 +427,15 @@ namespace THMS.UI.WinForms.Controls
             lblPayFrom.Visible = visible;
             cboPayFrom.Visible = visible;
 
-            var rowHeight = IsHandleCreated ? LogicalToDeviceUnits(32) : 32;
+            var rowHeight = IsHandleCreated
+                ? Math.Max(LogicalToDeviceUnits(36), Font.Height + LogicalToDeviceUnits(16))
+                : 36;
             pnlCommon.RowStyles[1].Height = visible ? rowHeight : 0;
             pnlCommon.RowStyles[2].Height = visible ? rowHeight : 0;
             if (visible)
                 BindPayFrom();
+            if (IsHandleCreated)
+                SizeDialogInputs();
         }
 
         private Control BuildBankPanel()
@@ -408,9 +484,11 @@ namespace THMS.UI.WinForms.Controls
             fields.Height = 36;
 
             gridPromotions = CreateGrid();
-            gridPromotions.Columns.Add(AmountColumn(nameof(PromotionEditRow.Amount), "Amount"));
-            gridPromotions.Columns.Add(DateColumn(nameof(PromotionEditRow.Deadline), "Deadline"));
-            gridPromotions.Columns.Add(EnumColumn<PromoType>(nameof(PromotionEditRow.Type), "Promo Type"));
+            gridPromotions.Columns.Add(DatePickerColumn(nameof(PromotionEditRow.DateAcquired), "Date Acquired"));
+            gridPromotions.Columns.Add(AmountColumn(nameof(PromotionEditRow.InitialAmount), "Initial Amount"));
+            gridPromotions.Columns.Add(AmountColumn(nameof(PromotionEditRow.CurrentBalance), "Current Balance"));
+            gridPromotions.Columns.Add(DatePickerColumn(nameof(PromotionEditRow.Deadline), "Deadline"));
+            gridPromotions.Columns.Add(PromoTypeColumn());
             gridPromotions.DataSource = _promotions;
 
             layout.Controls.Add(fields, 0, 0);
@@ -495,7 +573,11 @@ namespace THMS.UI.WinForms.Controls
                         _promotions.Add(new PromotionEditRow
                         {
                             Id = promo.Id,
-                            Amount = promo.Amount,
+                            DateAcquired = promo.DateAcquired.Year > 1
+                                ? promo.DateAcquired.Date
+                                : SafeDate(card.StatementDate),
+                            InitialAmount = promo.InitialAmount > 0 ? promo.InitialAmount : promo.CurrentBalance,
+                            CurrentBalance = promo.CurrentBalance,
                             Deadline = SafeDate(promo.Deadline),
                             Type = promo.Type
                         });
@@ -515,8 +597,38 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
+        private void CopyPreviousPromotions()
+        {
+            if (_existingStatement is not null || gridPromotions is null)
+                return;
+            if (SelectedAccount() is not Account account)
+                return;
+
+            _promotions.Clear();
+            foreach (var promo in PreviousStatementPromotions.CopyForNewStatement(_statementStore, account.Id))
+            {
+                _promotions.Add(ToEditRow(promo, dtStatementDate.Value.Date));
+            }
+        }
+
+        private static PromotionEditRow ToEditRow(PromotionalBalance promo, DateTime fallbackAcquired) =>
+            new()
+            {
+                Id = promo.Id,
+                DateAcquired = promo.DateAcquired.Year > 1 ? promo.DateAcquired.Date : fallbackAcquired,
+                InitialAmount = promo.InitialAmount > 0 ? promo.InitialAmount : promo.CurrentBalance,
+                CurrentBalance = promo.CurrentBalance,
+                Deadline = SafeDate(promo.Deadline),
+                Type = promo.Type
+            };
+
         private void OnAddPromotion(object? sender, EventArgs e) =>
-            _promotions.Add(new PromotionEditRow { Deadline = DateTime.Today.AddMonths(1), Type = PromoType.LumpSum });
+            _promotions.Add(new PromotionEditRow
+            {
+                DateAcquired = dtStatementDate.Value.Date,
+                Deadline = DateTime.Today.AddMonths(1),
+                Type = PromoType.LumpSum
+            });
 
         private void OnDeletePromotion(object? sender, EventArgs e) =>
             DeleteSelected(_promotions, gridPromotions);
@@ -630,7 +742,9 @@ namespace THMS.UI.WinForms.Controls
                     {
                         Id = p.Id == Guid.Empty ? Guid.NewGuid() : p.Id,
                         AccountId = account.Id,
-                        Amount = p.Amount,
+                        DateAcquired = p.DateAcquired.Date,
+                        InitialAmount = p.InitialAmount > 0 ? p.InitialAmount : p.CurrentBalance,
+                        CurrentBalance = p.CurrentBalance,
                         Deadline = p.Deadline.Date,
                         Type = p.Type
                     }).ToList()
@@ -755,16 +869,7 @@ namespace THMS.UI.WinForms.Controls
 
         private static DataGridView CreateGrid()
         {
-            return new DataGridView
-            {
-                Dock = DockStyle.Fill,
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                AutoGenerateColumns = false,
-                RowHeadersVisible = false,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
-            };
+            return new StatementEntryGrid();
         }
 
         private static DataGridViewTextBoxColumn TextColumn(string property, string header) =>
@@ -779,30 +884,40 @@ namespace THMS.UI.WinForms.Controls
         private static DataGridViewTextBoxColumn AmountColumn(string property, string header)
         {
             var column = TextColumn(property, header);
+            column.ValueType = typeof(decimal);
             column.DefaultCellStyle.Format = "n2";
             column.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             return column;
         }
 
-        private static DataGridViewTextBoxColumn DateColumn(string property, string header)
-        {
-            var column = TextColumn(property, header);
-            column.DefaultCellStyle.Format = "d";
-            column.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            return column;
-        }
-
-        private static DataGridViewComboBoxColumn EnumColumn<TEnum>(string property, string header) where TEnum : struct, Enum
-        {
-            return new DataGridViewComboBoxColumn
+        private static CalendarColumn DatePickerColumn(string property, string header) =>
+            new()
             {
                 DataPropertyName = property,
                 HeaderText = header,
                 Name = property,
-                DataSource = Enum.GetValues<TEnum>(),
-                ValueType = typeof(TEnum),
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
+            };
+
+        private static DataGridViewComboBoxColumn PromoTypeColumn()
+        {
+            var choices = new List<PromoTypeOption>
+            {
+                new(PromoTypeDisplay.Name(PromoType.LumpSum), PromoType.LumpSum),
+                new(PromoTypeDisplay.Name(PromoType.EqualPayments), PromoType.EqualPayments)
+            };
+            return new DataGridViewComboBoxColumn
+            {
+                DataPropertyName = nameof(PromotionEditRow.Type),
+                HeaderText = "Promo Type",
+                Name = nameof(PromotionEditRow.Type),
+                DataSource = choices,
+                DisplayMember = nameof(PromoTypeOption.Name),
+                ValueMember = nameof(PromoTypeOption.Type),
+                ValueType = typeof(PromoType),
                 FlatStyle = FlatStyle.Flat,
-                DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton
+                DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
+                ToolTipText = "Lump sum: pay any amounts by the deadline. Equal payments: remaining balance divided across months until the deadline."
             };
         }
 
@@ -858,6 +973,12 @@ namespace THMS.UI.WinForms.Controls
             public StatementType Type { get; } = type;
         }
 
+        private sealed class PromoTypeOption(string name, PromoType type)
+        {
+            public string Name { get; } = name;
+            public PromoType Type { get; } = type;
+        }
+
         private sealed class AccountListItem(Account account)
         {
             public Account Account { get; } = account;
@@ -865,12 +986,55 @@ namespace THMS.UI.WinForms.Controls
             public string Label => $"{Account.Name} ({AccountKinds.Of(Account)})";
         }
 
-        private sealed class PromotionEditRow
+        private sealed class PromotionEditRow : INotifyPropertyChanged
         {
+            private DateTime _dateAcquired = DateTime.Today;
+            private decimal _initialAmount;
+            private decimal _currentBalance;
+            private DateTime _deadline = DateTime.Today;
+            private PromoType _type;
+
             public Guid Id { get; set; }
-            public decimal Amount { get; set; }
-            public DateTime Deadline { get; set; } = DateTime.Today;
-            public PromoType Type { get; set; }
+
+            public DateTime DateAcquired
+            {
+                get => _dateAcquired;
+                set => Set(ref _dateAcquired, value.Date);
+            }
+
+            public decimal InitialAmount
+            {
+                get => _initialAmount;
+                set => Set(ref _initialAmount, value);
+            }
+
+            public decimal CurrentBalance
+            {
+                get => _currentBalance;
+                set => Set(ref _currentBalance, value);
+            }
+
+            public DateTime Deadline
+            {
+                get => _deadline;
+                set => Set(ref _deadline, value.Date);
+            }
+
+            public PromoType Type
+            {
+                get => _type;
+                set => Set(ref _type, value);
+            }
+
+            public event PropertyChangedEventHandler? PropertyChanged;
+
+            private void Set<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string? name = null)
+            {
+                if (EqualityComparer<T>.Default.Equals(field, value))
+                    return;
+                field = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+            }
         }
 
         private sealed class UsageEditRow

@@ -10,6 +10,7 @@ using THMS.Domain.Transportation;
 using THMS.Ingestion;
 using THMS.Logic.Energy;
 using THMS.Logic.Finance.Aggregation;
+using THMS.Logic.Finance.Model;
 using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Energy;
 using THMS.Logic.ViewModels.Finance;
@@ -263,6 +264,45 @@ namespace THMS.Tests.Logic
             Assert.That(views[1].BankCreditAvailable, Is.Null);
             Assert.That(views[1].CreditLimit, Is.EqualTo(5000m));
             Assert.That(views[2].Balance, Is.Null);
+        }
+
+        [Test]
+        public void UnifiedAccountViewBuilder_UsesLiveStatementAndLaterActivity()
+        {
+            var creditId = Guid.NewGuid();
+            var live = new Dictionary<Guid, PostedBalanceDisplay>
+            {
+                [creditId] = new(
+                    StatementDate: new DateTime(2026, 9, 8),
+                    StatementBalance: 17672.62m,
+                    AsOf: new DateTime(2026, 9, 18),
+                    Balance: 17800m,
+                    AmountDue: 764.62m,
+                    DueDate: new DateTime(2026, 10, 3))
+            };
+
+            var views = UnifiedAccountViewBuilder.Build(
+                [new CreditAccount { Id = creditId, Name = "AMEX", PostedBalance = 0, CreditLimit = 49000, APR = 19.99m }],
+                livePostedBalances: live);
+
+            Assert.That(views[0].StatementDate, Is.EqualTo(new DateTime(2026, 9, 8)));
+            Assert.That(views[0].StatementBalance, Is.EqualTo(17672.62m));
+            Assert.That(views[0].AsOfDate, Is.EqualTo(new DateTime(2026, 9, 18)));
+            Assert.That(views[0].Balance, Is.EqualTo(17800m));
+            Assert.That(views[0].AmountDue, Is.EqualTo(764.62m));
+            Assert.That(views[0].DueDate, Is.EqualTo(new DateTime(2026, 10, 3)));
+            Assert.That(views[0].APR, Is.EqualTo(19.99m));
+            Assert.That(views[0].BankCreditAvailable, Is.EqualTo(31200m));
+        }
+
+        [Test]
+        public void UnifiedAccountViewBuilder_OmitsDefaultCreditDueDateAndZeroApr()
+        {
+            var views = UnifiedAccountViewBuilder.Build(
+                [new CreditAccount { Name = "C", CreditLimit = 1000, DueDate = default, APR = 0 }]);
+
+            Assert.That(views[0].DueDate, Is.Null);
+            Assert.That(views[0].APR, Is.Null);
         }
 
         [Test]

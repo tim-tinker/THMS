@@ -248,16 +248,10 @@ namespace THMS.Logic.Orchestrators.Finance
 
         public List<AccountStatementListRow> GetStatementListRows(Guid accountId)
         {
-            var statements = _statements.GetForAccount(accountId);
-            var posted = _transactions.GetPostedTransactions(accountId).ToList();
-            return statements
+            return _statements.GetForAccount(accountId)
                 .OrderByDescending(s => s.StatementDate)
                 .ThenByDescending(s => s.DueDate)
-                .Select(statement => AccountStatementListRow.From(
-                    statement,
-                    StatementPeriodInterest.Applies(statement)
-                        ? StatementPeriodInterest.Compute(statement, statements, posted)
-                        : null))
+                .Select(AccountStatementListRow.From)
                 .ToList();
         }
 
@@ -289,7 +283,7 @@ namespace THMS.Logic.Orchestrators.Finance
             foreach (var statement in _statements.GetUpcoming(DateTime.Today).OfType<CreditCardStatement>())
             {
                 var account = RequireAccount(statement.AccountId);
-                foreach (var promo in statement.Promotions.Where(p => p.Deadline.Date <= untilDate && p.Amount > 0))
+                foreach (var promo in statement.Promotions.Where(p => p.Deadline.Date <= untilDate && p.CurrentBalance > 0))
                 {
                     if (existing.Contains(promo.Id))
                         continue;
@@ -840,16 +834,17 @@ namespace THMS.Logic.Orchestrators.Finance
 
         private static IEnumerable<(DateTime Date, decimal Amount)> PromotionInstallments(PromotionalBalance promo, DateTime until)
         {
+            var remainingBalance = promo.CurrentBalance;
             if (promo.Type == PromoType.LumpSum || promo.Deadline.Date <= DateTime.Today)
             {
                 if (promo.Deadline.Date <= until)
-                    yield return (promo.Deadline.Date, promo.Amount);
+                    yield return (promo.Deadline.Date, remainingBalance);
                 yield break;
             }
 
             var months = Math.Max(1, ((promo.Deadline.Year - DateTime.Today.Year) * 12) + promo.Deadline.Month - DateTime.Today.Month);
-            var installment = Math.Round(promo.Amount / months, 2, MidpointRounding.AwayFromZero);
-            var remaining = promo.Amount;
+            var installment = Math.Round(remainingBalance / months, 2, MidpointRounding.AwayFromZero);
+            var remaining = remainingBalance;
             for (var i = 1; i <= months; i++)
             {
                 var date = DateTime.Today.AddMonths(i);

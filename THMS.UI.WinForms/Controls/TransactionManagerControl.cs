@@ -17,7 +17,6 @@ namespace THMS.UI.WinForms.Controls
         private const string ShowPosted = "Posted";
         private const string ShowForecast = "Forecast";
         private const string ShowRecurringRules = "Recurring Rules";
-        private const string ShowByCategory = "By Category";
         private const string HistoryMonth = "Month";
         private const string HistoryYear = "Year";
         private const string HistoryLifetime = "Lifetime";
@@ -31,11 +30,16 @@ namespace THMS.UI.WinForms.Controls
 
         private BindingSource _accountsSource = new BindingSource();
         private BindingSource _transactionsSource = new BindingSource();
+        private BindingSource _categorySource = new BindingSource();
         private BindingSource _budgetsSource = new BindingSource();
         private DataGridView budgetGrid = null!;
+        private DataGridView categoryGrid = null!;
+        private DataGridViewTextBoxColumn categoryViewCategoryColumn = null!;
+        private ThmsButton btnCategorySplit = null!;
         private Label? lblLoadStatus;
         private ProgressBar? progressLoad;
         private TabControl? _detailTabs;
+        private TabPage? _categoryPage;
         private TabPage? _budgetsPage;
         private CancellationTokenSource? _txLoadCts;
         private bool _filterApplied;
@@ -51,11 +55,11 @@ namespace THMS.UI.WinForms.Controls
         public TransactionManagerControl()
         {
             InitializeComponent();
-            LayoutForecastToolbar();
             InitializeHistory();
             InitializeForecastPeriod();
             InitializeShowFilter();
             InitializeCategoryFilter();
+            LayoutForecastToolbar();
             InitializeGrids();
             HostBudgetUi();
             _ready = true;
@@ -137,7 +141,7 @@ namespace THMS.UI.WinForms.Controls
         private void InitializeShowFilter()
         {
             cmbShow.Items.Clear();
-            cmbShow.Items.AddRange([ShowAll, ShowPosted, ShowForecast, ShowRecurringRules, ShowByCategory]);
+            cmbShow.Items.AddRange([ShowAll, ShowPosted, ShowForecast, ShowRecurringRules]);
             cmbShow.SelectedIndex = 0;
             cmbShow.SelectedIndexChanged += OnShowFilterChanged;
             btnAddRule.Click += OnAddRuleClicked;
@@ -152,19 +156,15 @@ namespace THMS.UI.WinForms.Controls
                 Anchor = AnchorStyles.Left,
                 AutoSize = true,
                 Margin = new Padding(12, 8, 8, 4),
-                Text = "Category:",
-                Visible = false
+                Text = "Category:"
             };
             cmbCategoryFilter = new ComboBox
             {
                 Anchor = AnchorStyles.Left,
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Margin = new Padding(4, 4, 8, 4),
-                Visible = false
+                Margin = new Padding(4, 4, 8, 4)
             };
             cmbCategoryFilter.SelectedIndexChanged += OnCategoryFilterChanged;
-            forecastPanel.Controls.Add(lblCategoryFilter);
-            forecastPanel.Controls.Add(cmbCategoryFilter);
             BindCategoryFilter();
         }
 
@@ -188,10 +188,10 @@ namespace THMS.UI.WinForms.Controls
 
         private void OnCategoryFilterChanged(object? sender, EventArgs e)
         {
-            if (_suspendCategoryFilter || !_ready || SelectedShowMode() != ShowByCategory)
+            if (_suspendCategoryFilter || !_ready)
                 return;
 
-            RefreshCurrentAccount();
+            LoadCategoryRowsForSelectedAccount();
         }
 
         private void InitializeGrids()
@@ -234,6 +234,7 @@ namespace THMS.UI.WinForms.Controls
                 return;
             var tabDetails = new ThmsTabControl { Dock = DockStyle.Fill, Name = "tabDetails" };
             var transactionsPage = new TabPage("Transactions");
+            var categoryPage = new TabPage("By Category");
             var budgetsPage = new TabPage("Budgets");
 
             splitContainer.Panel2.Controls.Remove(detailGrid);
@@ -276,6 +277,8 @@ namespace THMS.UI.WinForms.Controls
 
             transactionsPage.Controls.Add(detailGrid);
             transactionsPage.Controls.Add(forecastBar);
+
+            HostCategoryUi(categoryPage);
 
             var toolbar = new FlowLayoutPanel
             {
@@ -334,15 +337,67 @@ namespace THMS.UI.WinForms.Controls
             budgetsPage.Controls.Add(budgetGrid);
             budgetsPage.Controls.Add(toolbar);
             tabDetails.TabPages.Add(transactionsPage);
+            tabDetails.TabPages.Add(categoryPage);
             tabDetails.TabPages.Add(budgetsPage);
-            tabDetails.SelectedIndexChanged += (_, _) =>
-            {
-                if (tabDetails.SelectedTab == budgetsPage)
-                    LoadBudgetsForSelectedAccount();
-            };
+            tabDetails.SelectedIndexChanged += (_, _) => RefreshCurrentAccount();
             _detailTabs = tabDetails;
+            _categoryPage = categoryPage;
             _budgetsPage = budgetsPage;
             splitContainer.Panel2.Controls.Add(tabDetails);
+        }
+
+        private void HostCategoryUi(TabPage categoryPage)
+        {
+            var toolbar = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(8, 6, 8, 6),
+                WrapContents = true
+            };
+            lblCategoryFilter.Margin = new Padding(4, 8, 8, 4);
+            cmbCategoryFilter.Margin = new Padding(4, 4, 8, 4);
+            toolbar.Controls.Add(lblCategoryFilter);
+            toolbar.Controls.Add(cmbCategoryFilter);
+            btnCategorySplit = new ThmsButton { Text = "Split Transaction" };
+            btnCategorySplit.Click += OnCategorySplitTransactionClicked;
+            toolbar.Controls.Add(btnCategorySplit);
+
+            categoryViewCategoryColumn = TextColumn("Category", "Category");
+            var dateColumn = TextColumn("Date", "Date");
+            dateColumn.DefaultCellStyle.Format = "d";
+            var descriptionColumn = TextColumn("Description", "Description");
+            descriptionColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            categoryGrid = new DataGridView
+            {
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToResizeRows = false,
+                AutoGenerateColumns = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                Dock = DockStyle.Fill,
+                EditMode = DataGridViewEditMode.EditProgrammatically,
+                MultiSelect = false,
+                ReadOnly = true,
+                RowHeadersVisible = false,
+                SelectionMode = DataGridViewSelectionMode.CellSelect
+            };
+            DataGridViewUtil.EnableDoubleBuffering(categoryGrid);
+            categoryGrid.Columns.AddRange(
+                dateColumn,
+                CurrencyColumn("Amount", "Amount"),
+                categoryViewCategoryColumn,
+                TextColumn("TypeLabel", "Type"),
+                descriptionColumn);
+            categoryGrid.DataSource = _categorySource;
+            categoryGrid.CellDoubleClick += OnCategoryViewCellDoubleClick;
+            categoryGrid.CellMouseClick += OnCategoryViewCellMouseClick;
+            categoryGrid.KeyDown += OnCategoryViewKeyDown;
+            categoryGrid.SelectionChanged += (_, _) => UpdateCategorySplitButton();
+
+            categoryPage.Controls.Add(categoryGrid);
+            categoryPage.Controls.Add(toolbar);
         }
 
         private static DataGridViewTextBoxColumn TextColumn(string property, string header) =>
@@ -364,11 +419,23 @@ namespace THMS.UI.WinForms.Controls
                 var nextPayments = accounts
                     .Where(a => a is LoanAccount or MortgageAccount)
                     .ToDictionary(a => a.Id, a => _ruleOrchestrator.GetNextPaymentDate(a.Id));
-                var usableBalances = PostedBalanceCalculator.UsablePostedBalanceAccountIds(
-                    accounts,
-                    id => _statements.GetForAccount(id));
+                var liveBalances = new Dictionary<Guid, PostedBalanceDisplay>();
+                foreach (var account in accounts)
+                {
+                    var statements = _statements.GetForAccount(account.Id).ToList();
+                    if (!PostedBalanceCalculator.TryResolveLatestStatement(account, statements, out _, out var anchor))
+                        continue;
 
-                _accountsSource.DataSource = UnifiedAccountViewBuilder.Build(accounts, nextPayments, usableBalances);
+                    var activity = _txOrchestrator.SumPostedAmountsAfter(account.Id, anchor.AsOf);
+                    var latest = _txOrchestrator.GetLatestPostedActivityDate(account.Id);
+                    if (PostedBalanceCalculator.TryCreateDisplay(account, statements, activity, latest, out var display))
+                        liveBalances[account.Id] = display;
+                }
+
+                _accountsSource.DataSource = UnifiedAccountViewBuilder.Build(
+                    accounts,
+                    nextPayments,
+                    livePostedBalances: liveBalances);
             }
             finally
             {
@@ -406,10 +473,7 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             _filterApplied = SelectedShowMode() == ShowPosted;
-            var showingCategory = SelectedShowMode() == ShowByCategory;
             cmbForecastPeriod.Enabled = SelectedShowMode() is ShowAll or ShowForecast;
-            lblCategoryFilter.Visible = cmbCategoryFilter.Visible = showingCategory;
-            ForecastColumn.Visible = !showingCategory;
             UpdateRuleActionButtons();
             RefreshCurrentAccount();
         }
@@ -436,16 +500,12 @@ namespace THMS.UI.WinForms.Controls
             var show = SelectedShowMode();
             var history = SelectedHistory();
             var forecastEnd = GetForecastEnd();
-            var categoryFilter = cmbCategoryFilter.SelectedItem as CategoryFilterChoice ?? CategoryFilterChoice.All;
-            var categories = show == ShowByCategory
-                ? _categoryOrchestrator.GetAllCategories(includeInactive: true)
-                : [];
             ShowLoadProgress($"Loading {history.ToLowerInvariant()} history...");
 
             try
             {
                 var views = await Task.Run(
-                    () => BuildTransactionViews(accountId, show, history, forecastEnd, categoryFilter, categories, token),
+                    () => BuildTransactionViews(accountId, show, history, forecastEnd, token),
                     token);
                 if (token.IsCancellationRequested || CurrentAccountId != accountId)
                     return;
@@ -464,24 +524,9 @@ namespace THMS.UI.WinForms.Controls
             string show,
             string history,
             DateTime forecastEnd,
-            CategoryFilterChoice categoryFilter,
-            IReadOnlyList<ExpenseCategory> categories,
             CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            if (show == ShowByCategory)
-            {
-                var start = BaseOrchestrator.GetStartDate(DateTime.Today, history);
-                var txs = history == HistoryLifetime
-                    ? _txOrchestrator.GetTransactionsForAccount(accountId)
-                    : _txOrchestrator.GetTransactionsForAccount(accountId, start, DateTime.Today);
-                var rows = UnifiedTransactionViewBuilder.BuildCategoryRows(txs.Posted, txs.PostedTransfers);
-                ApplyCategoryDisplayNames(rows);
-                var filtered = UnifiedTransactionViewBuilder.FilterCategoryRows(rows, categoryFilter, categories);
-                ClearForecastBalances(filtered);
-                return UnifiedTransactionView.OrderForDisplay(filtered).ToList();
-            }
-
             if (show == ShowRecurringRules)
             {
                 var rules = UnifiedTransactionViewBuilder.BuildRecurringRules(
@@ -771,9 +816,9 @@ namespace THMS.UI.WinForms.Controls
             if (e.RowIndex < 0)
                 return;
 
-            if (IsCategoryColumn(e.ColumnIndex))
+            if (IsCategoryColumn(detailGrid, CategoryColumn, e.ColumnIndex))
             {
-                ShowCategoryMenu(e.RowIndex);
+                ShowCategoryMenu(detailGrid, CategoryColumn, e.RowIndex);
                 return;
             }
 
@@ -792,31 +837,93 @@ namespace THMS.UI.WinForms.Controls
 
         private void OnCategoryCellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
         {
-            if (e.RowIndex < 0 || !IsCategoryColumn(e.ColumnIndex))
+            if (e.RowIndex < 0 || !IsCategoryColumn(detailGrid, CategoryColumn, e.ColumnIndex))
                 return;
             if (e.Button is not (MouseButtons.Left or MouseButtons.Right))
                 return;
-            if (!CanEditCategory(e.RowIndex))
+            if (!CanEditCategory(detailGrid, e.RowIndex))
                 return;
 
             detailGrid.CurrentCell = detailGrid[e.ColumnIndex, e.RowIndex];
-            ShowCategoryMenu(e.RowIndex);
+            ShowCategoryMenu(detailGrid, CategoryColumn, e.RowIndex);
         }
 
-        private bool IsCategoryColumn(int columnIndex) =>
-            columnIndex >= 0 && detailGrid.Columns[columnIndex] == CategoryColumn;
-
-        private bool CanEditCategory(int rowIndex)
+        private void OnCategoryViewCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
-            if (detailGrid.Rows[rowIndex].DataBoundItem is not UnifiedTransactionView view)
+            if (e.RowIndex < 0)
+                return;
+
+            if (IsCategoryColumn(categoryGrid, categoryViewCategoryColumn, e.ColumnIndex))
+            {
+                ShowCategoryMenu(categoryGrid, categoryViewCategoryColumn, e.RowIndex);
+                return;
+            }
+
+            if (categoryGrid.Rows[e.RowIndex].DataBoundItem is UnifiedTransactionView view && CanSplit(view))
+                OpenSplitEditor(view);
+        }
+
+        private void OnCategoryViewCellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
+        {
+            if (e.RowIndex < 0 || !IsCategoryColumn(categoryGrid, categoryViewCategoryColumn, e.ColumnIndex))
+                return;
+            if (e.Button is not (MouseButtons.Left or MouseButtons.Right))
+                return;
+            if (!CanEditCategory(categoryGrid, e.RowIndex))
+                return;
+
+            categoryGrid.CurrentCell = categoryGrid[e.ColumnIndex, e.RowIndex];
+            ShowCategoryMenu(categoryGrid, categoryViewCategoryColumn, e.RowIndex);
+        }
+
+        private void OnCategoryViewKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (categoryGrid.CurrentCell is { RowIndex: >= 0 } cell
+                && IsCategoryColumn(categoryGrid, categoryViewCategoryColumn, cell.ColumnIndex)
+                && e.KeyCode is Keys.F2 or Keys.Enter or Keys.Space
+                && CanEditCategory(categoryGrid, cell.RowIndex))
+            {
+                ShowCategoryMenu(categoryGrid, categoryViewCategoryColumn, cell.RowIndex);
+                e.Handled = true;
+            }
+        }
+
+        private void OnCategorySplitTransactionClicked(object? sender, EventArgs e)
+        {
+            if (GetSelectedCategoryRow() is not UnifiedTransactionView view)
+            {
+                MessageBox.Show(FindForm(), "Select a category row to split its posted transaction.", "Split Transaction",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            OpenSplitEditor(view);
+        }
+
+        private UnifiedTransactionView? GetSelectedCategoryRow() =>
+            categoryGrid?.CurrentRow?.DataBoundItem as UnifiedTransactionView;
+
+        private void UpdateCategorySplitButton()
+        {
+            if (btnCategorySplit is null)
+                return;
+            btnCategorySplit.Enabled = GetSelectedCategoryRow() is UnifiedTransactionView view && CanSplit(view);
+        }
+
+        private static bool IsCategoryColumn(DataGridView grid, DataGridViewColumn categoryColumn, int columnIndex) =>
+            columnIndex >= 0 && grid.Columns[columnIndex] == categoryColumn;
+
+        private static bool CanEditCategory(DataGridView grid, int rowIndex)
+        {
+            if (grid.Rows[rowIndex].DataBoundItem is not UnifiedTransactionView view)
                 return false;
 
             return view.Type is UnifiedTransactionView.PostedType or UnifiedTransactionView.PostedTransferType;
         }
 
-        private void ShowCategoryMenu(int rowIndex)
+        private void ShowCategoryMenu(DataGridView grid, DataGridViewColumn categoryColumn, int rowIndex)
         {
-            if (detailGrid.Rows[rowIndex].DataBoundItem is not UnifiedTransactionView view || !CanEditCategory(rowIndex))
+            if (grid.Rows[rowIndex].DataBoundItem is not UnifiedTransactionView view || !CanEditCategory(grid, rowIndex))
                 return;
 
             var posted = view.Type == UnifiedTransactionView.PostedType
@@ -844,9 +951,9 @@ namespace THMS.UI.WinForms.Controls
             manageItem.Click += (_, _) => OpenCategoryManager();
             menu.Items.Add(manageItem);
 
-            var cell = detailGrid.GetCellDisplayRectangle(CategoryColumn.Index, rowIndex, cutOverflow: false);
+            var cell = grid.GetCellDisplayRectangle(categoryColumn.Index, rowIndex, cutOverflow: false);
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
-            menu.Show(detailGrid, new Point(cell.Left, cell.Bottom));
+            menu.Show(grid, new Point(cell.Left, cell.Bottom));
         }
 
         private void AssignCategory(UnifiedTransactionView view, Guid categoryId)
@@ -885,11 +992,11 @@ namespace THMS.UI.WinForms.Controls
         private void OnTransactionGridKeyDown(object? sender, KeyEventArgs e)
         {
             if (detailGrid.CurrentCell is { RowIndex: >= 0 } cell
-                && IsCategoryColumn(cell.ColumnIndex)
+                && IsCategoryColumn(detailGrid, CategoryColumn, cell.ColumnIndex)
                 && e.KeyCode is Keys.F2 or Keys.Enter or Keys.Space
-                && CanEditCategory(cell.RowIndex))
+                && CanEditCategory(detailGrid, cell.RowIndex))
             {
-                ShowCategoryMenu(cell.RowIndex);
+                ShowCategoryMenu(detailGrid, CategoryColumn, cell.RowIndex);
                 e.Handled = true;
                 return;
             }
@@ -1076,8 +1183,10 @@ namespace THMS.UI.WinForms.Controls
             {
                 if (IsBudgetsTabSelected())
                     LoadBudgetsForAccount(account.Id);
-
-                await LoadTransactionsForAccountAsync(account.Id, cts.Token);
+                else if (IsCategoryTabSelected())
+                    LoadCategoryRowsForAccount(account.Id);
+                else
+                    await LoadTransactionsForAccountAsync(account.Id, cts.Token);
             }
             finally
             {
@@ -1088,6 +1197,34 @@ namespace THMS.UI.WinForms.Controls
 
         private bool IsBudgetsTabSelected() =>
             _detailTabs is not null && _budgetsPage is not null && _detailTabs.SelectedTab == _budgetsPage;
+
+        private bool IsCategoryTabSelected() =>
+            _detailTabs is not null && _categoryPage is not null && _detailTabs.SelectedTab == _categoryPage;
+
+        private void LoadCategoryRowsForSelectedAccount()
+        {
+            if (_accountsSource.Current is UnifiedAccountView account)
+                LoadCategoryRowsForAccount(account.Id);
+        }
+
+        private void LoadCategoryRowsForAccount(Guid accountId)
+        {
+            if (categoryGrid is null)
+                return;
+            var history = SelectedHistory();
+            var start = BaseOrchestrator.GetStartDate(DateTime.Today, history);
+            var txs = history == HistoryLifetime
+                ? _txOrchestrator.GetTransactionsForAccount(accountId)
+                : _txOrchestrator.GetTransactionsForAccount(accountId, start, DateTime.Today);
+            var rows = UnifiedTransactionViewBuilder.BuildCategoryRows(txs.Posted, txs.PostedTransfers);
+            ApplyCategoryDisplayNames(rows);
+            var filtered = UnifiedTransactionViewBuilder.FilterCategoryRows(
+                rows,
+                cmbCategoryFilter.SelectedItem as CategoryFilterChoice ?? CategoryFilterChoice.All,
+                _categoryOrchestrator.GetAllCategories(includeInactive: true));
+            _categorySource.DataSource = UnifiedTransactionView.OrderForDisplay(filtered).ToList();
+            UpdateCategorySplitButton();
+        }
 
         private void LoadBudgetsForSelectedAccount()
         {

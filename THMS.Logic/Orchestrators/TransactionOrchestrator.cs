@@ -69,6 +69,22 @@ namespace THMS.Logic.Orchestrators
                 + SumIncomingTransferSplits(accountId, before);
         }
 
+        public decimal SumPostedAmountsAfter(Guid accountId, DateTime after) =>
+            _store.SumPostedAmountsAfter(accountId, after)
+            + _store.SumPostedTransferAmountsAfter(accountId, after)
+            + SumIncomingTransferSplitsAfter(accountId, after);
+
+        public DateTime? GetLatestPostedActivityDate(Guid accountId)
+        {
+            var posted = _store.GetLatestPostedTransactionDate(accountId);
+            var transfer = _store.GetLatestPostedTransferTransactionDate(accountId);
+            if (posted is null)
+                return transfer;
+            if (transfer is null)
+                return posted;
+            return posted > transfer ? posted : transfer;
+        }
+
         private static bool InRange(DateTime date, DateTime start, DateTime end) =>
             date >= start && date <= end;
 
@@ -156,6 +172,21 @@ namespace THMS.Logic.Orchestrators
                 if (transaction.AccountId == accountId)
                     continue;
                 if (before is DateTime cutoff && transaction.Date >= cutoff)
+                    continue;
+                sum += IncomingTransferAmount(transaction, accountId);
+            }
+
+            return sum;
+        }
+
+        private decimal SumIncomingTransferSplitsAfter(Guid accountId, DateTime after)
+        {
+            var posted = _store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue)
+                .Concat(_store.GetPostedTransferTransactions(DateTime.MinValue, DateTime.MaxValue));
+            decimal sum = 0;
+            foreach (var transaction in posted)
+            {
+                if (transaction.AccountId == accountId || transaction.Date <= after)
                     continue;
                 sum += IncomingTransferAmount(transaction, accountId);
             }

@@ -6,6 +6,14 @@ namespace THMS.Logic.Finance.Model
 {
     public readonly record struct PostedBalanceAnchor(decimal LedgerBalance, DateTime AsOf);
 
+    public readonly record struct PostedBalanceDisplay(
+        DateTime StatementDate,
+        decimal StatementBalance,
+        DateTime AsOf,
+        decimal Balance,
+        decimal AmountDue,
+        DateTime? DueDate);
+
     public static class PostedBalanceCalculator
     {
         public static decimal GetStartingBalance(Account? account) => account switch
@@ -53,19 +61,60 @@ namespace THMS.Logic.Finance.Model
         public static bool TryResolveAnchor(
             Account account,
             IEnumerable<AccountStatement> statements,
+            out PostedBalanceAnchor anchor) =>
+            TryResolveLatestStatement(account, statements, out _, out anchor);
+
+        public static bool TryResolveLatestStatement(
+            Account account,
+            IEnumerable<AccountStatement> statements,
+            out AccountStatement statement,
             out PostedBalanceAnchor anchor)
         {
-            foreach (var statement in statements
+            foreach (var candidate in statements
                 .OrderByDescending(s => s.StatementDate)
                 .ThenByDescending(s => s.Id))
             {
-                if (TryGetStatementAnchor(account, statement, out anchor))
+                if (TryGetStatementAnchor(account, candidate, out anchor))
+                {
+                    statement = candidate;
                     return true;
+                }
             }
 
+            statement = null!;
             anchor = default;
             return false;
         }
+
+        public static bool TryCreateDisplay(
+            Account account,
+            IEnumerable<AccountStatement> statements,
+            decimal activityAfterStatement,
+            DateTime? latestActivityDate,
+            out PostedBalanceDisplay display)
+        {
+            if (!TryResolveLatestStatement(account, statements, out var statement, out var anchor))
+            {
+                display = default;
+                return false;
+            }
+
+            var statementDate = anchor.AsOf.Date;
+            var asOf = latestActivityDate is DateTime latest && latest.Date > statementDate
+                ? latest.Date
+                : statementDate;
+            display = new PostedBalanceDisplay(
+                StatementDate: statementDate,
+                StatementBalance: ToDisplayBalance(account, anchor.LedgerBalance),
+                AsOf: asOf,
+                Balance: ToDisplayBalance(account, ComputeFromAnchor(anchor, activityAfterStatement)),
+                AmountDue: statement.AmountDue,
+                DueDate: UsableDate(statement.DueDate));
+            return true;
+        }
+
+        public static DateTime? UsableDate(DateTime value) =>
+            value.Year > 1 ? value : null;
 
         public static bool TryGetStatementAnchor(
             Account account,

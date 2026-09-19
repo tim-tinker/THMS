@@ -12,7 +12,6 @@ namespace THMS.Logic.ViewModels.Finance
         public string StatementDate { get; init; } = NotApplicable;
         public string DueDate { get; init; } = NotApplicable;
         public string AmountDue { get; init; } = NotApplicable;
-        public string Interest { get; init; } = NotApplicable;
         public string StatementBalance { get; init; } = NotApplicable;
         public string EscrowBalance { get; init; } = NotApplicable;
         public string Promotions { get; init; } = NotApplicable;
@@ -20,7 +19,7 @@ namespace THMS.Logic.ViewModels.Finance
         public string Charges { get; init; } = NotApplicable;
         public string Notes { get; init; } = "";
 
-        public static AccountStatementListRow From(AccountStatement statement, decimal? periodInterest = null)
+        public static AccountStatementListRow From(AccountStatement statement)
         {
             ArgumentNullException.ThrowIfNull(statement);
 
@@ -32,34 +31,30 @@ namespace THMS.Logic.ViewModels.Finance
                     Type = DisplayType(bank.Type),
                     StatementDate = Date(bank.StatementDate),
                     Notes = bank.Notes ?? "",
-                    Interest = InterestCell(periodInterest),
                     StatementBalance = Money(bank.StatementBalance)
                 },
                 LoanStatement loan => ObligationRow(loan) with
                 {
-                    StatementBalance = Money(loan.StatementBalance),
-                    Interest = InterestCell(periodInterest)
+                    StatementBalance = Money(loan.StatementBalance)
                 },
                 MortgageStatement mortgage => ObligationRow(mortgage) with
                 {
                     StatementBalance = Money(mortgage.StatementBalance),
-                    EscrowBalance = Money(mortgage.EscrowBalance),
-                    Interest = InterestCell(periodInterest)
+                    EscrowBalance = Money(mortgage.EscrowBalance)
                 },
                 CreditCardStatement card => ObligationRow(card) with
                 {
                     StatementBalance = Money(card.StatementBalance),
-                    Interest = InterestCell(periodInterest),
-                    Promotions = FormatPromotions(card.Promotions)
+                    Promotions = CountItems(card.Promotions)
                 },
                 UtilityStatement utility => ObligationRow(utility) with
                 {
-                    Usage = FormatUsage(utility.Usage),
-                    Charges = FormatCharges(utility.Charges.Select(c => (c.Description, c.Amount)))
+                    Usage = CountItems(utility.Usage),
+                    Charges = CountItems(utility.Charges)
                 },
                 ServiceStatement service => ObligationRow(service) with
                 {
-                    Charges = FormatCharges(service.Charges.Select(c => (c.Description, c.Amount)))
+                    Charges = CountItems(service.Charges)
                 },
                 _ => ObligationRow(statement)
             };
@@ -89,40 +84,11 @@ namespace THMS.Logic.ViewModels.Finance
 
         private static string Date(DateTime value) => value.ToString("d");
         private static string Money(decimal value) => value.ToString("c2");
-        private static string InterestCell(decimal? periodInterest) =>
-            periodInterest is decimal value ? Money(value) : NotApplicable;
 
-        private static string FormatPromotions(IEnumerable<PromotionalBalance> promotions)
+        private static string CountItems<T>(IEnumerable<T> items)
         {
-            var items = promotions
-                .Select(p => $"{DisplayPromo(p.Type)} {Money(p.Amount)} by {Date(p.Deadline)}")
-                .ToList();
-            return items.Count == 0 ? "" : string.Join("; ", items);
+            var count = items.Count();
+            return count == 0 ? "" : count.ToString(CultureInfo.CurrentCulture);
         }
-
-        private static string FormatUsage(IEnumerable<UtilityUsageRecord> usage)
-        {
-            var items = usage
-                .Select(u => $"{u.Type} {u.Amount.ToString("N2", CultureInfo.CurrentCulture)} @ {u.Rate.ToString("0.####", CultureInfo.CurrentCulture)}")
-                .ToList();
-            return items.Count == 0 ? "" : string.Join("; ", items);
-        }
-
-        private static string FormatCharges(IEnumerable<(string Description, decimal Amount)> charges)
-        {
-            var items = charges
-                .Select(c => string.IsNullOrWhiteSpace(c.Description)
-                    ? Money(c.Amount)
-                    : $"{c.Description} {Money(c.Amount)}")
-                .ToList();
-            return items.Count == 0 ? "" : string.Join("; ", items);
-        }
-
-        private static string DisplayPromo(PromoType type) => type switch
-        {
-            PromoType.LumpSum => "Lump sum",
-            PromoType.EqualPayments => "Equal payments",
-            _ => type.ToString()
-        };
     }
 }

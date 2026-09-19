@@ -211,7 +211,15 @@ namespace THMS.Tests.Logic
                     DueDate = DateTime.Today.AddDays(10),
                     AmountDue = 300,
                     StatementBalance = 300,
-                    Promotions = [new() { AccountId = accountId, Amount = 50, Deadline = DateTime.Today.AddDays(8), Type = PromoType.LumpSum }]
+                    Promotions = [new()
+                    {
+                        AccountId = accountId,
+                        DateAcquired = DateTime.Today.AddDays(-40),
+                        InitialAmount = 120,
+                        Amount = 50,
+                        Deadline = DateTime.Today.AddDays(8),
+                        Type = PromoType.LumpSum
+                    }]
                 },
                 new UtilityStatement
                 {
@@ -253,6 +261,10 @@ namespace THMS.Tests.Logic
             var card = (CreditCardStatement)store.Get(statements[3].Id)!;
             Assert.That(card.Promotions, Has.Count.EqualTo(1));
             Assert.That(card.Promotions[0].Amount, Is.EqualTo(50m));
+            Assert.That(card.Promotions[0].CurrentBalance, Is.EqualTo(50m));
+            Assert.That(card.Promotions[0].InitialAmount, Is.EqualTo(120m));
+            Assert.That(card.Promotions[0].DateAcquired.Date, Is.EqualTo(DateTime.Today.AddDays(-40).Date));
+            Assert.That(card.Promotions[0].Type, Is.EqualTo(PromoType.LumpSum));
             var utility = (UtilityStatement)store.Get(statements[4].Id)!;
             Assert.That(utility.Usage[0].Amount, Is.EqualTo(400m));
             Assert.That(utility.Charges[0].Amount, Is.EqualTo(80m));
@@ -317,6 +329,94 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void CopyForNewStatement_ClonesPromotionsFromLatestCardStatement()
+        {
+            var store = new InMemoryAccountStatementDataStore();
+            var accountId = Guid.NewGuid();
+            var olderPromoId = Guid.NewGuid();
+            store.Save(new CreditCardStatement
+            {
+                AccountId = accountId,
+                StatementDate = new DateTime(2026, 7, 17),
+                DueDate = new DateTime(2026, 8, 11),
+                AmountDue = 40,
+                StatementBalance = 4000,
+                Promotions =
+                [
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        AccountId = accountId,
+                        DateAcquired = new DateTime(2026, 1, 11),
+                        InitialAmount = 100,
+                        Amount = 20,
+                        Deadline = new DateTime(2026, 12, 11),
+                        Type = PromoType.EqualPayments
+                    }
+                ]
+            });
+            store.Save(new CreditCardStatement
+            {
+                AccountId = accountId,
+                StatementDate = new DateTime(2026, 8, 17),
+                DueDate = new DateTime(2026, 9, 11),
+                AmountDue = 53,
+                StatementBalance = 5224.55m,
+                Promotions =
+                [
+                    new()
+                    {
+                        Id = olderPromoId,
+                        AccountId = accountId,
+                        DateAcquired = new DateTime(2026, 7, 11),
+                        InitialAmount = 734.39m,
+                        Amount = 314.39m,
+                        Deadline = new DateTime(2027, 8, 11),
+                        Type = PromoType.LumpSum
+                    },
+                    new()
+                    {
+                        AccountId = accountId,
+                        DateAcquired = new DateTime(2026, 8, 26),
+                        InitialAmount = 1875.80m,
+                        Amount = 1875.80m,
+                        Deadline = new DateTime(2028, 3, 11),
+                        Type = PromoType.LumpSum
+                    }
+                ]
+            });
+
+            var copied = PreviousStatementPromotions.CopyForNewStatement(store, accountId);
+
+            Assert.That(copied, Has.Count.EqualTo(2));
+            Assert.That(copied.Select(p => p.Id), Does.Not.Contain(olderPromoId));
+            Assert.That(copied[0].DateAcquired.Date, Is.EqualTo(new DateTime(2026, 7, 11)));
+            Assert.That(copied[0].InitialAmount, Is.EqualTo(734.39m));
+            Assert.That(copied[0].CurrentBalance, Is.EqualTo(314.39m));
+            Assert.That(copied[0].Deadline.Date, Is.EqualTo(new DateTime(2027, 8, 11)));
+            Assert.That(copied[0].Type, Is.EqualTo(PromoType.LumpSum));
+            Assert.That(copied[1].DateAcquired.Date, Is.EqualTo(new DateTime(2026, 8, 26)));
+            Assert.That(copied[1].CurrentBalance, Is.EqualTo(1875.80m));
+        }
+
+        [Test]
+        public void CopyForNewStatement_IsEmptyWhenAccountHasNoCardStatement()
+        {
+            var store = new InMemoryAccountStatementDataStore();
+            var accountId = Guid.NewGuid();
+            store.Save(new BankStatement
+            {
+                AccountId = accountId,
+                StatementDate = DateTime.Today,
+                DueDate = DateTime.Today,
+                StatementBalance = 10
+            });
+
+            Assert.That(PreviousStatementPromotions.CopyForNewStatement(store, accountId), Is.Empty);
+            Assert.That(PreviousStatementPromotions.CopyForNewStatement(store, Guid.NewGuid()), Is.Empty);
+        }
+
+        [Test]
         public void AccountStatementListRow_MapsCommonAndTypeSpecificFields()
         {
             var card = new CreditCardStatement
@@ -333,15 +433,14 @@ namespace THMS.Tests.Logic
                 ]
             };
 
-            var row = AccountStatementListRow.From(card, -12.25m);
+            var row = AccountStatementListRow.From(card);
             Assert.That(row.Id, Is.EqualTo(card.Id));
             Assert.That(row.Type, Is.EqualTo("Credit Card"));
             Assert.That(row.StatementDate, Is.EqualTo(card.StatementDate.ToString("d")));
             Assert.That(row.DueDate, Is.EqualTo(card.DueDate.ToString("d")));
             Assert.That(row.AmountDue, Is.EqualTo(220.50m.ToString("c2")));
             Assert.That(row.StatementBalance, Is.EqualTo(400m.ToString("c2")));
-            Assert.That(row.Interest, Is.EqualTo((-12.25m).ToString("c2")));
-            Assert.That(row.Promotions, Does.Contain("Lump sum").And.Contain(50m.ToString("c2")));
+            Assert.That(row.Promotions, Is.EqualTo("1"));
             Assert.That(row.Usage, Is.EqualTo(AccountStatementListRow.NotApplicable));
             Assert.That(row.Notes, Is.EqualTo("August"));
             Assert.That(AccountStatementListRow.DisplayType(StatementType.Bank), Is.EqualTo("Bank"));
@@ -358,11 +457,10 @@ namespace THMS.Tests.Logic
                 Notes = "August checking"
             };
 
-            var row = AccountStatementListRow.From(bank, 1.25m);
+            var row = AccountStatementListRow.From(bank);
             Assert.That(row.Type, Is.EqualTo("Bank"));
             Assert.That(row.DueDate, Is.EqualTo(AccountStatementListRow.NotApplicable));
             Assert.That(row.AmountDue, Is.EqualTo(AccountStatementListRow.NotApplicable));
-            Assert.That(row.Interest, Is.EqualTo(1.25m.ToString("c2")));
             Assert.That(row.StatementBalance, Is.EqualTo(1148.25m.ToString("c2")));
             Assert.That(row.Promotions, Is.EqualTo(AccountStatementListRow.NotApplicable));
             Assert.That(row.Notes, Is.EqualTo("August checking"));
@@ -388,7 +486,70 @@ namespace THMS.Tests.Logic
             Assert.That(utility.Usage, Is.EqualTo(""));
             Assert.That(utility.Charges, Is.EqualTo(""));
             Assert.That(utility.Promotions, Is.EqualTo(AccountStatementListRow.NotApplicable));
-            Assert.That(utility.Interest, Is.EqualTo(AccountStatementListRow.NotApplicable));
+
+            var billed = AccountStatementListRow.From(new UtilityStatement
+            {
+                StatementDate = new DateTime(2026, 8, 15),
+                DueDate = new DateTime(2026, 9, 10),
+                AmountDue = 80,
+                Usage = [new() { Type = "kWh", Amount = 400, Rate = 0.20m }],
+                Charges =
+                [
+                    new() { Description = "Energy", Amount = 80 },
+                    new() { Description = "Fee", Amount = 1 }
+                ]
+            });
+            Assert.That(billed.Usage, Is.EqualTo("1"));
+            Assert.That(billed.Charges, Is.EqualTo("2"));
+
+            var service = AccountStatementListRow.From(new ServiceStatement
+            {
+                StatementDate = new DateTime(2026, 8, 15),
+                DueDate = new DateTime(2026, 9, 10),
+                AmountDue = 15,
+                Charges = [new() { Description = "Streaming", Amount = 15 }]
+            });
+            Assert.That(service.Charges, Is.EqualTo("1"));
+            Assert.That(service.Usage, Is.EqualTo(AccountStatementListRow.NotApplicable));
+        }
+
+        [Test]
+        public void StatementChildRow_ExpandsPromotionsUsageAndCharges()
+        {
+            var card = StatementChildRow.From(new CreditCardStatement
+            {
+                Promotions =
+                [
+                    new()
+                    {
+                        Type = PromoType.LumpSum,
+                        DateAcquired = new DateTime(2026, 7, 11),
+                        InitialAmount = 734.39m,
+                        Amount = 314.39m,
+                        Deadline = new DateTime(2026, 10, 1)
+                    }
+                ]
+            });
+            Assert.That(card, Has.Count.EqualTo(1));
+            Assert.That(card[0].Kind, Is.EqualTo("Promotion"));
+            Assert.That(card[0].Description, Is.EqualTo("Lump sum"));
+            Assert.That(card[0].Amount, Is.EqualTo(314.39m.ToString("c2")));
+            Assert.That(card[0].Details, Does.Contain(new DateTime(2026, 7, 11).ToString("d")));
+            Assert.That(card[0].Details, Does.Contain(734.39m.ToString("c2")));
+            Assert.That(card[0].Details, Does.Contain(new DateTime(2026, 10, 1).ToString("d")));
+
+            var utility = StatementChildRow.From(new UtilityStatement
+            {
+                Usage = [new() { Type = "kWh", Amount = 400, Rate = 0.20m }],
+                Charges = [new() { Description = "Energy", Amount = 80 }]
+            });
+            Assert.That(utility, Has.Count.EqualTo(2));
+            Assert.That(utility[0].Kind, Is.EqualTo("Usage"));
+            Assert.That(utility[0].Description, Is.EqualTo("kWh"));
+            Assert.That(utility[1].Kind, Is.EqualTo("Charge"));
+            Assert.That(utility[1].Amount, Is.EqualTo(80m.ToString("c2")));
+
+            Assert.That(StatementChildRow.From(new BankStatement()), Is.Empty);
         }
 
         [Test]
@@ -454,9 +615,6 @@ namespace THMS.Tests.Logic
 
             Assert.That(StatementPeriodInterest.Compute(current, [older, current], posted), Is.EqualTo(-38.75m));
             Assert.That(StatementPeriodInterest.Compute(older, [older, current], posted), Is.EqualTo(0.40m));
-            Assert.That(
-                AccountStatementListRow.From(new UtilityStatement { StatementDate = DateTime.Today }).Interest,
-                Is.EqualTo(AccountStatementListRow.NotApplicable));
         }
 
         private static void TryDelete(string path)

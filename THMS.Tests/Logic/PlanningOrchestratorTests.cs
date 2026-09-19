@@ -3,6 +3,7 @@ using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Orchestrators.Finance;
+using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Tests.Logic
 {
@@ -191,7 +192,7 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void GetStatementListRows_ComputesInterestFromCategorizedTransactions()
+        public void GetStatementListRows_MapsAmountDueWithoutInterest()
         {
             var accounts = new InMemoryAccountDataStore();
             var transactions = new InMemoryTransactionDataStore();
@@ -217,7 +218,8 @@ namespace THMS.Tests.Logic
             var rows = new PlanningOrchestrator(accounts, transactions, statements).GetStatementListRows(checking.Id);
 
             Assert.That(rows, Has.Count.EqualTo(1));
-            Assert.That(rows[0].Interest, Is.EqualTo(1.25m.ToString("c2")));
+            Assert.That(rows[0].AmountDue, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(rows[0].StatementBalance, Is.EqualTo(101.25m.ToString("c2")));
         }
 
         [Test]

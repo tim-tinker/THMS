@@ -20,6 +20,7 @@ namespace THMS.UI.WinForms.Controls
             DataGridViewUtil.EnableDoubleBuffering(gridAccounts);
             gridAccounts.SelectionChanged += (_, _) => OnAccountSelectionChanged();
             gridAccounts.DataBindingComplete += (_, _) => OnAccountSelectionChanged();
+            gridAccounts.CellDoubleClick += OnAccountCellDoubleClick;
             LoadAccounts();
         }
 
@@ -74,7 +75,6 @@ namespace THMS.UI.WinForms.Controls
         private void UpdateActionButtons()
         {
             var hasSelection = GetSelectedAccount() is not null;
-            btnEdit.Enabled = hasSelection;
             btnDelete.Enabled = hasSelection;
         }
 
@@ -125,6 +125,14 @@ namespace THMS.UI.WinForms.Controls
             dialog.ShowDialog(FindForm());
         }
 
+        private void OnAccountCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0)
+                return;
+
+            EditSelectedAccount();
+        }
+
         private void OnAddAccount(object sender, EventArgs e)
         {
             using var dlg = new AccountEditForm(null);
@@ -134,15 +142,11 @@ namespace THMS.UI.WinForms.Controls
             SaveAndReload(dlg.Account);
         }
 
-        private void OnEditAccount(object sender, EventArgs e)
+        private void EditSelectedAccount()
         {
             var acct = GetSelectedAccount();
             if (acct == null)
-            {
-                MessageBox.Show(this, "Please select an account to edit.", "Accounts",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
-            }
 
             using var dlg = new AccountEditForm(acct);
             if (dlg.ShowDialog(FindForm()) != DialogResult.OK)

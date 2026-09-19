@@ -8,10 +8,13 @@
         public string AccountNumber { get; set; } = "";
         public string AccountType { get; set; } = "";
         public string WebsiteUrl { get; set; } = "";
+        public DateTime? StatementDate { get; set; }
+        public decimal? StatementBalance { get; set; }
         public DateTime? AsOfDate { get; set; }
 
         // UI-only fields
         public decimal? Balance { get; set; }
+        public decimal? AmountDue { get; set; }
         public decimal? BankCreditAvailable { get; set; }
         public decimal? CreditLimit { get; set; }
         public decimal? APR { get; set; }

@@ -76,7 +76,7 @@ namespace THMS.UI.WinForms.Controls
             layout.Name = "layout";
             layout.Padding = new Padding(12);
             layout.RowCount = 4;
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
@@ -86,8 +86,8 @@ namespace THMS.UI.WinForms.Controls
             typeSelectorLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             typeSelectorLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             typeSelectorLayout.RowCount = 2;
-            typeSelectorLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-            typeSelectorLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            typeSelectorLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+            typeSelectorLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
             typeSelectorLayout.Dock = DockStyle.Fill;
             typeSelectorLayout.Name = "typeSelectorLayout";
             typeSelectorLayout.Controls.Add(lblStatementType, 0, 0);
@@ -108,6 +108,8 @@ namespace THMS.UI.WinForms.Controls
             lblStatementType.TextAlign = ContentAlignment.MiddleLeft;
             cboStatementType.DropDownStyle = ComboBoxStyle.DropDownList;
             cboStatementType.Dock = DockStyle.Fill;
+            cboStatementType.DrawMode = DrawMode.OwnerDrawFixed;
+            cboStatementType.IntegralHeight = false;
             cboStatementType.Name = "cboStatementType";
             cboStatementType.SelectedIndexChanged += OnStatementTypeChanged;
             lblAccount.AutoSize = false;
@@ -117,6 +119,8 @@ namespace THMS.UI.WinForms.Controls
             lblAccount.TextAlign = ContentAlignment.MiddleLeft;
             cboAccount.DropDownStyle = ComboBoxStyle.DropDownList;
             cboAccount.Dock = DockStyle.Fill;
+            cboAccount.DrawMode = DrawMode.OwnerDrawFixed;
+            cboAccount.IntegralHeight = false;
             cboAccount.Name = "cboAccount";
             cboAccount.SelectedIndexChanged += OnStatementAccountChanged;
             btnNewAccount.AutoSize = true;
@@ -131,9 +135,9 @@ namespace THMS.UI.WinForms.Controls
             pnlCommon.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));
             pnlCommon.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             pnlCommon.RowCount = 4;
-            pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
-            pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
-            pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
+            pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+            pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+            pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
             pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
             pnlCommon.AutoSize = true;
             pnlCommon.AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -187,6 +191,8 @@ namespace THMS.UI.WinForms.Controls
             lblPayFrom.TextAlign = ContentAlignment.MiddleLeft;
             cboPayFrom.Dock = DockStyle.Fill;
             cboPayFrom.DropDownStyle = ComboBoxStyle.DropDownList;
+            cboPayFrom.DrawMode = DrawMode.OwnerDrawFixed;
+            cboPayFrom.IntegralHeight = false;
             cboPayFrom.Margin = new Padding(0, 4, 0, 4);
             cboPayFrom.Name = "cboPayFrom";
             lblNotes.AutoSize = false;
@@ -223,12 +229,12 @@ namespace THMS.UI.WinForms.Controls
             CancelButton = btnCancel;
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(640, 480);
+            ClientSize = new Size(720, 540);
             Controls.Add(layout);
             FormBorderStyle = FormBorderStyle.Sizable;
             MaximizeBox = true;
             MinimizeBox = false;
-            MinimumSize = new Size(480, 360);
+            MinimumSize = new Size(560, 420);
             Name = "StatementEditorDialog";
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterParent;

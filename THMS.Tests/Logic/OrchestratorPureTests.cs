@@ -179,6 +179,53 @@ namespace THMS.Tests.Logic
             Assert.That(PostedBalanceCalculator.HasUsablePostedBalance(bank, []), Is.False);
             Assert.That(PostedBalanceCalculator.HasUsablePostedBalance(bank, [statement]), Is.True);
         }
+
+        [Test]
+        public void TryCreateDisplay_UsesStatementThenLaterPostedActivity()
+        {
+            var card = new CreditAccount { CreditLimit = 49000, APR = 19.99m };
+            var statement = new CreditCardStatement
+            {
+                StatementDate = new DateTime(2026, 9, 8),
+                DueDate = new DateTime(2026, 10, 3),
+                AmountDue = 764.62m,
+                StatementBalance = 17672.62m
+            };
+
+            Assert.That(PostedBalanceCalculator.TryCreateDisplay(
+                card,
+                [statement],
+                activityAfterStatement: -125.50m,
+                latestActivityDate: new DateTime(2026, 9, 18),
+                out var display), Is.True);
+            Assert.That(display.StatementDate, Is.EqualTo(new DateTime(2026, 9, 8)));
+            Assert.That(display.StatementBalance, Is.EqualTo(17672.62m));
+            Assert.That(display.AsOf, Is.EqualTo(new DateTime(2026, 9, 18)));
+            Assert.That(display.Balance, Is.EqualTo(17798.12m));
+            Assert.That(display.AmountDue, Is.EqualTo(764.62m));
+            Assert.That(display.DueDate, Is.EqualTo(new DateTime(2026, 10, 3)));
+        }
+
+        [Test]
+        public void TryCreateDisplay_KeepsStatementDateWhenNoLaterActivity()
+        {
+            var bank = new BankAccount();
+            var statement = new BankStatement
+            {
+                StatementDate = new DateTime(2026, 8, 31),
+                StatementBalance = 1090.73m
+            };
+
+            Assert.That(PostedBalanceCalculator.TryCreateDisplay(
+                bank,
+                [statement],
+                activityAfterStatement: 0,
+                latestActivityDate: new DateTime(2026, 8, 15),
+                out var display), Is.True);
+            Assert.That(display.AsOf, Is.EqualTo(statement.StatementDate));
+            Assert.That(display.Balance, Is.EqualTo(1090.73m));
+            Assert.That(display.DueDate, Is.Null);
+        }
     }
 
     [TestFixture]

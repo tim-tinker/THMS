@@ -39,6 +39,9 @@
             DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle10 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle11 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle12 = new DataGridViewCellStyle();
             splitContainer = new SplitContainer();
             masterGrid = new DataGridView();
             detailGrid = new DataGridView();
@@ -60,8 +63,11 @@
             btnSplitTransaction = new Button();
             NameColumn = new DataGridViewTextBoxColumn();
             AccountTypeColumn = new DataGridViewTextBoxColumn();
+            StatementDateColumn = new DataGridViewTextBoxColumn();
+            StatementBalanceColumn = new DataGridViewTextBoxColumn();
             AsOfDateColumn = new DataGridViewTextBoxColumn();
             BalanceColumn = new DataGridViewTextBoxColumn();
+            AmountDueColumn = new DataGridViewTextBoxColumn();
             DueDateColumn = new DataGridViewTextBoxColumn();
             AvailableColumn = new DataGridViewTextBoxColumn();
             AprColumn = new DataGridViewTextBoxColumn();
@@ -102,7 +108,7 @@
             masterGrid.AllowUserToResizeRows = false;
             masterGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             masterGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            masterGrid.Columns.AddRange(new DataGridViewColumn[] { NameColumn, AccountTypeColumn, AsOfDateColumn, BalanceColumn, DueDateColumn, AvailableColumn, AprColumn, CreditLimitColumn, WebsiteColumn });
+            masterGrid.Columns.AddRange(new DataGridViewColumn[] { NameColumn, AccountTypeColumn, StatementDateColumn, StatementBalanceColumn, AsOfDateColumn, BalanceColumn, AmountDueColumn, DueDateColumn, AvailableColumn, AprColumn, CreditLimitColumn, WebsiteColumn });
             masterGrid.Dock = DockStyle.Fill;
             masterGrid.Location = new Point(0, 0);
             masterGrid.MultiSelect = false;
@@ -341,6 +347,33 @@
             AccountTypeColumn.ToolTipText = "Type of Account";
             AccountTypeColumn.Width = 97;
             // 
+            // StatementDateColumn
+            // 
+            StatementDateColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            StatementDateColumn.DataPropertyName = "StatementDate";
+            dataGridViewCellStyle10.Format = "d";
+            StatementDateColumn.DefaultCellStyle = dataGridViewCellStyle10;
+            StatementDateColumn.HeaderText = "Statement Date";
+            StatementDateColumn.MinimumWidth = 9;
+            StatementDateColumn.Name = "StatementDateColumn";
+            StatementDateColumn.ReadOnly = true;
+            StatementDateColumn.ToolTipText = "Date of the latest statement";
+            StatementDateColumn.Width = 150;
+            // 
+            // StatementBalanceColumn
+            // 
+            StatementBalanceColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            StatementBalanceColumn.DataPropertyName = "StatementBalance";
+            dataGridViewCellStyle11.Format = "c2";
+            dataGridViewCellStyle11.NullValue = "N/A";
+            StatementBalanceColumn.DefaultCellStyle = dataGridViewCellStyle11;
+            StatementBalanceColumn.HeaderText = "Statement Balance";
+            StatementBalanceColumn.MinimumWidth = 9;
+            StatementBalanceColumn.Name = "StatementBalanceColumn";
+            StatementBalanceColumn.ReadOnly = true;
+            StatementBalanceColumn.ToolTipText = "Balance on the latest statement";
+            StatementBalanceColumn.Width = 170;
+            // 
             // AsOfDateColumn
             // 
             AsOfDateColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
@@ -351,7 +384,7 @@
             AsOfDateColumn.MinimumWidth = 9;
             AsOfDateColumn.Name = "AsOfDateColumn";
             AsOfDateColumn.ReadOnly = true;
-            AsOfDateColumn.ToolTipText = "Date for the balance";
+            AsOfDateColumn.ToolTipText = "Date of the latest posted activity";
             AsOfDateColumn.Width = 106;
             // 
             // BalanceColumn
@@ -365,6 +398,21 @@
             BalanceColumn.MinimumWidth = 9;
             BalanceColumn.Name = "BalanceColumn";
             BalanceColumn.Width = 126;
+            BalanceColumn.ToolTipText = "Statement balance plus posted activity since the statement";
+            // 
+            // AmountDueColumn
+            // 
+            AmountDueColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            AmountDueColumn.DataPropertyName = "AmountDue";
+            dataGridViewCellStyle12.Format = "c2";
+            dataGridViewCellStyle12.NullValue = "N/A";
+            AmountDueColumn.DefaultCellStyle = dataGridViewCellStyle12;
+            AmountDueColumn.HeaderText = "Amount Due";
+            AmountDueColumn.MinimumWidth = 9;
+            AmountDueColumn.Name = "AmountDueColumn";
+            AmountDueColumn.ReadOnly = true;
+            AmountDueColumn.ToolTipText = "Amount due from the latest statement";
+            AmountDueColumn.Width = 140;
             // 
             // DueDateColumn
             // 
@@ -456,8 +504,11 @@
         private DataGridViewTextBoxColumn DescriptionColumn;
         private DataGridViewTextBoxColumn NameColumn;
         private DataGridViewTextBoxColumn AccountTypeColumn;
+        private DataGridViewTextBoxColumn StatementDateColumn;
+        private DataGridViewTextBoxColumn StatementBalanceColumn;
         private DataGridViewTextBoxColumn AsOfDateColumn;
         private DataGridViewTextBoxColumn BalanceColumn;
+        private DataGridViewTextBoxColumn AmountDueColumn;
         private DataGridViewTextBoxColumn DueDateColumn;
         private DataGridViewTextBoxColumn AvailableColumn;
         private DataGridViewTextBoxColumn AprColumn;

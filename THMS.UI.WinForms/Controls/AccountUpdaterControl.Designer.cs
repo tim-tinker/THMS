@@ -6,7 +6,6 @@
         private DataGridView gridAccounts;
         private FlowLayoutPanel pnlButtons;
         private ThmsButton btnAdd;
-        private ThmsButton btnEdit;
         private ThmsButton btnDelete;
         private ThmsButton btnImport;
         private ThmsButton btnConnectPlaid;
@@ -25,7 +24,6 @@
             gridAccounts = new DataGridView();
             pnlButtons = new FlowLayoutPanel();
             btnAdd = new ThmsButton();
-            btnEdit = new ThmsButton();
             btnDelete = new ThmsButton();
             btnImport = new ThmsButton();
             btnConnectPlaid = new ThmsButton();
@@ -59,7 +57,6 @@
             // pnlButtons
             // 
             pnlButtons.Controls.Add(btnAdd);
-            pnlButtons.Controls.Add(btnEdit);
             pnlButtons.Controls.Add(btnDelete);
             pnlButtons.Controls.Add(btnImport);
             pnlButtons.Controls.Add(btnConnectPlaid);
@@ -88,14 +85,7 @@
             btnAdd.TabIndex = 0;
             btnAdd.Text = "Add Account";
             btnAdd.Click += OnAddAccount;
-            // 
-            // btnEdit
-            // 
-            btnEdit.Name = "btnEdit";
-            btnEdit.TabIndex = 1;
-            btnEdit.Text = "Edit Account";
-            btnEdit.Click += OnEditAccount;
-            // 
+            //
             // btnDelete
             // 
             btnDelete.Destructive = true;
