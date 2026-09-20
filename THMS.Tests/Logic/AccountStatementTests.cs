@@ -467,6 +467,54 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void AccountRegisterRow_UsesLatestStatementAndNaWhenMissing()
+        {
+            var checking = new BankAccount
+            {
+                Name = "Checking",
+                Institution = "X",
+                AccountNumber = "1",
+                WebsiteUrl = ""
+            };
+            var card = new CreditAccount
+            {
+                Name = "Card",
+                Institution = "X",
+                AccountNumber = "2",
+                WebsiteUrl = ""
+            };
+            var empty = AccountRegisterRow.From(checking, latestStatement: null);
+            Assert.That(empty.StatementDate, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(empty.StatementBalance, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(empty.DueDate, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(empty.AmountDue, Is.EqualTo(AccountStatementListRow.NotApplicable));
+
+            var bank = AccountRegisterRow.From(checking, new BankStatement
+            {
+                AccountId = checking.Id,
+                StatementDate = new DateTime(2026, 8, 31),
+                DueDate = new DateTime(2026, 8, 31),
+                StatementBalance = 1090.73m
+            });
+            Assert.That(bank.StatementDate, Is.EqualTo(new DateTime(2026, 8, 31).ToString("d")));
+            Assert.That(bank.StatementBalance, Is.EqualTo(1090.73m.ToString("c2")));
+            Assert.That(bank.DueDate, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(bank.AmountDue, Is.EqualTo(AccountStatementListRow.NotApplicable));
+
+            var credit = AccountRegisterRow.From(card, new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = new DateTime(2026, 8, 15),
+                DueDate = new DateTime(2026, 9, 10),
+                AmountDue = 53m,
+                StatementBalance = 5224.55m
+            });
+            Assert.That(credit.DueDate, Is.EqualTo(new DateTime(2026, 9, 10).ToString("d")));
+            Assert.That(credit.AmountDue, Is.EqualTo(53m.ToString("c2")));
+            Assert.That(credit.StatementBalance, Is.EqualTo(5224.55m.ToString("c2")));
+        }
+
+        [Test]
         public void AccountStatementListRow_EmptyApplicableCollectionsAreBlank()
         {
             var card = AccountStatementListRow.From(new CreditCardStatement

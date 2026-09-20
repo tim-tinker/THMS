@@ -1,8 +1,10 @@
 ﻿using THMS.Data.Stores;
+using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Forecast;
 using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Transactions;
+using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Logic.Orchestrators
@@ -90,13 +92,26 @@ namespace THMS.Logic.Orchestrators
 
         public List<UnifiedTransactionView> GenerateForecast(Guid accountId, DateTime from, DateTime to)
         {
-            return _forecastGenerator.GenerateForecast(
+            var forecast = _forecastGenerator.GenerateForecast(
                 accountId,
                 from,
                 to,
                 _store.GetAllRecurringSingleRules(),
                 _store.GetAllRecurringTransferRules());
+            var scheduled = _store.GetScheduledPaymentIntents().ToList();
+            if (scheduled.Count == 0)
+                return forecast;
+
+            return forecast.Where(row => !CoveredByScheduledIntent(row, scheduled)).ToList();
         }
+
+        private static bool CoveredByScheduledIntent(
+            UnifiedTransactionView row,
+            IReadOnlyList<PaymentIntent> scheduled) =>
+            scheduled.Any(intent =>
+                (intent.FundingAccountId == row.AccountId || intent.DestinationAccountId == row.AccountId)
+                && Math.Abs(Math.Abs(intent.Amount) - Math.Abs(row.Amount)) <= RecurringRulePattern.AmountTolerance
+                && Math.Abs((intent.PayDate.Date - row.Date.Date).TotalDays) <= BillsOrchestrator.MatchDayTolerance);
 
         public decimal ComputePostedBalance(Guid accountId, decimal startingBalance)
         {

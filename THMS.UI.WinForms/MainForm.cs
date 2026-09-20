@@ -27,9 +27,8 @@ namespace THMS.UI
             AddDashboard("Energy", new EnergyDashboardForm());
 
             AddSectionLabel("Data Management");
-            AddEmbeddedForm("Planning Center", new PlanningCenterForm());
-            AddEmbeddedForm("Data Manager", new DataManagerForm());
             AddEmbeddedForm("Register", new RegisterForm());
+            AddEmbeddedForm("Data Manager", new DataManagerForm());
             AddEmbeddedForm("Energy", new DataCenterForm());
         }
 

@@ -45,14 +45,34 @@ namespace THMS.Tests.Logic.TestSupport
         public string ItemId { get; set; } = "item-1";
         public string InstitutionId { get; set; } = "ins_109508";
         public string InstitutionName { get; set; } = "First Platypus Bank";
+        public string HostedLinkUrl { get; set; } = "https://cdn.plaid.com/link/hosted";
+        public string? SessionPublicToken { get; set; } = "public-from-session";
         public string? LastPublicToken { get; private set; }
+        public string? LastLinkTokenGet { get; private set; }
         public bool CreatedSandboxToken { get; private set; }
         public bool CreatedLinkToken { get; private set; }
+        public bool HostedLinkRequested { get; private set; }
+        public int PublicTokenLookups { get; private set; }
+        public int PublicTokenLookupsUntilAvailable { get; set; }
 
-        public Task<string> CreateLinkTokenAsync(string userId)
+        public Task<PlaidLinkTokenResult> CreateLinkTokenAsync(string userId, bool hostedLink = false)
         {
             CreatedLinkToken = true;
-            return Task.FromResult(LinkToken);
+            HostedLinkRequested = hostedLink;
+            return Task.FromResult(new PlaidLinkTokenResult
+            {
+                LinkToken = LinkToken,
+                HostedLinkUrl = hostedLink ? HostedLinkUrl : null
+            });
+        }
+
+        public Task<string?> GetPublicTokenFromLinkSessionAsync(string linkToken)
+        {
+            LastLinkTokenGet = linkToken;
+            PublicTokenLookups++;
+            if (PublicTokenLookupsUntilAvailable > 0 && PublicTokenLookups < PublicTokenLookupsUntilAvailable)
+                return Task.FromResult<string?>(null);
+            return Task.FromResult(SessionPublicToken);
         }
 
         public Task<PlaidItemConnection> ExchangeForItemAsync(string publicToken)

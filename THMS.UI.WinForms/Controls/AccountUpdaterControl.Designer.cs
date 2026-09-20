@@ -48,11 +48,14 @@
             gridAccounts.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             gridAccounts.TabIndex = 0;
             gridAccounts.Columns.AddRange(
-                TextColumn("Name", "Name"),
+                TextColumn("Name", "Name", fill: true),
                 TextColumn("Type", "Type"),
                 TextColumn("Institution", "Institution"),
                 TextColumn("AccountNumber", "Account Number"),
-                TextColumn("BalanceAsOf", "As Of"));
+                TextColumn("StatementDate", "Statement Date"),
+                MoneyColumn("StatementBalance", "Statement Balance"),
+                TextColumn("DueDate", "Due Date"),
+                MoneyColumn("AmountDue", "Amount Due"));
             // 
             // pnlButtons
             // 
@@ -127,13 +130,24 @@
             ResumeLayout(false);
         }
 
-        private static DataGridViewTextBoxColumn TextColumn(string property, string header) =>
+        private static DataGridViewTextBoxColumn TextColumn(string property, string header, bool fill = false) =>
             new()
             {
                 DataPropertyName = property,
                 HeaderText = header,
                 Name = property,
-                ReadOnly = true
+                ReadOnly = true,
+                AutoSizeMode = fill
+                    ? DataGridViewAutoSizeColumnMode.Fill
+                    : DataGridViewAutoSizeColumnMode.AllCells
             };
+
+        private static DataGridViewTextBoxColumn MoneyColumn(string property, string header)
+        {
+            var column = TextColumn(property, header);
+            column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            column.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+            return column;
+        }
     }
 }

@@ -298,7 +298,7 @@
             });
 
             lblUntrackedHint = HintLabel(
-                "This is a biller without a tracked ledger. Add statements on the Planning Center. " +
+                "This is a biller without a tracked ledger. Add statements on Register. " +
                 "Payments come from a bank account.",
                 8, 380, 72);
             pnlUntracked.Controls.Add(lblUntrackedHint);

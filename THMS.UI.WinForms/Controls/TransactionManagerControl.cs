@@ -51,6 +51,7 @@ namespace THMS.UI.WinForms.Controls
         private ComboBox cmbCategoryFilter = null!;
         private decimal _postedBalanceBeforeEdit;
         private bool _hostProvidesHistory;
+        private bool _hostProvidesAccounts;
 
         public TransactionManagerControl()
         {
@@ -77,6 +78,45 @@ namespace THMS.UI.WinForms.Controls
                 lblHistory.Visible = !value;
                 cmbHistory.Visible = !value;
             }
+        }
+
+        [DefaultValue(false)]
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public bool HostProvidesAccounts
+        {
+            get => _hostProvidesAccounts;
+            set
+            {
+                _hostProvidesAccounts = value;
+                splitContainer.Panel1Collapsed = value;
+            }
+        }
+
+        public void SelectAccount(Guid? accountId)
+        {
+            LoadAccounts();
+            _suspendAccountChange = true;
+            try
+            {
+                if (accountId is Guid id)
+                {
+                    for (var i = 0; i < _accountsSource.Count; i++)
+                    {
+                        if (_accountsSource[i] is UnifiedAccountView view && view.Id == id)
+                        {
+                            _accountsSource.Position = i;
+                            break;
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                _suspendAccountChange = false;
+            }
+
+            RefreshCurrentAccount();
         }
 
         public Control GetControl() => this;

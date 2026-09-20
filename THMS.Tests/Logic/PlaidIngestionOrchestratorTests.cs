@@ -1,7 +1,11 @@
 using THMS.Data.Stores;
+using THMS.Data.Stores.SQLite;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.External;
+using THMS.External.Plaid;
+using Going.Plaid.Entity;
+using Going.Plaid.Link;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels;
@@ -43,7 +47,7 @@ namespace THMS.Tests.Logic
 
             await orchestrator.StartLinkFlow();
 
-            Assert.That(link.CreatedLinkToken, Is.True);
+            Assert.That(link.CreatedLinkToken, Is.False);
             Assert.That(link.CreatedSandboxToken, Is.True);
             Assert.That(link.LastPublicToken, Is.EqualTo(link.SandboxPublicToken));
             Assert.That(fetcher.LastAccessToken, Is.EqualTo(link.AccessToken));
@@ -67,6 +71,79 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void SaveAccountMappings_UpdatesExistingExternalLinkObject()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var checking = NewBank("Checking", "1234");
+            accounts.UpsertAccount(checking);
+            var orchestrator = Create(accounts);
+            var row = MappedRow(checking.Id, "plaid-checking", "1234");
+
+            orchestrator.SaveAccountMappings([row]);
+            var firstLink = accounts.GetAccount("Checking")!.ExternalLink;
+            Assert.That(firstLink, Is.Not.Null);
+
+            row.AccessToken = "tok-2";
+            row.ItemId = "item-2";
+            var saved = orchestrator.SaveAccountMappings([row]);
+            Assert.That(saved, Is.EqualTo(1));
+
+            var relinked = accounts.GetAccount("Checking")!;
+            Assert.That(relinked.ExternalLink, Is.SameAs(firstLink));
+            Assert.That(relinked.ExternalLink!.AccessToken, Is.EqualTo("tok-2"));
+            Assert.That(relinked.ExternalLink.ItemId, Is.EqualTo("item-2"));
+        }
+
+        [Test]
+        public void SaveAccountMappings_ClearsStaleLinkWhenPlaidAccountMoves()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var checking = NewBank("Checking", "1234");
+            var savings = NewBank("Savings", "5678");
+            accounts.UpsertAccount(checking);
+            accounts.UpsertAccount(savings);
+            var orchestrator = Create(accounts);
+            var row = MappedRow(checking.Id, "plaid-checking", "1234");
+
+            orchestrator.SaveAccountMappings([row]);
+            Assert.That(accounts.GetAccount("Checking")!.ExternalLink, Is.Not.Null);
+
+            row.SuggestedThmsAccountId = savings.Id;
+            var saved = orchestrator.SaveAccountMappings([row]);
+            Assert.That(saved, Is.EqualTo(1));
+            Assert.That(accounts.GetAccount("Checking")!.ExternalLink, Is.Null);
+            Assert.That(accounts.GetAccount("Savings")!.ExternalLink, Is.Not.Null);
+            Assert.That(accounts.GetAccount("Savings")!.ExternalLink!.PlaidAccountId, Is.EqualTo("plaid-checking"));
+        }
+
+        [Test]
+        public void SaveAccountMappings_RemovesStaleLinkFromSqliteStore()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"thms-plaid-remap-{Guid.NewGuid():N}.db");
+            try
+            {
+                var accounts = new SQLiteAccountDataStore(path);
+                var checking = NewBank("Checking", "1234");
+                var savings = NewBank("Savings", "5678");
+                accounts.UpsertAccount(checking);
+                accounts.UpsertAccount(savings);
+                var orchestrator = Create(accounts);
+                var row = MappedRow(checking.Id, "plaid-checking", "1234");
+
+                orchestrator.SaveAccountMappings([row]);
+                row.SuggestedThmsAccountId = savings.Id;
+                orchestrator.SaveAccountMappings([row]);
+
+                Assert.That(accounts.GetAccount("Checking")!.ExternalLink, Is.Null);
+                Assert.That(accounts.GetAccount("Savings")!.ExternalLink!.PlaidAccountId, Is.EqualTo("plaid-checking"));
+            }
+            finally
+            {
+                TryDeleteSqlite(path);
+            }
+        }
+
+        [Test]
         public async Task StartLinkFlow_RequiresPublicTokenOutsideSandbox()
         {
             var orchestrator = new PlaidAccountOrchestrator(
@@ -78,6 +155,183 @@ namespace THMS.Tests.Logic
             Assert.That(
                 async () => await orchestrator.StartLinkFlow(),
                 Throws.InvalidOperationException);
+        }
+
+        [Test]
+        public async Task StartLinkFlow_WithPublicToken_SkipsSandboxAndUnusedLinkToken()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var link = new FakePlaidLinkSession();
+            var fetcher = new FakeAccountFetcher
+            {
+                Accounts =
+                [
+                    new AccountDto
+                    {
+                        PlaidAccountId = "plaid-checking",
+                        Name = "Checking",
+                        Mask = "1234",
+                        Subtype = "checking"
+                    }
+                ]
+            };
+            var orchestrator = new PlaidAccountOrchestrator(accounts, fetcher, link, "Production");
+
+            await orchestrator.StartLinkFlow("public-real");
+
+            Assert.That(link.CreatedLinkToken, Is.False);
+            Assert.That(link.CreatedSandboxToken, Is.False);
+            Assert.That(link.LastPublicToken, Is.EqualTo("public-real"));
+            Assert.That(orchestrator.GetPlaidAccounts(), Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public async Task CreateHostedLinkSession_ReturnsHostedUrl()
+        {
+            var link = new FakePlaidLinkSession();
+            var orchestrator = Create(new InMemoryAccountDataStore(), link);
+
+            var session = await orchestrator.CreateHostedLinkSessionAsync();
+
+            Assert.That(link.CreatedLinkToken, Is.True);
+            Assert.That(link.HostedLinkRequested, Is.True);
+            Assert.That(session.LinkToken, Is.EqualTo(link.LinkToken));
+            Assert.That(session.HostedLinkUrl, Is.EqualTo(link.HostedLinkUrl));
+        }
+
+        [Test]
+        public void CreateHostedLinkSession_ThrowsWhenHostedUrlMissing()
+        {
+            var link = new FakePlaidLinkSession { HostedLinkUrl = "" };
+            var orchestrator = Create(new InMemoryAccountDataStore(), link);
+
+            Assert.That(
+                async () => await orchestrator.CreateHostedLinkSessionAsync(),
+                Throws.InvalidOperationException);
+        }
+
+        [Test]
+        public async Task GetPublicTokenFromLinkSession_ReturnsSessionToken()
+        {
+            var link = new FakePlaidLinkSession();
+            var orchestrator = Create(new InMemoryAccountDataStore(), link);
+
+            var token = await orchestrator.GetPublicTokenFromLinkSessionAsync(link.LinkToken);
+
+            Assert.That(token, Is.EqualTo(link.SessionPublicToken));
+            Assert.That(link.LastLinkTokenGet, Is.EqualTo(link.LinkToken));
+        }
+
+        [Test]
+        public async Task WaitForPublicTokenAsync_RetriesUntilAvailable()
+        {
+            var link = new FakePlaidLinkSession { PublicTokenLookupsUntilAvailable = 3 };
+            var orchestrator = Create(new InMemoryAccountDataStore(), link);
+
+            var token = await orchestrator.WaitForPublicTokenAsync(link.LinkToken, attempts: 5, delayMs: 1);
+
+            Assert.That(token, Is.EqualTo(link.SessionPublicToken));
+            Assert.That(link.PublicTokenLookups, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void ExtractPublicToken_ReadsItemAddResultsThenLegacyOnSuccess()
+        {
+            var fromResults = new LinkTokenGetResponse
+            {
+                LinkSessions =
+                [
+                    new LinkTokenGetSessionsResponse
+                    {
+                        Results = new LinkSessionResults
+                        {
+                            ItemAddResults =
+                            [
+                                new LinkSessionItemAddResult { PublicToken = "public-live" }
+                            ]
+                        }
+                    }
+                ]
+            };
+            Assert.That(PlaidLinkManager.ExtractPublicToken(fromResults), Is.EqualTo("public-live"));
+
+#pragma warning disable CS0612
+            var fromLegacy = new LinkTokenGetResponse
+            {
+                LinkSessions =
+                [
+                    new LinkTokenGetSessionsResponse
+                    {
+                        OnSuccess = new LinkSessionSuccess { PublicToken = "public-legacy" }
+                    }
+                ]
+            };
+#pragma warning restore CS0612
+            Assert.That(PlaidLinkManager.ExtractPublicToken(fromLegacy), Is.EqualTo("public-legacy"));
+
+            var exited = new LinkTokenGetResponse
+            {
+                LinkSessions = [new LinkTokenGetSessionsResponse()]
+            };
+            Assert.That(PlaidLinkManager.ExtractPublicToken(exited), Is.Null);
+        }
+
+        [Test]
+        public void IsHostedLinkCompletion_MatchesThmsUri()
+        {
+            Assert.That(
+                PlaidLinkManager.IsHostedLinkCompletion(new Uri("thms://plaid-link-complete")),
+                Is.True);
+            Assert.That(
+                PlaidLinkManager.IsHostedLinkCompletion(new Uri("thms://plaid-link-complete/")),
+                Is.True);
+            Assert.That(
+                PlaidLinkManager.IsHostedLinkCompletion(new Uri("https://cdn.plaid.com/link")),
+                Is.False);
+        }
+
+        private static PlaidAccountOrchestrator Create(IAccountDataStore accounts) =>
+            Create(accounts, new FakePlaidLinkSession());
+
+        private static PlaidAccountOrchestrator Create(IAccountDataStore accounts, FakePlaidLinkSession link) =>
+            new(accounts, new FakeAccountFetcher(), link, "Sandbox");
+
+        private static BankAccount NewBank(string name, string accountNumber) =>
+            new()
+            {
+                Name = name,
+                Institution = "",
+                AccountNumber = accountNumber,
+                WebsiteUrl = ""
+            };
+
+        private static PlaidAccountViewModel MappedRow(Guid thmsAccountId, string plaidAccountId, string mask) =>
+            new()
+            {
+                Institution = "First Platypus Bank",
+                PlaidAccountId = plaidAccountId,
+                Mask = mask,
+                Subtype = "checking",
+                SuggestedThmsAccountId = thmsAccountId,
+                Name = "Checking",
+                AccessToken = "tok",
+                ItemId = "item",
+                InstitutionId = "ins_1"
+            };
+
+        private static void TryDeleteSqlite(string path)
+        {
+            foreach (var file in new[] { path, path + "-wal", path + "-shm" })
+            {
+                try
+                {
+                    if (File.Exists(file))
+                        File.Delete(file);
+                }
+                catch (IOException)
+                {
+                }
+            }
         }
     }
 

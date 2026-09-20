@@ -6,6 +6,7 @@ using THMS.Logic.Finance.Forecast;
 using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Recurrence;
 using THMS.Logic.Finance.Transfer;
+using THMS.Logic.Orchestrators.Finance;
 
 namespace THMS.Logic.Orchestrators
 {
@@ -173,6 +174,8 @@ namespace THMS.Logic.Orchestrators
                 _budgetOrchestrator.EnsureSuggestedRules(account.Id);
                 _budgetOrchestrator.RefreshAccount(account.Id);
             }
+
+            new BillsOrchestrator(_accountStore, _transactionStore, _statements).MatchScheduled();
 
             return result;
         }

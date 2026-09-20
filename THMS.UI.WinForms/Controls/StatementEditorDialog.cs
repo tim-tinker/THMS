@@ -44,8 +44,6 @@ namespace THMS.UI.WinForms.Controls
                 lockedAccount)
         {
             _orchestrator = orchestrator;
-            if (existingStatement is not null)
-                _pendingPayFromId = orchestrator.FundingAccountForStatement(existingStatement.Id);
         }
 
         public StatementEditorDialog(
@@ -670,7 +668,6 @@ namespace THMS.UI.WinForms.Controls
                 if (_orchestrator is not null)
                 {
                     _orchestrator.SaveStatement(statement);
-                    _orchestrator.EnsureStatementPayment(statement, SelectedPayFrom()?.Id);
                 }
                 else
                 {
@@ -713,12 +710,6 @@ namespace THMS.UI.WinForms.Controls
             if (type != StatementType.Bank &&
                 !TryParseMoney(txtAmountDue.Text, "Amount due", out amountDue, out error))
                 return false;
-
-            if (type != StatementType.Bank && amountDue > 0 && SelectedPayFrom() is null)
-            {
-                error = "Select the account to pay this statement from.";
-                return false;
-            }
 
             statement = type switch
             {

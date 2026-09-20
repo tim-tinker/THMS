@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using THMS.Data.Stores.SqliteStores;
 using THMS.Data.Stores.SqlTables;
+using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores.SQLite
@@ -430,6 +431,49 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             return _store.ExpenseBudgetRules.GetAll(conn).ToList();
+        }
+
+        public void AddPaymentIntent(PaymentIntent intent)
+        {
+            using var conn = OpenConnection();
+            if (intent.Id == Guid.Empty)
+                intent.Id = Guid.NewGuid();
+            intent.ModifiedOn = DateTime.UtcNow;
+            _store.PaymentIntents.Add(conn, intent);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public void UpdatePaymentIntent(PaymentIntent intent)
+        {
+            using var conn = OpenConnection();
+            intent.ModifiedOn = DateTime.UtcNow;
+            _store.PaymentIntents.Update(conn, intent);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public void DeletePaymentIntent(Guid id)
+        {
+            using var conn = OpenConnection();
+            _store.PaymentIntents.Delete(conn, id);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public PaymentIntent? GetPaymentIntent(Guid id)
+        {
+            using var conn = OpenConnection();
+            return _store.PaymentIntents.GetById(conn, id);
+        }
+
+        public IEnumerable<PaymentIntent> GetAllPaymentIntents()
+        {
+            using var conn = OpenConnection();
+            return _store.PaymentIntents.GetAll(conn);
+        }
+
+        public IEnumerable<PaymentIntent> GetScheduledPaymentIntents()
+        {
+            using var conn = OpenConnection();
+            return _store.PaymentIntents.GetByStatus(conn, PaymentIntentStatus.Scheduled);
         }
 
         public void AddExpenseBudgetHistory(ExpenseBudgetHistory history)

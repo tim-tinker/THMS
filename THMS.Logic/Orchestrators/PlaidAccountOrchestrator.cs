@@ -42,15 +42,50 @@ namespace THMS.Logic.Orchestrators.Finance
                 StringComparison.OrdinalIgnoreCase);
         }
 
+        public bool IsSandbox => _sandbox;
+
+        public async Task<PlaidLinkTokenResult> CreateHostedLinkSessionAsync()
+        {
+            var result = await _linkSession.CreateLinkTokenAsync("thms-user", hostedLink: true);
+            if (string.IsNullOrWhiteSpace(result.HostedLinkUrl))
+                throw new InvalidOperationException("Plaid did not return a Hosted Link URL.");
+            return result;
+        }
+
+        public Task<string?> GetPublicTokenFromLinkSessionAsync(string linkToken) =>
+            _linkSession.GetPublicTokenFromLinkSessionAsync(linkToken);
+
+        public async Task<string?> WaitForPublicTokenAsync(
+            string linkToken,
+            int attempts = 10,
+            int delayMs = 500,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(linkToken);
+            if (attempts < 1)
+                throw new ArgumentOutOfRangeException(nameof(attempts));
+
+            string? token = null;
+            for (var attempt = 0; attempt < attempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                token = await _linkSession.GetPublicTokenFromLinkSessionAsync(linkToken);
+                if (!string.IsNullOrWhiteSpace(token))
+                    return token;
+                if (attempt < attempts - 1)
+                    await Task.Delay(delayMs, cancellationToken);
+            }
+
+            return token;
+        }
+
         public async Task StartLinkFlow(string? publicToken = null)
         {
-            await _linkSession.CreateLinkTokenAsync("thms-user");
-
             if (string.IsNullOrWhiteSpace(publicToken))
             {
                 if (!_sandbox)
                     throw new InvalidOperationException(
-                        "A Plaid public token is required outside sandbox. Complete Plaid Link and paste the token.");
+                        "A Plaid public token is required outside sandbox. Complete Plaid Link.");
 
                 publicToken = await _linkSession.CreateSandboxPublicTokenAsync(PlaidLinkManager.SandboxInstitutionId);
             }
@@ -102,16 +137,8 @@ namespace THMS.Logic.Orchestrators.Finance
                 if (!accounts.TryGetValue(row.SuggestedThmsAccountId, out var account))
                     throw new InvalidOperationException($"THMS account '{row.SuggestedThmsAccountId}' was not found.");
 
-                account.ExternalLink = new ExternalAccountLink
-                {
-                    Provider = "Plaid",
-                    ItemId = row.ItemId,
-                    AccessToken = row.AccessToken,
-                    PlaidAccountId = row.PlaidAccountId,
-                    InstitutionId = row.InstitutionId,
-                    AccountMask = row.Mask,
-                    InstitutionName = row.Institution
-                };
+                ClearStaleLinks(accounts, account.Id, row.PlaidAccountId);
+                ApplyLink(account, row);
                 if (string.IsNullOrWhiteSpace(account.Institution) && !string.IsNullOrWhiteSpace(row.Institution))
                     account.Institution = row.Institution;
 
@@ -120,6 +147,45 @@ namespace THMS.Logic.Orchestrators.Finance
             }
 
             return saved;
+        }
+
+        private void ClearStaleLinks(IReadOnlyDictionary<Guid, Account> accounts, Guid keepAccountId, string plaidAccountId)
+        {
+            if (string.IsNullOrWhiteSpace(plaidAccountId))
+                return;
+
+            foreach (var other in accounts.Values)
+            {
+                if (other.Id == keepAccountId)
+                    continue;
+                if (!HasPlaidAccount(other, plaidAccountId))
+                    continue;
+
+                other.ExternalLink = null;
+                _accounts.UpsertAccount(other);
+            }
+        }
+
+        private static bool HasPlaidAccount(Account account, string plaidAccountId) =>
+            account.ExternalLink is not null
+            && string.Equals(account.ExternalLink.PlaidAccountId, plaidAccountId, StringComparison.Ordinal);
+
+        private static void ApplyLink(Account account, PlaidAccountViewModel row)
+        {
+            var link = account.ExternalLink;
+            if (link is null)
+            {
+                link = new ExternalAccountLink();
+                account.ExternalLink = link;
+            }
+
+            link.Provider = "Plaid";
+            link.ItemId = row.ItemId;
+            link.AccessToken = row.AccessToken;
+            link.PlaidAccountId = row.PlaidAccountId;
+            link.InstitutionId = row.InstitutionId;
+            link.AccountMask = row.Mask;
+            link.InstitutionName = row.Institution;
         }
 
         private static Guid SuggestThmsAccount(AccountDto dto, IReadOnlyList<Account> accounts)

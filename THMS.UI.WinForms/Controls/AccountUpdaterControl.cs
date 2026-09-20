@@ -1,6 +1,9 @@
 ﻿using System.ComponentModel;
+using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Planning;
 using THMS.Logic.Orchestrators.Finance;
+using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.UI.WinForms.Controls
 {
@@ -8,6 +11,7 @@ namespace THMS.UI.WinForms.Controls
     {
         private readonly AccountOrchestrator _accountOrchestrator = new();
         private readonly AccountImportOrchestrator _importOrchestrator = new();
+        private readonly IAccountStatementDataStore _statements = new DataStoreFactory().GetAccountStatementStore();
         private bool _suppressSelectionEvents;
 
         public event EventHandler? SelectedAccountChanged;
@@ -29,12 +33,16 @@ namespace THMS.UI.WinForms.Controls
         private void LoadAccounts()
         {
             var selectedId = GetSelectedAccount()?.Id;
-            var accounts = _accountOrchestrator.GetAllAccounts().ToList();
+            var accounts = _accountOrchestrator.GetAllAccounts()
+                .Select(account => AccountRegisterRow.From(
+                    account,
+                    LatestStatement(_statements.GetForAccount(account.Id))))
+                .ToList();
             _suppressSelectionEvents = true;
             try
             {
                 gridAccounts.DataSource = null;
-                gridAccounts.DataSource = new BindingList<Account>(accounts);
+                gridAccounts.DataSource = new BindingList<AccountRegisterRow>(accounts);
                 SelectAccount(selectedId);
             }
             finally
@@ -46,6 +54,12 @@ namespace THMS.UI.WinForms.Controls
             SelectedAccountChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        private static AccountStatement? LatestStatement(IEnumerable<AccountStatement> statements) =>
+            statements
+                .OrderByDescending(s => s.StatementDate)
+                .ThenByDescending(s => s.DueDate)
+                .FirstOrDefault();
+
         public void SetImportStatus(string message) => lblStatus.Text = message;
 
         private void SelectAccount(Guid? id)
@@ -55,7 +69,7 @@ namespace THMS.UI.WinForms.Controls
 
             foreach (DataGridViewRow row in gridAccounts.Rows)
             {
-                if (row.DataBoundItem is Account account && account.Id == id)
+                if (row.DataBoundItem is AccountRegisterRow item && item.Id == id)
                 {
                     row.Selected = true;
                     if (row.Cells.Count > 0 && row.Cells[0].Visible)
@@ -201,8 +215,8 @@ namespace THMS.UI.WinForms.Controls
 
         private Account? GetSelectedAccount()
         {
-            if (gridAccounts.CurrentRow?.DataBoundItem is Account acct)
-                return acct;
+            if (gridAccounts.CurrentRow?.DataBoundItem is AccountRegisterRow row)
+                return row.Account;
 
             return null;
         }

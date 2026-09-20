@@ -1,105 +1,149 @@
+using THMS.Logic.Orchestrators.Finance;
+
 namespace THMS.UI.WinForms.Controls
 {
     public sealed class PlaidLinkDialog : Form
     {
-        private RadioButton radSandbox = null!;
-        private RadioButton radPublicToken = null!;
-        private TextBox txtPublicToken = null!;
+        private readonly PlaidAccountOrchestrator _orchestrator;
+        private RadioButton? _radSandbox;
+        private ThmsButton _btnContinue = null!;
 
         public string? PublicToken { get; private set; }
 
         public PlaidLinkDialog()
+            : this(new PlaidAccountOrchestrator())
         {
+        }
+
+        public PlaidLinkDialog(PlaidAccountOrchestrator orchestrator)
+        {
+            _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
             InitializeComponent();
         }
 
         private void InitializeComponent()
         {
+            var layout = new TableLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1,
+                Dock = DockStyle.Fill,
+                Padding = new Padding(16),
+                RowCount = 5
+            };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            for (var i = 0; i < 5; i++)
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            var help = _orchestrator.IsSandbox
+                ? "Sandbox can mint a test institution without opening Plaid Link. "
+                    + "Connect with Plaid Link opens Plaid's bank-login page in this app."
+                : "Connect with Plaid Link opens Plaid's bank-login page in this app. "
+                    + "When you finish, THMS exchanges the result for an access token.";
+
             var lblHelp = new Label
             {
-                AutoSize = false,
-                Location = new Point(16, 16),
-                Size = new Size(440, 64),
-                Text = "Plaid Link issues a public token that THMS exchanges for an access token. "
-                    + "In sandbox, THMS can create a test institution token. "
-                    + "Otherwise paste a public token from Plaid Link."
+                AutoSize = true,
+                MaximumSize = new Size(440, 0),
+                Text = help
             };
-            radSandbox = new RadioButton
+
+            var row = 1;
+            if (_orchestrator.IsSandbox)
+            {
+                _radSandbox = new RadioButton
+                {
+                    AutoSize = true,
+                    Checked = true,
+                    Margin = new Padding(0, 12, 0, 4),
+                    Text = "Use sandbox test bank"
+                };
+                var radConnect = new RadioButton
+                {
+                    AutoSize = true,
+                    Margin = new Padding(0, 4, 0, 8),
+                    Text = "Connect with Plaid Link"
+                };
+                layout.Controls.Add(_radSandbox, 0, row++);
+                layout.Controls.Add(radConnect, 0, row++);
+            }
+
+            var buttons = new FlowLayoutPanel
             {
                 AutoSize = true,
-                Checked = true,
-                Location = new Point(16, 88),
-                Text = "Use sandbox test bank"
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.RightToLeft,
+                Margin = new Padding(0, 8, 0, 0),
+                Padding = new Padding(0, 4, 0, 8),
+                WrapContents = false
             };
-            radPublicToken = new RadioButton
-            {
-                AutoSize = true,
-                Location = new Point(16, 116),
-                Text = "Paste public token"
-            };
-            txtPublicToken = new TextBox
-            {
-                Location = new Point(16, 144),
-                Size = new Size(440, 23)
-            };
-            var btnContinue = new Button
-            {
-                Location = new Point(276, 188),
-                Size = new Size(90, 32),
-                Text = "Continue"
-            };
-            var btnCancel = new Button
+            var btnCancel = new ThmsButton
             {
                 DialogResult = DialogResult.Cancel,
-                Location = new Point(376, 188),
-                Size = new Size(90, 32),
                 Text = "Cancel"
             };
-            btnContinue.Click += OnContinue;
-            radSandbox.CheckedChanged += (_, _) => txtPublicToken.Enabled = radPublicToken.Checked;
-            radPublicToken.CheckedChanged += (_, _) => txtPublicToken.Enabled = radPublicToken.Checked;
-            txtPublicToken.Enabled = false;
+            _btnContinue = new ThmsButton { Text = "Continue" };
+            _btnContinue.Click += OnContinue;
+            buttons.Controls.Add(btnCancel);
+            buttons.Controls.Add(_btnContinue);
 
-            AcceptButton = btnContinue;
+            layout.Controls.Add(lblHelp, 0, 0);
+            layout.Controls.Add(buttons, 0, row);
+
+            AcceptButton = _btnContinue;
             CancelButton = btnCancel;
-            AutoScaleDimensions = new SizeF(7F, 15F);
-            AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(472, 236);
+            AutoScaleDimensions = new SizeF(96F, 96F);
+            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoSize = true;
+            AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            Controls.Add(layout);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
+            MinimumSize = new Size(480, 220);
             Name = "PlaidLinkDialog";
+            ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterParent;
             Text = "Link Institution (Plaid Link)";
-            Controls.Add(lblHelp);
-            Controls.Add(radSandbox);
-            Controls.Add(radPublicToken);
-            Controls.Add(txtPublicToken);
-            Controls.Add(btnContinue);
-            Controls.Add(btnCancel);
         }
 
-        private void OnContinue(object? sender, EventArgs e)
+        private bool UseSandboxShortcut =>
+            _orchestrator.IsSandbox && (_radSandbox?.Checked ?? false);
+
+        private async void OnContinue(object? sender, EventArgs e)
         {
-            if (radPublicToken.Checked)
+            if (UseSandboxShortcut)
             {
-                var token = txtPublicToken.Text.Trim();
-                if (string.IsNullOrWhiteSpace(token))
+                PublicToken = null;
+                DialogResult = DialogResult.OK;
+                Close();
+                return;
+            }
+
+            _btnContinue.Enabled = false;
+            try
+            {
+                var session = await _orchestrator.CreateHostedLinkSessionAsync();
+                using var hosted = new PlaidHostedLinkDialog(session, _orchestrator);
+                if (hosted.ShowDialog(this) != DialogResult.OK
+                    || string.IsNullOrWhiteSpace(hosted.PublicToken))
                 {
-                    MessageBox.Show(this, "Paste a Plaid public token.", "Plaid Link",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    _btnContinue.Enabled = true;
                     return;
                 }
 
-                PublicToken = token;
+                PublicToken = hosted.PublicToken;
+                DialogResult = DialogResult.OK;
+                Close();
             }
-            else
+            catch (Exception ex)
             {
-                PublicToken = null;
+                MessageBox.Show(this, $"Plaid Link failed.\n{ex.Message}", "Plaid Link",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                _btnContinue.Enabled = true;
             }
-
-            DialogResult = DialogResult.OK;
-            Close();
         }
     }
 }

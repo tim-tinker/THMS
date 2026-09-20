@@ -1,4 +1,5 @@
 using THMS.Data.Stores.InMemoryStores;
+using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores
@@ -286,6 +287,33 @@ namespace THMS.Data.Stores
 
         public IEnumerable<ExpenseBudgetRule> GetAllExpenseBudgetRules() =>
             _store.GetAllExpenseBudgets();
+
+        public void AddPaymentIntent(PaymentIntent intent)
+        {
+            _store.AddPaymentIntent(intent);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public void UpdatePaymentIntent(PaymentIntent intent)
+        {
+            _store.UpdatePaymentIntent(intent);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public void DeletePaymentIntent(Guid id)
+        {
+            _store.DeletePaymentIntent(id);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public PaymentIntent? GetPaymentIntent(Guid id) =>
+            _store.GetPaymentIntent(id);
+
+        public IEnumerable<PaymentIntent> GetAllPaymentIntents() =>
+            _store.GetAllPaymentIntents();
+
+        public IEnumerable<PaymentIntent> GetScheduledPaymentIntents() =>
+            _store.GetScheduledPaymentIntents();
 
         public void SaveSplits(Guid parentId, IEnumerable<SplitTransactionRow> splits)
         {

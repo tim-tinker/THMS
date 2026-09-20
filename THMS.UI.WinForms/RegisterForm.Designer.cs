@@ -8,22 +8,19 @@ namespace THMS.UI.WinForms
         private TabPage tabAccounts;
         private Controls.AccountUpdaterControl accountUpdater;
         private Controls.ThmsTabControl tabs;
-        private TabPage tabPosted;
+        private TabPage tabBills;
+        private TabPage tabLedger;
         private TabPage tabStatements;
         private TabPage tabCategories;
-        private Panel pnlTransactions;
-        private DataGridView gridTransactions;
-        private DataGridViewTextBoxColumn DateColumn;
-        private DataGridViewTextBoxColumn AmountColumn;
-        private DataGridViewTextBoxColumn BalanceColumn;
-        private DataGridViewTextBoxColumn CategoryColumn;
-        private DataGridViewTextBoxColumn TypeColumn;
-        private DataGridViewTextBoxColumn DescriptionColumn;
+        private Controls.BillsControl billsControl;
+        private Panel pnlLedger;
+        private Controls.TransactionManagerControl ledger;
         private FlowLayoutPanel pnlTxButtons;
         private Controls.ThmsButton btnImport;
         private Controls.ThmsButton btnImportPlaid;
-        private Controls.ThmsButton btnSplit;
-        private Label lblTxStatus;
+        private Controls.ThmsButton btnImportRules;
+        private Controls.ThmsButton btnImportTransfers;
+        private Label lblLedgerStatus;
         private Panel pnlStatements;
         private DataGridView gridStatements;
         private FlowLayoutPanel pnlStatementButtons;
@@ -46,22 +43,19 @@ namespace THMS.UI.WinForms
             tabAccounts = new TabPage();
             accountUpdater = new Controls.AccountUpdaterControl();
             tabs = new Controls.ThmsTabControl();
-            tabPosted = new TabPage();
+            tabBills = new TabPage();
+            tabLedger = new TabPage();
             tabStatements = new TabPage();
             tabCategories = new TabPage();
-            pnlTransactions = new Panel();
-            gridTransactions = new DataGridView();
-            DateColumn = new DataGridViewTextBoxColumn();
-            AmountColumn = new DataGridViewTextBoxColumn();
-            BalanceColumn = new DataGridViewTextBoxColumn();
-            CategoryColumn = new DataGridViewTextBoxColumn();
-            TypeColumn = new DataGridViewTextBoxColumn();
-            DescriptionColumn = new DataGridViewTextBoxColumn();
+            billsControl = new Controls.BillsControl();
+            pnlLedger = new Panel();
+            ledger = new Controls.TransactionManagerControl();
             pnlTxButtons = new FlowLayoutPanel();
             btnImport = new Controls.ThmsButton();
             btnImportPlaid = new Controls.ThmsButton();
-            btnSplit = new Controls.ThmsButton();
-            lblTxStatus = new Label();
+            btnImportRules = new Controls.ThmsButton();
+            btnImportTransfers = new Controls.ThmsButton();
+            lblLedgerStatus = new Label();
             pnlStatements = new Panel();
             gridStatements = new DataGridView();
             pnlStatementButtons = new FlowLayoutPanel();
@@ -76,11 +70,11 @@ namespace THMS.UI.WinForms
             tabsTop.SuspendLayout();
             tabAccounts.SuspendLayout();
             tabs.SuspendLayout();
-            tabPosted.SuspendLayout();
+            tabBills.SuspendLayout();
+            tabLedger.SuspendLayout();
             tabStatements.SuspendLayout();
             tabCategories.SuspendLayout();
-            pnlTransactions.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)gridTransactions).BeginInit();
+            pnlLedger.SuspendLayout();
             pnlTxButtons.SuspendLayout();
             pnlStatements.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)gridStatements).BeginInit();
@@ -105,7 +99,6 @@ namespace THMS.UI.WinForms
             tabsTop.MaxTabWidth = 220;
             tabsTop.Name = "tabsTop";
             tabsTop.TabPages.Add(tabAccounts);
-            tabsTop.TabPages.Add(tabCategories);
             //
             // tabAccounts
             //
@@ -125,16 +118,91 @@ namespace THMS.UI.WinForms
             tabs.Dock = DockStyle.Fill;
             tabs.MaxTabWidth = 220;
             tabs.Name = "tabs";
-            tabs.TabPages.Add(tabPosted);
+            tabs.TabPages.Add(tabBills);
+            tabs.TabPages.Add(tabLedger);
             tabs.TabPages.Add(tabStatements);
+            tabs.TabPages.Add(tabCategories);
             //
-            // tabPosted
+            // tabBills
             //
-            tabPosted.Controls.Add(pnlTransactions);
-            tabPosted.Name = "tabPosted";
-            tabPosted.Padding = new Padding(4);
-            tabPosted.Text = "Posted Transactions";
-            tabPosted.UseVisualStyleBackColor = false;
+            tabBills.Controls.Add(billsControl);
+            tabBills.Name = "tabBills";
+            tabBills.Padding = new Padding(4);
+            tabBills.Text = "Bills";
+            tabBills.UseVisualStyleBackColor = false;
+            //
+            // billsControl
+            //
+            billsControl.Dock = DockStyle.Fill;
+            billsControl.Name = "billsControl";
+            //
+            // tabLedger
+            //
+            tabLedger.Controls.Add(pnlLedger);
+            tabLedger.Name = "tabLedger";
+            tabLedger.Padding = new Padding(4);
+            tabLedger.Text = "Ledger";
+            tabLedger.UseVisualStyleBackColor = false;
+            //
+            // pnlLedger
+            //
+            pnlLedger.Controls.Add(ledger);
+            pnlLedger.Controls.Add(lblLedgerStatus);
+            pnlLedger.Controls.Add(pnlTxButtons);
+            pnlLedger.Dock = DockStyle.Fill;
+            pnlLedger.Name = "pnlLedger";
+            //
+            // ledger
+            //
+            ledger.Dock = DockStyle.Fill;
+            ledger.HostProvidesHistory = true;
+            ledger.Name = "ledger";
+            //
+            // pnlTxButtons
+            //
+            pnlTxButtons.AutoSize = true;
+            pnlTxButtons.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            pnlTxButtons.Controls.Add(btnImport);
+            pnlTxButtons.Controls.Add(btnImportPlaid);
+            pnlTxButtons.Controls.Add(btnImportRules);
+            pnlTxButtons.Controls.Add(btnImportTransfers);
+            pnlTxButtons.Dock = DockStyle.Bottom;
+            pnlTxButtons.Name = "pnlTxButtons";
+            pnlTxButtons.Padding = new Padding(8);
+            pnlTxButtons.WrapContents = true;
+            //
+            // btnImport
+            //
+            btnImport.Name = "btnImport";
+            btnImport.Text = "Import";
+            btnImport.Click += OnImportFromFile;
+            //
+            // btnImportPlaid
+            //
+            btnImportPlaid.Name = "btnImportPlaid";
+            btnImportPlaid.Text = "Import from Plaid";
+            btnImportPlaid.Click += OnImportFromPlaid;
+            //
+            // btnImportRules
+            //
+            btnImportRules.Name = "btnImportRules";
+            btnImportRules.Text = "Import Transaction Rules";
+            btnImportRules.Click += OnImportTransactionRules;
+            //
+            // btnImportTransfers
+            //
+            btnImportTransfers.Name = "btnImportTransfers";
+            btnImportTransfers.Text = "Import Transfer Rules";
+            btnImportTransfers.Click += OnImportTransferRules;
+            //
+            // lblLedgerStatus
+            //
+            lblLedgerStatus.Dock = DockStyle.Bottom;
+            lblLedgerStatus.Height = 24;
+            lblLedgerStatus.Name = "lblLedgerStatus";
+            lblLedgerStatus.Padding = new Padding(8, 0, 8, 0);
+            lblLedgerStatus.Text = "Posted, forecast, and recurring rules for the selected account.";
+            lblLedgerStatus.TextAlign = ContentAlignment.MiddleLeft;
             //
             // tabStatements
             //
@@ -157,123 +225,6 @@ namespace THMS.UI.WinForms
             categoryManager.Dock = DockStyle.Fill;
             categoryManager.Name = "categoryManager";
             categoryManager.ShowCloseButton = false;
-            //
-            // pnlTransactions
-            //
-            pnlTransactions.Controls.Add(gridTransactions);
-            pnlTransactions.Controls.Add(lblTxStatus);
-            pnlTransactions.Controls.Add(pnlTxButtons);
-            pnlTransactions.Dock = DockStyle.Fill;
-            pnlTransactions.Name = "pnlTransactions";
-            //
-            // gridTransactions
-            //
-            gridTransactions.AllowUserToAddRows = false;
-            gridTransactions.AllowUserToDeleteRows = false;
-            gridTransactions.AllowUserToResizeRows = false;
-            gridTransactions.AutoGenerateColumns = false;
-            gridTransactions.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            gridTransactions.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            gridTransactions.Columns.AddRange(DateColumn, AmountColumn, BalanceColumn, CategoryColumn, TypeColumn, DescriptionColumn);
-            gridTransactions.Dock = DockStyle.Fill;
-            gridTransactions.EditMode = DataGridViewEditMode.EditProgrammatically;
-            gridTransactions.MultiSelect = false;
-            gridTransactions.Name = "gridTransactions";
-            gridTransactions.ReadOnly = true;
-            gridTransactions.RowHeadersVisible = false;
-            gridTransactions.SelectionMode = DataGridViewSelectionMode.CellSelect;
-            //
-            // DateColumn
-            //
-            DateColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            DateColumn.DataPropertyName = "Date";
-            DateColumn.DefaultCellStyle = new DataGridViewCellStyle { Format = "d" };
-            DateColumn.HeaderText = "Date";
-            DateColumn.Name = "DateColumn";
-            DateColumn.ReadOnly = true;
-            //
-            // AmountColumn
-            //
-            AmountColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            AmountColumn.DataPropertyName = "Amount";
-            AmountColumn.DefaultCellStyle = new DataGridViewCellStyle { Format = "c2" };
-            AmountColumn.HeaderText = "Amount";
-            AmountColumn.Name = "AmountColumn";
-            AmountColumn.ReadOnly = true;
-            //
-            // BalanceColumn
-            //
-            BalanceColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            BalanceColumn.DataPropertyName = "ForecastBalance";
-            BalanceColumn.DefaultCellStyle = new DataGridViewCellStyle { Format = "c2" };
-            BalanceColumn.HeaderText = "Balance";
-            BalanceColumn.Name = "BalanceColumn";
-            BalanceColumn.ReadOnly = true;
-            //
-            // CategoryColumn
-            //
-            CategoryColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            CategoryColumn.DataPropertyName = "Category";
-            CategoryColumn.HeaderText = "Category";
-            CategoryColumn.Name = "CategoryColumn";
-            CategoryColumn.ReadOnly = true;
-            //
-            // TypeColumn
-            //
-            TypeColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            TypeColumn.DataPropertyName = "TypeLabel";
-            TypeColumn.HeaderText = "Type";
-            TypeColumn.Name = "TypeColumn";
-            TypeColumn.ReadOnly = true;
-            //
-            // DescriptionColumn
-            //
-            DescriptionColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            DescriptionColumn.DataPropertyName = "Description";
-            DescriptionColumn.HeaderText = "Description";
-            DescriptionColumn.Name = "DescriptionColumn";
-            DescriptionColumn.ReadOnly = true;
-            //
-            // pnlTxButtons
-            //
-            pnlTxButtons.AutoSize = true;
-            pnlTxButtons.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-            pnlTxButtons.Controls.Add(btnImport);
-            pnlTxButtons.Controls.Add(btnImportPlaid);
-            pnlTxButtons.Controls.Add(btnSplit);
-            pnlTxButtons.Dock = DockStyle.Bottom;
-            pnlTxButtons.Name = "pnlTxButtons";
-            pnlTxButtons.Padding = new Padding(8);
-            pnlTxButtons.WrapContents = true;
-            //
-            // btnImport
-            //
-            btnImport.Enabled = false;
-            btnImport.Name = "btnImport";
-            btnImport.Text = "Import";
-            btnImport.Click += OnImportFromFile;
-            //
-            // btnImportPlaid
-            //
-            btnImportPlaid.Enabled = false;
-            btnImportPlaid.Name = "btnImportPlaid";
-            btnImportPlaid.Text = "Import from Plaid";
-            btnImportPlaid.Click += OnImportFromPlaid;
-            //
-            // btnSplit
-            //
-            btnSplit.Name = "btnSplit";
-            btnSplit.Text = "Split Transaction";
-            btnSplit.Click += OnSplitTransaction;
-            //
-            // lblTxStatus
-            //
-            lblTxStatus.Dock = DockStyle.Bottom;
-            lblTxStatus.Height = 24;
-            lblTxStatus.Name = "lblTxStatus";
-            lblTxStatus.Padding = new Padding(8, 0, 8, 0);
-            lblTxStatus.Text = "Select an account to view posted transactions.";
-            lblTxStatus.TextAlign = ContentAlignment.MiddleLeft;
             //
             // pnlStatements
             //
@@ -343,13 +294,13 @@ namespace THMS.UI.WinForms
             split.ResumeLayout(false);
             tabAccounts.ResumeLayout(false);
             tabsTop.ResumeLayout(false);
-            tabPosted.ResumeLayout(false);
+            tabBills.ResumeLayout(false);
+            tabLedger.ResumeLayout(false);
             tabStatements.ResumeLayout(false);
             tabCategories.ResumeLayout(false);
             tabs.ResumeLayout(false);
-            pnlTransactions.ResumeLayout(false);
-            pnlTransactions.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)gridTransactions).EndInit();
+            pnlLedger.ResumeLayout(false);
+            pnlLedger.PerformLayout();
             pnlTxButtons.ResumeLayout(false);
             pnlStatements.ResumeLayout(false);
             pnlStatements.PerformLayout();

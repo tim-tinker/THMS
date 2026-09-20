@@ -1,3 +1,4 @@
+using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores.InMemoryStores
@@ -15,6 +16,7 @@ namespace THMS.Data.Stores.InMemoryStores
         private readonly List<ExpenseCategory> _categories = new();
         private readonly List<CategoryAssignment> _assignments = new();
         private readonly List<SplitTransactionRow> _splits = new();
+        private readonly List<PaymentIntent> _paymentIntents = new();
 
         // ------------------------------------------------------------
         // Posted Transactions
@@ -204,6 +206,30 @@ namespace THMS.Data.Stores.InMemoryStores
 
         public IEnumerable<FutureTransferTransaction> GetRealizedFutureTransfers(DateTime cutoff) =>
             Attach(_futureTransfers.Where(t => t.IsRealized && t.Date <= cutoff).OrderBy(t => t.Date));
+
+        // ------------------------------------------------------------
+        // Payment Intents
+        // ------------------------------------------------------------
+
+        public void AddPaymentIntent(PaymentIntent intent) => Add(_paymentIntents, intent);
+
+        public void UpdatePaymentIntent(PaymentIntent intent)
+        {
+            intent.ModifiedOn = DateTime.UtcNow;
+            Update(_paymentIntents, intent);
+        }
+
+        public void DeletePaymentIntent(Guid id) =>
+            _paymentIntents.RemoveAll(p => p.Id == id);
+
+        public PaymentIntent? GetPaymentIntent(Guid id) =>
+            _paymentIntents.FirstOrDefault(p => p.Id == id);
+
+        public IEnumerable<PaymentIntent> GetAllPaymentIntents() =>
+            _paymentIntents.OrderBy(p => p.PayDate).ToList();
+
+        public IEnumerable<PaymentIntent> GetScheduledPaymentIntents() =>
+            _paymentIntents.Where(p => p.Status == PaymentIntentStatus.Scheduled).OrderBy(p => p.PayDate).ToList();
 
         // ------------------------------------------------------------
         // Recurring Single Rules

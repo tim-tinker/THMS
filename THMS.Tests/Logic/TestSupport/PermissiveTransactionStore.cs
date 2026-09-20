@@ -1,4 +1,5 @@
 using THMS.Data.Stores;
+using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Tests.Logic.TestSupport
@@ -111,6 +112,13 @@ namespace THMS.Tests.Logic.TestSupport
         public void UpsertAssignment(string normalizedDescription, Guid categoryId) => _inner.UpsertAssignment(normalizedDescription, categoryId);
         public CategoryAssignment? GetAssignment(string normalizedDescription) => _inner.GetAssignment(normalizedDescription);
         public IEnumerable<ExpenseBudgetRule> GetAllExpenseBudgetRules() => _inner.GetAllExpenseBudgetRules();
+
+        public void AddPaymentIntent(PaymentIntent intent) => _inner.AddPaymentIntent(intent);
+        public void UpdatePaymentIntent(PaymentIntent intent) => _inner.UpdatePaymentIntent(intent);
+        public void DeletePaymentIntent(Guid id) => _inner.DeletePaymentIntent(id);
+        public PaymentIntent? GetPaymentIntent(Guid id) => _inner.GetPaymentIntent(id);
+        public IEnumerable<PaymentIntent> GetAllPaymentIntents() => _inner.GetAllPaymentIntents();
+        public IEnumerable<PaymentIntent> GetScheduledPaymentIntents() => _inner.GetScheduledPaymentIntents();
 
         public void SaveSplits(Guid parentId, IEnumerable<SplitTransactionRow> splits) =>
             _inner.SaveSplits(parentId, splits);

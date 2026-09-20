@@ -106,23 +106,6 @@ namespace THMS.Logic.Orchestrators
                 return false;
 
             _planning.SaveStatement(statement);
-            if (statement is not BankStatement && statement.AmountDue > 0)
-            {
-                var payFromId = row.PayFromAccountId
-                    ?? ResolvePayFrom(row.PayFrom, statement.AccountId);
-                if (payFromId is Guid payFrom)
-                {
-                    try
-                    {
-                        _planning.EnsureStatementPayment(statement, payFrom);
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        // Keep the statement even if a pay-from account cannot fund it.
-                    }
-                }
-            }
-
             existingByAccount[statement.AccountId].Add(statement);
             return true;
         }
@@ -211,20 +194,6 @@ namespace THMS.Logic.Orchestrators
             }
 
             return existing.Any(item => item.StatementDate.Date == statement.StatementDate.Date);
-        }
-
-        private Guid? ResolvePayFrom(string? name, Guid statementAccountId)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-                return null;
-
-            var trimmed = name.Trim();
-            var account = _accounts.GetAccount(trimmed)
-                ?? _accounts.GetAllAccounts().FirstOrDefault(a =>
-                    string.Equals(a.Name, trimmed, StringComparison.OrdinalIgnoreCase));
-            if (account is null || account.Id == statementAccountId)
-                return null;
-            return account.Id;
         }
     }
 }

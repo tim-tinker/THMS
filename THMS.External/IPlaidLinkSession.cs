@@ -2,10 +2,17 @@ namespace THMS.External
 {
     public interface IPlaidLinkSession
     {
-        Task<string> CreateLinkTokenAsync(string userId);
+        Task<PlaidLinkTokenResult> CreateLinkTokenAsync(string userId, bool hostedLink = false);
+        Task<string?> GetPublicTokenFromLinkSessionAsync(string linkToken);
         Task<PlaidItemConnection> ExchangeForItemAsync(string publicToken);
         Task<string> CreateSandboxPublicTokenAsync(string institutionId);
         Task<PlaidInstitutionInfo> GetInstitutionAsync(string accessToken);
+    }
+
+    public sealed class PlaidLinkTokenResult
+    {
+        public string LinkToken { get; init; } = "";
+        public string? HostedLinkUrl { get; init; }
     }
 
     public sealed class PlaidItemConnection

@@ -17,6 +17,7 @@ namespace THMS.Data.Stores.SqliteStores
         private readonly ExpenseCategoriesTable _categories = new();
         private readonly CategoryAssignmentHistoryTable _assignments = new();
         private readonly SplitTransactionRowsTable _splits = new();
+        private readonly PaymentIntentsTable _paymentIntents = new();
 
         public void InitializeSchema(SqliteConnection conn)
         {
@@ -31,7 +32,18 @@ namespace THMS.Data.Stores.SqliteStores
             _categories.InitializeSchema(conn);
             _assignments.InitializeSchema(conn);
             _splits.InitializeSchema(conn);
+            _paymentIntents.InitializeSchema(conn);
             _categories.MigrateLegacyCategoryStrings(conn);
+            DropUnrealizedPlannedPayments(conn);
+        }
+
+        private static void DropUnrealizedPlannedPayments(SqliteConnection conn)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                DELETE FROM FutureSingleTransactions WHERE IsPlannedPayment = 1 AND IsRealized = 0;
+                DELETE FROM FutureTransferTransactions WHERE IsPlannedPayment = 1 AND IsRealized = 0;";
+            cmd.ExecuteNonQuery();
         }
 
         public PostedTransactionsTable Posted => _posted;
@@ -45,5 +57,6 @@ namespace THMS.Data.Stores.SqliteStores
         public ExpenseCategoriesTable Categories => _categories;
         public CategoryAssignmentHistoryTable Assignments => _assignments;
         public SplitTransactionRowsTable Splits => _splits;
+        public PaymentIntentsTable PaymentIntents => _paymentIntents;
     }
 }

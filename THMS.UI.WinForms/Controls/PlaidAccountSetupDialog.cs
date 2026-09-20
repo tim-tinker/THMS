@@ -10,8 +10,8 @@ namespace THMS.UI.WinForms.Controls
         private BindingList<PlaidAccountViewModel> _rows = [];
         private readonly DataGridView _grid = new();
         private readonly Label _status = new();
-        private readonly Button _btnLink = new();
-        private readonly Button _btnSave = new();
+        private readonly ThmsButton _btnLink = new();
+        private readonly ThmsButton _btnSave = new();
 
         public PlaidAccountSetupDialog()
             : this(new PlaidAccountOrchestrator())
@@ -40,31 +40,23 @@ namespace THMS.UI.WinForms.Controls
             };
 
             _btnLink.Text = "Link Institution (Plaid Link)";
-            _btnLink.AutoSize = true;
             _btnLink.Click += OnLinkInstitution;
             _btnSave.Text = "Save Mapping";
-            _btnSave.AutoSize = true;
             _btnSave.Click += OnSaveMapping;
-            var btnClose = new Button { Text = "Close", DialogResult = DialogResult.OK, AutoSize = true };
-
-            var toolbar = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                Height = 40,
-                Padding = new Padding(8, 4, 8, 4),
-                WrapContents = false
-            };
-            toolbar.Controls.Add(_btnLink);
-            toolbar.Controls.Add(_btnSave);
+            var btnClose = new ThmsButton { Text = "Close", DialogResult = DialogResult.OK };
 
             var buttons = new FlowLayoutPanel
             {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 Dock = DockStyle.Bottom,
                 FlowDirection = FlowDirection.RightToLeft,
-                Height = 48,
-                Padding = new Padding(8, 8, 8, 8)
+                Padding = new Padding(8, 8, 8, 12),
+                WrapContents = false
             };
             buttons.Controls.Add(btnClose);
+            buttons.Controls.Add(_btnSave);
+            buttons.Controls.Add(_btnLink);
 
             _status.Dock = DockStyle.Bottom;
             _status.Height = 24;
@@ -77,10 +69,11 @@ namespace THMS.UI.WinForms.Controls
             Controls.Add(_grid);
             Controls.Add(_status);
             Controls.Add(buttons);
-            Controls.Add(toolbar);
             Controls.Add(heading);
             CancelButton = btnClose;
             AcceptButton = btnClose;
+            _grid.CellValueChanged += (_, _) => UpdateActionButtons();
+            UpdateActionButtons();
         }
 
         private void ConfigureGrid()
@@ -98,6 +91,7 @@ namespace THMS.UI.WinForms.Controls
             {
                 if (_grid.IsCurrentCellDirty)
                     _grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+                UpdateActionButtons();
             };
             _grid.Columns.AddRange(
                 TextColumn(nameof(PlaidAccountViewModel.Institution), "Institution"),
@@ -138,7 +132,7 @@ namespace THMS.UI.WinForms.Controls
 
         private async void OnLinkInstitution(object? sender, EventArgs e)
         {
-            using var dialog = new PlaidLinkDialog();
+            using var dialog = new PlaidLinkDialog(_orchestrator);
             if (dialog.ShowDialog(this) != DialogResult.OK)
                 return;
 
@@ -148,6 +142,7 @@ namespace THMS.UI.WinForms.Controls
             {
                 await _orchestrator.StartLinkFlow(dialog.PublicToken);
                 _rows = new BindingList<PlaidAccountViewModel>(_orchestrator.GetPlaidAccounts());
+                _rows.ListChanged += (_, _) => UpdateActionButtons();
                 RefreshAccountChoices();
                 _grid.DataSource = _rows;
                 _status.Text = $"Linked {_rows.Count} Plaid account{(_rows.Count == 1 ? "" : "s")}.";
@@ -161,18 +156,15 @@ namespace THMS.UI.WinForms.Controls
             finally
             {
                 _btnLink.Enabled = true;
+                UpdateActionButtons();
             }
         }
 
         private void OnSaveMapping(object? sender, EventArgs e)
         {
             _grid.EndEdit();
-            if (_rows.Count == 0)
-            {
-                MessageBox.Show(this, "Link an institution before saving mappings.", "Plaid Account Setup",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (!CanSaveMappings())
                 return;
-            }
 
             try
             {
@@ -188,6 +180,18 @@ namespace THMS.UI.WinForms.Controls
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 _status.Text = "Save mapping failed.";
             }
+            finally
+            {
+                UpdateActionButtons();
+            }
         }
+
+        private void UpdateActionButtons()
+        {
+            _btnSave.Enabled = CanSaveMappings();
+        }
+
+        private bool CanSaveMappings() =>
+            _rows.Any(row => row.SuggestedThmsAccountId != Guid.Empty);
     }
 }

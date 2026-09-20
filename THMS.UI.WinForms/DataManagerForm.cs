@@ -7,7 +7,6 @@ namespace THMS.UI.WinForms
     {
         private static readonly string[] TabLabels =
         [
-            "Money",
             "EV Charge",
             "Home Circuit",
             "Solar",
@@ -17,12 +16,6 @@ namespace THMS.UI.WinForms
 
         private readonly Func<UserControl>[] _tabFactories =
         [
-            () =>
-            {
-                var money = new TransactionManagerControl();
-                money.HostProvidesHistory = true;
-                return money;
-            },
             () => new EvChargeSessionManagerControl(),
             () => new HomeCircuitManagerControl(),
             () => new SolarIntervalManagerControl(),

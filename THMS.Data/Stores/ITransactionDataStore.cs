@@ -1,4 +1,5 @@
 ﻿using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores
@@ -145,6 +146,16 @@ namespace THMS.Data.Stores
         IEnumerable<RecurringSingleTransactionRule> GetAllRecurringSingleRules();
         IEnumerable<RecurringTransferRule> GetAllRecurringTransferRules();
         IEnumerable<ExpenseBudgetRule> GetAllExpenseBudgetRules();
+
+        // ------------------------------------------------------------
+        // Payment Intents
+        // ------------------------------------------------------------
+        void AddPaymentIntent(PaymentIntent intent);
+        void UpdatePaymentIntent(PaymentIntent intent);
+        void DeletePaymentIntent(Guid id);
+        PaymentIntent? GetPaymentIntent(Guid id);
+        IEnumerable<PaymentIntent> GetAllPaymentIntents();
+        IEnumerable<PaymentIntent> GetScheduledPaymentIntents();
 
         // ------------------------------------------------------------
         // Split Transaction Rows
