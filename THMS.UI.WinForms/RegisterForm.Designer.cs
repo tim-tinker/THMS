@@ -3,29 +3,36 @@ namespace THMS.UI.WinForms
     partial class RegisterForm
     {
         private System.ComponentModel.IContainer components = null;
+        private MenuStrip menu;
+        private ToolStripMenuItem importMenu;
+        private ToolStripMenuItem importTransactionsItem;
+        private ToolStripMenuItem importAccountsItem;
+        private ToolStripMenuItem importCategoriesItem;
+        private ToolStripMenuItem importStatementsItem;
+        private ToolStripMenuItem importRecurringTransactionsItem;
+        private ToolStripMenuItem importRecurringTransfersItem;
+        private ToolStripMenuItem plaidMenu;
+        private ToolStripMenuItem plaidLinkAccountsItem;
+        private ToolStripMenuItem plaidSyncDataItem;
         private SplitContainer split;
         private Controls.ThmsTabControl tabsTop;
         private TabPage tabAccounts;
+        private TabPage tabCategories;
         private Controls.AccountUpdaterControl accountUpdater;
+        private Panel pnlAccountTabs;
+        private Label lblSelectedAccount;
         private Controls.ThmsTabControl tabs;
         private TabPage tabBills;
         private TabPage tabLedger;
         private TabPage tabStatements;
-        private TabPage tabCategories;
         private Controls.BillsControl billsControl;
         private Panel pnlLedger;
         private Controls.TransactionManagerControl ledger;
-        private FlowLayoutPanel pnlTxButtons;
-        private Controls.ThmsButton btnImport;
-        private Controls.ThmsButton btnImportPlaid;
-        private Controls.ThmsButton btnImportRules;
-        private Controls.ThmsButton btnImportTransfers;
         private Label lblLedgerStatus;
         private Panel pnlStatements;
         private DataGridView gridStatements;
         private FlowLayoutPanel pnlStatementButtons;
         private Controls.ThmsButton btnAddStatement;
-        private Controls.ThmsButton btnImportStatements;
         private Label lblStatementStatus;
         private Controls.CategoryManagerControl categoryManager;
 
@@ -38,29 +45,36 @@ namespace THMS.UI.WinForms
 
         private void InitializeComponent()
         {
+            menu = new MenuStrip();
+            importMenu = new ToolStripMenuItem();
+            importTransactionsItem = new ToolStripMenuItem();
+            importAccountsItem = new ToolStripMenuItem();
+            importCategoriesItem = new ToolStripMenuItem();
+            importStatementsItem = new ToolStripMenuItem();
+            importRecurringTransactionsItem = new ToolStripMenuItem();
+            importRecurringTransfersItem = new ToolStripMenuItem();
+            plaidMenu = new ToolStripMenuItem();
+            plaidLinkAccountsItem = new ToolStripMenuItem();
+            plaidSyncDataItem = new ToolStripMenuItem();
             split = new SplitContainer();
             tabsTop = new Controls.ThmsTabControl();
             tabAccounts = new TabPage();
+            tabCategories = new TabPage();
             accountUpdater = new Controls.AccountUpdaterControl();
+            pnlAccountTabs = new Panel();
+            lblSelectedAccount = new Label();
             tabs = new Controls.ThmsTabControl();
             tabBills = new TabPage();
             tabLedger = new TabPage();
             tabStatements = new TabPage();
-            tabCategories = new TabPage();
             billsControl = new Controls.BillsControl();
             pnlLedger = new Panel();
             ledger = new Controls.TransactionManagerControl();
-            pnlTxButtons = new FlowLayoutPanel();
-            btnImport = new Controls.ThmsButton();
-            btnImportPlaid = new Controls.ThmsButton();
-            btnImportRules = new Controls.ThmsButton();
-            btnImportTransfers = new Controls.ThmsButton();
             lblLedgerStatus = new Label();
             pnlStatements = new Panel();
             gridStatements = new DataGridView();
             pnlStatementButtons = new FlowLayoutPanel();
             btnAddStatement = new Controls.ThmsButton();
-            btnImportStatements = new Controls.ThmsButton();
             lblStatementStatus = new Label();
             categoryManager = new Controls.CategoryManagerControl();
             ((System.ComponentModel.ISupportInitialize)split).BeginInit();
@@ -69,17 +83,61 @@ namespace THMS.UI.WinForms
             split.SuspendLayout();
             tabsTop.SuspendLayout();
             tabAccounts.SuspendLayout();
+            tabCategories.SuspendLayout();
+            pnlAccountTabs.SuspendLayout();
             tabs.SuspendLayout();
             tabBills.SuspendLayout();
             tabLedger.SuspendLayout();
             tabStatements.SuspendLayout();
-            tabCategories.SuspendLayout();
             pnlLedger.SuspendLayout();
-            pnlTxButtons.SuspendLayout();
             pnlStatements.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)gridStatements).BeginInit();
             pnlStatementButtons.SuspendLayout();
+            menu.SuspendLayout();
             SuspendLayout();
+            //
+            // menu
+            //
+            menu.Items.AddRange(new ToolStripItem[] { importMenu, plaidMenu });
+            menu.Name = "menu";
+            importMenu.DropDownItems.AddRange(new ToolStripItem[]
+            {
+                importTransactionsItem,
+                importAccountsItem,
+                importCategoriesItem,
+                importStatementsItem,
+                importRecurringTransactionsItem,
+                importRecurringTransfersItem
+            });
+            importMenu.Name = "importMenu";
+            importMenu.Text = "&Import";
+            importTransactionsItem.Name = "importTransactionsItem";
+            importTransactionsItem.Text = "&Transactions";
+            importTransactionsItem.Click += OnImportFromFile;
+            importAccountsItem.Name = "importAccountsItem";
+            importAccountsItem.Text = "&Accounts";
+            importAccountsItem.Click += OnImportAccounts;
+            importCategoriesItem.Name = "importCategoriesItem";
+            importCategoriesItem.Text = "&Categories";
+            importCategoriesItem.Click += OnImportCategories;
+            importStatementsItem.Name = "importStatementsItem";
+            importStatementsItem.Text = "&Statements";
+            importStatementsItem.Click += OnImportStatements;
+            importRecurringTransactionsItem.Name = "importRecurringTransactionsItem";
+            importRecurringTransactionsItem.Text = "&Recurring Transactions";
+            importRecurringTransactionsItem.Click += OnImportTransactionRules;
+            importRecurringTransfersItem.Name = "importRecurringTransfersItem";
+            importRecurringTransfersItem.Text = "Recurring T&ransfers";
+            importRecurringTransfersItem.Click += OnImportTransferRules;
+            plaidMenu.DropDownItems.AddRange(new ToolStripItem[] { plaidLinkAccountsItem, plaidSyncDataItem });
+            plaidMenu.Name = "plaidMenu";
+            plaidMenu.Text = "&Plaid";
+            plaidLinkAccountsItem.Name = "plaidLinkAccountsItem";
+            plaidLinkAccountsItem.Text = "&Link Accounts";
+            plaidLinkAccountsItem.Click += OnLinkPlaidAccounts;
+            plaidSyncDataItem.Name = "plaidSyncDataItem";
+            plaidSyncDataItem.Text = "&Sync Data";
+            plaidSyncDataItem.Click += OnImportFromPlaid;
             //
             // split
             //
@@ -91,7 +149,7 @@ namespace THMS.UI.WinForms
             split.Panel2MinSize = 180;
             split.SplitterDistance = 260;
             split.Panel1.Controls.Add(tabsTop);
-            split.Panel2.Controls.Add(tabs);
+            split.Panel2.Controls.Add(pnlAccountTabs);
             //
             // tabsTop
             //
@@ -99,6 +157,7 @@ namespace THMS.UI.WinForms
             tabsTop.MaxTabWidth = 220;
             tabsTop.Name = "tabsTop";
             tabsTop.TabPages.Add(tabAccounts);
+            tabsTop.TabPages.Add(tabCategories);
             //
             // tabAccounts
             //
@@ -113,6 +172,24 @@ namespace THMS.UI.WinForms
             accountUpdater.Dock = DockStyle.Fill;
             accountUpdater.Name = "accountUpdater";
             //
+            // pnlAccountTabs
+            //
+            pnlAccountTabs.Controls.Add(tabs);
+            pnlAccountTabs.Controls.Add(lblSelectedAccount);
+            pnlAccountTabs.Dock = DockStyle.Fill;
+            pnlAccountTabs.Name = "pnlAccountTabs";
+            //
+            // lblSelectedAccount
+            //
+            lblSelectedAccount.AutoSize = false;
+            lblSelectedAccount.Dock = DockStyle.Top;
+            lblSelectedAccount.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            lblSelectedAccount.Name = "lblSelectedAccount";
+            lblSelectedAccount.Padding = new Padding(8, 10, 8, 8);
+            lblSelectedAccount.Text = "Account:";
+            lblSelectedAccount.TextAlign = ContentAlignment.MiddleLeft;
+            lblSelectedAccount.UseMnemonic = false;
+            //
             // tabs
             //
             tabs.Dock = DockStyle.Fill;
@@ -121,7 +198,6 @@ namespace THMS.UI.WinForms
             tabs.TabPages.Add(tabBills);
             tabs.TabPages.Add(tabLedger);
             tabs.TabPages.Add(tabStatements);
-            tabs.TabPages.Add(tabCategories);
             //
             // tabBills
             //
@@ -148,7 +224,6 @@ namespace THMS.UI.WinForms
             //
             pnlLedger.Controls.Add(ledger);
             pnlLedger.Controls.Add(lblLedgerStatus);
-            pnlLedger.Controls.Add(pnlTxButtons);
             pnlLedger.Dock = DockStyle.Fill;
             pnlLedger.Name = "pnlLedger";
             //
@@ -157,43 +232,6 @@ namespace THMS.UI.WinForms
             ledger.Dock = DockStyle.Fill;
             ledger.HostProvidesHistory = true;
             ledger.Name = "ledger";
-            //
-            // pnlTxButtons
-            //
-            pnlTxButtons.AutoSize = true;
-            pnlTxButtons.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-            pnlTxButtons.Controls.Add(btnImport);
-            pnlTxButtons.Controls.Add(btnImportPlaid);
-            pnlTxButtons.Controls.Add(btnImportRules);
-            pnlTxButtons.Controls.Add(btnImportTransfers);
-            pnlTxButtons.Dock = DockStyle.Bottom;
-            pnlTxButtons.Name = "pnlTxButtons";
-            pnlTxButtons.Padding = new Padding(8);
-            pnlTxButtons.WrapContents = true;
-            //
-            // btnImport
-            //
-            btnImport.Name = "btnImport";
-            btnImport.Text = "Import";
-            btnImport.Click += OnImportFromFile;
-            //
-            // btnImportPlaid
-            //
-            btnImportPlaid.Name = "btnImportPlaid";
-            btnImportPlaid.Text = "Import from Plaid";
-            btnImportPlaid.Click += OnImportFromPlaid;
-            //
-            // btnImportRules
-            //
-            btnImportRules.Name = "btnImportRules";
-            btnImportRules.Text = "Import Transaction Rules";
-            btnImportRules.Click += OnImportTransactionRules;
-            //
-            // btnImportTransfers
-            //
-            btnImportTransfers.Name = "btnImportTransfers";
-            btnImportTransfers.Text = "Import Transfer Rules";
-            btnImportTransfers.Click += OnImportTransferRules;
             //
             // lblLedgerStatus
             //
@@ -225,6 +263,7 @@ namespace THMS.UI.WinForms
             categoryManager.Dock = DockStyle.Fill;
             categoryManager.Name = "categoryManager";
             categoryManager.ShowCloseButton = false;
+            categoryManager.ShowImportButton = false;
             //
             // pnlStatements
             //
@@ -255,10 +294,9 @@ namespace THMS.UI.WinForms
             pnlStatementButtons.AutoSize = true;
             pnlStatementButtons.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             pnlStatementButtons.Controls.Add(btnAddStatement);
-            pnlStatementButtons.Controls.Add(btnImportStatements);
             pnlStatementButtons.Dock = DockStyle.Bottom;
             pnlStatementButtons.Name = "pnlStatementButtons";
-            pnlStatementButtons.Padding = new Padding(8);
+            pnlStatementButtons.Padding = new Padding(12, 12, 12, 16);
             pnlStatementButtons.WrapContents = true;
             //
             // btnAddStatement
@@ -266,12 +304,6 @@ namespace THMS.UI.WinForms
             btnAddStatement.Name = "btnAddStatement";
             btnAddStatement.Text = "Add";
             btnAddStatement.Click += OnAddStatement;
-            //
-            // btnImportStatements
-            //
-            btnImportStatements.Name = "btnImportStatements";
-            btnImportStatements.Text = "Import";
-            btnImportStatements.Click += OnImportStatements;
             //
             // lblStatementStatus
             //
@@ -286,6 +318,8 @@ namespace THMS.UI.WinForms
             //
             ClientSize = new Size(1100, 760);
             Controls.Add(split);
+            Controls.Add(menu);
+            MainMenuStrip = menu;
             Name = "RegisterForm";
             Text = "Register";
             split.Panel1.ResumeLayout(false);
@@ -293,20 +327,23 @@ namespace THMS.UI.WinForms
             ((System.ComponentModel.ISupportInitialize)split).EndInit();
             split.ResumeLayout(false);
             tabAccounts.ResumeLayout(false);
+            tabCategories.ResumeLayout(false);
             tabsTop.ResumeLayout(false);
             tabBills.ResumeLayout(false);
             tabLedger.ResumeLayout(false);
             tabStatements.ResumeLayout(false);
-            tabCategories.ResumeLayout(false);
             tabs.ResumeLayout(false);
+            pnlAccountTabs.ResumeLayout(false);
             pnlLedger.ResumeLayout(false);
             pnlLedger.PerformLayout();
-            pnlTxButtons.ResumeLayout(false);
             pnlStatements.ResumeLayout(false);
             pnlStatements.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)gridStatements).EndInit();
             pnlStatementButtons.ResumeLayout(false);
+            menu.ResumeLayout(false);
+            menu.PerformLayout();
             ResumeLayout(false);
+            PerformLayout();
         }
     }
 }

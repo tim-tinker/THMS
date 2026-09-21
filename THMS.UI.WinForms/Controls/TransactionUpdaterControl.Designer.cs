@@ -1,12 +1,12 @@
-﻿namespace THMS.UI.WinForms.Controls
+namespace THMS.UI.WinForms.Controls
 {
     partial class TransactionUpdaterControl
     {
         private System.ComponentModel.IContainer components = null;
 
         private Panel pnlActions;
-        private Button btnRunUpdate;
-        private Button btnClear;
+        private ThmsButton btnRunUpdate;
+        private ThmsButton btnClear;
         private Label lblStatus;
         private TextBox txtSummary;
 
@@ -22,8 +22,8 @@
             components = new System.ComponentModel.Container();
 
             pnlActions = new Panel();
-            btnRunUpdate = new Button();
-            btnClear = new Button();
+            btnRunUpdate = new ThmsButton();
+            btnClear = new ThmsButton();
             lblStatus = new Label();
             txtSummary = new TextBox();
             pnlActions.SuspendLayout();

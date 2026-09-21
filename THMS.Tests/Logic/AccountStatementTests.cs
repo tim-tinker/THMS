@@ -305,14 +305,24 @@ namespace THMS.Tests.Logic
             try
             {
                 var store = new SQLiteAccountDataStore(path);
+                var checking = new BankAccount
+                {
+                    Name = "Checking",
+                    Institution = "WF",
+                    AccountNumber = "1",
+                    WebsiteUrl = ""
+                };
                 var electric = new UntrackedAccount
                 {
                     Name = "Home Electric",
                     Institution = "Duke Energy",
                     AccountNumber = "ABC-123",
                     Type = AccountType.Utility,
-                    WebsiteUrl = "https://duke.example"
+                    WebsiteUrl = "https://duke.example",
+                    AutoPay = true,
+                    AutoPayFromAccountId = checking.Id
                 };
+                store.UpsertAccount(checking);
                 store.UpsertAccount(electric);
 
                 var loaded = store.GetAccount("Home Electric");
@@ -320,7 +330,10 @@ namespace THMS.Tests.Logic
                 Assert.That(loaded!.Type, Is.EqualTo(AccountType.Utility));
                 Assert.That(loaded.Institution, Is.EqualTo("Duke Energy"));
                 Assert.That(loaded.AccountNumber, Is.EqualTo("ABC-123"));
-                Assert.That(store.GetAllAccounts().Count(), Is.EqualTo(1));
+                Assert.That(loaded.WebsiteUrl, Is.EqualTo("https://duke.example"));
+                Assert.That(loaded.AutoPay, Is.True);
+                Assert.That(loaded.AutoPayFromAccountId, Is.EqualTo(checking.Id));
+                Assert.That(store.GetAllAccounts().Count(), Is.EqualTo(2));
             }
             finally
             {
@@ -488,6 +501,9 @@ namespace THMS.Tests.Logic
             Assert.That(empty.StatementBalance, Is.EqualTo(AccountStatementListRow.NotApplicable));
             Assert.That(empty.DueDate, Is.EqualTo(AccountStatementListRow.NotApplicable));
             Assert.That(empty.AmountDue, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(empty.Paid, Is.EqualTo(""));
+            Assert.That(empty.Apr, Is.EqualTo(""));
+            Assert.That(empty.CreditLimit, Is.EqualTo(""));
 
             var bank = AccountRegisterRow.From(checking, new BankStatement
             {
@@ -512,6 +528,117 @@ namespace THMS.Tests.Logic
             Assert.That(credit.DueDate, Is.EqualTo(new DateTime(2026, 9, 10).ToString("d")));
             Assert.That(credit.AmountDue, Is.EqualTo(53m.ToString("c2")));
             Assert.That(credit.StatementBalance, Is.EqualTo(5224.55m.ToString("c2")));
+            Assert.That(credit.Paid, Is.EqualTo(AccountRegisterRow.NotAutoPaid));
+        }
+
+        [Test]
+        public void AccountRegisterRow_MapsInterestAprCreditLimitAndAutoPay()
+        {
+            var checking = new BankAccount
+            {
+                Name = "WF Checking",
+                Institution = "WF",
+                AccountNumber = "1",
+                WebsiteUrl = "https://wellsfargo.example"
+            };
+            var card = new CreditAccount
+            {
+                Name = "AMEX Blue Cash",
+                Institution = "Amex",
+                AccountNumber = "2",
+                WebsiteUrl = "https://amex.example",
+                APR = 17.24m,
+                CreditLimit = 49200m
+            };
+            var loan = new LoanAccount
+            {
+                Name = "Solar Battery",
+                Institution = "Sunrun",
+                AccountNumber = "3",
+                WebsiteUrl = "",
+                InterestRate = 0.0699m,
+                AutoPay = true,
+                AutoPayFromAccountId = checking.Id
+            };
+            var previous = new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = new DateTime(2026, 8, 8),
+                DueDate = new DateTime(2026, 8, 3),
+                AmountDue = 100,
+                StatementBalance = 16000
+            };
+            var latest = new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = new DateTime(2026, 9, 8),
+                DueDate = new DateTime(2026, 9, 3),
+                AmountDue = 819.80m,
+                StatementBalance = 17672.62m
+            };
+            PostedTransaction[] posted =
+            [
+                new()
+                {
+                    AccountId = card.Id,
+                    Date = new DateTime(2026, 8, 20),
+                    Amount = 300.48m,
+                    CategoryId = DefaultExpenseCategories.InterestId,
+                    Category = DefaultExpenseCategories.Interest
+                },
+                new()
+                {
+                    AccountId = card.Id,
+                    Date = new DateTime(2026, 7, 20),
+                    Amount = 10m,
+                    CategoryId = DefaultExpenseCategories.InterestId,
+                    Category = DefaultExpenseCategories.Interest
+                }
+            ];
+
+            var cardRow = AccountRegisterRow.From(card, [previous, latest], posted);
+            Assert.That(cardRow.Name, Is.EqualTo("AMEX Blue Cash"));
+            Assert.That(cardRow.WebsiteUrl, Is.EqualTo("https://amex.example"));
+            Assert.That(cardRow.StatementDate, Is.EqualTo(new DateTime(2026, 9, 8).ToString("d")));
+            Assert.That(cardRow.StatementBalance, Is.EqualTo(17672.62m.ToString("c2")));
+            Assert.That(cardRow.InterestPaid, Is.EqualTo(300.48m.ToString("c2")));
+            Assert.That(cardRow.AmountDue, Is.EqualTo(819.80m.ToString("c2")));
+            Assert.That(cardRow.Paid, Is.EqualTo(AccountRegisterRow.NotAutoPaid));
+            Assert.That(cardRow.DueDate, Is.EqualTo(new DateTime(2026, 9, 3).ToString("d")));
+            Assert.That(cardRow.Apr, Is.EqualTo("17.24%"));
+            Assert.That(cardRow.CreditLimit, Is.EqualTo(49200m.ToString("c2")));
+
+            var loanRow = AccountRegisterRow.From(loan, latestStatement: null);
+            Assert.That(loanRow.Paid, Is.EqualTo(AccountRegisterRow.AutoPaid));
+            Assert.That(loanRow.Apr, Is.EqualTo("6.99%"));
+            Assert.That(AccountRegisterRow.FormatApr(new MortgageAccount { InterestRate = 2.875m }), Is.EqualTo("2.875%"));
+        }
+
+        [Test]
+        public void AccountRegisterRow_CompareSortsMoneyAndDatesNumericallyWithBlanksLast()
+        {
+            var low = AccountRegisterRow.From(new CreditAccount { Name = "Zeta", APR = 6.99m, CreditLimit = 200 }, new CreditCardStatement
+            {
+                StatementDate = new DateTime(2026, 8, 1),
+                DueDate = new DateTime(2026, 9, 1),
+                AmountDue = 200m,
+                StatementBalance = 200m
+            });
+            var high = AccountRegisterRow.From(new CreditAccount { Name = "Alpha", APR = 17.24m, CreditLimit = 1000 }, new CreditCardStatement
+            {
+                StatementDate = new DateTime(2026, 10, 1),
+                DueDate = new DateTime(2026, 11, 1),
+                AmountDue = 1000m,
+                StatementBalance = 1000m
+            });
+            var blank = AccountRegisterRow.From(new BankAccount { Name = "Checking" }, latestStatement: null);
+
+            Assert.That(AccountRegisterRow.Compare(low, high, nameof(AccountRegisterRow.AmountDue), descending: false), Is.LessThan(0));
+            Assert.That(AccountRegisterRow.Compare(low, high, nameof(AccountRegisterRow.AmountDue), descending: true), Is.GreaterThan(0));
+            Assert.That(AccountRegisterRow.Compare(blank, low, nameof(AccountRegisterRow.DueDate), descending: false), Is.GreaterThan(0));
+            Assert.That(AccountRegisterRow.Compare(blank, high, nameof(AccountRegisterRow.DueDate), descending: true), Is.GreaterThan(0));
+            Assert.That(AccountRegisterRow.Compare(low, high, nameof(AccountRegisterRow.Name), descending: false), Is.GreaterThan(0));
+            Assert.That(AccountRegisterRow.Compare(low, high, nameof(AccountRegisterRow.Apr), descending: false), Is.LessThan(0));
         }
 
         [Test]

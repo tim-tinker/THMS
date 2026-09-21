@@ -10,10 +10,19 @@
     <Compile Update="ChargeCostEntryForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Controls\AcceptBeforeDateDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\AccountCounterpartyDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Controls\AccountDiagnosticsDialog.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="Controls\AccountEditForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\AccountEntryDialog.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="Controls\AccountImportPreviewDialog.cs">
@@ -55,6 +64,9 @@
     <Compile Update="Controls\CategoryMergeDialog.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Controls\ChangeMatchDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Controls\ElectricContractManagerControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -80,6 +92,12 @@
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\ImportPreviewDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\MatchImportedDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\PayAccountDialog.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="Controls\PlaidAccountSetupDialog.cs">

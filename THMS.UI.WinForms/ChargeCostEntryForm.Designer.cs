@@ -1,4 +1,5 @@
-﻿namespace THMS.UI.WinForms
+using THMS.UI.WinForms.Controls;
+namespace THMS.UI.WinForms
 {
     partial class ChargeCostEntryForm
     {
@@ -21,8 +22,8 @@
             this.lblCost = new System.Windows.Forms.Label();
             this.dtpTimestamp = new System.Windows.Forms.DateTimePicker();
             this.numCost = new System.Windows.Forms.NumericUpDown();
-            this.btnSave = new System.Windows.Forms.Button();
-            this.btnCancel = new System.Windows.Forms.Button();
+            this.btnSave = new ThmsButton();
+            this.btnCancel = new ThmsButton();
 
             ((System.ComponentModel.ISupportInitialize)(this.numCost)).BeginInit();
             this.SuspendLayout();
@@ -52,21 +53,21 @@
             this.numCost.Size = new System.Drawing.Size(120, 27);
 
             // btnSave
-            this.btnSave.Location = new System.Drawing.Point(140, 100);
+            this.btnSave.Location = new System.Drawing.Point(140, 124);
             this.btnSave.Name = "btnSave";
             this.btnSave.Size = new System.Drawing.Size(100, 35);
             this.btnSave.Text = "Save";
             this.btnSave.Click += new System.EventHandler(this.btnSave_Click);
 
             // btnCancel
-            this.btnCancel.Location = new System.Drawing.Point(260, 100);
+            this.btnCancel.Location = new System.Drawing.Point(260, 124);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(100, 35);
             this.btnCancel.Text = "Cancel";
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
 
             // ChargeCostEntryForm
-            this.ClientSize = new System.Drawing.Size(380, 155);
+            this.ClientSize = new System.Drawing.Size(380, 192);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnSave);
             this.Controls.Add(this.numCost);
@@ -88,7 +89,7 @@
         private System.Windows.Forms.Label lblCost;
         private System.Windows.Forms.DateTimePicker dtpTimestamp;
         private System.Windows.Forms.NumericUpDown numCost;
-        private System.Windows.Forms.Button btnSave;
-        private System.Windows.Forms.Button btnCancel;
+        private ThmsButton btnSave;
+        private ThmsButton btnCancel;
     }
 }

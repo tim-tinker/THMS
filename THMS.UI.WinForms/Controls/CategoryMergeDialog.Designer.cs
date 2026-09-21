@@ -21,8 +21,8 @@ namespace THMS.UI.WinForms.Controls
             cmbSource = new ComboBox();
             lblTarget = new Label();
             cmbTarget = new ComboBox();
-            btnMerge = new Button();
-            btnCancel = new Button();
+            btnMerge = new ThmsButton();
+            btnCancel = new ThmsButton();
             SuspendLayout();
             lblHelp.AutoSize = true;
             lblHelp.Location = new Point(16, 16);
@@ -45,21 +45,21 @@ namespace THMS.UI.WinForms.Controls
             cmbTarget.Location = new Point(16, 148);
             cmbTarget.Name = "cmbTarget";
             cmbTarget.Size = new Size(360, 23);
-            btnMerge.Location = new Point(186, 196);
+            btnMerge.Location = new Point(186, 220);
             btnMerge.Name = "btnMerge";
-            btnMerge.Size = new Size(90, 32);
+            btnMerge.Size = new Size(90, 36);
             btnMerge.Text = "Merge";
             btnMerge.Click += OnMerge;
-            btnCancel.Location = new Point(286, 196);
+            btnCancel.Location = new Point(286, 220);
             btnCancel.Name = "btnCancel";
-            btnCancel.Size = new Size(90, 32);
+            btnCancel.Size = new Size(90, 36);
             btnCancel.Text = "Cancel";
             btnCancel.Click += OnCancel;
             AcceptButton = btnMerge;
             CancelButton = btnCancel;
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(392, 248);
+            ClientSize = new Size(392, 288);
             Controls.Add(lblHelp);
             Controls.Add(lblSource);
             Controls.Add(cmbSource);
@@ -84,7 +84,7 @@ namespace THMS.UI.WinForms.Controls
         private ComboBox cmbSource;
         private Label lblTarget;
         private ComboBox cmbTarget;
-        private Button btnMerge;
-        private Button btnCancel;
+        private ThmsButton btnMerge;
+        private ThmsButton btnCancel;
     }
 }

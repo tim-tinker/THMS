@@ -38,13 +38,14 @@ namespace THMS.UI.WinForms.Controls
                 Text = string.Join(Environment.NewLine, findings)
             };
 
-            var btnClose = new Button { Text = "Close", DialogResult = DialogResult.OK, AutoSize = true };
+            var btnClose = new ThmsButton { Text = "Close", DialogResult = DialogResult.OK };
             var buttons = new FlowLayoutPanel
             {
                 Dock = DockStyle.Bottom,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FlowDirection = FlowDirection.RightToLeft,
-                Height = 48,
-                Padding = new Padding(8, 8, 8, 8)
+                Padding = new Padding(12, 12, 12, 16)
             };
             buttons.Controls.Add(btnClose);
 

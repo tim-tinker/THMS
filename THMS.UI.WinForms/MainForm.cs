@@ -1,4 +1,5 @@
 using THMS.UI.WinForms;
+using THMS.UI.WinForms.Controls;
 
 namespace THMS.UI
 {
@@ -71,20 +72,19 @@ namespace THMS.UI
             ConfigureChildForm(embeddedForm);
         }
 
-        private Button CreateNavButton(string label)
+        private ThmsButton CreateNavButton(string label)
         {
-            var button = new Button
+            var button = new ThmsButton
             {
                 Text = label,
+                AutoSize = false,
                 Height = NavButtonHeight,
                 Width = GetNavButtonWidth(),
                 Margin = new Padding(0, 0, 0, 8),
-                FlatStyle = FlatStyle.Flat,
-                UseVisualStyleBackColor = false,
-                BackColor = NavIdleBack,
-                ForeColor = NavIdleFore,
                 TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(8, 0, 8, 0)
+                Padding = new Padding(8, 0, 8, 0),
+                BackColor = NavIdleBack,
+                ForeColor = NavIdleFore
             };
             button.FlatAppearance.BorderColor = Color.FromArgb(200, 200, 200);
             button.FlatAppearance.BorderSize = 1;

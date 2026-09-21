@@ -158,6 +158,15 @@ namespace THMS.Data.Stores
         IEnumerable<PaymentIntent> GetScheduledPaymentIntents();
 
         // ------------------------------------------------------------
+        // Reconciliations
+        // ------------------------------------------------------------
+        void AddReconciliation(TransactionReconciliation reconciliation);
+        void DeleteReconciliation(Guid id);
+        TransactionReconciliation? GetReconciliation(Guid id);
+        TransactionReconciliation? GetReconciliationByImported(Guid importedTransactionId);
+        IEnumerable<TransactionReconciliation> GetAllReconciliations();
+
+        // ------------------------------------------------------------
         // Split Transaction Rows
         // ------------------------------------------------------------
         void SaveSplits(Guid parentId, IEnumerable<SplitTransactionRow> splits);

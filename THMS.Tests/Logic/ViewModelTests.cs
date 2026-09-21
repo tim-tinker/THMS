@@ -310,8 +310,22 @@ namespace THMS.Tests.Logic
         {
             var account = Guid.NewGuid();
             var views = UnifiedTransactionViewBuilder.Build(
-                [new PostedTransaction { AccountId = account, Date = new DateTime(2026, 1, 5), Description = null, Amount = 1 }],
-                [new PostedTransferTransaction { AccountId = account, Date = new DateTime(2026, 1, 4), Description = "T", Amount = 2 }],
+                [new PostedTransaction
+                {
+                    AccountId = account,
+                    Date = new DateTime(2026, 1, 5),
+                    Description = null,
+                    Amount = 1,
+                    ImportedStatus = ImportedStatus.AcceptedNew
+                }],
+                [new PostedTransferTransaction
+                {
+                    AccountId = account,
+                    Date = new DateTime(2026, 1, 4),
+                    Description = "T",
+                    Amount = 2,
+                    ImportedStatus = ImportedStatus.AcceptedNew
+                }],
                 [
                     new FutureSingleTransaction { AccountId = account, Date = new DateTime(2026, 1, 3), Amount = 3, IsUserCreated = true },
                     new FutureSingleTransaction { AccountId = account, Date = new DateTime(2026, 1, 3).AddHours(1), Amount = 3.5m, IsUserCreated = false }
@@ -321,12 +335,59 @@ namespace THMS.Tests.Logic
                     new FutureTransferTransaction { FromAccountId = account, Date = new DateTime(2026, 1, 2).AddHours(1), Amount = 4.5m, IsUserCreated = false }
                 ]);
 
-            Assert.That(views, Has.Count.EqualTo(4));
+            Assert.That(views, Has.Count.EqualTo(6));
             Assert.That(views.First().Type, Is.EqualTo(UnifiedTransactionView.FutureTransferType));
             Assert.That(views.Last().Type, Is.EqualTo(UnifiedTransactionView.PostedType));
             Assert.That(views.Any(v => v.Type == UnifiedTransactionView.FutureType), Is.True);
             Assert.That(views.First(v => v.Type == UnifiedTransactionView.PostedType).Description, Is.EqualTo(""));
             Assert.That(views.All(v => v.Type is not "RecurringRule" and not "RecurringTransferRule"), Is.True);
+        }
+
+        [Test]
+        public void UnifiedTransactionViewBuilder_FutureTransfer_LeavesFromAndEntersTo()
+        {
+            var from = Guid.NewGuid();
+            var to = Guid.NewGuid();
+            var transfer = new FutureTransferTransaction
+            {
+                FromAccountId = from,
+                ToAccountId = to,
+                Date = new DateTime(2026, 9, 18),
+                Amount = 161m,
+                Description = "HSA Transfer",
+                IsUserCreated = true
+            };
+
+            var fromViews = UnifiedTransactionViewBuilder.Build([], [], userFutureTransfers: [transfer], forAccountId: from);
+            var toViews = UnifiedTransactionViewBuilder.Build([], [], userFutureTransfers: [transfer], forAccountId: to);
+
+            Assert.That(fromViews, Has.Count.EqualTo(1));
+            Assert.That(fromViews[0].Amount, Is.EqualTo(-161m));
+            Assert.That(fromViews[0].AccountId, Is.EqualTo(from));
+            Assert.That(toViews, Has.Count.EqualTo(1));
+            Assert.That(toViews[0].Amount, Is.EqualTo(161m));
+            Assert.That(toViews[0].AccountId, Is.EqualTo(to));
+        }
+
+        [Test]
+        public void UnifiedTransactionViewBuilder_BuildRecurringRules_SignsTransferForAccount()
+        {
+            var from = Guid.NewGuid();
+            var to = Guid.NewGuid();
+            var rule = new RecurringTransferRule
+            {
+                FromAccountId = from,
+                ToAccountId = to,
+                Description = "Sweep",
+                Amount = 20,
+                NextOccurrence = new DateTime(2026, 1, 15)
+            };
+
+            var fromViews = UnifiedTransactionViewBuilder.BuildRecurringRules([], [rule], from);
+            var toViews = UnifiedTransactionViewBuilder.BuildRecurringRules([], [rule], to);
+
+            Assert.That(fromViews.Single().Amount, Is.EqualTo(-20m));
+            Assert.That(toViews.Single().Amount, Is.EqualTo(20m));
         }
 
         [Test]

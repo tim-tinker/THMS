@@ -117,8 +117,8 @@ namespace THMS.UI.WinForms.Controls
             flowEditorButtons.Name = "flowEditorButtons";
             flowEditorButtons.WrapContents = true;
             flowEditorButtons.Controls.Add(btnSave);
-            flowEditorButtons.Controls.Add(btnDeactivate);
             flowEditorButtons.Controls.Add(btnMergeSelected);
+            flowEditorButtons.Controls.Add(btnDeactivate);
             btnSave.Name = "btnSave";
             btnSave.Text = "Save";
             btnSave.Click += OnSave;
@@ -133,7 +133,7 @@ namespace THMS.UI.WinForms.Controls
             pnlBottom.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             pnlBottom.Dock = DockStyle.Bottom;
             pnlBottom.Name = "pnlBottom";
-            pnlBottom.Padding = new Padding(8);
+            pnlBottom.Padding = new Padding(12, 12, 12, 16);
             pnlBottom.WrapContents = true;
             pnlBottom.Controls.Add(btnAdd);
             pnlBottom.Controls.Add(btnImport);

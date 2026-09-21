@@ -120,6 +120,13 @@ namespace THMS.Tests.Logic.TestSupport
         public IEnumerable<PaymentIntent> GetAllPaymentIntents() => _inner.GetAllPaymentIntents();
         public IEnumerable<PaymentIntent> GetScheduledPaymentIntents() => _inner.GetScheduledPaymentIntents();
 
+        public void AddReconciliation(TransactionReconciliation reconciliation) => _inner.AddReconciliation(reconciliation);
+        public void DeleteReconciliation(Guid id) => _inner.DeleteReconciliation(id);
+        public TransactionReconciliation? GetReconciliation(Guid id) => _inner.GetReconciliation(id);
+        public TransactionReconciliation? GetReconciliationByImported(Guid importedTransactionId) =>
+            _inner.GetReconciliationByImported(importedTransactionId);
+        public IEnumerable<TransactionReconciliation> GetAllReconciliations() => _inner.GetAllReconciliations();
+
         public void SaveSplits(Guid parentId, IEnumerable<SplitTransactionRow> splits) =>
             _inner.SaveSplits(parentId, splits);
 

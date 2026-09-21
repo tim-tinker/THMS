@@ -997,7 +997,7 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void RunLedgerUpdate_DoesNotUpdateRolledOffFuturesFromPriorAccount()
+        public void RunLedgerUpdate_RecommendsWithoutApplyingMatches()
         {
             var accounts = new InMemoryAccountDataStore();
             var txs = new InMemoryTransactionDataStore();
@@ -1009,14 +1009,17 @@ namespace THMS.Tests.Logic
             accounts.UpsertAccount(savings);
 
             var date = DateTime.Today.AddDays(-2);
-            txs.AddPostedTransaction(new PostedTransaction
+            var expected = new FutureSingleTransaction
             {
                 AccountId = checking.Id,
                 Description = "Netflix",
                 Amount = 15.99m,
-                Date = date.AddDays(-7)
-            });
-            txs.AddFutureSingleTransaction(new FutureSingleTransaction
+                Date = date.AddDays(-7),
+                Origin = ExpectedOrigin.Manual,
+                Status = ExpectedStatus.Planned
+            };
+            txs.AddFutureSingleTransaction(expected);
+            txs.AddPostedTransaction(new PostedTransaction
             {
                 AccountId = checking.Id,
                 Description = "Netflix",
@@ -1032,7 +1035,12 @@ namespace THMS.Tests.Logic
             });
 
             Assert.That(() => orchestrator.RunLedgerUpdate(), Throws.Nothing);
-            Assert.That(txs.GetFutureSingleTransactions(checking.Id), Is.Empty);
+            var future = txs.GetFutureSingleTransactions(checking.Id).Single();
+            Assert.That(future.IsRealized, Is.False);
+            Assert.That(future.Id, Is.EqualTo(expected.Id));
+            var posted = txs.GetPostedTransactions(checking.Id).Single();
+            Assert.That(posted.ImportedStatus, Is.EqualTo(ImportedStatus.Unreconciled));
+            Assert.That(posted.RecommendedExpectedId, Is.EqualTo(expected.Id));
         }
 
         [Test]

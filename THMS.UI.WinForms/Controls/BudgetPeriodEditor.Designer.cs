@@ -20,8 +20,8 @@ namespace THMS.UI.WinForms.Controls
             lblPeriod = new Label();
             lblStarting = new Label();
             numStarting = new NumericUpDown();
-            btnResetStarting = new Button();
-            btnTransfer = new Button();
+            btnResetStarting = new ThmsButton();
+            btnTransfer = new ThmsButton();
             lblBudgetAmount = new Label();
             numBudgetAmount = new NumericUpDown();
             lblActual = new Label();
@@ -33,10 +33,10 @@ namespace THMS.UI.WinForms.Controls
             lblRecommended = new Label();
             txtRecommended = new TextBox();
             pnlButtons = new Panel();
-            btnSave = new Button();
-            btnClosePeriod = new Button();
-            btnRollForward = new Button();
-            btnClose = new Button();
+            btnSave = new ThmsButton();
+            btnClosePeriod = new ThmsButton();
+            btnRollForward = new ThmsButton();
+            btnClose = new ThmsButton();
             ((System.ComponentModel.ISupportInitialize)numStarting).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numBudgetAmount).BeginInit();
             pnlButtons.SuspendLayout();
@@ -108,7 +108,7 @@ namespace THMS.UI.WinForms.Controls
             pnlButtons.Controls.Add(btnRollForward);
             pnlButtons.Controls.Add(btnClose);
             pnlButtons.Dock = DockStyle.Bottom;
-            pnlButtons.Height = 60;
+            pnlButtons.Height = 80;
             btnSave.Location = new Point(12, 12);
             btnSave.Name = "btnSave";
             btnSave.Size = new Size(90, 36);
@@ -132,7 +132,7 @@ namespace THMS.UI.WinForms.Controls
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = btnClose;
-            ClientSize = new Size(500, 340);
+            ClientSize = new Size(500, 360);
             Controls.Add(lblPeriodCaption);
             Controls.Add(lblPeriod);
             Controls.Add(lblStarting);
@@ -169,8 +169,8 @@ namespace THMS.UI.WinForms.Controls
         private Label lblPeriod;
         private Label lblStarting;
         private NumericUpDown numStarting;
-        private Button btnResetStarting;
-        private Button btnTransfer;
+        private ThmsButton btnResetStarting;
+        private ThmsButton btnTransfer;
         private Label lblBudgetAmount;
         private NumericUpDown numBudgetAmount;
         private Label lblActual;
@@ -182,9 +182,9 @@ namespace THMS.UI.WinForms.Controls
         private Label lblRecommended;
         private TextBox txtRecommended;
         private Panel pnlButtons;
-        private Button btnSave;
-        private Button btnClosePeriod;
-        private Button btnRollForward;
-        private Button btnClose;
+        private ThmsButton btnSave;
+        private ThmsButton btnClosePeriod;
+        private ThmsButton btnRollForward;
+        private ThmsButton btnClose;
     }
 }

@@ -23,8 +23,8 @@ namespace THMS.UI.WinForms.Controls
             cmbTarget = new ComboBox();
             lblAmount = new Label();
             numAmount = new NumericUpDown();
-            btnTransfer = new Button();
-            btnCancel = new Button();
+            btnTransfer = new ThmsButton();
+            btnCancel = new ThmsButton();
             ((System.ComponentModel.ISupportInitialize)numAmount).BeginInit();
             SuspendLayout();
             lblHelp.Location = new Point(16, 16);
@@ -56,21 +56,21 @@ namespace THMS.UI.WinForms.Controls
             numAmount.Maximum = new decimal(new int[] { 100000000, 0, 0, 0 });
             numAmount.Name = "numAmount";
             numAmount.Size = new Size(360, 23);
-            btnTransfer.Location = new Point(186, 256);
+            btnTransfer.Location = new Point(186, 280);
             btnTransfer.Name = "btnTransfer";
-            btnTransfer.Size = new Size(90, 32);
+            btnTransfer.Size = new Size(90, 36);
             btnTransfer.Text = "Transfer";
             btnTransfer.Click += OnTransfer;
-            btnCancel.Location = new Point(286, 256);
+            btnCancel.Location = new Point(286, 280);
             btnCancel.Name = "btnCancel";
-            btnCancel.Size = new Size(90, 32);
+            btnCancel.Size = new Size(90, 36);
             btnCancel.Text = "Cancel";
             btnCancel.Click += OnCancel;
             AcceptButton = btnTransfer;
             CancelButton = btnCancel;
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(392, 308);
+            ClientSize = new Size(392, 348);
             Controls.Add(lblHelp);
             Controls.Add(lblFrom);
             Controls.Add(lblSource);
@@ -100,7 +100,7 @@ namespace THMS.UI.WinForms.Controls
         private ComboBox cmbTarget;
         private Label lblAmount;
         private NumericUpDown numAmount;
-        private Button btnTransfer;
-        private Button btnCancel;
+        private ThmsButton btnTransfer;
+        private ThmsButton btnCancel;
     }
 }

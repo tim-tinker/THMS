@@ -28,19 +28,21 @@ namespace THMS.UI.WinForms
             ConfigureStatementGrid();
             tabsTop.RecalculateItemSize();
             tabs.RecalculateItemSize();
+            lblSelectedAccount.Height = Math.Max(
+                lblSelectedAccount.PreferredHeight,
+                lblSelectedAccount.Font.Height + lblSelectedAccount.Padding.Vertical);
+            tabsTop.SelectedIndexChanged += (_, _) =>
+            {
+                if (tabsTop.SelectedTab == tabCategories)
+                    categoryManager.RefreshLayout();
+            };
             tabs.SelectedIndexChanged += (_, _) =>
             {
-                if (tabs.SelectedTab == tabCategories)
-                    categoryManager.RefreshLayout();
                 if (tabs.SelectedTab == tabBills)
                     billsControl.Reload();
                 if (tabs.SelectedTab == tabLedger)
                     ledger.SelectAccount(accountUpdater.SelectedAccount?.Id);
             };
-            billsControl.ImportTransactionsClicked += OnImportFromFile;
-            billsControl.ImportPlaidClicked += OnImportFromPlaid;
-            billsControl.ImportRulesClicked += OnImportTransactionRules;
-            billsControl.ImportTransfersClicked += OnImportTransferRules;
             billsControl.AddStatementClicked += OnAddStatementFromBills;
             billsControl.DataChanged += (_, _) =>
             {
@@ -181,7 +183,11 @@ namespace THMS.UI.WinForms
 
         private void LoadSelectedAccount()
         {
-            billsControl.Reload();
+            var name = accountUpdater.SelectedAccount?.Name;
+            lblSelectedAccount.Text = string.IsNullOrWhiteSpace(name)
+                ? "Account:"
+                : $"Account: {name}";
+            billsControl.SelectAccount(accountUpdater.SelectedAccount?.Id);
             ledger.SelectAccount(accountUpdater.SelectedAccount?.Id);
             LoadStatementsForSelectedAccount();
             _loadedRevision = FinanceDataRevision.Current;
@@ -196,13 +202,11 @@ namespace THMS.UI.WinForms
                 _statementDetailsSource.DataSource = new List<StatementChildRow>();
                 lblStatementStatus.Text = "Select an account to view statements.";
                 btnAddStatement.Enabled = false;
-                btnImportStatements.Enabled = true;
                 return;
             }
 
             var canAdd = StatementAccountMatch.ForAccount(account) is not null;
             btnAddStatement.Enabled = canAdd;
-            btnImportStatements.Enabled = true;
 
             var rows = _planningOrchestrator.GetStatementListRows(account.Id);
             _statementsSource.DataSource = rows;
@@ -237,6 +241,25 @@ namespace THMS.UI.WinForms
         {
             accountUpdater.RefreshAccounts();
             LoadSelectedAccount();
+        }
+
+        private void OnImportAccounts(object? sender, EventArgs e)
+        {
+            accountUpdater.ImportAccountsFromFile();
+            AfterImport();
+        }
+
+        private void OnImportCategories(object? sender, EventArgs e)
+        {
+            categoryManager.ImportFromFile();
+            AfterImport();
+        }
+
+        private void OnLinkPlaidAccounts(object? sender, EventArgs e)
+        {
+            using var dialog = new PlaidAccountSetupDialog();
+            dialog.ShowDialog(this);
+            AfterImport();
         }
 
         private void OnImportFromFile(object? sender, EventArgs e)
@@ -419,6 +442,7 @@ namespace THMS.UI.WinForms
 
                 LoadStatementsForSelectedAccount();
                 billsControl.Reload();
+                accountUpdater.RefreshAccounts();
             }
             catch (Exception ex)
             {
@@ -456,6 +480,7 @@ namespace THMS.UI.WinForms
 
                 LoadStatementsForSelectedAccount();
                 billsControl.Reload();
+                accountUpdater.RefreshAccounts();
                 lblStatementStatus.Text = ImportStatusText.Imported(preview.Result, "statement", "statements");
             }
             catch (Exception ex)

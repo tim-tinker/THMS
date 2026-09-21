@@ -476,6 +476,41 @@ namespace THMS.Data.Stores.SQLite
             return _store.PaymentIntents.GetByStatus(conn, PaymentIntentStatus.Scheduled);
         }
 
+        public void AddReconciliation(TransactionReconciliation reconciliation)
+        {
+            using var conn = OpenConnection();
+            if (reconciliation.Id == Guid.Empty)
+                reconciliation.Id = Guid.NewGuid();
+            reconciliation.ModifiedOn = DateTime.UtcNow;
+            _store.Reconciliations.Add(conn, reconciliation);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public void DeleteReconciliation(Guid id)
+        {
+            using var conn = OpenConnection();
+            _store.Reconciliations.Delete(conn, id);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public TransactionReconciliation? GetReconciliation(Guid id)
+        {
+            using var conn = OpenConnection();
+            return _store.Reconciliations.GetById(conn, id);
+        }
+
+        public TransactionReconciliation? GetReconciliationByImported(Guid importedTransactionId)
+        {
+            using var conn = OpenConnection();
+            return _store.Reconciliations.GetByImported(conn, importedTransactionId);
+        }
+
+        public IEnumerable<TransactionReconciliation> GetAllReconciliations()
+        {
+            using var conn = OpenConnection();
+            return _store.Reconciliations.GetAll(conn);
+        }
+
         public void AddExpenseBudgetHistory(ExpenseBudgetHistory history)
         {
             using var conn = OpenConnection();

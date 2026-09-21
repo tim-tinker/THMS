@@ -14,7 +14,6 @@ namespace THMS.UI.WinForms.Controls
         private readonly AccountStatement? _existingStatement;
         private readonly Account? _lockedAccount;
         private readonly List<Account> _accounts;
-        private Guid? _pendingPayFromId;
         private bool _loading;
 
         private NumericUpDown? numEscrowBalance;
@@ -87,7 +86,7 @@ namespace THMS.UI.WinForms.Controls
 
         private void WireComboDrawing()
         {
-            foreach (var combo in new[] { cboAccount, cboStatementType, cboPayFrom })
+            foreach (var combo in new[] { cboAccount, cboStatementType })
             {
                 combo.DrawMode = DrawMode.OwnerDrawFixed;
                 combo.IntegralHeight = false;
@@ -100,7 +99,7 @@ namespace THMS.UI.WinForms.Controls
         {
             var comboHeight = Math.Max(LogicalToDeviceUnits(32), Font.Height + LogicalToDeviceUnits(14));
             var itemHeight = Math.Max(LogicalToDeviceUnits(20), Font.Height);
-            foreach (var combo in new[] { cboAccount, cboStatementType, cboPayFrom })
+            foreach (var combo in new[] { cboAccount, cboStatementType })
             {
                 combo.ItemHeight = itemHeight;
                 combo.Height = comboHeight;
@@ -117,10 +116,7 @@ namespace THMS.UI.WinForms.Controls
             var fieldHeight = Math.Max(LogicalToDeviceUnits(36), Font.Height + LogicalToDeviceUnits(16));
             pnlCommon.RowStyles[0].Height = fieldHeight;
             if (txtAmountDue.Visible)
-            {
                 pnlCommon.RowStyles[1].Height = fieldHeight;
-                pnlCommon.RowStyles[2].Height = fieldHeight;
-            }
         }
 
         private static void OnComboDrawItem(object? sender, DrawItemEventArgs e)
@@ -190,7 +186,6 @@ namespace THMS.UI.WinForms.Controls
             {
                 cboAccount.SelectedIndex = -1;
             }
-            BindPayFrom();
         }
 
         private void ApplyLockedAccountUi()
@@ -306,13 +301,14 @@ namespace THMS.UI.WinForms.Controls
                 ? StatementAccountMatch.CreateAccount(type)
                 : new UntrackedAccount { Type = AccountType.Utility };
 
-            using var dlg = new AccountEditForm(seed);
+            using var dlg = new AccountEditForm(seed, _accounts);
             if (dlg.ShowDialog(this) != DialogResult.OK)
                 return;
 
             try
             {
                 new AccountOrchestrator().Save(dlg.Account);
+                _orchestrator?.SyncAutoPayForAccount(dlg.Account);
             }
             catch (Exception ex)
             {
@@ -328,8 +324,6 @@ namespace THMS.UI.WinForms.Controls
                 SelectType(inferred);
             BindAccounts(dlg.Account.Id);
             _loading = false;
-            if (dlg.Account is BankAccount or CreditAccount)
-                BindPayFrom(dlg.Account.Id);
             if (SelectedType() is StatementType selected)
             {
                 LoadTypePanel(selected);
@@ -347,42 +341,8 @@ namespace THMS.UI.WinForms.Controls
         {
             if (_loading)
                 return;
-            BindPayFrom();
             CopyPreviousPromotions();
         }
-
-        private void BindPayFrom(Guid? selectedId = null)
-        {
-            var keep = selectedId ?? _pendingPayFromId ?? SelectedPayFrom()?.Id;
-            var exclude = SelectedAccount()?.Id;
-            var items = _accounts
-                .Where(a => a is BankAccount or CreditAccount)
-                .Where(a => exclude is null || a.Id != exclude)
-                .OrderBy(a => a.Name)
-                .Select(a => new AccountListItem(a))
-                .ToList();
-
-            cboPayFrom.DisplayMember = nameof(AccountListItem.Label);
-            cboPayFrom.ValueMember = nameof(AccountListItem.Id);
-            cboPayFrom.DataSource = items;
-
-            if (keep is Guid id)
-            {
-                var match = items.FirstOrDefault(i => i.Id == id);
-                cboPayFrom.SelectedItem = match;
-                if (match is null)
-                    cboPayFrom.SelectedIndex = -1;
-                else
-                    _pendingPayFromId = null;
-            }
-            else
-            {
-                cboPayFrom.SelectedIndex = -1;
-            }
-        }
-
-        private Account? SelectedPayFrom() =>
-            cboPayFrom.SelectedItem is AccountListItem item ? item.Account : null;
 
         private void LoadTypePanel(StatementType type)
         {
@@ -422,16 +382,11 @@ namespace THMS.UI.WinForms.Controls
             dtDueDate.Visible = visible;
             lblAmountDue.Visible = visible;
             txtAmountDue.Visible = visible;
-            lblPayFrom.Visible = visible;
-            cboPayFrom.Visible = visible;
 
             var rowHeight = IsHandleCreated
                 ? Math.Max(LogicalToDeviceUnits(36), Font.Height + LogicalToDeviceUnits(16))
                 : 36;
             pnlCommon.RowStyles[1].Height = visible ? rowHeight : 0;
-            pnlCommon.RowStyles[2].Height = visible ? rowHeight : 0;
-            if (visible)
-                BindPayFrom();
             if (IsHandleCreated)
                 SizeDialogInputs();
         }
@@ -849,8 +804,8 @@ namespace THMS.UI.WinForms.Controls
                 AutoSize = true,
                 WrapContents = false
             };
-            var addButton = new Button { Text = addText, AutoSize = true };
-            var deleteButton = new Button { Text = deleteText, AutoSize = true };
+            var addButton = new ThmsButton { Text = addText };
+            var deleteButton = new ThmsButton { Text = deleteText, Destructive = true };
             addButton.Click += add;
             deleteButton.Click += delete;
             toolbar.Controls.Add(addButton);

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using THMS.Domain.Finance.Accounts;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
@@ -11,12 +12,9 @@ namespace THMS.UI.WinForms.Controls
         private readonly DataGridView _grid = new();
         private readonly Label _lblCash = new();
         private readonly Label _lblStatus = new();
+        private Guid? _accountId;
         private bool _suppressCash;
 
-        public event EventHandler? ImportTransactionsClicked;
-        public event EventHandler? ImportPlaidClicked;
-        public event EventHandler? ImportRulesClicked;
-        public event EventHandler? ImportTransfersClicked;
         public event EventHandler<Guid?>? AddStatementClicked;
         public event EventHandler? DataChanged;
 
@@ -33,18 +31,28 @@ namespace THMS.UI.WinForms.Controls
             Reload();
         }
 
+        public void SelectAccount(Guid? accountId)
+        {
+            _accountId = accountId;
+            Reload();
+        }
+
         public void Reload()
         {
             _suppressCash = true;
             try
             {
-                var rows = _orchestrator.GetBills();
+                var rows = _accountId is Guid accountId
+                    ? _orchestrator.GetBills(accountId)
+                    : [];
                 _source.DataSource = rows;
                 RefreshFundingCombo();
                 UpdateCashRemaining();
-                _lblStatus.Text = rows.Count == 0
-                    ? "No bills due."
-                    : $"{rows.Count} bill{(rows.Count == 1 ? "" : "s")}.";
+                _lblStatus.Text = _accountId is null
+                    ? "Select an account to view bills."
+                    : rows.Count == 0
+                        ? "No expected activity for this account."
+                        : $"{rows.Count} item{(rows.Count == 1 ? "" : "s")}.";
             }
             finally
             {
@@ -82,12 +90,9 @@ namespace THMS.UI.WinForms.Controls
             };
             toolbar.Controls.Add(ActionButton("Mark paid at bank", OnMarkPaid));
             toolbar.Controls.Add(ActionButton("Unschedule", OnUnschedule));
+            toolbar.Controls.Add(ActionButton("Match import", OnMatchImport));
             toolbar.Controls.Add(ActionButton("Add bill", OnAddBill));
             toolbar.Controls.Add(ActionButton("Add statement", OnAddStatement));
-            toolbar.Controls.Add(ActionButton("Import", (_, _) => ImportTransactionsClicked?.Invoke(this, EventArgs.Empty)));
-            toolbar.Controls.Add(ActionButton("Import from Plaid", (_, _) => ImportPlaidClicked?.Invoke(this, EventArgs.Empty)));
-            toolbar.Controls.Add(ActionButton("Import Transaction Rules", (_, _) => ImportRulesClicked?.Invoke(this, EventArgs.Empty)));
-            toolbar.Controls.Add(ActionButton("Import Transfer Rules", (_, _) => ImportTransfersClicked?.Invoke(this, EventArgs.Empty)));
 
             DataGridViewUtil.EnableDoubleBuffering(_grid);
             _grid.AllowUserToAddRows = false;
@@ -103,6 +108,9 @@ namespace THMS.UI.WinForms.Controls
             _grid.DataSource = _source;
             _grid.CurrentCellDirtyStateChanged += OnDirtyStateChanged;
             _grid.CellValueChanged += (_, _) => UpdateCashRemaining();
+            _grid.CellContentClick += OnOtherAccountClicked;
+            _grid.CellFormatting += OnBillCellFormatting;
+            _grid.CellBeginEdit += OnPayFromBeginEdit;
             _grid.DataError += (_, e) => e.ThrowException = false;
 
             Controls.Add(_grid);
@@ -129,7 +137,6 @@ namespace THMS.UI.WinForms.Controls
                 Name = nameof(BillRow.DueDate),
                 AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
             });
-            _grid.Columns.Add(TextColumn(nameof(BillRow.DestinationName), "Account", readOnly: true));
             var notes = new DataGridViewTextBoxColumn
             {
                 DataPropertyName = nameof(BillRow.Notes),
@@ -144,6 +151,17 @@ namespace THMS.UI.WinForms.Controls
             amount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             amount.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             _grid.Columns.Add(amount);
+            _grid.Columns.Add(new DataGridViewLinkColumn
+            {
+                DataPropertyName = nameof(BillRow.OtherAccountName),
+                HeaderText = "Other account",
+                Name = nameof(BillRow.OtherAccountName),
+                ReadOnly = true,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells,
+                LinkBehavior = LinkBehavior.HoverUnderline,
+                TrackVisitedState = false,
+                SortMode = DataGridViewColumnSortMode.Automatic
+            });
             _grid.Columns.Add(new DataGridViewComboBoxColumn
             {
                 DataPropertyName = nameof(BillRow.FundingAccountId),
@@ -200,6 +218,83 @@ namespace THMS.UI.WinForms.Controls
             _lblCash.ForeColor = remaining < 0 ? Color.Firebrick : Color.FromArgb(32, 32, 32);
         }
 
+        private void OnOtherAccountClicked(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                return;
+            if (_grid.Columns[e.ColumnIndex].Name != nameof(BillRow.OtherAccountName))
+                return;
+            if (_grid.Rows[e.RowIndex].DataBoundItem is not BillRow row)
+                return;
+
+            OpenWebsite(row.OtherWebsiteUrl);
+        }
+
+        private void OnBillCellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                return;
+            if (_grid.Rows[e.RowIndex].DataBoundItem is not BillRow row)
+                return;
+            var name = _grid.Columns[e.ColumnIndex].Name;
+            if (name == nameof(BillRow.OtherAccountName)
+                && _grid.Rows[e.RowIndex].Cells[e.ColumnIndex] is DataGridViewLinkCell link)
+            {
+                if (string.IsNullOrWhiteSpace(row.OtherWebsiteUrl))
+                {
+                    link.LinkBehavior = LinkBehavior.NeverUnderline;
+                    link.LinkColor = _grid.DefaultCellStyle.ForeColor;
+                    link.ActiveLinkColor = _grid.DefaultCellStyle.ForeColor;
+                    link.VisitedLinkColor = _grid.DefaultCellStyle.ForeColor;
+                }
+                else
+                {
+                    link.LinkBehavior = LinkBehavior.HoverUnderline;
+                    link.LinkColor = Color.FromArgb(0, 99, 177);
+                    link.ActiveLinkColor = Color.FromArgb(0, 70, 127);
+                    link.VisitedLinkColor = Color.FromArgb(0, 99, 177);
+                }
+            }
+
+            if (name == nameof(BillRow.FundingAccountId) && !row.CanChoosePayFrom)
+            {
+                e.Value = "";
+                e.FormattingApplied = true;
+            }
+        }
+
+        private void OnPayFromBeginEdit(object? sender, DataGridViewCellCancelEventArgs e)
+        {
+            if (e.RowIndex < 0)
+                return;
+            if (_grid.Columns[e.ColumnIndex].Name != nameof(BillRow.FundingAccountId))
+                return;
+            if (_grid.Rows[e.RowIndex].DataBoundItem is not BillRow row || row.CanChoosePayFrom)
+                return;
+            e.Cancel = true;
+        }
+
+        private static void OpenWebsite(string? url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+                return;
+
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                if (!Uri.TryCreate("https://" + url.Trim(), UriKind.Absolute, out uri))
+                    return;
+            }
+
+            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+                return;
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = uri.ToString(),
+                UseShellExecute = true
+            });
+        }
+
         private void OnMarkPaid(object? sender, EventArgs e)
         {
             EndEdit();
@@ -241,9 +336,56 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
+        private void OnMatchImport(object? sender, EventArgs e)
+        {
+            if (_accountId is not Guid accountId)
+            {
+                MessageBox.Show(FindForm(), "Select an account first.", "Match import",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (_grid.CurrentRow?.DataBoundItem is not BillRow row)
+            {
+                MessageBox.Show(FindForm(), "Select a bill to match.", "Match import",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var imported = _orchestrator.GetUnreconciledImports(accountId);
+            if (imported.Count == 0)
+            {
+                MessageBox.Show(FindForm(), "There are no unreconciled imported transactions for this account.",
+                    "Match import", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var recommended = imported.FirstOrDefault(item =>
+                    row.IntentId is Guid expectedId && item.RecommendedExpectedId == expectedId)
+                ?.Id;
+            using var dialog = new MatchImportedDialog(row, imported, recommended);
+            if (dialog.ShowDialog(FindForm()) != DialogResult.OK || dialog.SelectedImportedId is not Guid importedId)
+                return;
+
+            try
+            {
+                _orchestrator.MatchToImported(row, importedId);
+                Reload();
+                DataChanged?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(FindForm(), ex.Message, "Match import",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
         private void OnAddBill(object? sender, EventArgs e)
         {
-            using var dialog = new AddManualBillDialog(_orchestrator.GetAccounts(), _orchestrator.GetFundingAccounts());
+            using var dialog = new AddManualBillDialog(
+                _orchestrator.GetAccounts(),
+                _orchestrator.GetFundingAccounts(),
+                _accountId);
             if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
 
@@ -267,7 +409,8 @@ namespace THMS.UI.WinForms.Controls
 
         private void OnAddStatement(object? sender, EventArgs e)
         {
-            var accountId = _grid.CurrentRow?.DataBoundItem is BillRow row ? row.DestinationAccountId : (Guid?)null;
+            var accountId = _accountId
+                ?? (_grid.CurrentRow?.DataBoundItem is BillRow row ? row.DestinationAccountId : (Guid?)null);
             AddStatementClicked?.Invoke(this, accountId);
         }
 
@@ -298,20 +441,29 @@ namespace THMS.UI.WinForms.Controls
         public DateTime PayDate { get; private set; }
         public string Notes { get; private set; } = "";
 
-        public AddManualBillDialog(IReadOnlyList<Account> destinations, IReadOnlyList<Account> funding)
+        public AddManualBillDialog(
+            IReadOnlyList<Account> destinations,
+            IReadOnlyList<Account> funding,
+            Guid? selectedAccountId = null)
         {
             Text = "Add bill";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false;
             MaximizeBox = false;
-            ClientSize = new Size(420, 280);
+            ClientSize = new Size(420, 296);
             var y = 16;
             Controls.Add(LabelAt("Account", 16, y));
             BindCombo(_cboDestination, destinations, 140, y);
             y += 40;
             Controls.Add(LabelAt("Pay from", 16, y));
             BindCombo(_cboFunding, funding, 140, y);
+            if (selectedAccountId is Guid id)
+            {
+                _cboDestination.SelectedValue = id;
+                if (funding.Any(a => a.Id == id))
+                    _cboFunding.SelectedValue = id;
+            }
             y += 40;
             Controls.Add(LabelAt("Amount", 16, y));
             _amount.Left = 140;

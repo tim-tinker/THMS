@@ -25,12 +25,12 @@ namespace THMS.UI.WinForms.Controls
             chkActive = new CheckBox();
             lblCategories = new Label();
             treeCategories = new TreeView();
-            btnManageCategories = new Button();
+            btnManageCategories = new ThmsButton();
             pnlButtons = new Panel();
-            btnAdd = new Button();
-            btnSave = new Button();
-            btnDelete = new Button();
-            btnClose = new Button();
+            btnAdd = new ThmsButton();
+            btnSave = new ThmsButton();
+            btnDelete = new ThmsButton();
+            btnClose = new ThmsButton();
             ((System.ComponentModel.ISupportInitialize)numAmount).BeginInit();
             pnlButtons.SuspendLayout();
             SuspendLayout();
@@ -83,7 +83,7 @@ namespace THMS.UI.WinForms.Controls
             pnlButtons.Controls.Add(btnDelete);
             pnlButtons.Controls.Add(btnClose);
             pnlButtons.Dock = DockStyle.Bottom;
-            pnlButtons.Height = 60;
+            pnlButtons.Height = 80;
             pnlButtons.Name = "pnlButtons";
             btnAdd.Location = new Point(12, 12);
             btnAdd.Name = "btnAdd";
@@ -98,6 +98,7 @@ namespace THMS.UI.WinForms.Controls
             btnDelete.Location = new Point(208, 12);
             btnDelete.Name = "btnDelete";
             btnDelete.Size = new Size(90, 36);
+            btnDelete.Destructive = true;
             btnDelete.Text = "Delete";
             btnDelete.Click += OnDelete;
             btnClose.Location = new Point(306, 12);
@@ -109,7 +110,7 @@ namespace THMS.UI.WinForms.Controls
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = btnClose;
-            ClientSize = new Size(420, 430);
+            ClientSize = new Size(420, 450);
             Controls.Add(lblName);
             Controls.Add(txtName);
             Controls.Add(lblAmount);
@@ -144,11 +145,11 @@ namespace THMS.UI.WinForms.Controls
         private CheckBox chkActive;
         private Label lblCategories;
         private TreeView treeCategories;
-        private Button btnManageCategories;
+        private ThmsButton btnManageCategories;
         private Panel pnlButtons;
-        private Button btnAdd;
-        private Button btnSave;
-        private Button btnDelete;
-        private Button btnClose;
+        private ThmsButton btnAdd;
+        private ThmsButton btnSave;
+        private ThmsButton btnDelete;
+        private ThmsButton btnClose;
     }
 }

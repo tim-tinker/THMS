@@ -1,4 +1,4 @@
-﻿namespace THMS.UI.WinForms.Controls
+namespace THMS.UI.WinForms.Controls
 {
     partial class AccountEditForm
     {
@@ -18,6 +18,11 @@
 
         private Label lblUrl;
         private TextBox txtUrl;
+
+        private Panel pnlAutoPay;
+        private CheckBox chkAutoPay;
+        private Label lblAutoPayFrom;
+        private ComboBox cmbAutoPayFrom;
 
         private Panel pnlBank;
         private Panel pnlCredit;
@@ -82,8 +87,8 @@
         private Label lblUntrackedHint;
 
         private Panel pnlButtons;
-        private Button btnSave;
-        private Button btnCancel;
+        private ThmsButton btnSave;
+        private ThmsButton btnCancel;
 
         protected override void Dispose(bool disposing)
         {
@@ -122,13 +127,31 @@
             lblUrl = FieldLabel("Website URL:", 20, 164, labelWidth);
             txtUrl = new TextBox { Left = fieldLeft, Top = 164, Width = fieldWidth };
 
-            pnlBank = new Panel { Left = 20, Top = 204, Width = 400, Height = 220 };
-            pnlCredit = new Panel { Left = 20, Top = 204, Width = 400, Height = 280 };
-            pnlLoan = new Panel { Left = 20, Top = 204, Width = 400, Height = 120 };
-            pnlMortgage = new Panel { Left = 20, Top = 204, Width = 400, Height = 160 };
-            pnlInvestment = new Panel { Left = 20, Top = 204, Width = 400, Height = 80 };
-            pnlInternal = new Panel { Left = 20, Top = 204, Width = 400, Height = 80 };
-            pnlUntracked = new Panel { Left = 20, Top = 204, Width = 400, Height = 96 };
+            pnlAutoPay = new Panel { Left = 20, Top = 200, Width = 400, Height = 72 };
+            chkAutoPay = new CheckBox
+            {
+                AutoSize = true,
+                Left = 0,
+                Top = 4,
+                Text = "Auto-pay (institution debits a funding account)"
+            };
+            lblAutoPayFrom = FieldLabel("Auto-pay from:", 0, 36, 160);
+            cmbAutoPayFrom = new ComboBox
+            {
+                Left = 180,
+                Top = 36,
+                Width = 220,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            pnlAutoPay.Controls.AddRange(new Control[] { chkAutoPay, lblAutoPayFrom, cmbAutoPayFrom });
+
+            pnlBank = new Panel { Left = 20, Top = 280, Width = 400, Height = 220 };
+            pnlCredit = new Panel { Left = 20, Top = 280, Width = 400, Height = 280 };
+            pnlLoan = new Panel { Left = 20, Top = 280, Width = 400, Height = 120 };
+            pnlMortgage = new Panel { Left = 20, Top = 280, Width = 400, Height = 160 };
+            pnlInvestment = new Panel { Left = 20, Top = 280, Width = 400, Height = 80 };
+            pnlInternal = new Panel { Left = 20, Top = 280, Width = 400, Height = 80 };
+            pnlUntracked = new Panel { Left = 20, Top = 280, Width = 400, Height = 96 };
 
             const int panelFieldLeft = 160;
 
@@ -303,13 +326,13 @@
                 8, 380, 72);
             pnlUntracked.Controls.Add(lblUntrackedHint);
 
-            btnSave = new Button { Text = "Save", Left = 20, Top = 12, Width = 120, Height = 40 };
+            btnSave = new ThmsButton { Text = "Save", Left = 20, Top = 12, Width = 120, Height = 40 };
             btnSave.Click += OnSave;
 
-            btnCancel = new Button { Text = "Cancel", Left = 160, Top = 12, Width = 120, Height = 40 };
+            btnCancel = new ThmsButton { Text = "Cancel", Left = 160, Top = 12, Width = 120, Height = 40 };
             btnCancel.Click += OnCancel;
 
-            pnlButtons = new Panel { Dock = DockStyle.Bottom, Height = 64 };
+            pnlButtons = new Panel { Dock = DockStyle.Bottom, Height = 80 };
             pnlButtons.Controls.Add(btnSave);
             pnlButtons.Controls.Add(btnCancel);
 
@@ -319,6 +342,7 @@
                 lblInstitution, txtInstitution,
                 lblAccountNumber, txtAccountNumber,
                 lblUrl, txtUrl,
+                pnlAutoPay,
                 pnlBank, pnlCredit, pnlLoan, pnlMortgage, pnlInvestment, pnlInternal, pnlUntracked,
                 pnlButtons
             });

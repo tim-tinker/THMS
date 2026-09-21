@@ -2,6 +2,7 @@ using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
+using THMS.Logic.Finance.Planning;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Logic.Orchestrators.Finance
@@ -32,48 +33,52 @@ namespace THMS.Logic.Orchestrators.Finance
             _statements = statements;
         }
 
-        public List<BillRow> GetBills(DateTime? asOf = null)
+        public List<BillRow> GetBills(Guid accountId, DateTime? asOf = null)
         {
+            DropSupersededStatementExpected();
+            if (accountId == Guid.Empty)
+                return [];
+
+            var asOfDate = asOf ?? DateTime.Today;
             var accounts = _accounts.GetAllAccounts().ToList();
-            var names = accounts.ToDictionary(a => a.Id, a => a.Name);
-            var scheduled = _transactions.GetScheduledPaymentIntents().ToList();
+            var byId = accounts.ToDictionary(a => a.Id);
             var rows = new List<BillRow>();
 
-            foreach (var intent in scheduled)
-                rows.Add(FromIntent(intent, names, BillStatuses.Scheduled));
+            foreach (var item in UnmatchedSingles().Where(e => SplitTransactionMath.AffectsAccount(e, accountId)))
+                rows.Add(FromExpected(item, byId, accountId, asOfDate));
+            foreach (var item in UnmatchedTransfers().Where(e => SplitTransactionMath.AffectsAccount(e, accountId)))
+                rows.Add(FromExpected(item, byId, accountId, asOfDate));
 
-            var coveredDestinations = new HashSet<Guid>();
-            foreach (var statement in accounts
-                         .SelectMany(account => _statements.GetForAccount(account.Id))
-                         .Where(s => s is not BankStatement)
-                         .Where(s => s.AmountDue > 0)
-                         .OrderBy(s => s.DueDate))
+            var latest = PayableStatements.Latest(_statements.GetForAccount(accountId));
+            if (latest is not null
+                && !IsCovered(PaymentIntentSource.Statement, latest.Id, latest.AccountId, latest.DueDate.Date))
             {
-                coveredDestinations.Add(statement.AccountId);
-                if (IsCovered(scheduled, PaymentIntentSource.Statement, statement.Id, statement.AccountId, statement.DueDate.Date))
-                    continue;
-
                 rows.Add(new BillRow
                 {
                     Source = PaymentIntentSource.Statement,
-                    SourceId = statement.Id,
-                    StatementId = statement.Id,
-                    DestinationAccountId = statement.AccountId,
-                    DestinationName = names.GetValueOrDefault(statement.AccountId, ""),
+                    SourceId = latest.Id,
+                    StatementId = latest.Id,
+                    DestinationAccountId = accountId,
+                    DestinationName = NameOf(byId, accountId),
+                    WebsiteUrl = UrlOf(byId, accountId),
                     FundingAccountId = Guid.Empty,
                     FundingName = "",
+                    OtherAccountId = null,
+                    OtherAccountName = "",
+                    OtherWebsiteUrl = "",
+                    CanChoosePayFrom = true,
                     Kind = BillKinds.Statement,
-                    DueDate = statement.DueDate.Date,
-                    Amount = Math.Abs(statement.AmountDue),
+                    DueDate = latest.DueDate.Date,
+                    Amount = Math.Abs(latest.AmountDue),
                     Status = BillStatuses.Due,
-                    Notes = statement.Notes ?? ""
+                    Notes = string.IsNullOrWhiteSpace(latest.Notes) ? "Statement due" : latest.Notes
                 });
             }
 
             foreach (var rule in _transactions.GetAllRecurringSingleRules()
-                         .Where(r => r.IsActive && r.Amount < 0))
+                         .Where(r => r.IsActive && r.AccountId == accountId))
             {
-                if (IsCovered(scheduled, PaymentIntentSource.RecurringSingle, rule.Id, rule.AccountId, rule.NextOccurrence.Date))
+                if (IsCovered(PaymentIntentSource.RecurringSingle, rule.Id, rule.AccountId, rule.NextOccurrence.Date))
                     continue;
 
                 rows.Add(new BillRow
@@ -81,57 +86,72 @@ namespace THMS.Logic.Orchestrators.Finance
                     Source = PaymentIntentSource.RecurringSingle,
                     SourceId = rule.Id,
                     DestinationAccountId = rule.AccountId,
-                    DestinationName = names.GetValueOrDefault(rule.AccountId, ""),
+                    DestinationName = NameOf(byId, rule.AccountId),
+                    WebsiteUrl = UrlOf(byId, rule.AccountId),
                     FundingAccountId = rule.AccountId,
-                    FundingName = names.GetValueOrDefault(rule.AccountId, ""),
+                    FundingName = NameOf(byId, rule.AccountId),
                     Kind = BillKinds.Recurring,
                     DueDate = rule.NextOccurrence.Date,
-                    Amount = Math.Abs(rule.Amount),
-                    Status = BillStatuses.Due,
+                    Amount = rule.Amount,
+                    Status = StatusOf(TransactionStatuses.ForExpected(
+                        rule.NextOccurrence, realized: false, ExpectedStatus.Planned, asOfDate)),
                     Notes = rule.Description ?? ""
                 });
             }
 
             foreach (var rule in _transactions.GetAllRecurringTransferRules()
-                         .Where(r => r.IsActive))
+                         .Where(r => r.IsActive && (r.FromAccountId == accountId || r.ToAccountId == accountId)))
             {
-                if (coveredDestinations.Contains(rule.ToAccountId))
-                    continue;
                 if (rule.FromAccountId == rule.ToAccountId)
                     continue;
-                if (IsCovered(scheduled, PaymentIntentSource.RecurringTransfer, rule.Id, rule.ToAccountId, rule.NextOccurrence.Date))
+                if (IsCovered(PaymentIntentSource.RecurringTransfer, rule.Id, rule.ToAccountId, rule.NextOccurrence.Date))
+                    continue;
+                if (accountId == rule.ToAccountId
+                    && latest is not null
+                    && !IsCovered(PaymentIntentSource.Statement, latest.Id, latest.AccountId, latest.DueDate.Date))
                     continue;
 
+                var otherId = accountId == rule.FromAccountId ? rule.ToAccountId : rule.FromAccountId;
                 rows.Add(new BillRow
                 {
                     Source = PaymentIntentSource.RecurringTransfer,
                     SourceId = rule.Id,
                     DestinationAccountId = rule.ToAccountId,
-                    DestinationName = names.GetValueOrDefault(rule.ToAccountId, ""),
+                    DestinationName = NameOf(byId, rule.ToAccountId),
+                    WebsiteUrl = UrlOf(byId, otherId),
                     FundingAccountId = rule.FromAccountId,
-                    FundingName = names.GetValueOrDefault(rule.FromAccountId, ""),
+                    FundingName = NameOf(byId, rule.FromAccountId),
+                    OtherAccountId = otherId,
+                    OtherAccountName = NameOf(byId, otherId),
+                    OtherWebsiteUrl = UrlOf(byId, otherId),
                     Kind = BillKinds.Transfer,
                     DueDate = rule.NextOccurrence.Date,
-                    Amount = Math.Abs(rule.Amount),
-                    Status = BillStatuses.Due,
+                    Amount = SplitTransactionMath.TransferAmountForAccount(
+                        rule.FromAccountId, rule.ToAccountId, rule.Amount, accountId),
+                    Status = StatusOf(TransactionStatuses.ForExpected(
+                        rule.NextOccurrence, realized: false, ExpectedStatus.Planned, asOfDate)),
                     Notes = rule.Description ?? ""
                 });
             }
 
             return rows
                 .OrderBy(r => r.DueDate)
-                .ThenBy(r => r.DestinationName)
                 .ThenBy(r => r.Notes)
+                .ThenBy(r => r.OtherAccountName)
                 .ToList();
         }
 
         public decimal CashRemaining(IEnumerable<BillRow>? pending = null)
         {
+            DropSupersededStatementExpected();
             var banks = _accounts.GetAllAccounts().OfType<BankAccount>().ToList();
             var bankIds = banks.Select(b => b.Id).ToHashSet();
             var current = banks.Sum(b => b.PostedBalance);
-            var held = _transactions.GetScheduledPaymentIntents()
-                .Where(p => bankIds.Contains(p.FundingAccountId))
+            var held = UnmatchedTransfers()
+                .Where(p => p.Status == ExpectedStatus.Scheduled && bankIds.Contains(p.FromAccountId))
+                .Sum(p => Math.Abs(p.Amount))
+                + UnmatchedSingles()
+                .Where(p => p.Status == ExpectedStatus.Scheduled && bankIds.Contains(p.AccountId))
                 .Sum(p => Math.Abs(p.Amount));
             var extra = 0m;
             if (pending is not null)
@@ -162,60 +182,66 @@ namespace THMS.Logic.Orchestrators.Finance
         public IReadOnlyList<Account> GetAccounts() =>
             _accounts.GetAllAccounts().OrderBy(a => a.Name).ToList();
 
-        public List<PaymentIntent> Schedule(IEnumerable<BillRow> rows)
+        public List<Guid> Schedule(IEnumerable<BillRow> rows)
         {
             ArgumentNullException.ThrowIfNull(rows);
-            var created = new List<PaymentIntent>();
+            var created = new List<Guid>();
             foreach (var row in rows.Where(r => r.Pay))
             {
-                if (row.Status == BillStatuses.Scheduled && row.IntentId is Guid existingId)
-                {
-                    var existing = _transactions.GetPaymentIntent(existingId);
-                    if (existing is null || existing.Status != PaymentIntentStatus.Scheduled)
-                        continue;
-                    ApplyRow(existing, row);
-                    _transactions.UpdatePaymentIntent(existing);
-                    created.Add(existing);
+                if (row.Amount == 0)
                     continue;
-                }
-
-                if (row.Amount <= 0)
-                    continue;
-                if (row.FundingAccountId == Guid.Empty)
-                    throw new InvalidOperationException($"Select a pay-from account for {row.DestinationName}.");
+                if (NeedsPayFrom(row) && row.FundingAccountId == Guid.Empty)
+                    throw new InvalidOperationException($"Select a pay-from account for {DisplayName(row)}.");
                 if (row.DestinationAccountId == Guid.Empty)
                     throw new InvalidOperationException("A destination account is required.");
 
-                var scheduled = _transactions.GetScheduledPaymentIntents()
-                    .FirstOrDefault(p => SameBill(p, row));
-                if (scheduled is not null)
-                {
-                    ApplyRow(scheduled, row);
-                    _transactions.UpdatePaymentIntent(scheduled);
-                    created.Add(scheduled);
-                    continue;
-                }
-
-                var intent = new PaymentIntent();
-                ApplyRow(intent, row);
-                intent.Status = PaymentIntentStatus.Scheduled;
-                _transactions.AddPaymentIntent(intent);
-                created.Add(intent);
+                created.Add(EnsureExpected(row, ExpectedStatus.Scheduled));
             }
 
             return created;
         }
 
-        public void Unschedule(Guid intentId)
+        public void Unschedule(Guid expectedId)
         {
-            var intent = _transactions.GetPaymentIntent(intentId)
+            var transfer = _transactions.GetFutureTransferTransaction(expectedId);
+            if (transfer is not null)
+            {
+                if (transfer.IsRealized)
+                    throw new InvalidOperationException("Only scheduled payments can be unscheduled.");
+                if (transfer.Origin is ExpectedOrigin.RecurringSingle
+                    or ExpectedOrigin.RecurringTransfer
+                    or ExpectedOrigin.Manual)
+                {
+                    transfer.Status = ExpectedStatus.Planned;
+                    _transactions.UpdateFutureTransferTransaction(transfer);
+                    return;
+                }
+
+                _transactions.DeleteFutureTransferTransaction(expectedId);
+                return;
+            }
+
+            var single = _transactions.GetFutureSingleTransaction(expectedId)
                 ?? throw new InvalidOperationException("Scheduled payment was not found.");
-            if (intent.Status != PaymentIntentStatus.Scheduled)
+            if (single.IsRealized)
                 throw new InvalidOperationException("Only scheduled payments can be unscheduled.");
-            _transactions.DeletePaymentIntent(intentId);
+            if (single.Origin is ExpectedOrigin.RecurringSingle or ExpectedOrigin.Manual)
+            {
+                single.Status = ExpectedStatus.Planned;
+                _transactions.UpdateFutureSingleTransaction(single);
+                return;
+            }
+
+            _transactions.DeleteFutureSingleTransaction(expectedId);
         }
 
-        public PaymentIntent AddManual(Guid destinationAccountId, Guid fundingAccountId, decimal amount, DateTime payDate, string? notes)
+        public FutureTransferTransaction AddManual(
+            Guid destinationAccountId,
+            Guid fundingAccountId,
+            decimal amount,
+            DateTime payDate,
+            string? notes,
+            Guid? statementId = null)
         {
             if (amount <= 0)
                 throw new InvalidOperationException("Amount must be greater than zero.");
@@ -224,171 +250,303 @@ namespace THMS.Logic.Orchestrators.Finance
             if (destinationAccountId == Guid.Empty)
                 throw new InvalidOperationException("Select an account.");
 
-            var intent = new PaymentIntent
+            var origin = statementId is Guid ? ExpectedOrigin.StatementPay : ExpectedOrigin.Pay;
+            var existing = UnmatchedTransfers()
+                .FirstOrDefault(p =>
+                    p.Origin == origin
+                    && (statementId is Guid sourceId ? p.OriginId == sourceId : p.ToAccountId == destinationAccountId && p.Date.Date == payDate.Date));
+            if (existing is not null)
             {
-                Source = PaymentIntentSource.Manual,
-                DestinationAccountId = destinationAccountId,
-                FundingAccountId = fundingAccountId,
-                Amount = amount,
-                PayDate = payDate.Date,
-                Status = PaymentIntentStatus.Scheduled,
+                existing.FromAccountId = fundingAccountId;
+                existing.ToAccountId = destinationAccountId;
+                existing.Amount = Math.Abs(amount);
+                existing.Date = payDate.Date;
+                existing.Status = ExpectedStatus.Scheduled;
+                if (!string.IsNullOrWhiteSpace(notes))
+                    existing.Description = notes.Trim();
+                _transactions.UpdateFutureTransferTransaction(existing);
+                return existing;
+            }
+
+            var transfer = new FutureTransferTransaction
+            {
+                FromAccountId = fundingAccountId,
+                ToAccountId = destinationAccountId,
+                Amount = Math.Abs(amount),
+                Date = payDate.Date,
+                Status = ExpectedStatus.Scheduled,
+                Origin = origin,
+                OriginId = statementId,
+                StatementId = statementId,
+                IsUserCreated = true,
+                IsPlannedPayment = true,
                 Description = string.IsNullOrWhiteSpace(notes) ? "Manual" : notes.Trim()
             };
-            _transactions.AddPaymentIntent(intent);
-            return intent;
+            ApplyPaymentCategory(transfer);
+            _transactions.AddFutureTransferTransaction(transfer);
+            return transfer;
         }
 
-        public int MatchScheduled()
+        public int MatchScheduled() =>
+            new ReconciliationOrchestrator(_transactions).RecommendMatches();
+
+        public List<ImportedTransactionView> GetUnreconciledImports(Guid accountId) =>
+            new ReconciliationOrchestrator(_transactions).GetUnreconciled(accountId);
+
+        public void MatchToImported(BillRow row, Guid importedId)
         {
-            var scheduled = _transactions.GetScheduledPaymentIntents().ToList();
-            if (scheduled.Count == 0)
-                return 0;
-
-            var posted = _transactions.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
-            var transfers = _transactions.GetPostedTransferTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
-            var used = scheduled
-                .Where(p => p.MatchedPostedTransactionId is Guid)
-                .Select(p => p.MatchedPostedTransactionId!.Value)
-                .ToHashSet();
-            var matched = 0;
-
-            foreach (var intent in scheduled)
-            {
-                var hit = FindMatch(intent, posted, transfers, used);
-                if (hit is null)
-                    continue;
-
-                intent.Status = PaymentIntentStatus.Matched;
-                intent.MatchedPostedTransactionId = hit.Value.PostedId;
-                intent.MatchedCounterpartTransactionId = hit.Value.CounterpartId;
-                _transactions.UpdatePaymentIntent(intent);
-                used.Add(hit.Value.PostedId);
-                AdvanceRule(intent, hit.Value.PostedDate);
-                matched++;
-            }
-
-            return matched;
+            ArgumentNullException.ThrowIfNull(row);
+            var expectedId = row.IntentId ?? EnsureExpected(row, ExpectedStatus.Planned);
+            new ReconciliationOrchestrator(_transactions).AcceptMatch(importedId, expectedId);
         }
 
-        private void AdvanceRule(PaymentIntent intent, DateTime postedDate)
+        private Guid EnsureExpected(BillRow row, ExpectedStatus status)
         {
-            if (intent.Source == PaymentIntentSource.RecurringSingle && intent.SourceId is Guid singleId)
+            var origin = OriginOf(row.Source);
+            if (row.Source == PaymentIntentSource.RecurringSingle
+                || (row.FundingAccountId == row.DestinationAccountId && row.FundingAccountId != Guid.Empty)
+                || (row.Source == PaymentIntentSource.Statement && row.FundingAccountId == Guid.Empty))
             {
-                var rule = _transactions.GetRecurringSingleRule(singleId);
-                if (rule is null || !rule.IsActive)
-                    return;
-                if (rule.NextOccurrence.Date > postedDate.Date.AddDays(MatchDayTolerance))
-                    return;
-                rule.LastOccurrence = postedDate.Date;
-                rule.NextOccurrence = postedDate.Date.AddFrequency(rule.Frequency);
-                _transactions.UpdateRecurringSingleRule(rule);
-                return;
+                var existingSingle = UnmatchedSingles()
+                    .FirstOrDefault(e => SameBill(e.Id, e.Origin, e.OriginId, e.AccountId, e.Date, row));
+                if (existingSingle is not null)
+                {
+                    ApplySingle(existingSingle, row, origin, status);
+                    _transactions.UpdateFutureSingleTransaction(existingSingle);
+                    return existingSingle.Id;
+                }
+
+                var single = new FutureSingleTransaction();
+                ApplySingle(single, row, origin, status);
+                ApplyPaymentCategory(single);
+                _transactions.AddFutureSingleTransaction(single);
+                return single.Id;
             }
 
-            if (intent.Source == PaymentIntentSource.RecurringTransfer && intent.SourceId is Guid transferId)
+            var existing = UnmatchedTransfers()
+                .FirstOrDefault(e => SameBill(e.Id, e.Origin, e.OriginId, e.ToAccountId, e.Date, row));
+            if (existing is not null)
             {
-                var rule = _transactions.GetRecurringTransferRule(transferId);
-                if (rule is null || !rule.IsActive)
-                    return;
-                if (rule.NextOccurrence.Date > postedDate.Date.AddDays(MatchDayTolerance))
-                    return;
-                rule.LastOccurrence = postedDate.Date;
-                rule.NextOccurrence = postedDate.Date.AddFrequency(rule.Frequency);
-                _transactions.UpdateRecurringTransferRule(rule);
+                ApplyTransfer(existing, row, origin, status);
+                _transactions.UpdateFutureTransferTransaction(existing);
+                return existing.Id;
             }
+
+            var transfer = new FutureTransferTransaction();
+            ApplyTransfer(transfer, row, origin, status);
+            ApplyPaymentCategory(transfer);
+            _transactions.AddFutureTransferTransaction(transfer);
+            return transfer.Id;
         }
 
-        private static (Guid PostedId, Guid? CounterpartId, DateTime PostedDate)? FindMatch(
-            PaymentIntent intent,
-            List<PostedTransaction> posted,
-            List<PostedTransferTransaction> transfers,
-            HashSet<Guid> used)
+        private static bool NeedsPayFrom(BillRow row) =>
+            row.Source is PaymentIntentSource.Statement or PaymentIntentSource.RecurringTransfer or PaymentIntentSource.Manual
+            && row.FundingAccountId == Guid.Empty
+            && row.DestinationAccountId != Guid.Empty;
+
+        private static string DisplayName(BillRow row) =>
+            string.IsNullOrWhiteSpace(row.Notes) ? row.DestinationName : row.Notes;
+
+        private void ApplyPaymentCategory(BaseTransaction transaction)
         {
-            foreach (var tx in transfers.Cast<PostedTransaction>().Concat(posted).OrderBy(t => t.Date))
-            {
-                if (used.Contains(tx.Id))
-                    continue;
-                if (!AccountMatches(intent, tx.AccountId))
-                    continue;
-                if (!AmountsEqual(tx.Amount, intent.Amount))
-                    continue;
-                if (!DatesClose(tx.Date, intent.PayDate))
-                    continue;
-
-                Guid? counterpart = tx is PostedTransferTransaction transfer
-                    ? transfer.RelatedPostedTransactionId
-                    : null;
-                return (tx.Id, counterpart, tx.Date.Date);
-            }
-
-            return null;
+            var category = _transactions.GetCategory(DefaultExpenseCategories.PaymentId)
+                ?? DefaultExpenseCategories.All.First(c => c.Id == DefaultExpenseCategories.PaymentId);
+            transaction.ApplyCategory(category);
         }
 
-        private static bool AccountMatches(PaymentIntent intent, Guid accountId) =>
-            accountId == intent.FundingAccountId || accountId == intent.DestinationAccountId;
+        private IEnumerable<FutureTransferTransaction> UnmatchedTransfers() =>
+            _transactions.GetAllFutureTransferTransactions().Where(e => !e.IsRealized);
 
-        private static bool AmountsEqual(decimal posted, decimal intent) =>
-            Math.Abs(Math.Abs(posted) - Math.Abs(intent)) <= RecurringRulePattern.AmountTolerance;
+        private IEnumerable<FutureSingleTransaction> UnmatchedSingles() =>
+            _transactions.GetAllFutureSingleTransactions().Where(e => !e.IsRealized);
 
-        private static bool DatesClose(DateTime posted, DateTime payDate) =>
-            Math.Abs((posted.Date - payDate.Date).TotalDays) <= MatchDayTolerance;
+        private void DropSupersededStatementExpected()
+        {
+            var latestByAccount = _accounts.GetAllAccounts()
+                .ToDictionary(a => a.Id, a => PayableStatements.Latest(_statements.GetForAccount(a.Id)));
 
-        private static bool IsCovered(
-            IEnumerable<PaymentIntent> scheduled,
+            foreach (var expected in UnmatchedTransfers()
+                         .Where(p => p.Origin == ExpectedOrigin.StatementPay)
+                         .ToList())
+            {
+                if (!latestByAccount.TryGetValue(expected.ToAccountId, out var latest)
+                    || latest is null
+                    || expected.OriginId != latest.Id)
+                {
+                    _transactions.DeleteFutureTransferTransaction(expected.Id);
+                }
+            }
+        }
+
+        private bool IsCovered(
             PaymentIntentSource source,
             Guid sourceId,
             Guid destinationId,
-            DateTime due) =>
-            scheduled.Any(p =>
-                (p.Source == source && p.SourceId == sourceId)
-                || (p.DestinationAccountId == destinationId && p.PayDate.Date == due.Date));
-
-        private static bool SameBill(PaymentIntent intent, BillRow row)
+            DateTime due)
         {
-            if (row.IntentId is Guid id && intent.Id == id)
+            var origin = OriginOf(source);
+            if (UnmatchedTransfers().Any(p =>
+                    (p.Origin == origin && p.OriginId == sourceId)
+                    || (p.ToAccountId == destinationId && p.Date.Date == due.Date)))
                 return true;
-            if (row.SourceId is Guid sourceId && intent.Source == row.Source && intent.SourceId == sourceId)
-                return true;
-            return intent.DestinationAccountId == row.DestinationAccountId
-                && intent.PayDate.Date == row.DueDate.Date
-                && intent.Source == row.Source;
+            return UnmatchedSingles().Any(p =>
+                (p.Origin == origin && p.OriginId == sourceId)
+                || (p.AccountId == destinationId && p.Date.Date == due.Date));
         }
 
-        private static void ApplyRow(PaymentIntent intent, BillRow row)
+        private static bool SameBill(
+            Guid id,
+            ExpectedOrigin origin,
+            Guid? originId,
+            Guid destinationId,
+            DateTime date,
+            BillRow row)
         {
-            intent.Source = row.Source;
-            intent.SourceId = row.SourceId;
-            intent.DestinationAccountId = row.DestinationAccountId;
-            intent.FundingAccountId = row.FundingAccountId;
-            intent.Amount = Math.Abs(row.Amount);
-            intent.PayDate = row.DueDate == default ? DateTime.Today : row.DueDate.Date;
-            intent.Description = string.IsNullOrWhiteSpace(row.Notes) ? row.DestinationName : row.Notes.Trim();
-            intent.Status = PaymentIntentStatus.Scheduled;
+            if (row.IntentId is Guid existingId && id == existingId)
+                return true;
+            if (row.SourceId is Guid sourceId && origin == OriginOf(row.Source) && originId == sourceId)
+                return true;
+            return destinationId == row.DestinationAccountId
+                && date.Date == row.DueDate.Date
+                && origin == OriginOf(row.Source);
         }
 
-        private static BillRow FromIntent(PaymentIntent intent, Dictionary<Guid, string> names, string status) =>
-            new()
+        private static void ApplyTransfer(
+            FutureTransferTransaction transfer,
+            BillRow row,
+            ExpectedOrigin origin,
+            ExpectedStatus status)
+        {
+            transfer.Origin = origin;
+            transfer.OriginId = row.SourceId;
+            transfer.ToAccountId = row.DestinationAccountId;
+            transfer.FromAccountId = row.FundingAccountId;
+            transfer.Amount = Math.Abs(row.Amount);
+            transfer.Date = row.DueDate == default ? DateTime.Today : row.DueDate.Date;
+            transfer.Description = string.IsNullOrWhiteSpace(row.Notes) ? row.DestinationName : row.Notes.Trim();
+            transfer.Status = status;
+            transfer.IsUserCreated = true;
+            transfer.IsPlannedPayment = true;
+            transfer.StatementId = row.Source == PaymentIntentSource.Statement ? row.SourceId : transfer.StatementId;
+        }
+
+        private static void ApplySingle(
+            FutureSingleTransaction single,
+            BillRow row,
+            ExpectedOrigin origin,
+            ExpectedStatus status)
+        {
+            single.Origin = origin;
+            single.OriginId = row.SourceId;
+            single.AccountId = row.DestinationAccountId == Guid.Empty ? row.FundingAccountId : row.DestinationAccountId;
+            single.Amount = row.Amount;
+            single.Date = row.DueDate == default ? DateTime.Today : row.DueDate.Date;
+            single.Description = string.IsNullOrWhiteSpace(row.Notes) ? row.DestinationName : row.Notes.Trim();
+            single.Status = status;
+            single.IsUserCreated = true;
+        }
+
+        private static ExpectedOrigin OriginOf(PaymentIntentSource source) =>
+            source switch
             {
-                Pay = status == BillStatuses.Scheduled,
-                IntentId = intent.Id,
-                Source = intent.Source,
-                SourceId = intent.SourceId,
-                StatementId = intent.Source == PaymentIntentSource.Statement ? intent.SourceId : null,
-                DestinationAccountId = intent.DestinationAccountId,
-                DestinationName = names.GetValueOrDefault(intent.DestinationAccountId, ""),
-                FundingAccountId = intent.FundingAccountId,
-                FundingName = names.GetValueOrDefault(intent.FundingAccountId, ""),
-                Kind = intent.Source switch
-                {
-                    PaymentIntentSource.Statement => BillKinds.Statement,
-                    PaymentIntentSource.RecurringTransfer => BillKinds.Transfer,
-                    PaymentIntentSource.Manual => BillKinds.Manual,
-                    _ => BillKinds.Recurring
-                },
-                DueDate = intent.PayDate.Date,
-                Amount = Math.Abs(intent.Amount),
-                Status = status,
-                Notes = intent.Description ?? ""
+                PaymentIntentSource.Statement => ExpectedOrigin.StatementPay,
+                PaymentIntentSource.RecurringSingle => ExpectedOrigin.RecurringSingle,
+                PaymentIntentSource.RecurringTransfer => ExpectedOrigin.RecurringTransfer,
+                _ => ExpectedOrigin.Pay
+            };
+
+        private static PaymentIntentSource SourceOf(ExpectedOrigin origin) =>
+            origin switch
+            {
+                ExpectedOrigin.StatementPay => PaymentIntentSource.Statement,
+                ExpectedOrigin.RecurringSingle => PaymentIntentSource.RecurringSingle,
+                ExpectedOrigin.RecurringTransfer => PaymentIntentSource.RecurringTransfer,
+                _ => PaymentIntentSource.Manual
+            };
+
+        private static string NameOf(IReadOnlyDictionary<Guid, Account> accounts, Guid id) =>
+            accounts.TryGetValue(id, out var account) ? account.Name : "";
+
+        private static string UrlOf(IReadOnlyDictionary<Guid, Account> accounts, Guid id) =>
+            accounts.TryGetValue(id, out var account) ? account.WebsiteUrl ?? "" : "";
+
+        private static BillRow FromExpected(
+            FutureSingleTransaction expected,
+            Dictionary<Guid, Account> accounts,
+            Guid accountId,
+            DateTime asOf)
+        {
+            var source = SourceOf(expected.Origin);
+            var otherId = SplitTransactionMath.OtherAccountId(expected, accountId);
+            return new BillRow
+            {
+                Pay = expected.Status == ExpectedStatus.Scheduled,
+                IntentId = expected.Id,
+                Source = source,
+                SourceId = expected.OriginId,
+                DestinationAccountId = expected.AccountId,
+                DestinationName = NameOf(accounts, expected.AccountId),
+                WebsiteUrl = UrlOf(accounts, otherId ?? expected.AccountId),
+                FundingAccountId = expected.AccountId,
+                FundingName = NameOf(accounts, expected.AccountId),
+                OtherAccountId = otherId,
+                OtherAccountName = otherId is Guid id ? NameOf(accounts, id) : "",
+                OtherWebsiteUrl = otherId is Guid other ? UrlOf(accounts, other) : "",
+                Kind = KindOf(source, isTransfer: otherId is not null),
+                DueDate = expected.Date.Date,
+                Amount = SplitTransactionMath.AmountForAccount(expected, accountId),
+                Status = StatusOf(expected.DisplayStatus(asOf)),
+                Notes = expected.Description ?? ""
+            };
+        }
+
+        private static BillRow FromExpected(
+            FutureTransferTransaction expected,
+            Dictionary<Guid, Account> accounts,
+            Guid accountId,
+            DateTime asOf)
+        {
+            var source = SourceOf(expected.Origin);
+            var otherId = SplitTransactionMath.OtherAccountId(expected, accountId);
+            return new BillRow
+            {
+                Pay = expected.Status == ExpectedStatus.Scheduled,
+                IntentId = expected.Id,
+                Source = source,
+                SourceId = expected.OriginId,
+                StatementId = expected.StatementId ?? (source == PaymentIntentSource.Statement ? expected.OriginId : null),
+                DestinationAccountId = expected.ToAccountId,
+                DestinationName = NameOf(accounts, expected.ToAccountId),
+                WebsiteUrl = UrlOf(accounts, otherId ?? expected.ToAccountId),
+                FundingAccountId = expected.FromAccountId,
+                FundingName = NameOf(accounts, expected.FromAccountId),
+                OtherAccountId = otherId,
+                OtherAccountName = otherId is Guid id ? NameOf(accounts, id) : "",
+                OtherWebsiteUrl = otherId is Guid other ? UrlOf(accounts, other) : "",
+                CanChoosePayFrom = expected.FromAccountId == Guid.Empty,
+                Kind = KindOf(source, isTransfer: true),
+                DueDate = expected.Date.Date,
+                Amount = SplitTransactionMath.AmountForAccount(expected, accountId),
+                Status = StatusOf(expected.DisplayStatus(asOf)),
+                Notes = expected.Description ?? ""
+            };
+        }
+
+        private static string KindOf(PaymentIntentSource source, bool isTransfer) =>
+            source switch
+            {
+                PaymentIntentSource.Statement => BillKinds.Statement,
+                PaymentIntentSource.RecurringTransfer => BillKinds.Transfer,
+                PaymentIntentSource.Manual => isTransfer ? BillKinds.Transfer : BillKinds.Manual,
+                _ => isTransfer ? BillKinds.Transfer : BillKinds.Recurring
+            };
+
+        private static string StatusOf(string displayStatus) =>
+            displayStatus switch
+            {
+                TransactionStatuses.Scheduled => BillStatuses.Scheduled,
+                TransactionStatuses.Pending => BillStatuses.Pending,
+                _ => BillStatuses.Due
             };
     }
 }

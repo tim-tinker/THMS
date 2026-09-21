@@ -89,7 +89,7 @@ namespace THMS.UI.WinForms.Controls
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FlowDirection = FlowDirection.RightToLeft,
-                Padding = new Padding(8),
+                Padding = new Padding(12, 12, 12, 16),
                 WrapContents = true
             };
             var btnCancel = new ThmsButton { Text = "Cancel", DialogResult = DialogResult.Cancel };
@@ -102,9 +102,9 @@ namespace THMS.UI.WinForms.Controls
             btnRemove.Click += (_, _) => RemoveSelected();
             btnAdd.Click += (_, _) => AddRow();
             buttons.Controls.Add(btnCancel);
+            buttons.Controls.Add(btnRemove);
             buttons.Controls.Add(btnOk);
             buttons.Controls.Add(btnBalance);
-            buttons.Controls.Add(btnRemove);
             buttons.Controls.Add(btnAdd);
 
             ConfigureGrid();

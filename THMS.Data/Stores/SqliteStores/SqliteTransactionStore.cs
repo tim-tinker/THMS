@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using THMS.Data.Stores.SqlTables;
+using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores.SqliteStores
@@ -18,6 +19,7 @@ namespace THMS.Data.Stores.SqliteStores
         private readonly CategoryAssignmentHistoryTable _assignments = new();
         private readonly SplitTransactionRowsTable _splits = new();
         private readonly PaymentIntentsTable _paymentIntents = new();
+        private readonly TransactionReconciliationsTable _reconciliations = new();
 
         public void InitializeSchema(SqliteConnection conn)
         {
@@ -33,17 +35,44 @@ namespace THMS.Data.Stores.SqliteStores
             _assignments.InitializeSchema(conn);
             _splits.InitializeSchema(conn);
             _paymentIntents.InitializeSchema(conn);
+            _reconciliations.InitializeSchema(conn);
             _categories.MigrateLegacyCategoryStrings(conn);
-            DropUnrealizedPlannedPayments(conn);
+            MigratePaymentIntentsToExpected(conn);
         }
 
-        private static void DropUnrealizedPlannedPayments(SqliteConnection conn)
+        private void MigratePaymentIntentsToExpected(SqliteConnection conn)
         {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                DELETE FROM FutureSingleTransactions WHERE IsPlannedPayment = 1 AND IsRealized = 0;
-                DELETE FROM FutureTransferTransactions WHERE IsPlannedPayment = 1 AND IsRealized = 0;";
-            cmd.ExecuteNonQuery();
+            foreach (var intent in _paymentIntents.GetAll(conn).ToList())
+            {
+                if (intent.Status != PaymentIntentStatus.Scheduled)
+                    continue;
+                if (_futureTransfers.GetById(conn, intent.Id) is not null)
+                    continue;
+
+                var origin = intent.Source switch
+                {
+                    PaymentIntentSource.Statement => ExpectedOrigin.StatementPay,
+                    PaymentIntentSource.RecurringSingle => ExpectedOrigin.RecurringSingle,
+                    PaymentIntentSource.RecurringTransfer => ExpectedOrigin.RecurringTransfer,
+                    _ => ExpectedOrigin.Pay
+                };
+                _futureTransfers.Add(conn, new FutureTransferTransaction
+                {
+                    Id = intent.Id,
+                    FromAccountId = intent.FundingAccountId,
+                    ToAccountId = intent.DestinationAccountId,
+                    Date = intent.PayDate.Date,
+                    Amount = Math.Abs(intent.Amount),
+                    Description = intent.Description,
+                    Origin = origin,
+                    OriginId = intent.SourceId,
+                    Status = ExpectedStatus.Scheduled,
+                    IsUserCreated = true,
+                    IsPlannedPayment = true,
+                    StatementId = intent.Source == PaymentIntentSource.Statement ? intent.SourceId : null
+                });
+                _paymentIntents.Delete(conn, intent.Id);
+            }
         }
 
         public PostedTransactionsTable Posted => _posted;
@@ -58,5 +87,6 @@ namespace THMS.Data.Stores.SqliteStores
         public CategoryAssignmentHistoryTable Assignments => _assignments;
         public SplitTransactionRowsTable Splits => _splits;
         public PaymentIntentsTable PaymentIntents => _paymentIntents;
+        public TransactionReconciliationsTable Reconciliations => _reconciliations;
     }
 }

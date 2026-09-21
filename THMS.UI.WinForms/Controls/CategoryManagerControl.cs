@@ -29,6 +29,14 @@ namespace THMS.UI.WinForms.Controls
             set => btnClose.Visible = value;
         }
 
+        [DefaultValue(true)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        public bool ShowImportButton
+        {
+            get => btnImport.Visible;
+            set => btnImport.Visible = value;
+        }
+
         public CategoryManagerControl()
         {
             InitializeComponent();
@@ -55,6 +63,8 @@ namespace THMS.UI.WinForms.Controls
             PerformLayout();
             ApplyEditorLayout();
         }
+
+        public void ImportFromFile() => OnImport(this, EventArgs.Empty);
 
         public bool TryLeave()
         {

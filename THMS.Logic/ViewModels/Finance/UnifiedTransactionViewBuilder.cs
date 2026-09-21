@@ -17,37 +17,64 @@ namespace THMS.Logic.ViewModels.Finance
             var list = new List<UnifiedTransactionView>();
 
             foreach (var tx in posted)
+            {
+                if (!TransactionStatuses.IsLedgerImported(tx.ImportedStatus))
+                    continue;
                 AddLedgerRows(list, tx, tx.AccountId, UnifiedTransactionView.PostedType,
-                    UnifiedTransactionView.PostedTransferType, forAccountId);
+                    UnifiedTransactionView.PostedTransferType, forAccountId, tx.DisplayStatus);
+            }
 
             foreach (var tx in postedTransfers)
+            {
+                if (!TransactionStatuses.IsLedgerImported(tx.ImportedStatus))
+                    continue;
                 AddLedgerRows(list, tx, tx.AccountId, UnifiedTransactionView.PostedTransferType,
-                    UnifiedTransactionView.PostedTransferType, forAccountId);
+                    UnifiedTransactionView.PostedTransferType, forAccountId, tx.DisplayStatus);
+            }
 
             foreach (var tx in userFutureSingles ?? [])
             {
-                if (!tx.IsUserCreated || tx.IsRealized)
+                if (tx.IsRealized)
                     continue;
 
                 AddLedgerRows(list, tx, tx.AccountId, UnifiedTransactionView.FutureType,
-                    UnifiedTransactionView.FutureTransferType, forAccountId);
+                    UnifiedTransactionView.FutureTransferType, forAccountId, tx.DisplayStatus());
             }
 
             foreach (var tx in userFutureTransfers ?? [])
             {
-                if (!tx.IsUserCreated || tx.IsRealized)
+                if (tx.IsRealized)
                     continue;
 
+                if (forAccountId is Guid accountId)
+                {
+                    if (tx.FromAccountId != accountId && tx.ToAccountId != accountId)
+                        continue;
+                    list.Add(ForLedgerRow(
+                        tx,
+                        accountId,
+                        UnifiedTransactionView.FutureTransferType,
+                        amount: SplitTransactionMath.TransferAmountForAccount(
+                            tx.FromAccountId, tx.ToAccountId, tx.Amount, accountId),
+                        status: tx.DisplayStatus()));
+                    AddTransferSplitRows(list, tx, UnifiedTransactionView.FutureTransferType, accountId);
+                    continue;
+                }
+
                 AddLedgerRows(list, tx, tx.FromAccountId, UnifiedTransactionView.FutureTransferType,
-                    UnifiedTransactionView.FutureTransferType, forAccountId);
+                    UnifiedTransactionView.FutureTransferType, forAccountId: null, tx.DisplayStatus());
             }
 
             foreach (var source in incomingPostedSplitSources ?? [])
+            {
+                if (!TransactionStatuses.IsLedgerImported(source.ImportedStatus))
+                    continue;
                 AddTransferSplitRows(list, source, UnifiedTransactionView.PostedTransferType, forAccountId);
+            }
 
             foreach (var source in incomingFutureSplitSources ?? [])
             {
-                if (!source.IsUserCreated || source.IsRealized)
+                if (source.IsRealized)
                     continue;
 
                 AddTransferSplitRows(list, source, UnifiedTransactionView.FutureTransferType, forAccountId);
@@ -78,7 +105,22 @@ namespace THMS.Logic.ViewModels.Finance
             }
 
             foreach (var rule in transfers)
+            {
+                if (forAccountId is Guid accountId)
+                {
+                    if (rule.FromAccountId != accountId && rule.ToAccountId != accountId)
+                        continue;
+                    list.Add(ForLedgerRow(
+                        rule,
+                        accountId,
+                        UnifiedTransactionView.RecurringTransferRuleType,
+                        amount: SplitTransactionMath.TransferAmountForAccount(
+                            rule.FromAccountId, rule.ToAccountId, rule.Amount, accountId)));
+                    continue;
+                }
+
                 list.Add(ForLedgerRow(rule, rule.FromAccountId, UnifiedTransactionView.RecurringTransferRuleType));
+            }
 
             return UnifiedTransactionView.OrderForDisplay(list).ToList();
         }
@@ -89,7 +131,8 @@ namespace THMS.Logic.ViewModels.Finance
             string type,
             DateTime? date = null,
             decimal? amount = null,
-            Guid? occurrenceId = null)
+            Guid? occurrenceId = null,
+            string? status = null)
         {
             var occurrenceAmount = amount ?? transaction.Amount;
             var summarizeSplits = transaction.HasSplits && Math.Abs(occurrenceAmount) == Math.Abs(transaction.Amount);
@@ -104,6 +147,7 @@ namespace THMS.Logic.ViewModels.Finance
                 Category = summarizeSplits ? UnifiedTransactionView.SplitCategory : transaction.Category,
                 CategoryId = summarizeSplits ? null : transaction.CategoryId,
                 Type = type,
+                Status = status ?? "",
                 ForecastBalance = null
             };
         }
@@ -237,17 +281,18 @@ namespace THMS.Logic.ViewModels.Finance
             Guid parentAccountId,
             string parentType,
             string transferType,
-            Guid? forAccountId)
+            Guid? forAccountId,
+            string? status = null)
         {
             if (forAccountId is Guid accountId)
             {
                 if (parentAccountId == accountId)
-                    list.Add(ForLedgerRow(transaction, parentAccountId, parentType));
+                    list.Add(ForLedgerRow(transaction, parentAccountId, parentType, status: status));
                 AddTransferSplitRows(list, transaction, transferType, accountId);
                 return;
             }
 
-            list.Add(ForLedgerRow(transaction, parentAccountId, parentType));
+            list.Add(ForLedgerRow(transaction, parentAccountId, parentType, status: status));
             AddTransferSplitRows(list, transaction, transferType, forAccountId: null);
         }
 

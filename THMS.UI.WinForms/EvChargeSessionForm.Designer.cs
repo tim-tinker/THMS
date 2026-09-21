@@ -1,4 +1,5 @@
-﻿namespace THMS.UI.WinForms
+using THMS.UI.WinForms.Controls;
+namespace THMS.UI.WinForms
 {
     partial class EvChargeSessionForm
     {
@@ -53,8 +54,8 @@
             _numLastSoc = new NumericUpDown();
             _numBatteryKwhAdded = new NumericUpDown();
             label1 = new Label();
-            _btnCancel = new Button();
-            _btnSave = new Button();
+            _btnCancel = new ThmsButton();
+            _btnSave = new ThmsButton();
             label11 = new Label();
             label12 = new Label();
             ((System.ComponentModel.ISupportInitialize)_numOdometer).BeginInit();
@@ -327,7 +328,7 @@
             // 
             AutoScaleDimensions = new SizeF(12F, 30F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(549, 626);
+            ClientSize = new Size(549, 642);
             Controls.Add(_btnSave);
             Controls.Add(_btnCancel);
             Controls.Add(label1);
@@ -398,8 +399,8 @@
         private NumericUpDown _numLastSoc;
         private NumericUpDown _numBatteryKwhAdded;
         private Label label1;
-        private Button _btnCancel;
-        private Button _btnSave;
+        private ThmsButton _btnCancel;
+        private ThmsButton _btnSave;
         private Label label11;
         private Label label12;
     }

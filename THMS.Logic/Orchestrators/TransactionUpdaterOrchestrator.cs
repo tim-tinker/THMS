@@ -18,7 +18,6 @@ namespace THMS.Logic.Orchestrators
 
         private readonly TransferDetector _transferDetector = new();
         private readonly RecurringDetector _recurringDetector = new();
-        private readonly FutureReconciler _futureReconciler = new();
         private readonly BudgetOrchestrator _budgetOrchestrator;
 
         private const bool EnableRecurringDetector = false;
@@ -142,26 +141,6 @@ namespace THMS.Logic.Orchestrators
                             _transactionStore.UpdateRecurringTransferRule(r);
                     }
 
-                    var allPostedNow = _transactionStore.GetPostedTransactions(account.Id).ToList();
-                    var allPostedTransfersNow = _transactionStore.GetPostedTransferTransactions(account.Id).ToList();
-                    var allSingleRules = existingSingleRules.Concat(newSingleRules).ToList();
-                    var allTransferRules = existingTransferRules.Concat(newTransferRules).ToList();
-
-                    _futureReconciler.ReconcileSingles(allPostedNow, allSingleRules, dayTolerance: 4);
-                    _futureReconciler.ReconcileTransfers(allPostedTransfersNow, allTransferRules, dayTolerance: 4);
-
-                    foreach (var r in _futureReconciler.MatchedSingleRules)
-                        _transactionStore.UpdateRecurringSingleRule(r);
-
-                    foreach (var r in _futureReconciler.MatchedTransferRules)
-                        _transactionStore.UpdateRecurringTransferRule(r);
-
-                    foreach (var f in _transactionStore.GetFutureSingleTransactions(account.Id).Where(f => !f.IsUserCreated))
-                        _transactionStore.DeleteFutureSingleTransaction(f.Id);
-
-                    foreach (var f in _transactionStore.GetFutureTransferTransactions(account.Id).Where(f => !f.IsUserCreated))
-                        _transactionStore.DeleteFutureTransferTransaction(f.Id);
-
                     result.ForecastUpdated = true;
                     result.RollOffCompleted = true;
                 }
@@ -175,7 +154,9 @@ namespace THMS.Logic.Orchestrators
                 _budgetOrchestrator.RefreshAccount(account.Id);
             }
 
-            new BillsOrchestrator(_accountStore, _transactionStore, _statements).MatchScheduled();
+            var reconciliation = new ReconciliationOrchestrator(_transactionStore);
+            reconciliation.MaterializePlannedFromRules();
+            reconciliation.RecommendMatches();
 
             return result;
         }

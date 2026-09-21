@@ -1,5 +1,6 @@
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Transactions;
+using THMS.Logic.Orchestrators.Finance;
 
 namespace THMS.Logic.Orchestrators
 {
@@ -57,16 +58,21 @@ namespace THMS.Logic.Orchestrators
                 rule.Id = Guid.NewGuid();
             rule.IsUserCreated = true;
             _store.AddRecurringSingleRule(rule);
+            Rematerialize(rule.Id, rule);
         }
 
         public void UpdateSingleRule(RecurringSingleTransactionRule rule)
         {
             ArgumentNullException.ThrowIfNull(rule);
             _store.UpdateRecurringSingleRule(rule);
+            Rematerialize(rule.Id, rule);
         }
 
-        public void DeleteSingleRule(Guid ruleId) =>
+        public void DeleteSingleRule(Guid ruleId)
+        {
+            new ReconciliationOrchestrator(_store).DropUnmatchedForRule(ruleId);
             _store.DeleteRecurringSingleRule(ruleId);
+        }
 
         public void AddTransferRule(RecurringTransferRule rule)
         {
@@ -75,15 +81,34 @@ namespace THMS.Logic.Orchestrators
                 rule.Id = Guid.NewGuid();
             rule.IsUserCreated = true;
             _store.AddRecurringTransferRule(rule);
+            Rematerialize(rule.Id, rule);
         }
 
         public void UpdateTransferRule(RecurringTransferRule rule)
         {
             ArgumentNullException.ThrowIfNull(rule);
             _store.UpdateRecurringTransferRule(rule);
+            Rematerialize(rule.Id, rule);
         }
 
-        public void DeleteTransferRule(Guid ruleId) =>
+        public void DeleteTransferRule(Guid ruleId)
+        {
+            new ReconciliationOrchestrator(_store).DropUnmatchedForRule(ruleId);
             _store.DeleteRecurringTransferRule(ruleId);
+        }
+
+        private void Rematerialize(Guid ruleId, RecurringSingleTransactionRule rule)
+        {
+            var reconciliation = new ReconciliationOrchestrator(_store);
+            reconciliation.DropUnmatchedForRule(ruleId);
+            reconciliation.MaterializeRule(rule);
+        }
+
+        private void Rematerialize(Guid ruleId, RecurringTransferRule rule)
+        {
+            var reconciliation = new ReconciliationOrchestrator(_store);
+            reconciliation.DropUnmatchedForRule(ruleId);
+            reconciliation.MaterializeRule(rule);
+        }
     }
 }

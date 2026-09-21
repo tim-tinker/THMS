@@ -1,4 +1,5 @@
-﻿namespace THMS.UI.WinForms
+using THMS.UI.WinForms.Controls;
+namespace THMS.UI.WinForms
 {
     partial class MileageEntryForm
     {
@@ -21,8 +22,8 @@
             lblOdometer = new Label();
             dtpDate = new DateTimePicker();
             numOdometer = new NumericUpDown();
-            btnSave = new Button();
-            btnCancel = new Button();
+            btnSave = new ThmsButton();
+            btnCancel = new ThmsButton();
             label1 = new Label();
             _numGallons = new NumericUpDown();
             _numCost = new NumericUpDown();
@@ -141,7 +142,7 @@
             // 
             AcceptButton = btnSave;
             CancelButton = btnCancel;
-            ClientSize = new Size(406, 288);
+            ClientSize = new Size(406, 304);
             Controls.Add(_checkFull);
             Controls.Add(label2);
             Controls.Add(_numCost);
@@ -172,8 +173,8 @@
         private System.Windows.Forms.Label lblOdometer;
         private System.Windows.Forms.DateTimePicker dtpDate;
         private System.Windows.Forms.NumericUpDown numOdometer;
-        private System.Windows.Forms.Button btnSave;
-        private System.Windows.Forms.Button btnCancel;
+        private ThmsButton btnSave;
+        private ThmsButton btnCancel;
         private Label label1;
         private NumericUpDown _numGallons;
         private NumericUpDown _numCost;

@@ -19,6 +19,8 @@ namespace THMS.Data.Stores.SqlTables
                 );";
             cmd.ExecuteNonQuery();
             SqliteCategoryColumns.EnsureCategoryId(conn, "PostedTransactions");
+            EnsureColumn(conn, "ImportedStatus", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn(conn, "RecommendedExpectedId", "TEXT");
         }
 
         public void Add(SqliteConnection conn, PostedTransaction transaction)
@@ -26,9 +28,9 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO PostedTransactions
-                (Id, AccountId, Date, Description, Amount, Category, CategoryId)
+                (Id, AccountId, Date, Description, Amount, Category, CategoryId, ImportedStatus, RecommendedExpectedId)
                 VALUES
-                (@Id, @AccountId, @Date, @Description, @Amount, @Category, @CategoryId);";
+                (@Id, @AccountId, @Date, @Description, @Amount, @Category, @CategoryId, @ImportedStatus, @RecommendedExpectedId);";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
         }
@@ -43,7 +45,9 @@ namespace THMS.Data.Stores.SqlTables
                     Description = @Description,
                     Amount = @Amount,
                     Category = @Category,
-                    CategoryId = @CategoryId
+                    CategoryId = @CategoryId,
+                    ImportedStatus = @ImportedStatus,
+                    RecommendedExpectedId = @RecommendedExpectedId
                 WHERE Id = @Id;";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
@@ -164,7 +168,7 @@ namespace THMS.Data.Stores.SqlTables
         }
 
         private const string SelectColumns =
-            "SELECT Id, AccountId, Date, Description, Amount, Category, CategoryId";
+            "SELECT Id, AccountId, Date, Description, Amount, Category, CategoryId, ImportedStatus, RecommendedExpectedId";
 
         private static void Bind(SqliteCommand cmd, PostedTransaction transaction)
         {
@@ -175,6 +179,12 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@Amount", transaction.Amount);
             cmd.Parameters.AddWithValue("@Category", (object?)transaction.Category ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@CategoryId", SqliteCategoryColumns.BindId(transaction.CategoryId));
+            cmd.Parameters.AddWithValue("@ImportedStatus", (int)transaction.ImportedStatus);
+            cmd.Parameters.AddWithValue(
+                "@RecommendedExpectedId",
+                transaction.RecommendedExpectedId is Guid expected && expected != Guid.Empty
+                    ? expected.ToString()
+                    : DBNull.Value);
         }
 
         private static PostedTransaction Read(SqliteDataReader reader)
@@ -187,8 +197,22 @@ namespace THMS.Data.Stores.SqlTables
                 Description = reader.IsDBNull(3) ? null : reader.GetString(3),
                 Amount = (decimal)(double)reader.GetDouble(4),
                 Category = reader.IsDBNull(5) ? null : reader.GetString(5),
-                CategoryId = SqliteCategoryColumns.ReadId(reader, 6)
+                CategoryId = SqliteCategoryColumns.ReadId(reader, 6),
+                ImportedStatus = ReadImportedStatus(reader, 7),
+                RecommendedExpectedId = SqliteCategoryColumns.ReadId(reader, 8)
             };
+        }
+
+        private static ImportedStatus ReadImportedStatus(SqliteDataReader reader, int index) =>
+            reader.FieldCount > index && !reader.IsDBNull(index)
+                ? (ImportedStatus)reader.GetInt32(index)
+                : ImportedStatus.Unreconciled;
+
+        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
+        {
+            using var alter = conn.CreateCommand();
+            alter.CommandText = $"ALTER TABLE PostedTransactions ADD COLUMN IF NOT EXISTS {columnName} {columnDef};";
+            alter.ExecuteNonQuery();
         }
 
         private static IEnumerable<PostedTransaction> ReadAll(SqliteCommand cmd)

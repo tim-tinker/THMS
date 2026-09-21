@@ -92,6 +92,38 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void ImportAccounts_AppliesLoanAndMortgageAprFromPreview()
+        {
+            var store = new InMemoryAccountDataStore();
+            var orchestrator = new AccountImportOrchestrator(store);
+            var loanPreview = AccountImportPreview.FromAccount(new LoanAccount
+            {
+                Name = "Auto",
+                Institution = "Bank",
+                AccountNumber = "1",
+                WebsiteUrl = ""
+            });
+            loanPreview.Apr = 0.0699m;
+            loanPreview.Principal = 10000;
+            var mortgagePreview = AccountImportPreview.FromAccount(new MortgageAccount
+            {
+                Name = "House",
+                Institution = "Bank",
+                AccountNumber = "2",
+                WebsiteUrl = ""
+            });
+            mortgagePreview.Apr = 2.875m;
+            mortgagePreview.Principal = 200000;
+
+            orchestrator.ImportAccounts([loanPreview, mortgagePreview]);
+
+            var loan = store.GetAllAccounts().OfType<LoanAccount>().Single();
+            var mortgage = store.GetAllAccounts().OfType<MortgageAccount>().Single();
+            Assert.That(loan.InterestRate, Is.EqualTo(0.0699m));
+            Assert.That(mortgage.InterestRate, Is.EqualTo(2.875m));
+        }
+
+        [Test]
         public void LoadAccountsFromFile_ParsesCsv()
         {
             var path = Path.Combine(Path.GetTempPath(), $"accounts-{Guid.NewGuid():N}.csv");
@@ -99,18 +131,27 @@ namespace THMS.Tests.Logic
                 Name,Type,Number,URL,CreditLimit,APR,Principal,Term
                 Checking,Bank,111,https://bank,,,,
                 Card,Credit,222,,5000,0.1999,,
+                Auto,Loan,333,,,0.0699,29133.33,60
+                House,Mortgage,444,,,2.875,39594.91,360
                 """);
             try
             {
                 var orchestrator = new AccountImportOrchestrator(new InMemoryAccountDataStore());
                 var rows = orchestrator.LoadAccountsFromFile(path);
 
-                Assert.That(rows, Has.Count.EqualTo(2));
+                Assert.That(rows, Has.Count.EqualTo(4));
                 Assert.That(rows[0].Name, Is.EqualTo("Checking"));
                 Assert.That(rows[0].Type, Is.EqualTo("Bank"));
                 Assert.That(rows[1].Name, Is.EqualTo("Card"));
                 Assert.That(rows[1].Type, Is.EqualTo("Credit"));
                 Assert.That(rows[1].CreditLimit, Is.EqualTo(5000));
+                Assert.That(rows[1].Apr, Is.EqualTo(0.1999m));
+                Assert.That(rows[2].Type, Is.EqualTo("Loan"));
+                Assert.That(rows[2].Apr, Is.EqualTo(0.0699m));
+                Assert.That(rows[2].Principal, Is.EqualTo(29133.33m));
+                Assert.That(rows[3].Type, Is.EqualTo("Mortgage"));
+                Assert.That(rows[3].Apr, Is.EqualTo(2.875m));
+                Assert.That(rows[3].Principal, Is.EqualTo(39594.91m));
             }
             finally
             {

@@ -1,4 +1,5 @@
-﻿namespace THMS.UI.WinForms
+using THMS.UI.WinForms.Controls;
+namespace THMS.UI.WinForms
 {
     partial class AddVehicleForm
     {
@@ -25,8 +26,8 @@
             txtMake = new TextBox();
             txtModel = new TextBox();
             numYear = new NumericUpDown();
-            btnSave = new Button();
-            btnCancel = new Button();
+            btnSave = new ThmsButton();
+            btnCancel = new ThmsButton();
             _checkEv = new CheckBox();
             _numericFuelCapacity = new NumericUpDown();
             _labelCapacity = new Label();
@@ -158,7 +159,7 @@
             // 
             AcceptButton = btnSave;
             CancelButton = btnCancel;
-            ClientSize = new Size(517, 324);
+            ClientSize = new Size(517, 340);
             Controls.Add(_labelFuelType);
             Controls.Add(_labelCapacity);
             Controls.Add(_numericFuelCapacity);
@@ -193,8 +194,8 @@
         private System.Windows.Forms.TextBox txtMake;
         private System.Windows.Forms.TextBox txtModel;
         private System.Windows.Forms.NumericUpDown numYear;
-        private System.Windows.Forms.Button btnSave;
-        private System.Windows.Forms.Button btnCancel;
+        private ThmsButton btnSave;
+        private ThmsButton btnCancel;
         private CheckBox _checkEv;
         private NumericUpDown _numericFuelCapacity;
         private Label _labelCapacity;

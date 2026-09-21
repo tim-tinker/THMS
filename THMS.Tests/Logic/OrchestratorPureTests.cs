@@ -606,11 +606,16 @@ namespace THMS.Tests.Logic
                 }
             };
 
-            var futures = new ForecastGenerator().GenerateForecast(
+            var fromViews = new ForecastGenerator().GenerateForecast(
                 from, today, today.AddMonths(3), [], rules);
-            Assert.That(futures.Any(f => f.Amount == 25), Is.True);
-            Assert.That(futures.Any(f => f.Amount == 2), Is.True);
-            Assert.That(futures.All(f => f.Type == UnifiedTransactionView.ForecastTransferType), Is.True);
+            Assert.That(fromViews.Any(f => f.Amount == -25), Is.True);
+            Assert.That(fromViews.Any(f => f.Amount == -2), Is.True);
+            Assert.That(fromViews.All(f => f.Type == UnifiedTransactionView.ForecastTransferType), Is.True);
+
+            var toViews = new ForecastGenerator().GenerateForecast(
+                to, today, today.AddMonths(3), [], rules);
+            Assert.That(toViews.Any(f => f.Amount == 25), Is.True);
+            Assert.That(toViews.Any(f => f.Amount == 2), Is.True);
         }
 
         [Test]
@@ -870,8 +875,7 @@ namespace THMS.Tests.Logic
             var orchestrator = new AccountOrchestrator(store);
 
             Assert.That(() => orchestrator.Save(new BankAccount { Name = " ", Institution = "A", AccountNumber = "1" }), Throws.ArgumentException);
-            Assert.That(() => orchestrator.Save(new BankAccount { Name = "A", Institution = " ", AccountNumber = "1" }), Throws.ArgumentException);
-            Assert.That(() => orchestrator.Save(new BankAccount { Name = "A", Institution = "B", AccountNumber = " " }), Throws.ArgumentException);
+            Assert.That(() => orchestrator.Save(new BankAccount { Name = "A", Institution = "", AccountNumber = "" }), Throws.Nothing);
             Assert.That(
                 () => orchestrator.Save(new CreditAccount
                 {
@@ -901,6 +905,41 @@ namespace THMS.Tests.Logic
             };
             orchestrator.Save(loc);
             Assert.That(store.GetAccount(loc.Name)!.AccountNumber, Is.EqualTo("9900"));
+        }
+
+        [Test]
+        public void Save_AutoPayRequiresFundingAccount()
+        {
+            var store = new InMemoryAccountDataStore();
+            var orchestrator = new AccountOrchestrator(store);
+            var checking = Bank();
+            orchestrator.Save(checking);
+
+            Assert.That(
+                () => orchestrator.Save(new CreditAccount
+                {
+                    Name = "Card",
+                    Institution = "Bank",
+                    AccountNumber = "1",
+                    Type = AccountType.CreditCard,
+                    CreditLimit = 1000,
+                    AutoPay = true
+                }),
+                Throws.ArgumentException.With.Message.Contains("funding"));
+
+            var card = new CreditAccount
+            {
+                Name = "Card",
+                Institution = "Bank",
+                AccountNumber = "1",
+                Type = AccountType.CreditCard,
+                CreditLimit = 1000,
+                AutoPay = true,
+                AutoPayFromAccountId = checking.Id
+            };
+            orchestrator.Save(card);
+            Assert.That(store.GetAccount("Card")!.AutoPay, Is.True);
+            Assert.That(store.GetAccount("Card")!.AutoPayFromAccountId, Is.EqualTo(checking.Id));
         }
 
         [Test]
@@ -1119,8 +1158,9 @@ namespace THMS.Tests.Logic
                 Date = monthly.NextOccurrence
             });
             orchestrator.ReconcileRules(accountId);
-            Assert.That(store.GetRecurringSingleRules(accountId).First(r => r.Amount == 10).LastOccurrence, Is.EqualTo(start));
-            Assert.That(store.GetRecurringSingleRules(accountId).First(r => r.Amount == 10).NextOccurrence, Is.EqualTo(start.AddMonths(1)));
+            Assert.That(store.GetRecurringSingleRules(accountId).First(r => r.Amount == 10).LastOccurrence, Is.Null);
+            var posted = store.GetPostedTransactions(accountId).Single();
+            Assert.That(posted.ImportedStatus, Is.EqualTo(ImportedStatus.Unreconciled));
 
             var transferRule = store.GetRecurringTransferRules(accountId).First(r => r.Amount == 20);
             store.AddPostedTransferTransaction(new PostedTransferTransaction
@@ -1130,7 +1170,7 @@ namespace THMS.Tests.Logic
                 Date = transferRule.NextOccurrence
             });
             orchestrator.ReconcileRules(accountId);
-            Assert.That(store.GetRecurringTransferRules(accountId).First(r => r.Amount == 20).LastOccurrence, Is.EqualTo(start));
+            Assert.That(store.GetRecurringTransferRules(accountId).First(r => r.Amount == 20).LastOccurrence, Is.Null);
         }
     }
 
@@ -1194,9 +1234,10 @@ namespace THMS.Tests.Logic
                 accountId,
                 new DateTime(2026, 9, 1),
                 new DateTime(2026, 10, 2));
-            Assert.That(forecast.Any(f => f.Description == "Rent"), Is.True);
+            Assert.That(forecast.Any(f => f.Description == "Rent"), Is.False);
             Assert.That(forecast.Any(f => f.Description == "Auto"), Is.True);
-            Assert.That(forecast.Any(f => f.Description == "Sweep"), Is.True);
+            Assert.That(forecast.Any(f => f.Description == "Sweep" && f.Date.Date == new DateTime(2026, 9, 8)), Is.False);
+            Assert.That(forecast.Any(f => f.Description == "Sweep" && f.Date.Date > new DateTime(2026, 9, 8)), Is.True);
 
             orchestrator.DeleteSingleRule(single.Id);
             orchestrator.DeleteTransferRule(transfer.Id);

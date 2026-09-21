@@ -1,4 +1,5 @@
-﻿namespace THMS.UI.WinForms
+using THMS.UI.WinForms.Controls;
+namespace THMS.UI.WinForms
 {
     partial class ElectricContractDataEntryForm
     {
@@ -44,8 +45,8 @@
             label7 = new Label();
             _numDeliveryRate = new NumericUpDown();
             label8 = new Label();
-            _btnCancel = new Button();
-            _btnSave = new Button();
+            _btnCancel = new ThmsButton();
+            _btnSave = new ThmsButton();
             ((System.ComponentModel.ISupportInitialize)_numBaseEnergyCharge).BeginInit();
             ((System.ComponentModel.ISupportInitialize)_numEnergyRate).BeginInit();
             ((System.ComponentModel.ISupportInitialize)_numSolarCreditRate).BeginInit();
@@ -224,7 +225,7 @@
             AutoScaleDimensions = new SizeF(12F, 30F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = _btnCancel;
-            ClientSize = new Size(450, 422);
+            ClientSize = new Size(450, 438);
             Controls.Add(_btnSave);
             Controls.Add(_btnCancel);
             Controls.Add(label8);
@@ -278,7 +279,7 @@
         private Label label7;
         private NumericUpDown _numDeliveryRate;
         private Label label8;
-        private Button _btnCancel;
-        private Button _btnSave;
+        private ThmsButton _btnCancel;
+        private ThmsButton _btnSave;
     }
 }

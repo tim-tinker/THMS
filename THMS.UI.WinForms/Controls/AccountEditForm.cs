@@ -2,21 +2,25 @@
 using System.Windows.Forms;
 using THMS.Domain.Finance.Accounts;
 using THMS.Logic.Finance.Model;
+using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.UI.WinForms.Controls
 {
     public partial class AccountEditForm : Form
     {
+        private readonly List<Account> _accounts;
+
         public Account Account { get; private set; }
 
-        public AccountEditForm(Account? existing)
+        public AccountEditForm(Account? existing, IEnumerable<Account>? accounts = null)
         {
             InitializeComponent();
 
-            // If creating new, default to BankAccount
+            _accounts = accounts?.ToList() ?? [];
             Account = existing ?? new BankAccount { Type = AccountType.Checking };
 
             PopulateAccountTypeCombo();
+            chkAutoPay.CheckedChanged += (_, _) => UpdateAutoPayEnabled();
             BindFields();
             ShowCorrectPanel();
         }
@@ -64,6 +68,8 @@ namespace THMS.UI.WinForms.Controls
             txtInstitution.Text = Account.Institution;
             txtAccountNumber.Text = Account.AccountNumber;
             txtUrl.Text = Account.WebsiteUrl;
+            BindFundingAccounts();
+            chkAutoPay.Checked = Account.AutoPay;
 
             var openingAsOf = PickerDate(dtBankOpeningAsOf, Account.BalanceAsOf);
             dtBankOpeningAsOf.Value = openingAsOf;
@@ -114,6 +120,7 @@ namespace THMS.UI.WinForms.Controls
             Account.Institution = txtInstitution.Text;
             Account.AccountNumber = txtAccountNumber.Text;
             Account.WebsiteUrl = txtUrl.Text;
+            SaveAutoPay();
 
             // Subtype-specific save
             switch (Account)
@@ -188,10 +195,54 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             panel.Visible = true;
+            LayoutAutoPay(panel);
 
             // Sizing before the handle exists (and AutoScale runs) clips the button bar.
             if (IsHandleCreated)
                 ResizeFormForPanel(panel);
+        }
+
+        private void LayoutAutoPay(Panel subtypePanel)
+        {
+            pnlAutoPay.Visible = Account.SupportsAutoPay;
+            subtypePanel.Top = pnlAutoPay.Visible ? pnlAutoPay.Bottom + 8 : pnlAutoPay.Top;
+            UpdateAutoPayEnabled();
+        }
+
+        private void BindFundingAccounts()
+        {
+            var choices = new List<PayFromChoice> { PayFromChoice.Unspecified };
+            choices.AddRange(_accounts
+                .Where(a => a is BankAccount or CreditAccount)
+                .Where(a => a.Id != Account.Id)
+                .OrderBy(a => a.Name)
+                .Select(PayFromChoice.From));
+
+            cmbAutoPayFrom.DisplayMember = nameof(PayFromChoice.Name);
+            cmbAutoPayFrom.ValueMember = nameof(PayFromChoice.Id);
+            cmbAutoPayFrom.DataSource = choices;
+            var selected = Account.AutoPayFromAccountId ?? Guid.Empty;
+            cmbAutoPayFrom.SelectedItem = choices.FirstOrDefault(c => c.Id == selected) ?? PayFromChoice.Unspecified;
+        }
+
+        private void SaveAutoPay()
+        {
+            if (!Account.SupportsAutoPay)
+            {
+                Account.AutoPay = false;
+                Account.AutoPayFromAccountId = null;
+                return;
+            }
+
+            Account.AutoPay = chkAutoPay.Checked;
+            Account.AutoPayFromAccountId = cmbAutoPayFrom.SelectedItem is PayFromChoice choice && choice.Id != Guid.Empty
+                ? choice.Id
+                : null;
+        }
+
+        private void UpdateAutoPayEnabled()
+        {
+            cmbAutoPayFrom.Enabled = pnlAutoPay.Visible && chkAutoPay.Checked;
         }
 
         private void ResizeFormForPanel(Panel panel)
@@ -219,6 +270,10 @@ namespace THMS.UI.WinForms.Controls
             var institution = txtInstitution.Text;
             var accountNumber = txtAccountNumber.Text;
             var url = txtUrl.Text;
+            var autoPay = chkAutoPay.Checked;
+            var autoPayFrom = cmbAutoPayFrom.SelectedItem is PayFromChoice choice && choice.Id != Guid.Empty
+                ? choice.Id
+                : (Guid?)null;
 
             Account = selected switch
             {
@@ -247,6 +302,8 @@ namespace THMS.UI.WinForms.Controls
             Account.Institution = institution;
             Account.AccountNumber = accountNumber;
             Account.WebsiteUrl = url;
+            Account.AutoPay = autoPay;
+            Account.AutoPayFromAccountId = autoPayFrom;
             BindFields();
             ShowCorrectPanel();
         }
@@ -254,12 +311,21 @@ namespace THMS.UI.WinForms.Controls
         private void OnSave(object sender, EventArgs e)
         {
             SaveFields();
-            if (string.IsNullOrWhiteSpace(Account.Name) ||
-                string.IsNullOrWhiteSpace(Account.Institution) ||
-                string.IsNullOrWhiteSpace(Account.AccountNumber))
+            if (string.IsNullOrWhiteSpace(Account.Name))
             {
                 MessageBox.Show(this,
-                    "Name, institution, and account number are required.",
+                    "Name is required.",
+                    "Account Editor",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (Account.AutoPay &&
+                (Account.AutoPayFromAccountId is not Guid funding || funding == Guid.Empty))
+            {
+                MessageBox.Show(this,
+                    "Choose the account the institution should debit for auto-pay.",
                     "Account Editor",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);

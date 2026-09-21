@@ -27,6 +27,9 @@ namespace THMS.Data.Stores.SqlTables
             EnsureColumn(conn, "StatementId", "TEXT");
             EnsureColumn(conn, "PromotionalBalanceId", "TEXT");
             EnsureColumn(conn, "PlanningNote", "TEXT");
+            EnsureColumn(conn, "Origin", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn(conn, "OriginId", "TEXT");
+            EnsureColumn(conn, "Status", "INTEGER NOT NULL DEFAULT 0");
         }
 
         public void Add(SqliteConnection conn, FutureSingleTransaction transaction)
@@ -35,10 +38,10 @@ namespace THMS.Data.Stores.SqlTables
             cmd.CommandText = @"
                 INSERT INTO FutureSingleTransactions
                 (Id, AccountId, Date, Description, Amount, Category, CategoryId, IsRealized, PostedTransactionId, IsUserCreated,
-                 IsPlannedPayment, StatementId, PromotionalBalanceId, PlanningNote)
+                 IsPlannedPayment, StatementId, PromotionalBalanceId, PlanningNote, Origin, OriginId, Status)
                 VALUES
                 (@Id, @AccountId, @Date, @Description, @Amount, @Category, @CategoryId, @IsRealized, @PostedTransactionId, @IsUserCreated,
-                 @IsPlannedPayment, @StatementId, @PromotionalBalanceId, @PlanningNote);";
+                 @IsPlannedPayment, @StatementId, @PromotionalBalanceId, @PlanningNote, @Origin, @OriginId, @Status);";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
         }
@@ -60,7 +63,10 @@ namespace THMS.Data.Stores.SqlTables
                     IsPlannedPayment = @IsPlannedPayment,
                     StatementId = @StatementId,
                     PromotionalBalanceId = @PromotionalBalanceId,
-                    PlanningNote = @PlanningNote
+                    PlanningNote = @PlanningNote,
+                    Origin = @Origin,
+                    OriginId = @OriginId,
+                    Status = @Status
                 WHERE Id = @Id;";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
@@ -147,7 +153,7 @@ namespace THMS.Data.Stores.SqlTables
 
         private const string SelectColumns =
             @"SELECT Id, AccountId, Date, Description, Amount, Category, IsRealized, PostedTransactionId, IsUserCreated, CategoryId,
-                     IsPlannedPayment, StatementId, PromotionalBalanceId, PlanningNote";
+                     IsPlannedPayment, StatementId, PromotionalBalanceId, PlanningNote, Origin, OriginId, Status";
 
         private static void Bind(SqliteCommand cmd, FutureSingleTransaction transaction)
         {
@@ -169,6 +175,9 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@StatementId", BindGuid(transaction.StatementId));
             cmd.Parameters.AddWithValue("@PromotionalBalanceId", BindGuid(transaction.PromotionalBalanceId));
             cmd.Parameters.AddWithValue("@PlanningNote", (object?)transaction.PlanningNote ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@Origin", (int)transaction.Origin);
+            cmd.Parameters.AddWithValue("@OriginId", BindGuid(transaction.OriginId));
+            cmd.Parameters.AddWithValue("@Status", (int)transaction.Status);
         }
 
         private static FutureSingleTransaction Read(SqliteDataReader reader)
@@ -188,9 +197,17 @@ namespace THMS.Data.Stores.SqlTables
                 IsPlannedPayment = ReadBool(reader, 10),
                 StatementId = SqliteCategoryColumns.ReadId(reader, 11),
                 PromotionalBalanceId = SqliteCategoryColumns.ReadId(reader, 12),
-                PlanningNote = reader.FieldCount > 13 && !reader.IsDBNull(13) ? reader.GetString(13) : null
+                PlanningNote = reader.FieldCount > 13 && !reader.IsDBNull(13) ? reader.GetString(13) : null,
+                Origin = ReadEnum(reader, 14, ExpectedOrigin.Manual),
+                OriginId = SqliteCategoryColumns.ReadId(reader, 15),
+                Status = ReadEnum(reader, 16, ExpectedStatus.Planned)
             };
         }
+
+        private static T ReadEnum<T>(SqliteDataReader reader, int index, T fallback) where T : struct, Enum =>
+            reader.FieldCount > index && !reader.IsDBNull(index)
+                ? (T)Enum.ToObject(typeof(T), reader.GetInt32(index))
+                : fallback;
 
         private static bool ReadBool(SqliteDataReader reader, int index) =>
             reader.FieldCount > index && !reader.IsDBNull(index) && reader.GetInt32(index) == 1;

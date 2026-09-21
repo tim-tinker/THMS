@@ -1,4 +1,5 @@
-﻿namespace THMS.UI.WinForms
+using THMS.UI.WinForms.Controls;
+namespace THMS.UI.WinForms
 {
     partial class VehicleListDashboardForm
     {
@@ -24,8 +25,8 @@
         private void InitializeComponent()
         {
             vehicleGrid = new DataGridView();
-            btnAddVehicle = new Button();
-            btnDetails = new Button();
+            btnAddVehicle = new ThmsButton();
+            btnDetails = new ThmsButton();
             historyBar = new Controls.HistoryPeriodBar();
             ((System.ComponentModel.ISupportInitialize)vehicleGrid).BeginInit();
             SuspendLayout();
@@ -83,7 +84,7 @@
             // 
             AutoScaleDimensions = new SizeF(12F, 30F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(980, 652);
+            ClientSize = new Size(980, 668);
             Controls.Add(btnDetails);
             Controls.Add(btnAddVehicle);
             Controls.Add(vehicleGrid);
@@ -101,8 +102,8 @@
         #endregion
 
         private System.Windows.Forms.DataGridView vehicleGrid;
-        private System.Windows.Forms.Button btnAddVehicle;
-        private System.Windows.Forms.Button btnDetails;
+        private ThmsButton btnAddVehicle;
+        private ThmsButton btnDetails;
         private Controls.HistoryPeriodBar historyBar;
     }
 }

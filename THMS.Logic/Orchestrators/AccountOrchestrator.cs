@@ -115,12 +115,6 @@ namespace THMS.Logic.Orchestrators.Finance
             if (string.IsNullOrWhiteSpace(account.Name))
                 throw new ArgumentException("Account name is required.");
 
-            if (string.IsNullOrWhiteSpace(account.Institution))
-                throw new ArgumentException("Institution is required.");
-
-            if (string.IsNullOrWhiteSpace(account.AccountNumber))
-                throw new ArgumentException("Account number is required.");
-
             if (account.Type == AccountType.CreditCard ||
                 account.Type == AccountType.LineOfCredit)
             {
@@ -130,6 +124,21 @@ namespace THMS.Logic.Orchestrators.Finance
                         throw new ArgumentException("Credit limit must be positive.");
                 }
             }
+
+            if (!account.SupportsAutoPay)
+            {
+                account.AutoPay = false;
+                account.AutoPayFromAccountId = null;
+                return;
+            }
+
+            if (!account.AutoPay)
+                return;
+
+            if (account.AutoPayFromAccountId is not Guid funding || funding == Guid.Empty)
+                throw new ArgumentException("Auto-pay requires a funding account.");
+            if (funding == account.Id)
+                throw new ArgumentException("Auto-pay cannot debit the same account.");
         }
 
         // ------------------------------------------------------------
@@ -137,10 +146,11 @@ namespace THMS.Logic.Orchestrators.Finance
         // ------------------------------------------------------------
         private void Normalize(Account account)
         {
+            account.Institution ??= "";
+            account.AccountNumber ??= "";
             if (account is UntrackedAccount)
                 return;
 
-            // Remove spaces, dashes, etc.
             account.AccountNumber = new string(
                 account.AccountNumber.Where(char.IsDigit).ToArray()
             );

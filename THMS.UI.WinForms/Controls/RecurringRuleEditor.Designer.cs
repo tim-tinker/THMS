@@ -36,11 +36,11 @@ namespace THMS.UI.WinForms.Controls
             lblNextOccurrence = new Label();
             dtNextOccurrence = new DateTimePicker();
             pnlButtons = new Panel();
-            btnAdd = new Button();
-            btnSave = new Button();
-            btnDelete = new Button();
-            btnClose = new Button();
-            btnEditSplits = new Button();
+            btnAdd = new ThmsButton();
+            btnSave = new ThmsButton();
+            btnDelete = new ThmsButton();
+            btnClose = new ThmsButton();
+            btnEditSplits = new ThmsButton();
             ((System.ComponentModel.ISupportInitialize)numAmount).BeginInit();
             pnlButtons.SuspendLayout();
             SuspendLayout();
@@ -228,7 +228,7 @@ namespace THMS.UI.WinForms.Controls
             pnlButtons.Dock = DockStyle.Bottom;
             pnlButtons.Location = new Point(0, 371);
             pnlButtons.Name = "pnlButtons";
-            pnlButtons.Size = new Size(414, 60);
+            pnlButtons.Size = new Size(414, 80);
             pnlButtons.TabIndex = 19;
             // 
             // btnAdd
@@ -257,6 +257,7 @@ namespace THMS.UI.WinForms.Controls
             btnDelete.Name = "btnDelete";
             btnDelete.Size = new Size(90, 36);
             btnDelete.TabIndex = 2;
+            btnDelete.Destructive = true;
             btnDelete.Text = "Delete";
             btnDelete.UseVisualStyleBackColor = true;
             btnDelete.Click += OnDelete;
@@ -277,7 +278,7 @@ namespace THMS.UI.WinForms.Controls
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = btnClose;
-            ClientSize = new Size(414, 431);
+            ClientSize = new Size(414, 451);
             Controls.Add(lblRuleType);
             Controls.Add(cmbRuleType);
             Controls.Add(lblAccount);
@@ -330,11 +331,11 @@ namespace THMS.UI.WinForms.Controls
         private ComboBox cmbFrequency;
         private Label lblNextOccurrence;
         private DateTimePicker dtNextOccurrence;
-        private Button btnEditSplits;
+        private ThmsButton btnEditSplits;
         private Panel pnlButtons;
-        private Button btnAdd;
-        private Button btnSave;
-        private Button btnDelete;
-        private Button btnClose;
+        private ThmsButton btnAdd;
+        private ThmsButton btnSave;
+        private ThmsButton btnDelete;
+        private ThmsButton btnClose;
     }
 }

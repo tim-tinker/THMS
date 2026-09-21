@@ -1,4 +1,4 @@
-﻿namespace THMS.UI.WinForms.Controls
+namespace THMS.UI.WinForms.Controls
 {
     partial class TransactionManagerControl
     {
@@ -14,9 +14,9 @@
         private System.Windows.Forms.ComboBox cmbForecastPeriod;
         private System.Windows.Forms.Label lblShow;
         private System.Windows.Forms.ComboBox cmbShow;
-        private System.Windows.Forms.Button btnAddRule;
-        private System.Windows.Forms.Button btnDeleteRule;
-        private System.Windows.Forms.Button btnSplitTransaction;
+        private ThmsButton btnAddRule;
+        private ThmsButton btnDeleteRule;
+        private ThmsButton btnSplitTransaction;
 
         protected override void Dispose(bool disposing)
         {
@@ -58,9 +58,9 @@
             cmbForecastPeriod = new ComboBox();
             lblShow = new Label();
             cmbShow = new ComboBox();
-            btnAddRule = new Button();
-            btnDeleteRule = new Button();
-            btnSplitTransaction = new Button();
+            btnAddRule = new ThmsButton();
+            btnDeleteRule = new ThmsButton();
+            btnSplitTransaction = new ThmsButton();
             NameColumn = new DataGridViewTextBoxColumn();
             AccountTypeColumn = new DataGridViewTextBoxColumn();
             StatementDateColumn = new DataGridViewTextBoxColumn();
@@ -213,8 +213,8 @@
             forecastPanel.Controls.Add(lblShow);
             forecastPanel.Controls.Add(cmbShow);
             forecastPanel.Controls.Add(btnAddRule);
-            forecastPanel.Controls.Add(btnDeleteRule);
             forecastPanel.Controls.Add(btnSplitTransaction);
+            forecastPanel.Controls.Add(btnDeleteRule);
             forecastPanel.AutoSize = true;
             forecastPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             forecastPanel.Dock = DockStyle.Top;
@@ -306,6 +306,7 @@
             // btnDeleteRule
             // 
             btnDeleteRule.AutoSize = true;
+            btnDeleteRule.Destructive = true;
             btnDeleteRule.Enabled = false;
             btnDeleteRule.Location = new Point(751, 10);
             btnDeleteRule.Margin = new Padding(4, 4, 8, 4);

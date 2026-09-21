@@ -59,7 +59,7 @@ namespace THMS.UI.WinForms.Controls
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 Dock = DockStyle.Bottom,
                 FlowDirection = FlowDirection.RightToLeft,
-                Padding = new Padding(8, 8, 8, 12),
+                Padding = new Padding(12, 12, 12, 16),
                 WrapContents = false
             };
             buttons.Controls.Add(btnCancel);

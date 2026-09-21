@@ -10,7 +10,7 @@ namespace THMS.UI.WinForms.Controls
         private ComboBox cboStatementType;
         private Label lblAccount;
         private ComboBox cboAccount;
-        private Button btnNewAccount;
+        private ThmsButton btnNewAccount;
         private TableLayoutPanel pnlCommon;
         private Label lblStatementDate;
         private DateTimePicker dtStatementDate;
@@ -20,12 +20,10 @@ namespace THMS.UI.WinForms.Controls
         private TextBox txtAmountDue;
         private Label lblNotes;
         private TextBox txtNotes;
-        private Label lblPayFrom;
-        private ComboBox cboPayFrom;
         private Panel pnlTypeSpecific;
         private FlowLayoutPanel pnlButtons;
-        private Button btnSave;
-        private Button btnCancel;
+        private ThmsButton btnSave;
+        private ThmsButton btnCancel;
 
         protected override void Dispose(bool disposing)
         {
@@ -43,7 +41,7 @@ namespace THMS.UI.WinForms.Controls
             cboStatementType = new ComboBox();
             lblAccount = new Label();
             cboAccount = new ComboBox();
-            btnNewAccount = new Button();
+            btnNewAccount = new ThmsButton();
             pnlCommon = new TableLayoutPanel();
             lblStatementDate = new Label();
             dtStatementDate = new DateTimePicker();
@@ -53,12 +51,10 @@ namespace THMS.UI.WinForms.Controls
             txtAmountDue = new TextBox();
             lblNotes = new Label();
             txtNotes = new TextBox();
-            lblPayFrom = new Label();
-            cboPayFrom = new ComboBox();
             pnlTypeSpecific = new Panel();
             pnlButtons = new FlowLayoutPanel();
-            btnSave = new Button();
-            btnCancel = new Button();
+            btnSave = new ThmsButton();
+            btnCancel = new ThmsButton();
             layout.SuspendLayout();
             pnlTypeSelector.SuspendLayout();
             typeSelectorLayout.SuspendLayout();
@@ -79,7 +75,7 @@ namespace THMS.UI.WinForms.Controls
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             typeSelectorLayout.ColumnCount = 3;
             typeSelectorLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110F));
@@ -134,8 +130,7 @@ namespace THMS.UI.WinForms.Controls
             pnlCommon.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             pnlCommon.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));
             pnlCommon.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            pnlCommon.RowCount = 4;
-            pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+            pnlCommon.RowCount = 3;
             pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
             pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
             pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
@@ -151,11 +146,8 @@ namespace THMS.UI.WinForms.Controls
             pnlCommon.Controls.Add(lblAmountDue, 0, 1);
             pnlCommon.Controls.Add(txtAmountDue, 1, 1);
             pnlCommon.SetColumnSpan(txtAmountDue, 3);
-            pnlCommon.Controls.Add(lblPayFrom, 0, 2);
-            pnlCommon.Controls.Add(cboPayFrom, 1, 2);
-            pnlCommon.SetColumnSpan(cboPayFrom, 3);
-            pnlCommon.Controls.Add(lblNotes, 0, 3);
-            pnlCommon.Controls.Add(txtNotes, 1, 3);
+            pnlCommon.Controls.Add(lblNotes, 0, 2);
+            pnlCommon.Controls.Add(txtNotes, 1, 2);
             pnlCommon.SetColumnSpan(txtNotes, 3);
 
             lblStatementDate.AutoSize = false;
@@ -184,17 +176,6 @@ namespace THMS.UI.WinForms.Controls
             txtAmountDue.Dock = DockStyle.Fill;
             txtAmountDue.Margin = new Padding(0, 4, 0, 4);
             txtAmountDue.Name = "txtAmountDue";
-            lblPayFrom.AutoSize = false;
-            lblPayFrom.Dock = DockStyle.Fill;
-            lblPayFrom.Name = "lblPayFrom";
-            lblPayFrom.Text = "Pay From";
-            lblPayFrom.TextAlign = ContentAlignment.MiddleLeft;
-            cboPayFrom.Dock = DockStyle.Fill;
-            cboPayFrom.DropDownStyle = ComboBoxStyle.DropDownList;
-            cboPayFrom.DrawMode = DrawMode.OwnerDrawFixed;
-            cboPayFrom.IntegralHeight = false;
-            cboPayFrom.Margin = new Padding(0, 4, 0, 4);
-            cboPayFrom.Name = "cboPayFrom";
             lblNotes.AutoSize = false;
             lblNotes.Dock = DockStyle.Fill;
             lblNotes.Name = "lblNotes";
@@ -210,9 +191,12 @@ namespace THMS.UI.WinForms.Controls
             pnlTypeSpecific.Dock = DockStyle.Fill;
             pnlTypeSpecific.Name = "pnlTypeSpecific";
 
+            pnlButtons.AutoSize = true;
+            pnlButtons.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             pnlButtons.Dock = DockStyle.Fill;
             pnlButtons.FlowDirection = FlowDirection.RightToLeft;
             pnlButtons.Name = "pnlButtons";
+            pnlButtons.Padding = new Padding(12, 12, 12, 16);
             pnlButtons.WrapContents = false;
             btnSave.AutoSize = true;
             btnSave.Name = "btnSave";
@@ -222,8 +206,8 @@ namespace THMS.UI.WinForms.Controls
             btnCancel.Name = "btnCancel";
             btnCancel.Text = "Cancel";
             btnCancel.Click += OnCancel;
-            pnlButtons.Controls.Add(btnSave);
             pnlButtons.Controls.Add(btnCancel);
+            pnlButtons.Controls.Add(btnSave);
 
             AcceptButton = btnSave;
             CancelButton = btnCancel;

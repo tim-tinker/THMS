@@ -1,4 +1,5 @@
-﻿namespace THMS.UI.WinForms
+using THMS.UI.WinForms.Controls;
+namespace THMS.UI.WinForms
 {
     partial class ImporterForm
     {
@@ -6,10 +7,10 @@
 
         private System.Windows.Forms.Label lblFile;
         private System.Windows.Forms.TextBox txtFilePath;
-        private System.Windows.Forms.Button btnBrowse;
+        private ThmsButton btnBrowse;
         private System.Windows.Forms.Label lblImporterType;
         private System.Windows.Forms.ComboBox comboImporterType;
-        private System.Windows.Forms.Button btnImport;
+        private ThmsButton btnImport;
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.ProgressBar progressBar;
 
@@ -26,10 +27,10 @@
         {
             this.lblFile = new System.Windows.Forms.Label();
             this.txtFilePath = new System.Windows.Forms.TextBox();
-            this.btnBrowse = new System.Windows.Forms.Button();
+            this.btnBrowse = new ThmsButton();
             this.lblImporterType = new System.Windows.Forms.Label();
             this.comboImporterType = new System.Windows.Forms.ComboBox();
-            this.btnImport = new System.Windows.Forms.Button();
+            this.btnImport = new ThmsButton();
             this.lblStatus = new System.Windows.Forms.Label();
             this.progressBar = new System.Windows.Forms.ProgressBar();
             this.SuspendLayout();

@@ -10,5 +10,10 @@
 
         public ExternalAccountLink? ExternalLink { get; set; }
         public string WebsiteUrl { get; set; }
+        public bool AutoPay { get; set; }
+        public Guid? AutoPayFromAccountId { get; set; }
+
+        public bool SupportsAutoPay =>
+            this is CreditAccount or LoanAccount or MortgageAccount or UntrackedAccount;
     }
 }

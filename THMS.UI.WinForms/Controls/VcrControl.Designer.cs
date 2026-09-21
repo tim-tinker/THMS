@@ -1,4 +1,4 @@
-﻿using static System.Windows.Forms.DataFormats;
+using static System.Windows.Forms.DataFormats;
 
 namespace THMS.UI.WinForms.Controls
 {
@@ -31,9 +31,9 @@ namespace THMS.UI.WinForms.Controls
         private void InitializeComponent()
         {
             layout = new TableLayoutPanel();
-            _btnBack = new Button();
+            _btnBack = new ThmsButton();
             _datePicker = new DateTimePicker();
-            _btnForward = new Button();
+            _btnForward = new ThmsButton();
             layout.SuspendLayout();
             SuspendLayout();
             // 
@@ -102,8 +102,8 @@ namespace THMS.UI.WinForms.Controls
         #endregion
 
         private TableLayoutPanel layout;
-        private Button _btnBack;
-        private Button _btnForward;
+        private ThmsButton _btnBack;
+        private ThmsButton _btnForward;
         private DateTimePicker _datePicker;
     }
 }

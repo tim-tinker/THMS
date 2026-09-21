@@ -7,8 +7,6 @@
         private FlowLayoutPanel pnlButtons;
         private ThmsButton btnAdd;
         private ThmsButton btnDelete;
-        private ThmsButton btnImport;
-        private ThmsButton btnConnectPlaid;
         private ThmsButton btnDiagnostics;
         private Label lblStatus;
 
@@ -25,8 +23,6 @@
             pnlButtons = new FlowLayoutPanel();
             btnAdd = new ThmsButton();
             btnDelete = new ThmsButton();
-            btnImport = new ThmsButton();
-            btnConnectPlaid = new ThmsButton();
             btnDiagnostics = new ThmsButton();
             lblStatus = new Label();
             ((System.ComponentModel.ISupportInitialize)gridAccounts).BeginInit();
@@ -48,28 +44,29 @@
             gridAccounts.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             gridAccounts.TabIndex = 0;
             gridAccounts.Columns.AddRange(
-                TextColumn("Name", "Name", fill: true),
-                TextColumn("Type", "Type"),
-                TextColumn("Institution", "Institution"),
-                TextColumn("AccountNumber", "Account Number"),
+                NameColumn(),
                 TextColumn("StatementDate", "Statement Date"),
-                MoneyColumn("StatementBalance", "Statement Balance"),
-                TextColumn("DueDate", "Due Date"),
-                MoneyColumn("AmountDue", "Amount Due"));
+                MoneyColumn("StatementBalance", "Balance"),
+                MoneyColumn("InterestPaid", "Interest Paid"),
+                MoneyColumn("AmountDue", "Amount Due"),
+                TextColumn("Paid", "Paid"),
+                TextColumn("DueDate", "Due"),
+                TextColumn("Apr", "APR"),
+                MoneyColumn("CreditLimit", "Credit Limit"));
+            foreach (DataGridViewColumn column in gridAccounts.Columns)
+                column.SortMode = DataGridViewColumnSortMode.Automatic;
             // 
             // pnlButtons
             // 
             pnlButtons.Controls.Add(btnAdd);
-            pnlButtons.Controls.Add(btnDelete);
-            pnlButtons.Controls.Add(btnImport);
-            pnlButtons.Controls.Add(btnConnectPlaid);
             pnlButtons.Controls.Add(btnDiagnostics);
+            pnlButtons.Controls.Add(btnDelete);
             pnlButtons.AutoSize = true;
             pnlButtons.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             pnlButtons.Dock = DockStyle.Bottom;
             pnlButtons.FlowDirection = FlowDirection.LeftToRight;
             pnlButtons.Name = "pnlButtons";
-            pnlButtons.Padding = new Padding(8, 8, 8, 8);
+            pnlButtons.Padding = new Padding(12, 12, 12, 16);
             pnlButtons.Size = new Size(800, 56);
             pnlButtons.TabIndex = 1;
             pnlButtons.WrapContents = true;
@@ -97,20 +94,6 @@
             btnDelete.Text = "Delete Account";
             btnDelete.Click += OnDeleteAccount;
             // 
-            // btnImport
-            // 
-            btnImport.Name = "btnImport";
-            btnImport.TabIndex = 3;
-            btnImport.Text = "Import";
-            btnImport.Click += OnImportAccounts;
-            // 
-            // btnConnectPlaid
-            // 
-            btnConnectPlaid.Name = "btnConnectPlaid";
-            btnConnectPlaid.TabIndex = 4;
-            btnConnectPlaid.Text = "Connect to Plaid";
-            btnConnectPlaid.Click += OnConnectToPlaid;
-            // 
             // btnDiagnostics
             // 
             btnDiagnostics.Name = "btnDiagnostics";
@@ -129,6 +112,19 @@
             pnlButtons.ResumeLayout(false);
             ResumeLayout(false);
         }
+
+        private static DataGridViewLinkColumn NameColumn() =>
+            new()
+            {
+                DataPropertyName = "Name",
+                HeaderText = "Account",
+                Name = "Name",
+                ReadOnly = true,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                LinkBehavior = LinkBehavior.HoverUnderline,
+                TrackVisitedState = false,
+                SortMode = DataGridViewColumnSortMode.Automatic
+            };
 
         private static DataGridViewTextBoxColumn TextColumn(string property, string header, bool fill = false) =>
             new()

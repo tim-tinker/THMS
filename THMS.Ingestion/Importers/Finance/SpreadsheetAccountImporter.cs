@@ -99,6 +99,8 @@ namespace THMS.Ingestion.Importers.Finance
                     break;
 
                 case LoanAccount loan:
+                    if (TryReadDecimal(reader, 5, out var loanApr))
+                        loan.InterestRate = loanApr;
                     if (TryReadDecimal(reader, 6, out var principal))
                         loan.Principal = principal;
                     if (TryReadInt(reader, 7, out var term))
@@ -106,6 +108,8 @@ namespace THMS.Ingestion.Importers.Finance
                     break;
 
                 case MortgageAccount mortgage:
+                    if (TryReadDecimal(reader, 5, out var mortgageApr))
+                        mortgage.InterestRate = mortgageApr;
                     if (TryReadDecimal(reader, 6, out var mPrincipal))
                         mortgage.Principal = mPrincipal;
                     if (TryReadInt(reader, 7, out var mTerm))

@@ -52,7 +52,8 @@ namespace THMS.Tests.Logic
             Assert.That(new LoanDiagnosticsOrchestrator(), Is.Not.Null);
             Assert.That(new ForecastDiagnosticsOrchestrator(), Is.Not.Null);
             Assert.That(new PlanningOrchestrator(), Is.Not.Null);
-            Assert.That(new BillsOrchestrator(), Is.Not.Null);
+            Assert.That(new ReconciliationOrchestrator(), Is.Not.Null);
+            Assert.That(new AccountActivityOrchestrator(), Is.Not.Null);
             Assert.That(new PlaidAccountOrchestrator(), Is.Not.Null);
             Assert.That(new PlaidTransactionOrchestrator(), Is.Not.Null);
             Assert.That(new ExternalTransactionAccess(), Is.Not.Null);

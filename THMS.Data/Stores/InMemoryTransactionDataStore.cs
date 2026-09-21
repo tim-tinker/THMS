@@ -315,6 +315,27 @@ namespace THMS.Data.Stores
         public IEnumerable<PaymentIntent> GetScheduledPaymentIntents() =>
             _store.GetScheduledPaymentIntents();
 
+        public void AddReconciliation(TransactionReconciliation reconciliation)
+        {
+            _store.AddReconciliation(reconciliation);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public void DeleteReconciliation(Guid id)
+        {
+            _store.DeleteReconciliation(id);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public TransactionReconciliation? GetReconciliation(Guid id) =>
+            _store.GetReconciliation(id);
+
+        public TransactionReconciliation? GetReconciliationByImported(Guid importedTransactionId) =>
+            _store.GetReconciliationByImported(importedTransactionId);
+
+        public IEnumerable<TransactionReconciliation> GetAllReconciliations() =>
+            _store.GetAllReconciliations();
+
         public void SaveSplits(Guid parentId, IEnumerable<SplitTransactionRow> splits)
         {
             _store.SaveSplits(parentId, splits);

@@ -74,10 +74,9 @@ namespace THMS.Data.Stores.SqliteStores
             if (baseInfo == null)
                 return null;
 
-            var (name, institution, accountNumber, type, balanceAsOf, classType) = baseInfo.Value;
             var externalLink = _externalLinkTable.Get(conn, id);
 
-            Account? account = classType switch
+            Account? account = baseInfo.ClassType switch
             {
                 nameof(BankAccount) => LoadBank(conn, id),
                 nameof(CreditAccount) => LoadCredit(conn, id),
@@ -93,11 +92,14 @@ namespace THMS.Data.Stores.SqliteStores
                 return null;
 
             account.Id = id;
-            account.Name = name;
-            account.Institution = institution;
-            account.AccountNumber = accountNumber;
-            account.Type = type;
-            account.BalanceAsOf = balanceAsOf;
+            account.Name = baseInfo.Name;
+            account.Institution = baseInfo.Institution;
+            account.AccountNumber = baseInfo.AccountNumber;
+            account.Type = baseInfo.Type;
+            account.BalanceAsOf = baseInfo.BalanceAsOf;
+            account.WebsiteUrl = baseInfo.WebsiteUrl;
+            account.AutoPay = baseInfo.AutoPay;
+            account.AutoPayFromAccountId = baseInfo.AutoPayFromAccountId;
             account.ExternalLink = externalLink;
             return account;
         }

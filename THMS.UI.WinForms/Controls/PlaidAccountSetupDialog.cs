@@ -31,12 +31,11 @@ namespace THMS.UI.WinForms.Controls
 
             var heading = new Label
             {
+                AutoSize = true,
                 Dock = DockStyle.Top,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                Height = 36,
-                Padding = new Padding(8, 8, 8, 0),
-                Text = "Connect a Plaid institution, then map each Plaid account to a THMS account.",
-                TextAlign = ContentAlignment.MiddleLeft
+                Padding = new Padding(12, 12, 12, 8),
+                Text = "Connect a Plaid institution, then map each Plaid account to a THMS account."
             };
 
             _btnLink.Text = "Link Institution (Plaid Link)";
@@ -51,7 +50,7 @@ namespace THMS.UI.WinForms.Controls
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 Dock = DockStyle.Bottom,
                 FlowDirection = FlowDirection.RightToLeft,
-                Padding = new Padding(8, 8, 8, 12),
+                Padding = new Padding(12, 12, 12, 16),
                 WrapContents = false
             };
             buttons.Controls.Add(btnClose);

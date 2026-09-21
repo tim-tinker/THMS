@@ -17,8 +17,10 @@ namespace THMS.UI.WinForms.Controls
         {
             components = new System.ComponentModel.Container();
             gridHistory = new DataGridView();
-            btnClose = new Button();
+            pnlButtons = new FlowLayoutPanel();
+            btnClose = new ThmsButton();
             ((System.ComponentModel.ISupportInitialize)gridHistory).BeginInit();
+            pnlButtons.SuspendLayout();
             SuspendLayout();
             gridHistory.AllowUserToAddRows = false;
             gridHistory.AllowUserToDeleteRows = false;
@@ -29,8 +31,15 @@ namespace THMS.UI.WinForms.Controls
             gridHistory.ReadOnly = true;
             gridHistory.RowHeadersVisible = false;
             gridHistory.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            btnClose.Dock = DockStyle.Bottom;
-            btnClose.Height = 40;
+            pnlButtons.AutoSize = true;
+            pnlButtons.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            pnlButtons.Controls.Add(btnClose);
+            pnlButtons.Dock = DockStyle.Bottom;
+            pnlButtons.FlowDirection = FlowDirection.RightToLeft;
+            pnlButtons.Name = "pnlButtons";
+            pnlButtons.Padding = new Padding(12, 12, 12, 16);
+            pnlButtons.WrapContents = false;
+            btnClose.AutoSize = true;
             btnClose.Name = "btnClose";
             btnClose.Text = "Close";
             btnClose.Click += OnClose;
@@ -39,7 +48,7 @@ namespace THMS.UI.WinForms.Controls
             CancelButton = btnClose;
             ClientSize = new Size(900, 360);
             Controls.Add(gridHistory);
-            Controls.Add(btnClose);
+            Controls.Add(pnlButtons);
             FormBorderStyle = FormBorderStyle.Sizable;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -47,12 +56,16 @@ namespace THMS.UI.WinForms.Controls
             StartPosition = FormStartPosition.CenterParent;
             Text = "Budget History";
             ((System.ComponentModel.ISupportInitialize)gridHistory).EndInit();
+            pnlButtons.ResumeLayout(false);
+            pnlButtons.PerformLayout();
             ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion
 
         private DataGridView gridHistory;
-        private Button btnClose;
+        private FlowLayoutPanel pnlButtons;
+        private ThmsButton btnClose;
     }
 }

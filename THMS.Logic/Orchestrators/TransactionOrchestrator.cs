@@ -1,5 +1,4 @@
 ﻿using THMS.Data.Stores;
-using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Forecast;
 using THMS.Logic.Finance.Model;
@@ -13,7 +12,6 @@ namespace THMS.Logic.Orchestrators
     {
         private readonly ITransactionDataStore _store;
         private readonly ForecastGenerator _forecastGenerator = new();
-        private readonly FutureReconciler _reconciler = new();
 
         public TransactionOrchestrator()
             : this(new DataStoreFactory().GetTransactionStore())
@@ -31,8 +29,8 @@ namespace THMS.Logic.Orchestrators
             {
                 Posted = _store.GetPostedTransactions(accountId),
                 PostedTransfers = _store.GetPostedTransferTransactions(accountId),
-                FutureSingles = _store.GetFutureSingleTransactions(accountId).Where(f => f.IsUserCreated),
-                FutureTransfers = _store.GetFutureTransferTransactions(accountId).Where(f => f.IsUserCreated),
+                FutureSingles = _store.GetFutureSingleTransactions(accountId).Where(f => !f.IsRealized),
+                FutureTransfers = _store.GetFutureTransferTransactions(accountId).Where(f => !f.IsRealized),
                 RecurringSingles = _store.GetRecurringSingleRules(accountId),
                 RecurringTransfers = _store.GetRecurringTransferRules(accountId),
                 IncomingTransferSplitPosted = IncomingPostedSplitSources(accountId, DateTime.MinValue, DateTime.MaxValue),
@@ -50,9 +48,9 @@ namespace THMS.Logic.Orchestrators
                 Posted = _store.GetPostedTransactions(accountId, start, end),
                 PostedTransfers = _store.GetPostedTransferTransactions(accountId, start, end),
                 FutureSingles = _store.GetFutureSingleTransactions(accountId)
-                    .Where(f => f.IsUserCreated && InRange(f.Date, start, end)),
+                    .Where(f => !f.IsRealized && InRange(f.Date, start, end)),
                 FutureTransfers = _store.GetFutureTransferTransactions(accountId)
-                    .Where(f => f.IsUserCreated && InRange(f.Date, start, end)),
+                    .Where(f => !f.IsRealized && InRange(f.Date, start, end)),
                 RecurringSingles = _store.GetRecurringSingleRules(accountId),
                 RecurringTransfers = _store.GetRecurringTransferRules(accountId),
                 IncomingTransferSplitPosted = IncomingPostedSplitSources(accountId, start, end),
@@ -98,20 +96,36 @@ namespace THMS.Logic.Orchestrators
                 to,
                 _store.GetAllRecurringSingleRules(),
                 _store.GetAllRecurringTransferRules());
-            var scheduled = _store.GetScheduledPaymentIntents().ToList();
+            var scheduled = UnmatchedExpected();
             if (scheduled.Count == 0)
                 return forecast;
 
-            return forecast.Where(row => !CoveredByScheduledIntent(row, scheduled)).ToList();
+            return forecast.Where(row => !CoveredByExpected(row, scheduled)).ToList();
         }
 
-        private static bool CoveredByScheduledIntent(
+        private List<BaseTransaction> UnmatchedExpected()
+        {
+            var list = new List<BaseTransaction>();
+            list.AddRange(_store.GetAllFutureSingleTransactions().Where(e => !e.IsRealized));
+            list.AddRange(_store.GetAllFutureTransferTransactions().Where(e => !e.IsRealized));
+            return list;
+        }
+
+        private static bool CoveredByExpected(
             UnifiedTransactionView row,
-            IReadOnlyList<PaymentIntent> scheduled) =>
-            scheduled.Any(intent =>
-                (intent.FundingAccountId == row.AccountId || intent.DestinationAccountId == row.AccountId)
-                && Math.Abs(Math.Abs(intent.Amount) - Math.Abs(row.Amount)) <= RecurringRulePattern.AmountTolerance
-                && Math.Abs((intent.PayDate.Date - row.Date.Date).TotalDays) <= BillsOrchestrator.MatchDayTolerance);
+            IReadOnlyList<BaseTransaction> expected) =>
+            expected.Any(item =>
+            {
+                var accountsMatch = item switch
+                {
+                    FutureSingleTransaction s => s.AccountId == row.AccountId,
+                    FutureTransferTransaction t => t.FromAccountId == row.AccountId || t.ToAccountId == row.AccountId,
+                    _ => false
+                };
+                return accountsMatch
+                    && Math.Abs(Math.Abs(item.Amount) - Math.Abs(row.Amount)) <= RecurringRulePattern.AmountTolerance
+                    && Math.Abs((item.Date.Date - row.Date.Date).TotalDays) <= BillsOrchestrator.MatchDayTolerance;
+            });
 
         public decimal ComputePostedBalance(Guid accountId, decimal startingBalance)
         {
@@ -124,22 +138,8 @@ namespace THMS.Logic.Orchestrators
 
         public BaseTransaction? GetParent(Guid transactionId) => FindParent(transactionId);
 
-        public void ReconcileRules(Guid accountId)
-        {
-            var posted = _store.GetPostedTransactions(accountId).ToList();
-            var postedTransfers = _store.GetPostedTransferTransactions(accountId).ToList();
-            var singleRules = _store.GetRecurringSingleRules(accountId).ToList();
-            var transferRules = _store.GetRecurringTransferRules(accountId).ToList();
-
-            _reconciler.ReconcileSingles(posted, singleRules);
-            _reconciler.ReconcileTransfers(postedTransfers, transferRules);
-
-            foreach (var rule in _reconciler.MatchedSingleRules)
-                _store.UpdateRecurringSingleRule(rule);
-
-            foreach (var rule in _reconciler.MatchedTransferRules)
-                _store.UpdateRecurringTransferRule(rule);
-        }
+        public void ReconcileRules(Guid accountId) =>
+            new ReconciliationOrchestrator(_store).RecommendMatches();
 
         public List<SplitTransactionRow> GetSplits(Guid transactionId) =>
             _store.GetSplits(transactionId);
@@ -175,7 +175,7 @@ namespace THMS.Logic.Orchestrators
 
         private IEnumerable<FutureSingleTransaction> IncomingFutureSplitSources(Guid accountId) =>
             _store.GetAllFutureSingleTransactions()
-                .Where(t => t.AccountId != accountId && HasTransferTo(t, accountId));
+                .Where(t => !t.IsRealized && t.AccountId != accountId && HasTransferTo(t, accountId));
 
         private decimal SumIncomingTransferSplits(Guid accountId, DateTime? before)
         {

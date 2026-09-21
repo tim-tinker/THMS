@@ -1,12 +1,13 @@
-﻿namespace THMS.UI.WinForms
+using THMS.UI.WinForms.Controls;
+namespace THMS.UI.WinForms
 {
     partial class VehicleSelectionForm
     {
         private System.ComponentModel.IContainer components = null;
 
         private System.Windows.Forms.DataGridView gridVehicles;
-        private System.Windows.Forms.Button btnOk;
-        private System.Windows.Forms.Button btnCancel;
+        private ThmsButton btnOk;
+        private ThmsButton btnCancel;
 
         protected override void Dispose(bool disposing)
         {
@@ -20,8 +21,8 @@
         private void InitializeComponent()
         {
             gridVehicles = new DataGridView();
-            btnOk = new Button();
-            btnCancel = new Button();
+            btnOk = new ThmsButton();
+            btnCancel = new ThmsButton();
             NameColumn = new DataGridViewTextBoxColumn();
             MakeColumn = new DataGridViewTextBoxColumn();
             ModelColumn = new DataGridViewTextBoxColumn();
@@ -107,7 +108,7 @@
             // 
             AutoScaleDimensions = new SizeF(12F, 30F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(600, 430);
+            ClientSize = new Size(600, 446);
             Controls.Add(btnCancel);
             Controls.Add(btnOk);
             Controls.Add(gridVehicles);

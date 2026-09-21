@@ -111,10 +111,12 @@ namespace THMS.Logic.Finance.Forecast
             {
                 if (next >= from)
                 {
-                    var amount = OccurrenceAmount(
-                        rule.Amount, rule.IsFinalPaymentDifferent, rule.EndDate, rule.FinalPaymentAmount, next);
-                    if (rule.FromAccountId != rule.ToAccountId && rule.ToAccountId == accountId)
-                        amount = -amount;
+                    var amount = SplitTransactionMath.TransferAmountForAccount(
+                        rule.FromAccountId,
+                        rule.ToAccountId,
+                        OccurrenceAmount(
+                            rule.Amount, rule.IsFinalPaymentDifferent, rule.EndDate, rule.FinalPaymentAmount, next),
+                        accountId);
 
                     yield return UnifiedTransactionViewBuilder.ForLedgerRow(
                         rule,

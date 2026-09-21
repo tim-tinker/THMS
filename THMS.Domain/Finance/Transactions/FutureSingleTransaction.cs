@@ -14,5 +14,12 @@
         public Guid? StatementId { get; set; }
         public Guid? PromotionalBalanceId { get; set; }
         public string? PlanningNote { get; set; }
+
+        public ExpectedOrigin Origin { get; set; } = ExpectedOrigin.Manual;
+        public Guid? OriginId { get; set; }
+        public ExpectedStatus Status { get; set; } = ExpectedStatus.Planned;
+
+        public string DisplayStatus(DateTime? asOf = null) =>
+            TransactionStatuses.ForExpected(Date, IsRealized, Status, asOf);
     }
 }

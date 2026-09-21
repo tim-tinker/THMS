@@ -145,11 +145,11 @@ namespace THMS.UI.WinForms
                 WrapContents = true,
                 Padding = new Padding(0, 0, 0, 4)
             };
-            var btnPeriod = new Button { Text = "Open Current Period", AutoSize = true };
-            var btnTransfer = new Button { Text = "Transfer Balance", AutoSize = true };
-            var btnHistory = new Button { Text = "View History", AutoSize = true };
-            var btnCategories = new Button { Text = "Manage Categories", AutoSize = true };
-            var btnLedger = new Button { Text = "Open Ledger", AutoSize = true };
+            var btnPeriod = new ThmsButton { Text = "Open Current Period" };
+            var btnTransfer = new ThmsButton { Text = "Transfer Balance" };
+            var btnHistory = new ThmsButton { Text = "View History" };
+            var btnCategories = new ThmsButton { Text = "Manage Categories" };
+            var btnLedger = new ThmsButton { Text = "Open Ledger" };
             btnPeriod.Click += (_, _) => OpenSelectedPeriod();
             btnTransfer.Click += (_, _) => OpenSelectedTransfer();
             btnHistory.Click += (_, _) => OpenSelectedHistory();

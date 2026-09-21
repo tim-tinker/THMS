@@ -134,6 +134,7 @@ namespace THMS.Tests.Logic
                         Date = new DateTime(2026, 1, 5),
                         Description = "HEB",
                         Amount = -80,
+                        ImportedStatus = ImportedStatus.AcceptedNew,
                         Splits =
                         [
                             new() { Id = Guid.NewGuid(), Amount = -50, Type = SplitType.Expense, Category = "Groceries", CategoryId = DefaultExpenseCategories.GroceriesId },
@@ -167,6 +168,7 @@ namespace THMS.Tests.Logic
                 Date = new DateTime(2026, 1, 5),
                 Description = "Paycheck",
                 Amount = 1234,
+                ImportedStatus = ImportedStatus.AcceptedNew,
                 Splits =
                 [
                     new() { Amount = 2345, Type = SplitType.Income },
@@ -279,6 +281,7 @@ namespace THMS.Tests.Logic
                 Date = new DateTime(2026, 1, 5),
                 Description = "Paycheck",
                 Amount = 1234,
+                ImportedStatus = ImportedStatus.AcceptedNew,
                 Splits =
                 [
                     new() { Amount = 2345, Type = SplitType.Income, CategoryId = DefaultExpenseCategories.UncategorizedId, Category = DefaultExpenseCategories.Uncategorized },

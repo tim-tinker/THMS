@@ -12,8 +12,13 @@ namespace THMS.Logic.ViewModels.Finance
         public Guid? SourceId { get; set; }
         public Guid DestinationAccountId { get; set; }
         public string DestinationName { get; set; } = "";
+        public string WebsiteUrl { get; set; } = "";
         public Guid FundingAccountId { get; set; }
         public string FundingName { get; set; } = "";
+        public Guid? OtherAccountId { get; set; }
+        public string OtherAccountName { get; set; } = "";
+        public string OtherWebsiteUrl { get; set; } = "";
+        public bool CanChoosePayFrom { get; set; }
         public string Kind { get; set; } = "";
         public DateTime DueDate { get; set; }
         public decimal Amount { get; set; }
@@ -37,6 +42,7 @@ namespace THMS.Logic.ViewModels.Finance
     {
         public const string Due = "Due";
         public const string Scheduled = "Scheduled";
+        public const string Pending = "Pending";
     }
 
     public static class BillKinds

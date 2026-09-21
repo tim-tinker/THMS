@@ -1,6 +1,7 @@
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
+using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Planning;
 using THMS.Logic.ViewModels.Finance;
 
@@ -57,11 +58,13 @@ namespace THMS.Logic.Orchestrators.Finance
             if (_statements.Get(id) is null)
                 throw new InvalidOperationException("Statement was not found.");
 
-            foreach (var intent in _transactions.GetScheduledPaymentIntents()
-                         .Where(p => p.Source == PaymentIntentSource.Statement && p.SourceId == id)
+            foreach (var expected in _transactions.GetAllFutureTransferTransactions()
+                         .Where(p => !p.IsRealized
+                                     && p.Origin == ExpectedOrigin.StatementPay
+                                     && p.OriginId == id)
                          .ToList())
             {
-                _transactions.DeletePaymentIntent(intent.Id);
+                _transactions.DeleteFutureTransferTransaction(expected.Id);
             }
 
             _statements.Delete(id);
@@ -72,6 +75,87 @@ namespace THMS.Logic.Orchestrators.Finance
             ArgumentNullException.ThrowIfNull(statement);
             AccountStatementValidator.EnsureValid(statement);
             _statements.Save(statement);
+            var account = _accounts.GetAllAccounts().FirstOrDefault(a => a.Id == statement.AccountId);
+            if (account is not null)
+                SyncAutoPayForAccount(account);
+            else
+                SyncAutoPayForStatement(statement);
+        }
+
+        public void SyncAutoPayForAccount(Account account)
+        {
+            ArgumentNullException.ThrowIfNull(account);
+            DropSupersededStatementIntents(account.Id);
+            var latest = PayableStatements.Latest(_statements.GetForAccount(account.Id));
+            if (latest is not null)
+                SyncAutoPayForStatement(latest, account);
+        }
+
+        private void DropSupersededStatementIntents(Guid accountId)
+        {
+            var keepId = PayableStatements.Latest(_statements.GetForAccount(accountId))?.Id;
+            var statementIds = _statements.GetForAccount(accountId).Select(s => s.Id).ToHashSet();
+            foreach (var expected in _transactions.GetAllFutureTransferTransactions()
+                         .Where(p => !p.IsRealized
+                                     && p.Origin == ExpectedOrigin.StatementPay
+                                     && p.OriginId is Guid sourceId
+                                     && statementIds.Contains(sourceId)
+                                     && sourceId != keepId)
+                         .ToList())
+            {
+                _transactions.DeleteFutureTransferTransaction(expected.Id);
+            }
+        }
+
+        private void SyncAutoPayForStatement(AccountStatement statement, Account? account = null)
+        {
+            account ??= _accounts.GetAllAccounts().FirstOrDefault(a => a.Id == statement.AccountId);
+            var existing = _transactions.GetAllFutureTransferTransactions()
+                .FirstOrDefault(p => !p.IsRealized
+                                     && p.Origin == ExpectedOrigin.StatementPay
+                                     && p.OriginId == statement.Id);
+            var latest = PayableStatements.Latest(_statements.GetForAccount(statement.AccountId));
+
+            if (statement is BankStatement || statement.AmountDue <= 0 || latest?.Id != statement.Id)
+            {
+                if (existing is not null)
+                    _transactions.DeleteFutureTransferTransaction(existing.Id);
+                return;
+            }
+
+            if (account is null || !account.AutoPay ||
+                account.AutoPayFromAccountId is not Guid funding || funding == Guid.Empty)
+            {
+                return;
+            }
+
+            if (existing is not null)
+            {
+                existing.ToAccountId = statement.AccountId;
+                existing.FromAccountId = funding;
+                existing.Amount = Math.Abs(statement.AmountDue);
+                existing.Date = statement.DueDate.Date;
+                existing.Status = ExpectedStatus.Scheduled;
+                if (string.IsNullOrWhiteSpace(existing.Description))
+                    existing.Description = string.IsNullOrWhiteSpace(statement.Notes) ? account.Name : statement.Notes.Trim();
+                _transactions.UpdateFutureTransferTransaction(existing);
+                return;
+            }
+
+            _transactions.AddFutureTransferTransaction(new FutureTransferTransaction
+            {
+                FromAccountId = funding,
+                ToAccountId = statement.AccountId,
+                Amount = Math.Abs(statement.AmountDue),
+                Date = statement.DueDate.Date,
+                Status = ExpectedStatus.Scheduled,
+                Origin = ExpectedOrigin.StatementPay,
+                OriginId = statement.Id,
+                StatementId = statement.Id,
+                IsUserCreated = true,
+                IsPlannedPayment = true,
+                Description = string.IsNullOrWhiteSpace(statement.Notes) ? account.Name : statement.Notes.Trim()
+            });
         }
     }
 }

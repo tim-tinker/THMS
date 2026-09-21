@@ -22,7 +22,7 @@ namespace THMS.Logic.ViewModels.Finance
                 AccountNumber = account.AccountNumber,
                 WebsiteUrl = account.WebsiteUrl,
                 CreditLimit = account is CreditAccount credit ? credit.CreditLimit : null,
-                Apr = account is CreditAccount creditApr ? creditApr.APR : null,
+                Apr = AprOf(account),
                 Principal = account switch
                 {
                     LoanAccount loan => loan.Principal,
@@ -61,12 +61,16 @@ namespace THMS.Logic.ViewModels.Finance
                         credit.APR = Apr.Value;
                     break;
                 case LoanAccount loan:
+                    if (Apr.HasValue)
+                        loan.InterestRate = Apr.Value;
                     if (Principal.HasValue)
                         loan.Principal = Principal.Value;
                     if (TermMonths.HasValue)
                         loan.TermMonths = TermMonths.Value;
                     break;
                 case MortgageAccount mortgage:
+                    if (Apr.HasValue)
+                        mortgage.InterestRate = Apr.Value;
                     if (Principal.HasValue)
                         mortgage.Principal = Principal.Value;
                     if (TermMonths.HasValue)
@@ -78,6 +82,14 @@ namespace THMS.Logic.ViewModels.Finance
             Type = TypeLabel(account);
             return account;
         }
+
+        private static decimal? AprOf(Account account) => account switch
+        {
+            CreditAccount credit => credit.APR,
+            LoanAccount loan => loan.InterestRate,
+            MortgageAccount mortgage => mortgage.InterestRate,
+            _ => null
+        };
 
         public static string TypeLabel(Account account) => account switch
         {

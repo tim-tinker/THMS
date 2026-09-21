@@ -24,6 +24,10 @@ namespace THMS.UI.WinForms.Controls
         private readonly AccountOrchestrator _accountOrchestrator = new();
         private readonly TransactionOrchestrator _txOrchestrator = new();
         private readonly RecurringRuleOrchestrator _ruleOrchestrator = new();
+        private readonly ReconciliationOrchestrator _reconciliationOrchestrator = new();
+        private readonly BindingSource _importedSource = new();
+        private DataGridView importedGrid = null!;
+        private Label? lblImported;
         private readonly BudgetOrchestrator _budgetOrchestrator = new();
         private readonly CategoryOrchestrator _categoryOrchestrator = new();
         private readonly IAccountStatementDataStore _statements = new DataStoreFactory().GetAccountStatementStore();
@@ -242,8 +246,19 @@ namespace THMS.UI.WinForms.Controls
             detailGrid.AutoGenerateColumns = false;
             detailGrid.ReadOnly = true;
             detailGrid.EditMode = DataGridViewEditMode.EditProgrammatically;
-            detailGrid.SelectionMode = DataGridViewSelectionMode.CellSelect;
+            detailGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            detailGrid.MultiSelect = true;
             CategoryColumn.ReadOnly = true;
+            if (detailGrid.Columns["Status"] is null)
+            {
+                detailGrid.Columns.Insert(4, new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = nameof(UnifiedTransactionView.Status),
+                    HeaderText = "Status",
+                    Name = "Status",
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
+                });
+            }
 
             detailGrid.DataSource = _transactionsSource;
             masterGrid.DataSource = _accountsSource;
@@ -266,6 +281,7 @@ namespace THMS.UI.WinForms.Controls
             detailGrid.KeyDown += OnTransactionGridKeyDown;
             detailGrid.CellMouseClick += OnCategoryCellMouseClick;
             detailGrid.SelectionChanged += (_, _) => UpdateRuleActionButtons();
+            detailGrid.MouseDown += OnLedgerMouseDown;
         }
 
         private void HostBudgetUi()
@@ -315,7 +331,7 @@ namespace THMS.UI.WinForms.Controls
             forecastBar.Controls.Add(lblLoadStatus);
             forecastBar.Controls.Add(progressLoad);
 
-            transactionsPage.Controls.Add(detailGrid);
+            transactionsPage.Controls.Add(BuildTransactionSplit());
             transactionsPage.Controls.Add(forecastBar);
 
             HostCategoryUi(categoryPage);
@@ -342,10 +358,10 @@ namespace THMS.UI.WinForms.Controls
             btnTransferBalance.Click += (_, _) => OpenBudgetTransfer();
             toolbar.Controls.Add(btnAddBudget);
             toolbar.Controls.Add(btnEditBudget);
-            toolbar.Controls.Add(btnDeleteBudget);
             toolbar.Controls.Add(btnViewHistory);
             toolbar.Controls.Add(btnOpenPeriod);
             toolbar.Controls.Add(btnTransferBalance);
+            toolbar.Controls.Add(btnDeleteBudget);
 
             budgetGrid = new DataGridView
             {
@@ -384,6 +400,70 @@ namespace THMS.UI.WinForms.Controls
             _categoryPage = categoryPage;
             _budgetsPage = budgetsPage;
             splitContainer.Panel2.Controls.Add(tabDetails);
+        }
+
+        private Control BuildTransactionSplit()
+        {
+            importedGrid = new DataGridView
+            {
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToResizeRows = false,
+                AutoGenerateColumns = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                Dock = DockStyle.Fill,
+                MultiSelect = true,
+                ReadOnly = true,
+                RowHeadersVisible = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            };
+            DataGridViewUtil.EnableDoubleBuffering(importedGrid);
+            var importedDate = TextColumn(nameof(ImportedTransactionView.Date), "Date");
+            importedDate.DefaultCellStyle.Format = "d";
+            importedDate.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            var importedAmount = CurrencyColumn(nameof(ImportedTransactionView.Amount), "Amount");
+            importedAmount.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            var importedDescription = TextColumn(nameof(ImportedTransactionView.Description), "Description");
+            importedDescription.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            importedDescription.FillWeight = 100;
+            var importedMatch = TextColumn(nameof(ImportedTransactionView.RecommendedMatch), "Recommended Match");
+            importedMatch.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            importedMatch.FillWeight = 120;
+            var importedStatus = TextColumn(nameof(ImportedTransactionView.Status), "Status");
+            importedStatus.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            importedGrid.Columns.AddRange(
+                importedDate,
+                importedAmount,
+                importedDescription,
+                importedMatch,
+                importedStatus);
+            importedGrid.DataSource = _importedSource;
+            importedGrid.MouseDown += OnImportedMouseDown;
+
+            lblImported = new Label
+            {
+                AutoSize = false,
+                Dock = DockStyle.Top,
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Padding = new Padding(8, 10, 8, 8),
+                Text = "Imported (unreconciled)",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            lblImported.Height = lblImported.PreferredHeight;
+
+            var importedPanel = new Panel { Dock = DockStyle.Fill };
+            importedPanel.Controls.Add(importedGrid);
+            importedPanel.Controls.Add(lblImported);
+
+            var split = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Horizontal,
+                SplitterDistance = 280
+            };
+            split.Panel1.Controls.Add(detailGrid);
+            split.Panel2.Controls.Add(importedPanel);
+            return split;
         }
 
         private void HostCategoryUi(TabPage categoryPage)
@@ -499,6 +579,175 @@ namespace THMS.UI.WinForms.Controls
             RefreshCurrentAccount();
         }
 
+        private void LoadImported(Guid accountId)
+        {
+            if (importedGrid is null)
+                return;
+            var rows = _reconciliationOrchestrator.GetUnreconciled(accountId);
+            _importedSource.DataSource = rows;
+            if (lblImported is not null)
+                lblImported.Text = rows.Count == 0
+                    ? "Imported (none unreconciled)"
+                    : $"Imported (unreconciled) — {rows.Count}";
+        }
+
+        private void OnImportedMouseDown(object? sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Right || importedGrid is null)
+                return;
+            var hit = importedGrid.HitTest(e.X, e.Y);
+            if (hit.RowIndex >= 0)
+            {
+                if (!importedGrid.Rows[hit.RowIndex].Selected)
+                {
+                    importedGrid.ClearSelection();
+                    importedGrid.Rows[hit.RowIndex].Selected = true;
+                }
+            }
+
+            var selected = SelectedImported().ToList();
+            var menu = new ContextMenuStrip();
+            var accept = new ToolStripMenuItem("Accept Match");
+            accept.Enabled = selected.Count > 0 && selected.All(r => r.RecommendedExpectedId is Guid);
+            accept.Click += (_, _) => AcceptImportedMatches(selected);
+            var change = new ToolStripMenuItem("Change Match");
+            change.Enabled = selected.Count == 1;
+            change.Click += (_, _) => ChangeImportedMatch(selected[0]);
+            var asNew = new ToolStripMenuItem("Accept as New");
+            asNew.Enabled = selected.Count > 0;
+            asNew.Click += (_, _) => AcceptImportedAsNew(selected);
+            var before = new ToolStripMenuItem("Accept all unreconciled before date…");
+            before.Enabled = CurrentAccountId is Guid;
+            before.Click += (_, _) => AcceptImportedBeforeDate();
+            menu.Items.Add(accept);
+            menu.Items.Add(change);
+            menu.Items.Add(asNew);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(before);
+            menu.Show(importedGrid, e.Location);
+        }
+
+        private void OnLedgerMouseDown(object? sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Right)
+                return;
+            var hit = detailGrid.HitTest(e.X, e.Y);
+            if (hit.RowIndex < 0)
+                return;
+            if (!detailGrid.Rows[hit.RowIndex].Selected)
+            {
+                detailGrid.ClearSelection();
+                detailGrid.Rows[hit.RowIndex].Selected = true;
+            }
+
+            var selected = detailGrid.SelectedRows
+                .Cast<DataGridViewRow>()
+                .Select(r => r.DataBoundItem)
+                .OfType<UnifiedTransactionView>()
+                .Where(v => v.Status is TransactionStatuses.Reconciled or TransactionStatuses.New)
+                .ToList();
+            if (selected.Count == 0)
+                return;
+
+            var menu = new ContextMenuStrip();
+            var undo = new ToolStripMenuItem("Undo Match");
+            undo.Click += (_, _) => UndoLedgerMatches(selected);
+            menu.Items.Add(undo);
+            menu.Show(detailGrid, e.Location);
+        }
+
+        private IEnumerable<ImportedTransactionView> SelectedImported()
+        {
+            if (importedGrid is null)
+                yield break;
+            foreach (DataGridViewRow row in importedGrid.SelectedRows)
+            {
+                if (row.DataBoundItem is ImportedTransactionView view)
+                    yield return view;
+            }
+        }
+
+        private void AcceptImportedMatches(IReadOnlyList<ImportedTransactionView> rows)
+        {
+            try
+            {
+                foreach (var row in rows)
+                    _reconciliationOrchestrator.AcceptMatch(row.Id);
+                RefreshAll();
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(FindForm(), ex.Message, "Accept Match", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void AcceptImportedAsNew(IReadOnlyList<ImportedTransactionView> rows)
+        {
+            try
+            {
+                foreach (var row in rows)
+                    _reconciliationOrchestrator.AcceptAsNew(row.Id);
+                RefreshAll();
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(FindForm(), ex.Message, "Accept as New", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void ChangeImportedMatch(ImportedTransactionView imported)
+        {
+            if (CurrentAccountId is not Guid accountId)
+                return;
+            var choices = _reconciliationOrchestrator.GetUnmatchedExpected(accountId).ToList();
+            using var dialog = new ChangeMatchDialog(imported, choices);
+            if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+                return;
+            try
+            {
+                if (dialog.TreatAsNew)
+                    _reconciliationOrchestrator.AcceptAsNew(imported.Id);
+                else if (dialog.SelectedExpectedId is Guid expectedId)
+                    _reconciliationOrchestrator.AcceptMatch(imported.Id, expectedId);
+                RefreshAll();
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(FindForm(), ex.Message, "Change Match", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void AcceptImportedBeforeDate()
+        {
+            if (CurrentAccountId is not Guid accountId)
+                return;
+            var suggested = _statements.GetForAccount(accountId)
+                .OrderByDescending(s => s.StatementDate)
+                .Select(s => s.StatementDate.Date)
+                .FirstOrDefault();
+            if (suggested == default)
+                suggested = DateTime.Today;
+            using var dialog = new AcceptBeforeDateDialog(suggested);
+            if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+                return;
+            _reconciliationOrchestrator.AcceptAsNewBefore(accountId, dialog.BeforeDate);
+            RefreshAll();
+        }
+
+        private void UndoLedgerMatches(IReadOnlyList<UnifiedTransactionView> rows)
+        {
+            try
+            {
+                foreach (var row in rows)
+                    _reconciliationOrchestrator.UndoMatch(row.LookupId);
+                RefreshAll();
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(FindForm(), ex.Message, "Undo Match", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
         private void OnForecastPeriodChanged(object? sender, EventArgs e)
         {
             if (!_ready)
@@ -552,6 +801,7 @@ namespace THMS.UI.WinForms.Controls
 
                 ShowLoadProgress("Updating grid...");
                 _transactionsSource.DataSource = views;
+                LoadImported(accountId);
                 UpdateRuleActionButtons();
             }
             catch (OperationCanceledException)
@@ -607,11 +857,11 @@ namespace THMS.UI.WinForms.Controls
             var posted = UnifiedTransactionViewBuilder.Build(
                 txs.Posted,
                 txs.PostedTransfers,
-                txs.FutureSingles,
-                txs.FutureTransfers,
+                userFutureSingles: [],
+                userFutureTransfers: [],
                 accountId,
                 txs.IncomingTransferSplitPosted,
-                txs.IncomingTransferSplitFutures);
+                incomingFutureSplitSources: []);
 
             if (show == ShowPosted)
                 return posted;

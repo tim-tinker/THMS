@@ -23,6 +23,9 @@
         public Guid? CategoryId { get; set; }
         public string? Category { get; set; }
         public string Type { get; set; } = "";
+        public string Status { get; set; } = "";
+        public Guid? RecommendedExpectedId { get; set; }
+        public string RecommendedMatch { get; set; } = "";
 
         public decimal? ForecastBalance { get; set; }
 

@@ -17,6 +17,7 @@ namespace THMS.Data.Stores.InMemoryStores
         private readonly List<CategoryAssignment> _assignments = new();
         private readonly List<SplitTransactionRow> _splits = new();
         private readonly List<PaymentIntent> _paymentIntents = new();
+        private readonly List<TransactionReconciliation> _reconciliations = new();
 
         // ------------------------------------------------------------
         // Posted Transactions
@@ -230,6 +231,23 @@ namespace THMS.Data.Stores.InMemoryStores
 
         public IEnumerable<PaymentIntent> GetScheduledPaymentIntents() =>
             _paymentIntents.Where(p => p.Status == PaymentIntentStatus.Scheduled).OrderBy(p => p.PayDate).ToList();
+
+        public void AddReconciliation(TransactionReconciliation reconciliation) => Add(_reconciliations, reconciliation);
+
+        public void DeleteReconciliation(Guid id) =>
+            _reconciliations.RemoveAll(r => r.Id == id);
+
+        public TransactionReconciliation? GetReconciliation(Guid id) =>
+            _reconciliations.FirstOrDefault(r => r.Id == id);
+
+        public TransactionReconciliation? GetReconciliationByImported(Guid importedId) =>
+            _reconciliations
+                .Where(r => r.ImportedTransactionId == importedId)
+                .OrderByDescending(r => r.AcceptedOn)
+                .FirstOrDefault();
+
+        public IEnumerable<TransactionReconciliation> GetAllReconciliations() =>
+            _reconciliations.OrderBy(r => r.AcceptedOn).ToList();
 
         // ------------------------------------------------------------
         // Recurring Single Rules

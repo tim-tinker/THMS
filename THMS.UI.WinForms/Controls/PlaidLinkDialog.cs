@@ -76,7 +76,7 @@ namespace THMS.UI.WinForms.Controls
                 Dock = DockStyle.Fill,
                 FlowDirection = FlowDirection.RightToLeft,
                 Margin = new Padding(0, 8, 0, 0),
-                Padding = new Padding(0, 4, 0, 8),
+                Padding = new Padding(0, 8, 0, 16),
                 WrapContents = false
             };
             var btnCancel = new ThmsButton

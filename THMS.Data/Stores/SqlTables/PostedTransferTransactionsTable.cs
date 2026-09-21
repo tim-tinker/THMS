@@ -21,6 +21,8 @@ namespace THMS.Data.Stores.SqlTables
                 );";
             cmd.ExecuteNonQuery();
             SqliteCategoryColumns.EnsureCategoryId(conn, "PostedTransferTransactions");
+            EnsureColumn(conn, "ImportedStatus", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn(conn, "RecommendedExpectedId", "TEXT");
         }
 
         public void Add(SqliteConnection conn, PostedTransferTransaction transaction)
@@ -28,9 +30,11 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO PostedTransferTransactions
-                (Id, AccountId, Date, Description, Amount, Category, CategoryId, RelatedPostedTransactionId, Direction)
+                (Id, AccountId, Date, Description, Amount, Category, CategoryId, RelatedPostedTransactionId, Direction,
+                 ImportedStatus, RecommendedExpectedId)
                 VALUES
-                (@Id, @AccountId, @Date, @Description, @Amount, @Category, @CategoryId, @RelatedPostedTransactionId, @Direction);";
+                (@Id, @AccountId, @Date, @Description, @Amount, @Category, @CategoryId, @RelatedPostedTransactionId, @Direction,
+                 @ImportedStatus, @RecommendedExpectedId);";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
         }
@@ -47,7 +51,9 @@ namespace THMS.Data.Stores.SqlTables
                     Category = @Category,
                     CategoryId = @CategoryId,
                     RelatedPostedTransactionId = @RelatedPostedTransactionId,
-                    Direction = @Direction
+                    Direction = @Direction,
+                    ImportedStatus = @ImportedStatus,
+                    RecommendedExpectedId = @RecommendedExpectedId
                 WHERE Id = @Id;";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
@@ -163,7 +169,7 @@ namespace THMS.Data.Stores.SqlTables
         }
 
         private const string SelectColumns =
-            "SELECT Id, AccountId, Date, Description, Amount, Category, RelatedPostedTransactionId, Direction, CategoryId";
+            "SELECT Id, AccountId, Date, Description, Amount, Category, RelatedPostedTransactionId, Direction, CategoryId, ImportedStatus, RecommendedExpectedId";
 
         private static void Bind(SqliteCommand cmd, PostedTransferTransaction transaction)
         {
@@ -180,6 +186,12 @@ namespace THMS.Data.Stores.SqlTables
                     ? DBNull.Value
                     : transaction.RelatedPostedTransactionId.ToString());
             cmd.Parameters.AddWithValue("@Direction", transaction.Direction.ToString());
+            cmd.Parameters.AddWithValue("@ImportedStatus", (int)transaction.ImportedStatus);
+            cmd.Parameters.AddWithValue(
+                "@RecommendedExpectedId",
+                transaction.RecommendedExpectedId is Guid expected && expected != Guid.Empty
+                    ? expected.ToString()
+                    : DBNull.Value);
         }
 
         private static PostedTransferTransaction Read(SqliteDataReader reader)
@@ -194,8 +206,22 @@ namespace THMS.Data.Stores.SqlTables
                 Category = reader.IsDBNull(5) ? null : reader.GetString(5),
                 RelatedPostedTransactionId = reader.IsDBNull(6) ? Guid.Empty : Guid.Parse(reader.GetString(6)),
                 Direction = Enum.Parse<TransferDirection>(reader.GetString(7)),
-                CategoryId = SqliteCategoryColumns.ReadId(reader, 8)
+                CategoryId = SqliteCategoryColumns.ReadId(reader, 8),
+                ImportedStatus = ReadImportedStatus(reader, 9),
+                RecommendedExpectedId = SqliteCategoryColumns.ReadId(reader, 10)
             };
+        }
+
+        private static ImportedStatus ReadImportedStatus(SqliteDataReader reader, int index) =>
+            reader.FieldCount > index && !reader.IsDBNull(index)
+                ? (ImportedStatus)reader.GetInt32(index)
+                : ImportedStatus.Unreconciled;
+
+        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
+        {
+            using var alter = conn.CreateCommand();
+            alter.CommandText = $"ALTER TABLE PostedTransferTransactions ADD COLUMN IF NOT EXISTS {columnName} {columnDef};";
+            alter.ExecuteNonQuery();
         }
 
         private static IEnumerable<PostedTransferTransaction> ReadAll(SqliteCommand cmd)

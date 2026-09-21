@@ -8,9 +8,9 @@ namespace THMS.UI.WinForms.Controls
         private readonly Label _status = new();
         private readonly ProgressBar _progress = new();
         private readonly Panel _progressHost = new();
-        private readonly Button _btnOk = new();
-        private readonly Button _btnCancel = new();
-        private readonly Button _btnDelete = new();
+        private readonly ThmsButton _btnOk = new();
+        private readonly ThmsButton _btnCancel = new();
+        private readonly ThmsButton _btnDelete = new() { Destructive = true };
 
         protected ImportPreviewDialog(IList<TRow> rows)
         {
@@ -48,14 +48,15 @@ namespace THMS.UI.WinForms.Controls
             var buttons = new FlowLayoutPanel
             {
                 Dock = DockStyle.Bottom,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FlowDirection = FlowDirection.RightToLeft,
-                Height = 48,
-                Padding = new Padding(8),
+                Padding = new Padding(12, 12, 12, 16),
                 WrapContents = false
             };
-            buttons.Controls.Add(_btnOk);
             buttons.Controls.Add(_btnCancel);
             buttons.Controls.Add(_btnDelete);
+            buttons.Controls.Add(_btnOk);
 
             _status.Dock = DockStyle.Bottom;
             _status.Height = 24;
