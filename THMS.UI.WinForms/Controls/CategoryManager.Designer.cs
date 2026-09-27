@@ -19,7 +19,6 @@ namespace THMS.UI.WinForms.Controls
             SuspendLayout();
             manager.Dock = DockStyle.Fill;
             manager.Name = "manager";
-            AcceptButton = manager.SaveButton;
             CancelButton = manager.CloseButton;
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;

@@ -9,7 +9,6 @@ namespace THMS.UI.WinForms.Controls
         private readonly TransactionImportOrchestrator _importOrchestrator;
         private readonly PlaidTransactionOrchestrator _plaidTransactionOrchestrator;
         private List<TransactionImportPreview> _filePreviewRows = [];
-        private List<PlaidTransactionViewModel> _plaidPreviewRows = [];
 
         public TransactionIngestionControl()
             : this(new TransactionImportOrchestrator(), new PlaidTransactionOrchestrator())
@@ -24,9 +23,6 @@ namespace THMS.UI.WinForms.Controls
             _plaidTransactionOrchestrator = plaidTransactionOrchestrator;
             InitializeComponent();
             ConfigureFilePreviewGrid();
-            ConfigurePlaidPreviewGrid();
-            dtStart.Value = DateTime.Today.AddDays(-30);
-            dtEnd.Value = DateTime.Today;
         }
 
         private void ConfigureFilePreviewGrid()
@@ -39,26 +35,6 @@ namespace THMS.UI.WinForms.Controls
                 AmountColumn(nameof(TransactionImportPreview.Amount), "Amount"),
                 TextColumn(nameof(TransactionImportPreview.Account), "Account"),
                 TextColumn(nameof(TransactionImportPreview.Category), "Category"));
-        }
-
-        private void ConfigurePlaidPreviewGrid()
-        {
-            gridPlaidPreview.AutoGenerateColumns = false;
-            gridPlaidPreview.Columns.Clear();
-            gridPlaidPreview.Columns.AddRange(
-                DateColumn(nameof(PlaidTransactionViewModel.Date), "Date"),
-                TextColumn(nameof(PlaidTransactionViewModel.Description), "Description"),
-                AmountColumn(nameof(PlaidTransactionViewModel.Amount), "Amount"),
-                TextColumn(nameof(PlaidTransactionViewModel.Account), "Account"),
-                TextColumn(nameof(PlaidTransactionViewModel.Category), "Category"),
-                new DataGridViewCheckBoxColumn
-                {
-                    DataPropertyName = nameof(PlaidTransactionViewModel.Pending),
-                    HeaderText = "Pending",
-                    Name = nameof(PlaidTransactionViewModel.Pending),
-                    ReadOnly = true,
-                    AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
-                });
         }
 
         private static DataGridViewTextBoxColumn TextColumn(string property, string header) =>
@@ -143,46 +119,24 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
-        private async void OnDownloadPlaid(object sender, EventArgs e)
+        private async void OnSyncPlaid(object sender, EventArgs e)
         {
-            btnDownloadPlaid.Enabled = false;
-            SetPlaidStatus("Downloading Plaid transactions...");
+            btnSyncPlaid.Enabled = false;
+            AppStatus.Set("Syncing Plaid...", busy: true);
             try
             {
-                _plaidPreviewRows = await _plaidTransactionOrchestrator.DownloadNewTransactions(
-                    dtStart.Value.Date,
-                    dtEnd.Value.Date);
-                gridPlaidPreview.DataSource = _plaidPreviewRows;
-                SetPlaidStatus($"Downloaded {_plaidPreviewRows.Count} Plaid transaction{(_plaidPreviewRows.Count == 1 ? "" : "s")}.");
+                var progress = new Progress<PlaidSyncProgress>(AppStatus.Report);
+                var result = await _plaidTransactionOrchestrator.SyncIncrementalAsync(progress: progress);
+                AppStatus.Set(result.Summary);
             }
             catch (Exception ex)
             {
-                ShowError($"Plaid download failed.\n{ex.Message}");
-                SetPlaidStatus("Download failed.");
+                ShowError($"Plaid sync failed.\n{ex.Message}");
+                AppStatus.Set("Plaid sync failed.");
             }
             finally
             {
-                btnDownloadPlaid.Enabled = true;
-            }
-        }
-
-        private void OnImportPlaid(object sender, EventArgs e)
-        {
-            if (_plaidPreviewRows.Count == 0)
-            {
-                ShowError("Download Plaid transactions before importing.");
-                return;
-            }
-
-            try
-            {
-                var imported = _plaidTransactionOrchestrator.ImportTransactions(_plaidPreviewRows);
-                SetPlaidStatus(ImportStatusText.Imported(imported, "Plaid transaction", "Plaid transactions"));
-            }
-            catch (Exception ex)
-            {
-                ShowError($"Plaid import failed.\n{ex.Message}");
-                SetPlaidStatus("Import failed.");
+                btnSyncPlaid.Enabled = true;
             }
         }
 
@@ -200,7 +154,5 @@ namespace THMS.UI.WinForms.Controls
         }
 
         private void SetFileStatus(string message) => lblFileStatus.Text = message;
-
-        private void SetPlaidStatus(string message) => lblPlaidStatus.Text = message;
     }
 }

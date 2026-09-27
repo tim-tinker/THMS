@@ -25,7 +25,6 @@ namespace THMS.UI.WinForms.Controls
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            AcceptButton = manager.SaveButton;
             CancelButton = manager.CloseButton;
         }
 

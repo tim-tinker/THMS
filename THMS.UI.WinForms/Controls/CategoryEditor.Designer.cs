@@ -20,7 +20,9 @@ namespace THMS.UI.WinForms.Controls
             txtName = new TextBox();
             lblParent = new Label();
             cmbParent = new ComboBox();
+            chkActive = new CheckBox();
             btnSave = new ThmsButton();
+            btnDeactivate = new ThmsButton();
             btnCancel = new ThmsButton();
             SuspendLayout();
             lblName.AutoSize = true;
@@ -38,12 +40,23 @@ namespace THMS.UI.WinForms.Controls
             cmbParent.Location = new Point(130, 52);
             cmbParent.Name = "cmbParent";
             cmbParent.Size = new Size(220, 23);
-            btnSave.Location = new Point(130, 124);
+            chkActive.AutoSize = true;
+            chkActive.Location = new Point(130, 92);
+            chkActive.Name = "chkActive";
+            chkActive.Text = "Active";
+            btnSave.Location = new Point(130, 132);
             btnSave.Name = "btnSave";
             btnSave.Size = new Size(90, 36);
             btnSave.Text = "Save";
             btnSave.Click += OnSave;
-            btnCancel.Location = new Point(230, 124);
+            btnDeactivate.Destructive = true;
+            btnDeactivate.Location = new Point(20, 132);
+            btnDeactivate.Name = "btnDeactivate";
+            btnDeactivate.Size = new Size(100, 36);
+            btnDeactivate.Text = "Deactivate";
+            btnDeactivate.Visible = false;
+            btnDeactivate.Click += OnDeactivate;
+            btnCancel.Location = new Point(230, 132);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(90, 36);
             btnCancel.Text = "Cancel";
@@ -57,6 +70,8 @@ namespace THMS.UI.WinForms.Controls
             Controls.Add(txtName);
             Controls.Add(lblParent);
             Controls.Add(cmbParent);
+            Controls.Add(chkActive);
+            Controls.Add(btnDeactivate);
             Controls.Add(btnSave);
             Controls.Add(btnCancel);
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -75,7 +90,9 @@ namespace THMS.UI.WinForms.Controls
         private TextBox txtName;
         private Label lblParent;
         private ComboBox cmbParent;
+        private CheckBox chkActive;
         private ThmsButton btnSave;
+        private ThmsButton btnDeactivate;
         private ThmsButton btnCancel;
     }
 }

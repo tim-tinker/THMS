@@ -7,28 +7,36 @@ namespace THMS.UI.WinForms.Controls
     public partial class BudgetRuleEditor : Form
     {
         private BudgetOrchestrator? _orchestrator;
-        private Guid _accountId;
         private ExpenseBudgetRule? _existing;
+        private ExpenseCategory? _seedCategory;
 
         public BudgetRuleEditor()
         {
             InitializeComponent();
         }
 
-        public BudgetRuleEditor(Guid accountId, ExpenseBudgetRule? existing = null)
-            : this(new BudgetOrchestrator(), accountId, existing)
+        public BudgetRuleEditor(BudgetOrchestrator orchestrator, ExpenseBudgetRule? existing = null)
+            : this(orchestrator, existing, seedCategory: null)
         {
         }
 
-        public BudgetRuleEditor(BudgetOrchestrator orchestrator, Guid accountId, ExpenseBudgetRule? existing = null)
+        public BudgetRuleEditor(BudgetOrchestrator orchestrator, ExpenseCategory seedCategory)
+            : this(orchestrator, existing: null, seedCategory)
+        {
+        }
+
+        public BudgetRuleEditor(
+            BudgetOrchestrator orchestrator,
+            ExpenseBudgetRule? existing,
+            ExpenseCategory? seedCategory)
             : this()
         {
             if (LicenseManager.UsageMode == LicenseUsageMode.Designtime)
                 return;
 
             _orchestrator = orchestrator;
-            _accountId = accountId;
             _existing = existing;
+            _seedCategory = seedCategory;
             Bind();
         }
 
@@ -42,11 +50,13 @@ namespace THMS.UI.WinForms.Controls
             cmbFrequency.SelectedIndex = 2;
 
             var selected = new HashSet<Guid>(_existing?.IncludedCategoryIds ?? []);
+            if (_seedCategory is not null)
+                selected.Add(_seedCategory.Id);
             BindCategoryTree(selected);
 
             if (_existing is null)
             {
-                txtName.Text = "";
+                txtName.Text = _seedCategory?.Name ?? "";
                 numAmount.Value = 0;
                 chkActive.Checked = true;
                 btnSave.Enabled = false;
@@ -135,7 +145,6 @@ namespace THMS.UI.WinForms.Controls
             rule = new ExpenseBudgetRule
             {
                 Id = newId || _existing is null ? Guid.NewGuid() : _existing.Id,
-                AccountId = _accountId,
                 BudgetName = txtName.Text.Trim(),
                 IncludedCategoryIds = categories,
                 BudgetFrequency = ParseFrequency(cmbFrequency.SelectedItem?.ToString()),

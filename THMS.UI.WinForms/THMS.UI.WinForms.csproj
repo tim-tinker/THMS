@@ -65,27 +65,27 @@
     <Compile Update="Controls\RecurringRuleImportPreviewDialog.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="Controls\PlaidAccountSetupDialog.cs">
-      <SubType>Form</SubType>
-    </Compile>
+            <Compile Update="Controls\PlaidAccountSetupDialog.cs">
+                <SubType>Form</SubType>
+            </Compile>
+            <Compile Update="Controls\PlaidHistoryStartDialog.cs">
+                <SubType>Form</SubType>
+            </Compile>
     <Compile Update="Controls\ThmsButton.cs">
       <SubType>Component</SubType>
     </Compile>
     <Compile Update="RegisterForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="Controls\TransactionImportPreviewDialog.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Controls\EvChargeSessionImportPreviewDialog.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Controls\PlaidTransactionImportDialog.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Controls\TransactionIngestionControl.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
+            <Compile Update="Controls\TransactionImportPreviewDialog.cs">
+                <SubType>Form</SubType>
+            </Compile>
+            <Compile Update="Controls\EvChargeSessionImportPreviewDialog.cs">
+                <SubType>Form</SubType>
+            </Compile>
+            <Compile Update="Controls\TransactionIngestionControl.cs">
+                <SubType>UserControl</SubType>
+            </Compile>
     <Compile Update="Controls\FinanceDiagnosticsControl.cs">
       <SubType>UserControl</SubType>
     </Compile>

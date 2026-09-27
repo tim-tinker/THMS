@@ -134,7 +134,9 @@ namespace THMS.Logic.Orchestrators
                 AccountId = row.AccountId,
                 Date = row.Date,
                 Amount = row.Amount,
-                Description = row.Description ?? ""
+                Description = row.Description ?? "",
+                ExternalTransactionId = row.ExternalTransactionId ?? "",
+                ImportedStatus = ImportedStatus.Unreconciled
             };
 
             if (!categorize)
@@ -193,6 +195,18 @@ namespace THMS.Logic.Orchestrators
                 existing = _txStore.GetPostedTransactions(row.AccountId).ToList();
                 existingByAccount[row.AccountId] = existing;
             }
+
+            if (!string.IsNullOrWhiteSpace(row.ExternalTransactionId)
+                && (existing.Any(posted =>
+                        string.Equals(posted.ExternalTransactionId, row.ExternalTransactionId, StringComparison.Ordinal))
+                    || _txStore.GetPostedTransferTransactions(row.AccountId).Any(posted =>
+                        string.Equals(posted.ExternalTransactionId, row.ExternalTransactionId, StringComparison.Ordinal))))
+            {
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(row.ExternalTransactionId))
+                return false;
 
             return existing.Any(posted =>
                 posted.Date.Date == row.Date.Date

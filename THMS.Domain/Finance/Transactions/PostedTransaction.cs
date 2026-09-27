@@ -3,6 +3,7 @@
     public class PostedTransaction : BaseSingleAccountTransaction
     {
         public string? PlaidCategory { get; set; }
+        public string ExternalTransactionId { get; set; } = "";
         public ImportedStatus ImportedStatus { get; set; } = ImportedStatus.Unreconciled;
         public Guid? RecommendedExpectedId { get; set; }
 

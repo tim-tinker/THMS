@@ -6,6 +6,7 @@ namespace THMS.Data.Stores
     public class InMemoryAccountDataStore : IAccountDataStore
     {
         private readonly InMemoryAccountStore _accountStore = new();
+        private readonly Dictionary<string, PlaidItemSyncState> _itemSync = new(StringComparer.Ordinal);
 
         public void UpsertAccount(Account account)
         {
@@ -22,6 +23,17 @@ namespace THMS.Data.Stores
         public void DeleteAccount(Guid id)
         {
             _accountStore.Delete(id);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public IReadOnlyList<PlaidItemSyncState> GetPlaidItemSyncStates() => _itemSync.Values.ToList();
+
+        public PlaidItemSyncState? GetPlaidItemSyncState(string itemId) =>
+            _itemSync.TryGetValue(itemId, out var state) ? state : null;
+
+        public void UpsertPlaidItemSyncState(PlaidItemSyncState state)
+        {
+            _itemSync[state.ItemId] = state;
             FinanceDataRevision.NoteChanged();
         }
     }

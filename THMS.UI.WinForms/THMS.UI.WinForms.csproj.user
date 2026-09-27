@@ -103,6 +103,9 @@
     <Compile Update="Controls\PlaidAccountSetupDialog.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Controls\PlaidHistoryStartDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Controls\PlaidLinkDialog.cs">
       <SubType>Form</SubType>
     </Compile>

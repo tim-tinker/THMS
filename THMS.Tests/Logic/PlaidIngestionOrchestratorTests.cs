@@ -68,6 +68,10 @@ namespace THMS.Tests.Logic
             Assert.That(linked.ExternalLink.AccountMask, Is.EqualTo("1234"));
             Assert.That(linked.ExternalLink.InstitutionName, Is.EqualTo("First Platypus Bank"));
             Assert.That(linked.Institution, Is.EqualTo("First Platypus Bank"));
+            var itemState = accounts.GetPlaidItemSyncState(link.ItemId);
+            Assert.That(itemState, Is.Not.Null);
+            Assert.That(itemState!.HasCursor, Is.False);
+            Assert.That(itemState.Status, Is.EqualTo(PlaidItemSyncStatus.NotSynced));
         }
 
         [Test]
@@ -114,6 +118,29 @@ namespace THMS.Tests.Logic
             Assert.That(accounts.GetAccount("Checking")!.ExternalLink, Is.Null);
             Assert.That(accounts.GetAccount("Savings")!.ExternalLink, Is.Not.Null);
             Assert.That(accounts.GetAccount("Savings")!.ExternalLink!.PlaidAccountId, Is.EqualTo("plaid-checking"));
+        }
+
+        [Test]
+        public void ItemsNeedingInitialHistory_ReturnsMappedItemsWithoutCursor()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var checking = NewBank("Checking", "1234");
+            accounts.UpsertAccount(checking);
+            var orchestrator = Create(accounts);
+            var row = MappedRow(checking.Id, "plaid-checking", "1234");
+
+            orchestrator.SaveAccountMappings([row]);
+            var needing = orchestrator.ItemsNeedingInitialHistory([row]);
+            Assert.That(needing, Has.Count.EqualTo(1));
+            Assert.That(needing[0].ItemId, Is.EqualTo("item"));
+
+            accounts.UpsertPlaidItemSyncState(new PlaidItemSyncState
+            {
+                ItemId = "item",
+                Cursor = "cursor-1",
+                Status = PlaidItemSyncStatus.Synced
+            });
+            Assert.That(orchestrator.ItemsNeedingInitialHistory([row]), Is.Empty);
         }
 
         [Test]
@@ -405,6 +432,49 @@ namespace THMS.Tests.Logic
             Assert.That(posted[0].Category, Is.EqualTo("Restaurants"));
             Assert.That(posted[0].CategoryId, Is.Not.Null);
         }
+
+        [Test]
+        public void ImportTransactions_SkipsDuplicateExternalTransactionId()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var txs = new InMemoryTransactionDataStore();
+            var checking = new BankAccount
+            {
+                Name = "Checking",
+                Institution = "Bank",
+                AccountNumber = "1",
+                WebsiteUrl = ""
+            };
+            accounts.UpsertAccount(checking);
+            var orchestrator = new TransactionImportOrchestrator(
+                new FakeTransactionFetcher(),
+                txs,
+                accounts);
+            var first = new TransactionImportPreview
+            {
+                Date = new DateTime(2026, 3, 1),
+                Description = "Coffee",
+                Amount = -4.50m,
+                Account = "Checking",
+                AccountId = checking.Id,
+                ExternalTransactionId = "plaid-tx-1"
+            };
+            var second = new TransactionImportPreview
+            {
+                Date = new DateTime(2026, 3, 2),
+                Description = "Coffee again",
+                Amount = -9m,
+                Account = "Checking",
+                AccountId = checking.Id,
+                ExternalTransactionId = "plaid-tx-1"
+            };
+
+            orchestrator.ImportTransactions([first]);
+            var imported = orchestrator.ImportTransactions([second]);
+
+            Assert.That(imported.Count, Is.EqualTo(0));
+            Assert.That(txs.GetPostedTransactions(checking.Id).ToList(), Has.Count.EqualTo(1));
+        }
     }
 
     [TestFixture]
@@ -489,6 +559,231 @@ namespace THMS.Tests.Logic
                 async () => await orchestrator.DownloadNewTransactions(DateTime.Today.AddDays(-30), DateTime.Today),
                 Throws.InvalidOperationException);
         }
+
+        [Test]
+        public async Task SyncInitial_ImportsUnreconciledSkipsPendingAndOlderThanHistoryStart()
+        {
+            var (accounts, txs, checking, fetcher) = Linked();
+            fetcher.SyncPages.Enqueue(new TransactionSyncPage
+            {
+                Added =
+                [
+                    Tx("tx-old", checking, new DateTime(2026, 1, 1), "Old", -5m),
+                    Tx("tx-ok", checking, new DateTime(2026, 4, 2), "Market", -12.34m),
+                    Tx("tx-pending", checking, new DateTime(2026, 4, 3), "Hold", -1m, pending: true),
+                    Tx("tx-other", "other-plaid", new DateTime(2026, 4, 2), "Other bank", -9m)
+                ],
+                NextCursor = "cursor-1",
+                HasMore = false
+            });
+            var orchestrator = new PlaidTransactionOrchestrator(accounts, fetcher, txs);
+
+            var result = await orchestrator.SyncInitialAsync("item", new DateTime(2026, 3, 1));
+
+            Assert.That(result.Imported, Is.EqualTo(1));
+            Assert.That(result.ItemsSynced, Is.EqualTo(1));
+            var posted = txs.GetPostedTransactions(checking.Id).Single();
+            Assert.That(posted.Description, Is.EqualTo("Market"));
+            Assert.That(posted.ExternalTransactionId, Is.EqualTo("tx-ok"));
+            Assert.That(posted.ImportedStatus, Is.EqualTo(ImportedStatus.Unreconciled));
+            var state = accounts.GetPlaidItemSyncState("item");
+            Assert.That(state, Is.Not.Null);
+            Assert.That(state!.Cursor, Is.EqualTo("cursor-1"));
+            Assert.That(state.Status, Is.EqualTo(PlaidItemSyncStatus.Synced));
+            Assert.That(state.HistoryStartDate, Is.EqualTo(new DateTime(2026, 3, 1)));
+            Assert.That(fetcher.LastSyncCursor, Is.EqualTo(""));
+        }
+
+        [Test]
+        public async Task SyncIncremental_SkipsItemsWithoutCursor()
+        {
+            var (accounts, txs, _, fetcher) = Linked();
+            fetcher.SyncPages.Enqueue(new TransactionSyncPage
+            {
+                Added = [Tx("tx-1", "plaid-checking", new DateTime(2026, 4, 2), "Market", -12m)],
+                NextCursor = "cursor-1",
+                HasMore = false
+            });
+            var orchestrator = new PlaidTransactionOrchestrator(accounts, fetcher, txs);
+
+            var result = await orchestrator.SyncIncrementalAsync();
+
+            Assert.That(result.Imported, Is.EqualTo(0));
+            Assert.That(result.ItemsSkipped, Is.EqualTo(1));
+            Assert.That(result.Summary, Does.Contain("Import history"));
+            Assert.That(txs.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue), Is.Empty);
+            Assert.That(fetcher.LastSyncAccessToken, Is.Null);
+        }
+
+        [Test]
+        public async Task SyncIncremental_AfterCursor_ImportsAdded()
+        {
+            var (accounts, txs, checking, fetcher) = Linked();
+            accounts.UpsertPlaidItemSyncState(new PlaidItemSyncState
+            {
+                ItemId = "item",
+                Cursor = "cursor-1",
+                Status = PlaidItemSyncStatus.Synced
+            });
+            fetcher.SyncPages.Enqueue(new TransactionSyncPage
+            {
+                Added = [Tx("tx-2", checking, new DateTime(2026, 4, 4), "Payroll", 100m)],
+                NextCursor = "cursor-2",
+                HasMore = false
+            });
+            var orchestrator = new PlaidTransactionOrchestrator(accounts, fetcher, txs);
+
+            var result = await orchestrator.SyncIncrementalAsync();
+
+            Assert.That(result.Imported, Is.EqualTo(1));
+            Assert.That(result.ItemsSynced, Is.EqualTo(1));
+            Assert.That(fetcher.LastSyncCursor, Is.EqualTo("cursor-1"));
+            Assert.That(accounts.GetPlaidItemSyncState("item")!.Cursor, Is.EqualTo("cursor-2"));
+            Assert.That(txs.GetPostedTransactions(checking.Id).Single().Description, Is.EqualTo("Payroll"));
+        }
+
+        [Test]
+        public async Task SyncIncremental_SetsNeedsAuthOnLoginRequired()
+        {
+            var (accounts, txs, _, fetcher) = Linked();
+            accounts.UpsertPlaidItemSyncState(new PlaidItemSyncState
+            {
+                ItemId = "item",
+                Cursor = "cursor-1",
+                Status = PlaidItemSyncStatus.Synced
+            });
+            fetcher.Exception = new PlaidItemLoginRequiredException("ITEM_LOGIN_REQUIRED");
+            var orchestrator = new PlaidTransactionOrchestrator(accounts, fetcher, txs);
+
+            var result = await orchestrator.SyncIncrementalAsync();
+
+            Assert.That(result.ItemsNeedingAuth, Is.EqualTo(1));
+            Assert.That(result.ItemsSynced, Is.EqualTo(0));
+            var state = accounts.GetPlaidItemSyncState("item")!;
+            Assert.That(state.Status, Is.EqualTo(PlaidItemSyncStatus.NeedsAuth));
+            Assert.That(state.Cursor, Is.EqualTo("cursor-1"));
+            Assert.That(orchestrator.HasItemsReadyForIncrementalSync(), Is.False);
+        }
+
+        [Test]
+        public async Task Sync_RemovesUnreconciledButKeepsMatched()
+        {
+            var (accounts, txs, checking, fetcher) = Linked();
+            accounts.UpsertPlaidItemSyncState(new PlaidItemSyncState
+            {
+                ItemId = "item",
+                Cursor = "cursor-1",
+                Status = PlaidItemSyncStatus.Synced
+            });
+            var keep = new PostedTransaction
+            {
+                AccountId = checking.Id,
+                Date = new DateTime(2026, 4, 1),
+                Description = "Keep",
+                Amount = -3m,
+                ExternalTransactionId = "tx-keep",
+                ImportedStatus = ImportedStatus.Matched
+            };
+            var drop = new PostedTransaction
+            {
+                AccountId = checking.Id,
+                Date = new DateTime(2026, 4, 1),
+                Description = "Drop",
+                Amount = -4m,
+                ExternalTransactionId = "tx-drop",
+                ImportedStatus = ImportedStatus.Unreconciled
+            };
+            txs.AddPostedTransaction(keep);
+            txs.AddPostedTransaction(drop);
+            fetcher.SyncPages.Enqueue(new TransactionSyncPage
+            {
+                RemovedIds = ["tx-keep", "tx-drop"],
+                NextCursor = "cursor-2",
+                HasMore = false
+            });
+            var orchestrator = new PlaidTransactionOrchestrator(accounts, fetcher, txs);
+
+            await orchestrator.SyncIncrementalAsync();
+
+            var remaining = txs.GetPostedTransactions(checking.Id).ToList();
+            Assert.That(remaining, Has.Count.EqualTo(1));
+            Assert.That(remaining[0].ExternalTransactionId, Is.EqualTo("tx-keep"));
+        }
+
+        [Test]
+        public async Task Sync_SavesCursorAfterEachPage()
+        {
+            var (accounts, txs, checking, fetcher) = Linked();
+            fetcher.SyncPages.Enqueue(new TransactionSyncPage
+            {
+                Added = [Tx("tx-1", checking, new DateTime(2026, 4, 2), "One", -1m)],
+                NextCursor = "cursor-a",
+                HasMore = true
+            });
+            fetcher.SyncPages.Enqueue(new TransactionSyncPage
+            {
+                Added = [Tx("tx-2", checking, new DateTime(2026, 4, 3), "Two", -2m)],
+                NextCursor = "cursor-b",
+                HasMore = false
+            });
+            var orchestrator = new PlaidTransactionOrchestrator(accounts, fetcher, txs);
+
+            var result = await orchestrator.SyncInitialAsync("item", new DateTime(2026, 1, 1));
+
+            Assert.That(result.Imported, Is.EqualTo(2));
+            Assert.That(accounts.GetPlaidItemSyncState("item")!.Cursor, Is.EqualTo("cursor-b"));
+            Assert.That(txs.GetPostedTransactions(checking.Id).ToList(), Has.Count.EqualTo(2));
+        }
+
+        private static (InMemoryAccountDataStore Accounts, InMemoryTransactionDataStore Txs, BankAccount Checking, FakeTransactionFetcher Fetcher) Linked()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var txs = new InMemoryTransactionDataStore();
+            var checking = new BankAccount
+            {
+                Name = "Checking",
+                Institution = "Bank",
+                AccountNumber = "1",
+                WebsiteUrl = "",
+                ExternalLink = new ExternalAccountLink
+                {
+                    AccessToken = "tok",
+                    PlaidAccountId = "plaid-checking",
+                    ItemId = "item",
+                    InstitutionId = "ins_1",
+                    AccountMask = "1111",
+                    InstitutionName = "Bank"
+                }
+            };
+            accounts.UpsertAccount(checking);
+            return (accounts, txs, checking, new FakeTransactionFetcher());
+        }
+
+        private static TransactionDto Tx(
+            string id,
+            BankAccount account,
+            DateTime date,
+            string name,
+            decimal amount,
+            bool pending = false) =>
+            Tx(id, account.ExternalLink!.PlaidAccountId, date, name, amount, pending);
+
+        private static TransactionDto Tx(
+            string id,
+            string plaidAccountId,
+            DateTime date,
+            string name,
+            decimal amount,
+            bool pending = false) =>
+            new()
+            {
+                TransactionId = id,
+                AccountId = plaidAccountId,
+                Date = date,
+                Name = name,
+                Amount = amount,
+                Pending = pending
+            };
     }
 
     file sealed class CollectingProgress<T>(List<T> items) : IProgress<T>

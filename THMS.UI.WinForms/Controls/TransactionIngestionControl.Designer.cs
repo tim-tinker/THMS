@@ -14,11 +14,8 @@ namespace THMS.UI.WinForms.Controls
         private Label lblFileStatus;
         private Panel pnlPlaidImport;
         private Label lblPlaidImport;
-        private DateTimePicker dtStart;
-        private DateTimePicker dtEnd;
-        private ThmsButton btnDownloadPlaid;
-        private ThmsButton btnImportPlaid;
-        private DataGridView gridPlaidPreview;
+        private Label lblPlaidHelp;
+        private ThmsButton btnSyncPlaid;
         private Label lblPlaidStatus;
         private Panel pnlLedger;
         private Label lblLedger;
@@ -44,17 +41,13 @@ namespace THMS.UI.WinForms.Controls
             lblFileStatus = new Label();
             pnlPlaidImport = new Panel();
             lblPlaidImport = new Label();
-            dtStart = new DateTimePicker();
-            dtEnd = new DateTimePicker();
-            btnDownloadPlaid = new ThmsButton();
-            btnImportPlaid = new ThmsButton();
-            gridPlaidPreview = new DataGridView();
+            lblPlaidHelp = new Label();
+            btnSyncPlaid = new ThmsButton();
             lblPlaidStatus = new Label();
             pnlLedger = new Panel();
             lblLedger = new Label();
             transactionUpdater = new TransactionUpdaterControl();
             ((System.ComponentModel.ISupportInitialize)gridFilePreview).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)gridPlaidPreview).BeginInit();
             layout.SuspendLayout();
             pnlFileImport.SuspendLayout();
             pnlPlaidImport.SuspendLayout();
@@ -71,9 +64,9 @@ namespace THMS.UI.WinForms.Controls
             layout.Dock = DockStyle.Fill;
             layout.Name = "layout";
             layout.RowCount = 3;
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 34F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 34F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 32F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 120F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
             // 
             // pnlFileImport
             // 
@@ -117,7 +110,7 @@ namespace THMS.UI.WinForms.Controls
             // 
             // pnlPlaidImport
             // 
-            pnlPlaidImport.Controls.Add(gridPlaidPreview);
+            pnlPlaidImport.Controls.Add(lblPlaidHelp);
             pnlPlaidImport.Controls.Add(CreatePlaidToolbar());
             pnlPlaidImport.Controls.Add(lblPlaidImport);
             pnlPlaidImport.Controls.Add(lblPlaidStatus);
@@ -130,30 +123,25 @@ namespace THMS.UI.WinForms.Controls
             lblPlaidImport.AutoSize = false;
             lblPlaidImport.Dock = DockStyle.Top;
             lblPlaidImport.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            lblPlaidImport.Height = 36;
+            lblPlaidImport.Height = 28;
             lblPlaidImport.Name = "lblPlaidImport";
-            lblPlaidImport.Text = "Plaid Transaction Import";
+            lblPlaidImport.Text = "Plaid";
             lblPlaidImport.TextAlign = ContentAlignment.MiddleLeft;
+            // 
+            // lblPlaidHelp
+            // 
+            lblPlaidHelp.Dock = DockStyle.Fill;
+            lblPlaidHelp.Name = "lblPlaidHelp";
+            lblPlaidHelp.Padding = new Padding(0, 4, 0, 0);
+            lblPlaidHelp.Text = "Posted activity imports into Unreconciled. First history is imported from Link Accounts.";
             // 
             // lblPlaidStatus
             // 
             lblPlaidStatus.Dock = DockStyle.Bottom;
             lblPlaidStatus.Height = 24;
             lblPlaidStatus.Name = "lblPlaidStatus";
-            lblPlaidStatus.Text = "Ready.";
+            lblPlaidStatus.Text = "";
             lblPlaidStatus.TextAlign = ContentAlignment.MiddleLeft;
-            // 
-            // gridPlaidPreview
-            // 
-            gridPlaidPreview.AllowUserToAddRows = false;
-            gridPlaidPreview.AllowUserToDeleteRows = false;
-            gridPlaidPreview.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            gridPlaidPreview.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            gridPlaidPreview.Dock = DockStyle.Fill;
-            gridPlaidPreview.Name = "gridPlaidPreview";
-            gridPlaidPreview.ReadOnly = true;
-            gridPlaidPreview.RowHeadersVisible = false;
-            gridPlaidPreview.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             // 
             // pnlLedger
             // 
@@ -185,7 +173,6 @@ namespace THMS.UI.WinForms.Controls
             Name = "TransactionIngestionControl";
             Size = new Size(1000, 720);
             ((System.ComponentModel.ISupportInitialize)gridFilePreview).EndInit();
-            ((System.ComponentModel.ISupportInitialize)gridPlaidPreview).EndInit();
             layout.ResumeLayout(false);
             pnlFileImport.ResumeLayout(false);
             pnlPlaidImport.ResumeLayout(false);
@@ -229,53 +216,18 @@ namespace THMS.UI.WinForms.Controls
 
         private Control CreatePlaidToolbar()
         {
-            var toolbar = new TableLayoutPanel
+            var toolbar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
-                Height = 40,
-                ColumnCount = 6,
-                Name = "plaidToolbar"
+                Height = 36,
+                Name = "plaidToolbar",
+                WrapContents = false
             };
-            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            var lblStart = new Label
-            {
-                AutoSize = true,
-                Anchor = AnchorStyles.Left,
-                Text = "Start",
-                TextAlign = ContentAlignment.MiddleLeft
-            };
-            dtStart.Format = DateTimePickerFormat.Short;
-            dtStart.Name = "dtStart";
-            dtStart.Width = 110;
-            var lblEnd = new Label
-            {
-                AutoSize = true,
-                Anchor = AnchorStyles.Left,
-                Text = "End",
-                TextAlign = ContentAlignment.MiddleLeft
-            };
-            dtEnd.Format = DateTimePickerFormat.Short;
-            dtEnd.Name = "dtEnd";
-            dtEnd.Width = 110;
-            btnDownloadPlaid.Text = "Download Plaid Transactions";
-            btnDownloadPlaid.AutoSize = true;
-            btnDownloadPlaid.Name = "btnDownloadPlaid";
-            btnDownloadPlaid.Click += OnDownloadPlaid;
-            btnImportPlaid.Text = "Import Plaid Transactions";
-            btnImportPlaid.AutoSize = true;
-            btnImportPlaid.Name = "btnImportPlaid";
-            btnImportPlaid.Click += OnImportPlaid;
-            toolbar.Controls.Add(lblStart, 0, 0);
-            toolbar.Controls.Add(dtStart, 1, 0);
-            toolbar.Controls.Add(lblEnd, 2, 0);
-            toolbar.Controls.Add(dtEnd, 3, 0);
-            toolbar.Controls.Add(btnDownloadPlaid, 4, 0);
-            toolbar.Controls.Add(btnImportPlaid, 5, 0);
+            btnSyncPlaid.Text = "Sync Data";
+            btnSyncPlaid.AutoSize = true;
+            btnSyncPlaid.Name = "btnSyncPlaid";
+            btnSyncPlaid.Click += OnSyncPlaid;
+            toolbar.Controls.Add(btnSyncPlaid);
             return toolbar;
         }
     }

@@ -19,8 +19,8 @@ namespace THMS.Logic.Orchestrators
             _store = store;
         }
 
-        public List<ExpenseBudgetRule> GetRules(Guid accountId) =>
-            _store.GetExpenseBudgetRules(accountId).ToList();
+        public List<ExpenseBudgetRule> GetRules() =>
+            _store.GetAllExpenseBudgetRules().ToList();
 
         public ExpenseBudgetRule? GetRule(Guid ruleId) =>
             _store.GetExpenseBudgetRule(ruleId);
@@ -31,18 +31,13 @@ namespace THMS.Logic.Orchestrators
             return _store.GetAllCategories();
         }
 
-        public int EnsureSuggestedRules(Guid accountId)
+        public int EnsureSuggestedRules()
         {
-            if (_store.GetExpenseBudgetRules(accountId).Any())
+            if (_store.GetAllExpenseBudgetRules().Any())
                 return 0;
 
             _store.EnsureDefaultCategories();
-            var latest = _store.GetLatestPostedTransactionDate(accountId);
-            if (latest is null)
-                return 0;
-
-            var start = latest.Value.Date.AddMonths(-13);
-            var posted = _store.GetPostedTransactions(accountId, start, latest.Value.Date).ToList();
+            var posted = _store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
             if (posted.Count == 0)
                 return 0;
 
@@ -71,7 +66,6 @@ namespace THMS.Logic.Orchestrators
                 _store.AddExpenseBudgetRule(new ExpenseBudgetRule
                 {
                     Id = Guid.NewGuid(),
-                    AccountId = accountId,
                     BudgetName = suggestion.Name,
                     IncludedCategoryIds = [suggestion.CategoryId],
                     BudgetFrequency = BudgetFrequency.Monthly,
@@ -82,7 +76,7 @@ namespace THMS.Logic.Orchestrators
             }
 
             if (created > 0)
-                RefreshAccount(accountId);
+                RefreshAllActive();
 
             return created;
         }
@@ -178,6 +172,9 @@ namespace THMS.Logic.Orchestrators
         public ExpenseBudgetHistory? GetActivePeriod(Guid ruleId) =>
             _store.GetActiveBudgetHistory(ruleId);
 
+        public ExpenseBudgetHistory? GetPeriod(Guid historyId) =>
+            _store.GetExpenseBudgetHistoryById(historyId);
+
         public List<ExpenseBudgetHistory> GetHistory(Guid ruleId) =>
             _store.GetExpenseBudgetHistory(ruleId).ToList();
 
@@ -207,9 +204,6 @@ namespace THMS.Logic.Orchestrators
                 ?? throw new InvalidOperationException($"Budget rule {fromRuleId} was not found.");
             var toRule = _store.GetExpenseBudgetRule(toRuleId)
                 ?? throw new InvalidOperationException($"Budget rule {toRuleId} was not found.");
-            if (fromRule.AccountId != toRule.AccountId)
-                throw new InvalidOperationException("Budgets must belong to the same account.");
-
             var fromPeriod = RequireActiveOpenPeriod(fromRuleId);
             var toPeriod = RequireActiveOpenPeriod(toRuleId);
 
@@ -274,12 +268,6 @@ namespace THMS.Logic.Orchestrators
             var created = CreatePeriod(rule, BudgetPeriodCalculator.NextPeriod(lastEnd, rule.BudgetFrequency), previous);
             RefreshPeriod(rule, created);
             return created;
-        }
-
-        public void RefreshAccount(Guid accountId)
-        {
-            foreach (var rule in _store.GetExpenseBudgetRules(accountId).Where(r => r.IsActive))
-                RefreshRule(rule);
         }
 
         public void RefreshAllActive()
@@ -348,7 +336,7 @@ namespace THMS.Logic.Orchestrators
 
         private void RefreshPeriod(ExpenseBudgetRule rule, ExpenseBudgetHistory history)
         {
-            var posted = _store.GetPostedTransactions(rule.AccountId).ToList();
+            var posted = _store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
             var catalog = _store.GetAllCategories(includeInactive: true).ToList();
             history.ActualExpenses = _detector.ComputeActualExpenses(
                 posted,

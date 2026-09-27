@@ -597,6 +597,108 @@ namespace THMS.Tests.Logic
     }
 
     [TestFixture]
+    public class CategoryBudgetComposerTests
+    {
+        [Test]
+        public void Build_AttachesBudgetColumnsToMatchingCategoryOnly()
+        {
+            var groceries = DefaultExpenseCategories.All.Single(c => c.Id == DefaultExpenseCategories.GroceriesId);
+            var restaurants = DefaultExpenseCategories.All.Single(c => c.Id == DefaultExpenseCategories.RestaurantsId);
+            var ruleId = Guid.NewGuid();
+            var period = new ExpenseBudgetHistory
+            {
+                BudgetRuleId = ruleId,
+                PeriodStart = new DateTime(2026, 9, 1),
+                PeriodEnd = new DateTime(2026, 9, 30),
+                StartingBalance = 0,
+                BudgetAmount = 200,
+                ActualExpenses = 50,
+                RecommendedAmount = 180
+            };
+            period.RecalculateRemaining();
+
+            var rows = CategoryBudgetComposer.Build(
+                DefaultExpenseCategories.All.ToList(),
+                [
+                    new ExpenseBudgetRule
+                    {
+                        Id = ruleId,
+                        BudgetName = groceries.Name,
+                        IncludedCategoryIds = [groceries.Id],
+                        BudgetFrequency = BudgetFrequency.Monthly,
+                        IsActive = true
+                    }
+                ],
+                new Dictionary<Guid, ExpenseBudgetHistory?> { [ruleId] = period },
+                new DateTime(2026, 9, 7));
+
+            var groceryRow = rows.Single(r => r.CategoryId == groceries.Id);
+            Assert.That(groceryRow.HasBudget, Is.True);
+            Assert.That(groceryRow.Remaining, Is.EqualTo(150m));
+            Assert.That(groceryRow.Ending, Is.EqualTo(150m));
+            Assert.That(groceryRow.Recommended, Is.EqualTo(180m));
+            Assert.That(groceryRow.Frequency, Is.EqualTo("Monthly"));
+            Assert.That(groceryRow.Status, Is.EqualTo("OK"));
+
+            var dining = rows.Single(r => r.CategoryId == restaurants.Id);
+            Assert.That(dining.HasBudget, Is.False);
+            Assert.That(dining.Remaining, Is.Null);
+            Assert.That(dining.Frequency, Is.EqualTo(""));
+        }
+
+        [Test]
+        public void AssignBudgets_PrefersCategoryWhoseNameMatchesBudget()
+        {
+            var assigned = CategoryBudgetComposer.AssignBudgets(
+                DefaultExpenseCategories.All.ToList(),
+                [
+                    new ExpenseBudgetRule
+                    {
+                        BudgetName = DefaultExpenseCategories.Utility,
+                        IncludedCategoryIds =
+                        [
+                            DefaultExpenseCategories.ElectricId,
+                            DefaultExpenseCategories.UtilityId
+                        ],
+                        BudgetFrequency = BudgetFrequency.Monthly,
+                        IsActive = true
+                    }
+                ]);
+
+            Assert.That(assigned.Keys, Is.EquivalentTo(new[] { DefaultExpenseCategories.UtilityId }));
+        }
+
+        [Test]
+        public void BuildPeriods_OrdersNewestFirst()
+        {
+            var ruleId = Guid.NewGuid();
+            var rows = CategoryBudgetComposer.BuildPeriods(
+            [
+                new ExpenseBudgetHistory
+                {
+                    Id = Guid.NewGuid(),
+                    BudgetRuleId = ruleId,
+                    PeriodStart = new DateTime(2026, 8, 1),
+                    PeriodEnd = new DateTime(2026, 8, 31),
+                    IsClosed = true
+                },
+                new ExpenseBudgetHistory
+                {
+                    Id = Guid.NewGuid(),
+                    BudgetRuleId = ruleId,
+                    PeriodStart = new DateTime(2026, 9, 1),
+                    PeriodEnd = new DateTime(2026, 9, 30),
+                    IsClosed = false
+                }
+            ]);
+
+            Assert.That(rows, Has.Count.EqualTo(2));
+            Assert.That(rows[0].Status, Is.EqualTo("Open"));
+            Assert.That(rows[1].Status, Is.EqualTo("Closed"));
+        }
+    }
+
+    [TestFixture]
     public class VehicleAndTransportationViewModelTests
     {
         [Test]

@@ -26,6 +26,7 @@
             this.CategoryId = original.CategoryId;
             this.ImportedStatus = original.ImportedStatus;
             this.RecommendedExpectedId = original.RecommendedExpectedId;
+            this.ExternalTransactionId = original.ExternalTransactionId;
 
             // Transfer-specific fields
             this.RelatedPostedTransactionId = relatedId;

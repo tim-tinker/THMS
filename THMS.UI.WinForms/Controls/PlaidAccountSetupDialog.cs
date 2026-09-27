@@ -7,6 +7,7 @@ namespace THMS.UI.WinForms.Controls
     public sealed class PlaidAccountSetupDialog : Form
     {
         private readonly PlaidAccountOrchestrator _orchestrator;
+        private readonly PlaidTransactionOrchestrator _transactionOrchestrator;
         private BindingList<PlaidAccountViewModel> _rows = [];
         private readonly DataGridView _grid = new();
         private readonly Label _status = new();
@@ -14,13 +15,21 @@ namespace THMS.UI.WinForms.Controls
         private readonly ThmsButton _btnSave = new();
 
         public PlaidAccountSetupDialog()
-            : this(new PlaidAccountOrchestrator())
+            : this(new PlaidAccountOrchestrator(), new PlaidTransactionOrchestrator())
         {
         }
 
         public PlaidAccountSetupDialog(PlaidAccountOrchestrator orchestrator)
+            : this(orchestrator, new PlaidTransactionOrchestrator())
+        {
+        }
+
+        public PlaidAccountSetupDialog(
+            PlaidAccountOrchestrator orchestrator,
+            PlaidTransactionOrchestrator transactionOrchestrator)
         {
             _orchestrator = orchestrator;
+            _transactionOrchestrator = transactionOrchestrator;
 
             Text = "Plaid Account Setup";
             StartPosition = FormStartPosition.CenterParent;
@@ -159,19 +168,26 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
-        private void OnSaveMapping(object? sender, EventArgs e)
+        private async void OnSaveMapping(object? sender, EventArgs e)
         {
             _grid.EndEdit();
             if (!CanSaveMappings())
                 return;
 
+            _btnSave.Enabled = false;
+            _btnLink.Enabled = false;
             try
             {
                 var saved = _orchestrator.SaveAccountMappings(_rows);
                 RefreshAccountChoices();
-                _status.Text = saved == 0
-                    ? "No mappings saved. Choose a THMS account for each Plaid account."
-                    : $"Saved {saved} Plaid account mapping{(saved == 1 ? "" : "s")}.";
+                if (saved == 0)
+                {
+                    _status.Text = "No mappings saved. Choose a THMS account for each Plaid account.";
+                    return;
+                }
+
+                _status.Text = $"Saved {saved} Plaid account mapping{(saved == 1 ? "" : "s")}.";
+                await ImportHistoryForNewItemsAsync();
             }
             catch (Exception ex)
             {
@@ -181,8 +197,42 @@ namespace THMS.UI.WinForms.Controls
             }
             finally
             {
+                _btnLink.Enabled = true;
                 UpdateActionButtons();
             }
+        }
+
+        private async Task ImportHistoryForNewItemsAsync()
+        {
+            var items = _orchestrator.ItemsNeedingInitialHistory(_rows);
+            if (items.Count == 0)
+                return;
+
+            var imported = 0;
+            foreach (var item in items)
+            {
+                using var dialog = new PlaidHistoryStartDialog(item.Institution);
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    _status.Text = "History not imported yet. Use Link Accounts later, or Sync Data after a first import.";
+                    AppStatus.Set("Plaid is linked. Import history from Link Accounts before auto-sync can run.");
+                    continue;
+                }
+
+                _status.Text = $"Importing Plaid history ({item.Institution})...";
+                AppStatus.Set($"Importing Plaid history ({item.Institution})...", busy: true);
+                var progress = new Progress<PlaidSyncProgress>(AppStatus.Report);
+                var result = await _transactionOrchestrator.SyncInitialAsync(
+                    item.ItemId,
+                    dialog.HistoryStart,
+                    progress: progress);
+                imported += result.Imported;
+                AppStatus.Set(result.Summary);
+                _status.Text = result.Summary;
+            }
+
+            if (imported > 0)
+                _status.Text = $"Imported {imported:N0} Plaid transaction{(imported == 1 ? "" : "s")} from history.";
         }
 
         private void UpdateActionButtons()

@@ -148,11 +148,8 @@ namespace THMS.Logic.Orchestrators
                 RefreshPostedBalance(account);
             }
 
-            foreach (var account in accounts)
-            {
-                _budgetOrchestrator.EnsureSuggestedRules(account.Id);
-                _budgetOrchestrator.RefreshAccount(account.Id);
-            }
+            _budgetOrchestrator.EnsureSuggestedRules();
+            _budgetOrchestrator.RefreshAllActive();
 
             var reconciliation = new ReconciliationOrchestrator(_transactionStore);
             reconciliation.MaterializePlannedFromRules();

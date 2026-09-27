@@ -52,7 +52,8 @@
                 TextColumn("Paid", "Paid"),
                 TextColumn("DueDate", "Due"),
                 TextColumn("Apr", "APR"),
-                MoneyColumn("CreditLimit", "Credit Limit"));
+                MoneyColumn("CreditLimit", "Credit Limit"),
+                TextColumn("PlaidStatus", "Plaid"));
             foreach (DataGridViewColumn column in gridAccounts.Columns)
                 column.SortMode = DataGridViewColumnSortMode.Automatic;
             // 

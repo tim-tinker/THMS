@@ -1,3 +1,4 @@
+using THMS.Logic.Orchestrators.Finance;
 using THMS.UI.WinForms;
 using THMS.UI.WinForms.Controls;
 
@@ -13,11 +14,14 @@ namespace THMS.UI
 
         private readonly Dictionary<string, BaseDashboardForm> _dashboards = [];
         private readonly Dictionary<string, BaseEmbeddedForm> _embeddedForms = [];
+        private readonly PlaidTransactionOrchestrator _plaidSync = new();
+        private CancellationTokenSource? _plaidSyncCts;
 
         /// <summary>Designer only.</summary>
         public MainForm()
         {
             InitializeComponent();
+            AppStatus.Bind(SetAppStatus);
         }
 
         public void LoadModules()
@@ -36,6 +40,78 @@ namespace THMS.UI
         private void OnLoad(object sender, EventArgs e)
         {
             ShowDashboard("Finance");
+        }
+
+        private async void OnShown(object? sender, EventArgs e)
+        {
+            Shown -= OnShown;
+            await RunStartupPlaidSyncAsync();
+        }
+
+        private void OnFormClosing(object? sender, FormClosingEventArgs e)
+        {
+            _plaidSyncCts?.Cancel();
+        }
+
+        private async Task RunStartupPlaidSyncAsync()
+        {
+            if (!_plaidSync.HasLinkedItems())
+            {
+                SetAppStatus("Ready.");
+                return;
+            }
+
+            if (!_plaidSync.HasItemsReadyForIncrementalSync())
+            {
+                SetAppStatus("Plaid is linked. Import history from Link Accounts before auto-sync can run.");
+                return;
+            }
+
+            _plaidSyncCts = new CancellationTokenSource();
+            SetAppStatus("Syncing Plaid...", busy: true);
+            try
+            {
+                var progress = new Progress<PlaidSyncProgress>(AppStatus.Report);
+                var result = await _plaidSync.SyncIncrementalAsync(_plaidSyncCts.Token, progress);
+                SetAppStatus(result.Summary);
+                RefreshAfterPlaidSync();
+            }
+            catch (OperationCanceledException)
+            {
+                SetAppStatus("Plaid sync cancelled.");
+            }
+            catch (Exception ex)
+            {
+                SetAppStatus("Plaid sync failed.");
+                MessageBox.Show(this, $"Plaid sync failed.\n{ex.Message}", "Plaid",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void RefreshAfterPlaidSync()
+        {
+            if (_embeddedForms.TryGetValue("Register", out var register) && register is RegisterForm form)
+                form.RefreshAfterExternalData();
+            if (_dashboards.TryGetValue("Finance", out var dashboard))
+                dashboard.RefreshDashboard();
+        }
+
+        private void SetAppStatus(string message, bool busy = false)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(() => SetAppStatus(message, busy));
+                return;
+            }
+
+            lblPlaidStatus.Text = string.IsNullOrWhiteSpace(message) ? "Ready." : message;
+            syncProgress.Visible = busy;
+        }
+
+        private void OnStatusStripPaint(object? sender, PaintEventArgs e)
+        {
+            using var pen = new Pen(Color.FromArgb(200, 200, 200));
+            e.Graphics.DrawLine(pen, 0, 0, statusStrip.Width, 0);
         }
 
         private void AddSectionLabel(string text)

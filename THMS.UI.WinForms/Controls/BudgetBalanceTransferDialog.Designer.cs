@@ -31,7 +31,7 @@ namespace THMS.UI.WinForms.Controls
             lblHelp.MaximumSize = new Size(360, 0);
             lblHelp.Name = "lblHelp";
             lblHelp.Size = new Size(360, 48);
-            lblHelp.Text = "Move starting balance from this budget's current period to another open budget on the same account.";
+            lblHelp.Text = "Move starting balance from this budget's current period to another open budget.";
             lblFrom.AutoSize = true;
             lblFrom.Location = new Point(16, 72);
             lblFrom.Name = "lblFrom";

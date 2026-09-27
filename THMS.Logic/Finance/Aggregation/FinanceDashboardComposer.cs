@@ -32,7 +32,7 @@ namespace THMS.Logic.Finance.Aggregation
             var monthPosted = posted.Where(t => t.Date.Date >= monthStart && t.Date.Date <= monthEnd).ToList();
 
             var totals = SumAccounts(accounts);
-            var budgets = BuildBudgets(today, budgetRules, activePeriods, names);
+            var budgets = BuildBudgets(today, budgetRules, activePeriods);
             var payments = BuildPayments(today, accounts, recurringSingles, names);
             var uncategorized = posted.Count(IsUncategorized);
             var mismatch = posted.Count(t => t.HasSplits && !SplitTransactionMath.AmountsMatch(t.Amount, t.Splits));
@@ -108,8 +108,7 @@ namespace THMS.Logic.Finance.Aggregation
         private static List<FinanceDashboardBudgetRow> BuildBudgets(
             DateTime today,
             IReadOnlyList<ExpenseBudgetRule> budgetRules,
-            IReadOnlyDictionary<Guid, ExpenseBudgetHistory?> activePeriods,
-            IReadOnlyDictionary<Guid, string> names)
+            IReadOnlyDictionary<Guid, ExpenseBudgetHistory?> activePeriods)
         {
             var rows = new List<FinanceDashboardBudgetRow>();
             foreach (var rule in budgetRules.Where(r => r.IsActive).OrderBy(r => r.BudgetName))
@@ -120,7 +119,6 @@ namespace THMS.Logic.Finance.Aggregation
                 rows.Add(new FinanceDashboardBudgetRow
                 {
                     RuleId = rule.Id,
-                    AccountName = names.GetValueOrDefault(rule.AccountId, ""),
                     BudgetName = rule.BudgetName,
                     Frequency = rule.BudgetFrequency.ToString(),
                     Remaining = period.Remaining,

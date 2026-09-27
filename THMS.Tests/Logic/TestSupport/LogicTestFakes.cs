@@ -24,6 +24,9 @@ namespace THMS.Tests.Logic.TestSupport
         public List<TransactionDto> Transactions { get; set; } = [];
         public Exception? Exception { get; set; }
         public AccountDto? LastAccount { get; private set; }
+        public string? LastSyncAccessToken { get; private set; }
+        public string? LastSyncCursor { get; private set; }
+        public Queue<TransactionSyncPage> SyncPages { get; } = new();
 
         public Task<List<TransactionDto>> FetchTransactionsAsync(
             AccountDto account,
@@ -34,6 +37,26 @@ namespace THMS.Tests.Logic.TestSupport
             if (Exception is not null)
                 throw Exception;
             return Task.FromResult(Transactions);
+        }
+
+        public Task<TransactionSyncPage> SyncTransactionsAsync(
+            string accessToken,
+            string? cursor,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            LastSyncAccessToken = accessToken;
+            LastSyncCursor = cursor;
+            if (Exception is not null)
+                throw Exception;
+            if (SyncPages.Count > 0)
+                return Task.FromResult(SyncPages.Dequeue());
+            return Task.FromResult(new TransactionSyncPage
+            {
+                Added = Transactions.ToList(),
+                NextCursor = string.IsNullOrWhiteSpace(cursor) ? "cursor-end" : cursor,
+                HasMore = false
+            });
         }
     }
 

@@ -59,6 +59,22 @@ namespace THMS.Logic.Orchestrators
             };
         }
 
+        public (List<PostedTransaction> Posted, List<PostedTransferTransaction> Transfers) GetPostedActivity(
+            DateTime start,
+            DateTime end)
+        {
+            if (start <= DateTime.MinValue)
+            {
+                return (
+                    _store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList(),
+                    _store.GetPostedTransferTransactions(DateTime.MinValue, DateTime.MaxValue).ToList());
+            }
+
+            return (
+                _store.GetPostedTransactions(start, end).ToList(),
+                _store.GetPostedTransferTransactions(start, end).ToList());
+        }
+
         public decimal SumPostedAmountsBefore(Guid accountId, DateTime before)
         {
             if (before <= DateTime.MinValue)
@@ -242,28 +258,8 @@ namespace THMS.Logic.Orchestrators
             return prepared;
         }
 
-        private void RefreshBudgets(BaseTransaction parent)
-        {
-            var budgets = new BudgetOrchestrator(_store);
-            switch (parent)
-            {
-                case BaseSingleAccountTransaction single:
-                    budgets.RefreshAccount(single.AccountId);
-                    foreach (var dest in Destinations(single))
-                        budgets.RefreshAccount(dest);
-                    break;
-                case TransferTransaction transfer:
-                    budgets.RefreshAccount(transfer.FromAccountId);
-                    budgets.RefreshAccount(transfer.ToAccountId);
-                    break;
-            }
-        }
-
-        private static IEnumerable<Guid> Destinations(BaseTransaction parent) =>
-            parent.Splits
-                .Where(s => s.Type == SplitType.Transfer && s.TransferAccountId is Guid id && id != Guid.Empty)
-                .Select(s => s.TransferAccountId!.Value)
-                .Distinct();
+        private void RefreshBudgets(BaseTransaction parent) =>
+            new BudgetOrchestrator(_store).RefreshAllActive();
     }
 
     public class AccountTransactions

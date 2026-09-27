@@ -1177,7 +1177,7 @@ namespace THMS.Tests.Logic
                 IsActive = true
             });
 
-            var rule = orchestrator.GetRules(accountId).Single();
+            var rule = orchestrator.GetRules().Single();
             Assert.That(rule.BudgetName, Is.EqualTo("Utilities"));
             Assert.That(rule.IncludedCategoryIds, Is.EquivalentTo(new[] { DefaultExpenseCategories.ElectricId, DefaultExpenseCategories.WaterId }));
             Assert.That(rule.DefaultBudgetAmount, Is.EqualTo(-150m));
@@ -1202,7 +1202,7 @@ namespace THMS.Tests.Logic
             Assert.That(updated.BudgetFrequency, Is.EqualTo(BudgetFrequency.Weekly));
 
             orchestrator.DeleteRule(rule.Id);
-            Assert.That(orchestrator.GetRules(accountId), Is.Empty);
+            Assert.That(orchestrator.GetRules(), Is.Empty);
             Assert.That(store.GetExpenseBudgetHistory(rule.Id), Is.Empty);
         }
 
@@ -1241,16 +1241,16 @@ namespace THMS.Tests.Logic
                 Description = "Card payment"
             });
 
-            var created = orchestrator.EnsureSuggestedRules(accountId);
+            var created = orchestrator.EnsureSuggestedRules();
 
             Assert.That(created, Is.GreaterThan(0));
-            var rules = orchestrator.GetRules(accountId);
+            var rules = orchestrator.GetRules();
             Assert.That(rules, Has.Some.Matches<ExpenseBudgetRule>(r =>
                 r.BudgetName == DefaultExpenseCategories.Groceries &&
                 r.IncludedCategoryIds.Contains(DefaultExpenseCategories.GroceriesId)));
             Assert.That(rules, Has.None.Matches<ExpenseBudgetRule>(r =>
                 r.IncludedCategoryIds.Contains(DefaultExpenseCategories.PaymentId)));
-            Assert.That(orchestrator.EnsureSuggestedRules(accountId), Is.EqualTo(0));
+            Assert.That(orchestrator.EnsureSuggestedRules(), Is.EqualTo(0));
         }
 
         [Test]
@@ -1269,13 +1269,13 @@ namespace THMS.Tests.Logic
                 IsActive = true
             });
 
-            var ruleId = orchestrator.GetRules(accountId).Single().Id;
+            var ruleId = orchestrator.GetRules().Single().Id;
             var original = store.GetActiveBudgetHistory(ruleId)!;
             original.PeriodStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(-1);
             original.PeriodEnd = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddDays(-1);
             store.UpdateExpenseBudgetHistory(original);
 
-            orchestrator.RefreshAccount(accountId);
+            orchestrator.RefreshAllActive();
 
             var closed = store.GetExpenseBudgetHistoryById(original.Id);
             Assert.That(closed, Is.Not.Null);
@@ -1313,7 +1313,7 @@ namespace THMS.Tests.Logic
                 IsActive = true
             });
 
-            var period = orchestrator.GetActivePeriod(orchestrator.GetRules(accountId).Single().Id)!;
+            var period = orchestrator.GetActivePeriod(orchestrator.GetRules().Single().Id)!;
             Assert.That(period.ActualExpenses, Is.EqualTo(40m));
             Assert.That(period.Remaining, Is.EqualTo(60m));
             Assert.That(period.EndingBalance, Is.EqualTo(60m));
@@ -1343,7 +1343,7 @@ namespace THMS.Tests.Logic
                 IsActive = true
             });
 
-            var ruleId = orchestrator.GetRules(accountId).Single().Id;
+            var ruleId = orchestrator.GetRules().Single().Id;
             var current = orchestrator.GetActivePeriod(ruleId)!;
             var created = orchestrator.RollForward(ruleId);
 
@@ -1370,10 +1370,10 @@ namespace THMS.Tests.Logic
                 IsActive = true
             });
 
-            var ruleId = orchestrator.GetRules(accountId).Single().Id;
+            var ruleId = orchestrator.GetRules().Single().Id;
             var current = orchestrator.GetActivePeriod(ruleId)!;
             orchestrator.ClosePeriod(current.Id);
-            orchestrator.RefreshAccount(accountId);
+            orchestrator.RefreshAllActive();
 
             Assert.That(orchestrator.GetActivePeriod(ruleId), Is.Null);
             Assert.That(store.GetExpenseBudgetHistory(ruleId).Count(h => !h.IsClosed), Is.EqualTo(0));
@@ -1417,10 +1417,48 @@ namespace THMS.Tests.Logic
                 IsActive = true
             });
 
-            var period = orchestrator.GetActivePeriod(orchestrator.GetRules(accountId).Single().Id)!;
+            var period = orchestrator.GetActivePeriod(orchestrator.GetRules().Single().Id)!;
             Assert.That(period.ActualExpenses, Is.EqualTo(0m));
             Assert.That(period.RecommendedAmount, Is.GreaterThan(0m));
             Assert.That(period.RecommendedAmount, Is.Not.EqualTo(period.ActualExpenses));
+        }
+
+        [Test]
+        public void RefreshAllActive_CountsCategorySpendFromEveryAccount()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                BudgetName = "Groceries",
+                IncludedCategoryIds = [DefaultExpenseCategories.GroceriesId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = 200,
+                IsActive = true
+            });
+
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = Guid.NewGuid(),
+                Date = DateTime.Today,
+                Amount = -30,
+                Category = DefaultExpenseCategories.Groceries,
+                CategoryId = DefaultExpenseCategories.GroceriesId
+            });
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = Guid.NewGuid(),
+                Date = DateTime.Today,
+                Amount = -20,
+                Category = DefaultExpenseCategories.Groceries,
+                CategoryId = DefaultExpenseCategories.GroceriesId
+            });
+
+            orchestrator.RefreshAllActive();
+
+            var period = orchestrator.GetActivePeriod(orchestrator.GetRules().Single().Id)!;
+            Assert.That(period.ActualExpenses, Is.EqualTo(50m));
+            Assert.That(period.Remaining, Is.EqualTo(150m));
         }
 
         [Test]
@@ -1447,7 +1485,7 @@ namespace THMS.Tests.Logic
                 IsActive = true
             });
 
-            var ruleId = orchestrator.GetRules(accountId).Single().Id;
+            var ruleId = orchestrator.GetRules().Single().Id;
             var current = orchestrator.GetActivePeriod(ruleId)!;
             Assert.That(current.ActualExpenses, Is.EqualTo(40m));
             Assert.That(current.Remaining, Is.EqualTo(60m));
@@ -1475,7 +1513,7 @@ namespace THMS.Tests.Logic
                 IsActive = true
             });
 
-            var period = orchestrator.GetActivePeriod(orchestrator.GetRules(accountId).Single().Id)!;
+            var period = orchestrator.GetActivePeriod(orchestrator.GetRules().Single().Id)!;
             orchestrator.SetStartingBalance(period.Id, 25);
 
             var updated = orchestrator.GetActivePeriod(period.BudgetRuleId)!;
@@ -1505,7 +1543,7 @@ namespace THMS.Tests.Logic
                 IsActive = true
             });
 
-            var period = orchestrator.GetActivePeriod(orchestrator.GetRules(accountId).Single().Id)!;
+            var period = orchestrator.GetActivePeriod(orchestrator.GetRules().Single().Id)!;
             orchestrator.ClosePeriod(period.Id);
 
             Assert.That(
@@ -1530,7 +1568,7 @@ namespace THMS.Tests.Logic
             });
             orchestrator.AddRule(new ExpenseBudgetRule
             {
-                AccountId = accountId,
+                AccountId = Guid.NewGuid(),
                 BudgetName = "Dining",
                 IncludedCategoryIds = [DefaultExpenseCategories.RestaurantsId],
                 BudgetFrequency = BudgetFrequency.Monthly,
@@ -1538,8 +1576,8 @@ namespace THMS.Tests.Logic
                 IsActive = true
             });
 
-            var groceries = orchestrator.GetRules(accountId).Single(r => r.BudgetName == "Groceries");
-            var dining = orchestrator.GetRules(accountId).Single(r => r.BudgetName == "Dining");
+            var groceries = orchestrator.GetRules().Single(r => r.BudgetName == "Groceries");
+            var dining = orchestrator.GetRules().Single(r => r.BudgetName == "Dining");
             orchestrator.SetStartingBalance(orchestrator.GetActivePeriod(groceries.Id)!.Id, 40);
 
             orchestrator.TransferBalance(groceries.Id, dining.Id, 15);
@@ -1568,7 +1606,7 @@ namespace THMS.Tests.Logic
                 IsActive = true
             });
 
-            var ruleId = orchestrator.GetRules(accountId).Single().Id;
+            var ruleId = orchestrator.GetRules().Single().Id;
             Assert.That(() => orchestrator.TransferBalance(ruleId, ruleId, 10), Throws.ArgumentException);
             Assert.That(
                 () => orchestrator.TransferBalance(ruleId, Guid.NewGuid(), 0),

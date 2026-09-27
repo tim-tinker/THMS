@@ -20,14 +20,16 @@ namespace THMS.UI.WinForms.Controls
         {
         }
 
-        public BudgetPeriodEditor(BudgetOrchestrator orchestrator, Guid ruleId)
+        public BudgetPeriodEditor(BudgetOrchestrator orchestrator, Guid ruleId, Guid? historyId = null)
             : this()
         {
             if (LicenseManager.UsageMode == LicenseUsageMode.Designtime)
                 return;
 
             _orchestrator = orchestrator;
-            _history = orchestrator.GetActivePeriod(ruleId);
+            _history = historyId is Guid id
+                ? orchestrator.GetPeriod(id) ?? orchestrator.GetActivePeriod(ruleId)
+                : orchestrator.GetActivePeriod(ruleId);
             Bind();
         }
 

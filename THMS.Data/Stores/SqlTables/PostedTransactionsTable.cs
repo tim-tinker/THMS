@@ -21,6 +21,7 @@ namespace THMS.Data.Stores.SqlTables
             SqliteCategoryColumns.EnsureCategoryId(conn, "PostedTransactions");
             EnsureColumn(conn, "ImportedStatus", "INTEGER NOT NULL DEFAULT 0");
             EnsureColumn(conn, "RecommendedExpectedId", "TEXT");
+            EnsureColumn(conn, "ExternalTransactionId", "TEXT NOT NULL DEFAULT ''");
         }
 
         public void Add(SqliteConnection conn, PostedTransaction transaction)
@@ -28,9 +29,9 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO PostedTransactions
-                (Id, AccountId, Date, Description, Amount, Category, CategoryId, ImportedStatus, RecommendedExpectedId)
+                (Id, AccountId, Date, Description, Amount, Category, CategoryId, ImportedStatus, RecommendedExpectedId, ExternalTransactionId)
                 VALUES
-                (@Id, @AccountId, @Date, @Description, @Amount, @Category, @CategoryId, @ImportedStatus, @RecommendedExpectedId);";
+                (@Id, @AccountId, @Date, @Description, @Amount, @Category, @CategoryId, @ImportedStatus, @RecommendedExpectedId, @ExternalTransactionId);";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
         }
@@ -47,7 +48,8 @@ namespace THMS.Data.Stores.SqlTables
                     Category = @Category,
                     CategoryId = @CategoryId,
                     ImportedStatus = @ImportedStatus,
-                    RecommendedExpectedId = @RecommendedExpectedId
+                    RecommendedExpectedId = @RecommendedExpectedId,
+                    ExternalTransactionId = @ExternalTransactionId
                 WHERE Id = @Id;";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
@@ -168,7 +170,7 @@ namespace THMS.Data.Stores.SqlTables
         }
 
         private const string SelectColumns =
-            "SELECT Id, AccountId, Date, Description, Amount, Category, CategoryId, ImportedStatus, RecommendedExpectedId";
+            "SELECT Id, AccountId, Date, Description, Amount, Category, CategoryId, ImportedStatus, RecommendedExpectedId, ExternalTransactionId";
 
         private static void Bind(SqliteCommand cmd, PostedTransaction transaction)
         {
@@ -185,6 +187,7 @@ namespace THMS.Data.Stores.SqlTables
                 transaction.RecommendedExpectedId is Guid expected && expected != Guid.Empty
                     ? expected.ToString()
                     : DBNull.Value);
+            cmd.Parameters.AddWithValue("@ExternalTransactionId", transaction.ExternalTransactionId ?? "");
         }
 
         private static PostedTransaction Read(SqliteDataReader reader)
@@ -199,9 +202,13 @@ namespace THMS.Data.Stores.SqlTables
                 Category = reader.IsDBNull(5) ? null : reader.GetString(5),
                 CategoryId = SqliteCategoryColumns.ReadId(reader, 6),
                 ImportedStatus = ReadImportedStatus(reader, 7),
-                RecommendedExpectedId = SqliteCategoryColumns.ReadId(reader, 8)
+                RecommendedExpectedId = SqliteCategoryColumns.ReadId(reader, 8),
+                ExternalTransactionId = ReadExternalId(reader, 9)
             };
         }
+
+        private static string ReadExternalId(SqliteDataReader reader, int index) =>
+            reader.FieldCount > index && !reader.IsDBNull(index) ? reader.GetString(index) : "";
 
         private static ImportedStatus ReadImportedStatus(SqliteDataReader reader, int index) =>
             reader.FieldCount > index && !reader.IsDBNull(index)

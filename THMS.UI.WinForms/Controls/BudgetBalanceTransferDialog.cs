@@ -51,7 +51,7 @@ namespace THMS.UI.WinForms.Controls
             lblSource.Text =
                 $"{_sourceRule.BudgetName}: starting {_sourcePeriod.StartingBalance:c2}, remaining {_sourcePeriod.Remaining:c2}";
 
-            var targets = Orchestrator.GetRules(_sourceRule.AccountId)
+            var targets = Orchestrator.GetRules()
                 .Where(r => r.Id != _sourceRuleId && r.IsActive)
                 .Select(r => new TransferTarget(r, Orchestrator.GetActivePeriod(r.Id)))
                 .Where(t => t.Period is { IsClosed: false })
@@ -64,7 +64,7 @@ namespace THMS.UI.WinForms.Controls
             btnTransfer.Enabled = targets.Count > 0;
             numAmount.Value = Clamp(_sourcePeriod.StartingBalance > 0 ? _sourcePeriod.StartingBalance : 0);
             if (targets.Count == 0)
-                lblHelp.Text = "No other open budgets on this account are available to receive a transfer.";
+                lblHelp.Text = "No other open budgets are available to receive a transfer.";
         }
 
         private void OnTransfer(object? sender, EventArgs e)

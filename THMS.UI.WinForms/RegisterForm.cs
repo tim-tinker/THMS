@@ -19,6 +19,8 @@ namespace THMS.UI.WinForms
         private readonly BindingSource _statementDetailsSource = new();
         private int _loadedRevision = int.MinValue;
 
+        private bool _accountSplitReady;
+
         public RegisterForm()
         {
             InitializeComponent();
@@ -31,10 +33,16 @@ namespace THMS.UI.WinForms
             lblSelectedAccount.Height = Math.Max(
                 lblSelectedAccount.PreferredHeight,
                 lblSelectedAccount.Font.Height + lblSelectedAccount.Padding.Vertical);
+            split.SizeChanged += (_, _) => LayoutAccountSplit();
             tabsTop.SelectedIndexChanged += (_, _) =>
             {
                 if (tabsTop.SelectedTab == tabCategories)
+                {
                     categoryManager.RefreshLayout();
+                    categoryManager.ReloadIfClean();
+                }
+                else
+                    LayoutAccountSplit();
             };
             tabs.SelectedIndexChanged += (_, _) =>
             {
@@ -50,7 +58,33 @@ namespace THMS.UI.WinForms
                 ledger.SelectAccount(accountUpdater.SelectedAccount?.Id);
             };
             accountUpdater.SelectedAccountChanged += (_, _) => LoadSelectedAccount();
+            historyBar.SelectedPeriodChanged += (_, _) => ApplyHistoryPeriod();
+            ApplyHistoryPeriod();
             LoadSelectedAccount();
+        }
+
+        private void LayoutAccountSplit()
+        {
+            if (_accountSplitReady)
+                return;
+
+            const int panel1Min = 140;
+            const int panel2Min = 180;
+            var available = split.Height - split.SplitterWidth;
+            if (available < panel1Min + panel2Min)
+                return;
+
+            split.Panel1MinSize = panel1Min;
+            split.Panel2MinSize = panel2Min;
+            split.SplitterDistance = Math.Clamp(260, panel1Min, available - panel2Min);
+            _accountSplitReady = true;
+        }
+
+        private void ApplyHistoryPeriod()
+        {
+            var period = historyBar.SelectedPeriod;
+            ledger.SetGridDataSource(period);
+            categoryManager.SetHistoryPeriod(period);
         }
 
         protected override void OnVisibleChanged(EventArgs e)
@@ -243,6 +277,8 @@ namespace THMS.UI.WinForms
             LoadSelectedAccount();
         }
 
+        public void RefreshAfterExternalData() => AfterImport();
+
         private void OnImportAccounts(object? sender, EventArgs e)
         {
             accountUpdater.ImportAccountsFromFile();
@@ -299,16 +335,28 @@ namespace THMS.UI.WinForms
             }
         }
 
-        private void OnImportFromPlaid(object? sender, EventArgs e)
+        private async void OnImportFromPlaid(object? sender, EventArgs e)
         {
-            using var dialog = new PlaidTransactionImportDialog();
-            if (dialog.ShowDialog(this) != DialogResult.OK)
-                return;
-
-            AfterImport();
-            var status = ImportStatusText.Imported(dialog.Result, "Plaid transaction", "Plaid transactions");
-            billsControl.SetStatus(status);
-            lblLedgerStatus.Text = status;
+            plaidSyncDataItem.Enabled = false;
+            try
+            {
+                AppStatus.Set("Syncing Plaid...", busy: true);
+                var orchestrator = new PlaidTransactionOrchestrator();
+                var progress = new Progress<PlaidSyncProgress>(AppStatus.Report);
+                var result = await orchestrator.SyncIncrementalAsync(progress: progress);
+                AfterImport();
+                AppStatus.Set(result.Summary);
+            }
+            catch (Exception ex)
+            {
+                AppStatus.Set("Plaid sync failed.");
+                MessageBox.Show(this, $"Plaid sync failed.\n{ex.Message}", "Plaid",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            finally
+            {
+                plaidSyncDataItem.Enabled = true;
+            }
         }
 
         private void OnImportTransactionRules(object? sender, EventArgs e)

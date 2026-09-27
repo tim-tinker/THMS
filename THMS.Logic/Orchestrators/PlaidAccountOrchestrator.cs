@@ -144,9 +144,35 @@ namespace THMS.Logic.Orchestrators.Finance
 
                 _accounts.UpsertAccount(account);
                 saved++;
+                EnsureItemSyncState(row.ItemId);
             }
 
             return saved;
+        }
+
+        public IReadOnlyList<(string ItemId, string Institution)> ItemsNeedingInitialHistory(
+            IEnumerable<PlaidAccountViewModel> mappedRows)
+        {
+            ArgumentNullException.ThrowIfNull(mappedRows);
+            return mappedRows
+                .Where(row => row.SuggestedThmsAccountId != Guid.Empty && !string.IsNullOrWhiteSpace(row.ItemId))
+                .GroupBy(row => row.ItemId, StringComparer.Ordinal)
+                .Select(group => (ItemId: group.Key, Institution: group.First().Institution))
+                .Where(item => _accounts.GetPlaidItemSyncState(item.ItemId) is not { HasCursor: true })
+                .ToList();
+        }
+
+        private void EnsureItemSyncState(string itemId)
+        {
+            if (string.IsNullOrWhiteSpace(itemId))
+                return;
+            if (_accounts.GetPlaidItemSyncState(itemId) is not null)
+                return;
+            _accounts.UpsertPlaidItemSyncState(new PlaidItemSyncState
+            {
+                ItemId = itemId,
+                Status = PlaidItemSyncStatus.NotSynced
+            });
         }
 
         private void ClearStaleLinks(IReadOnlyDictionary<Guid, Account> accounts, Guid keepAccountId, string plaidAccountId)

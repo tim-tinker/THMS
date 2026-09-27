@@ -21,6 +21,7 @@ namespace THMS.UI.WinForms.Controls
         private readonly CategoryOrchestrator _categoryOrchestrator = new();
         private readonly IAccountStatementDataStore _statements = new DataStoreFactory().GetAccountStatementStore();
         private readonly ITransactionDataStore _transactions = new DataStoreFactory().GetTransactionStore();
+        private readonly IAccountDataStore _accounts = new DataStoreFactory().GetAccountStore();
         private readonly ContextMenuStrip _accountMenu = new();
         private bool _suppressSelectionEvents;
 
@@ -55,11 +56,18 @@ namespace THMS.UI.WinForms.Controls
             var sortColumn = gridAccounts.SortedColumn?.Name;
             var sortOrder = gridAccounts.SortOrder;
             var posted = _transactions.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
+            var itemState = _accounts.GetPlaidItemSyncStates()
+                .ToDictionary(s => s.ItemId, StringComparer.Ordinal);
             var accounts = _accountOrchestrator.GetAllAccounts()
-                .Select(account => AccountRegisterRow.From(
-                    account,
-                    _statements.GetForAccount(account.Id).ToList(),
-                    posted.Where(tx => tx.AccountId == account.Id)))
+                .Select(account =>
+                {
+                    itemState.TryGetValue(account.ExternalLink?.ItemId ?? "", out var state);
+                    return AccountRegisterRow.From(
+                        account,
+                        _statements.GetForAccount(account.Id).ToList(),
+                        posted.Where(tx => tx.AccountId == account.Id),
+                        AccountRegisterRow.PlaidStatusOf(account, state));
+                })
                 .ToList();
             _suppressSelectionEvents = true;
             try

@@ -50,5 +50,24 @@ namespace THMS.Data.Stores.SQLite
             tx.Commit();
             FinanceDataRevision.NoteChanged();
         }
+
+        public IReadOnlyList<PlaidItemSyncState> GetPlaidItemSyncStates()
+        {
+            using var conn = OpenConnection();
+            return _accountStore.GetPlaidItemSyncStates(conn);
+        }
+
+        public PlaidItemSyncState? GetPlaidItemSyncState(string itemId)
+        {
+            using var conn = OpenConnection();
+            return _accountStore.GetPlaidItemSyncState(conn, itemId);
+        }
+
+        public void UpsertPlaidItemSyncState(PlaidItemSyncState state)
+        {
+            using var conn = OpenConnection();
+            _accountStore.UpsertPlaidItemSyncState(conn, state);
+            FinanceDataRevision.NoteChanged();
+        }
     }
 }

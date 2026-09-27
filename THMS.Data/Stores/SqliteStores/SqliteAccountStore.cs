@@ -14,6 +14,7 @@ namespace THMS.Data.Stores.SqliteStores
         private readonly MortgageAccountTable _mortgageAccountTable = new();
         private readonly InvestmentAccountTable _investmentAccountTable = new();
         private readonly InternalAccountTable _internalAccountTable = new();
+        private readonly PlaidItemSyncStateTable _plaidItemSync = new();
 
         public void InitializeSchema(SqliteConnection conn)
         {
@@ -25,6 +26,7 @@ namespace THMS.Data.Stores.SqliteStores
             _mortgageAccountTable.InitializeSchema(conn);
             _investmentAccountTable.InitializeSchema(conn);
             _internalAccountTable.InitializeSchema(conn);
+            _plaidItemSync.InitializeSchema(conn);
         }
 
         public void Upsert(SqliteConnection conn, Account account)
@@ -217,5 +219,14 @@ namespace THMS.Data.Stores.SqliteStores
                 Purpose = purpose
             };
         }
+
+        public IReadOnlyList<PlaidItemSyncState> GetPlaidItemSyncStates(SqliteConnection conn) =>
+            _plaidItemSync.GetAll(conn);
+
+        public PlaidItemSyncState? GetPlaidItemSyncState(SqliteConnection conn, string itemId) =>
+            _plaidItemSync.Get(conn, itemId);
+
+        public void UpsertPlaidItemSyncState(SqliteConnection conn, PlaidItemSyncState state) =>
+            _plaidItemSync.Upsert(conn, state);
     }
 }

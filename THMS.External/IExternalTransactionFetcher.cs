@@ -6,5 +6,10 @@
             AccountDto account,
             DateTime start,
             DateTime end);
+
+        Task<TransactionSyncPage> SyncTransactionsAsync(
+            string accessToken,
+            string? cursor,
+            CancellationToken cancellationToken = default);
     }
 }

@@ -29,6 +29,7 @@ namespace THMS.Logic.ViewModels.Finance
         public decimal? AprValue { get; init; }
         public string CreditLimit { get; init; } = "";
         public decimal? CreditLimitValue { get; init; }
+        public string PlaidStatus { get; init; } = "";
 
         public static AccountRegisterRow From(Account account, AccountStatement? latestStatement) =>
             From(account, latestStatement is null ? [] : [latestStatement], posted: []);
@@ -36,7 +37,8 @@ namespace THMS.Logic.ViewModels.Finance
         public static AccountRegisterRow From(
             Account account,
             IReadOnlyList<AccountStatement> statements,
-            IEnumerable<PostedTransaction> posted)
+            IEnumerable<PostedTransaction> posted,
+            string? plaidStatus = null)
         {
             ArgumentNullException.ThrowIfNull(account);
             ArgumentNullException.ThrowIfNull(statements);
@@ -76,8 +78,16 @@ namespace THMS.Logic.ViewModels.Finance
                 Apr = FormatApr(apr),
                 AprValue = apr,
                 CreditLimit = creditLimit is decimal limit ? limit.ToString("c2") : "",
-                CreditLimitValue = creditLimit
+                CreditLimitValue = creditLimit,
+                PlaidStatus = plaidStatus ?? PlaidStatusOf(account, itemState: null)
             };
+        }
+
+        public static string PlaidStatusOf(Account account, PlaidItemSyncState? itemState)
+        {
+            if (account.ExternalLink is null || string.IsNullOrWhiteSpace(account.ExternalLink.ItemId))
+                return "";
+            return itemState?.DisplayLabel ?? "Not synced";
         }
 
         public static int Compare(AccountRegisterRow x, AccountRegisterRow y, string propertyName, bool descending)
@@ -96,6 +106,7 @@ namespace THMS.Logic.ViewModels.Finance
                 nameof(DueDate) => CompareNullable(x.DueDateValue, y.DueDateValue, descending),
                 nameof(Apr) => CompareNullable(x.AprValue, y.AprValue, descending),
                 nameof(CreditLimit) => CompareNullable(x.CreditLimitValue, y.CreditLimitValue, descending),
+                nameof(PlaidStatus) => CompareText(x.PlaidStatus, y.PlaidStatus, descending),
                 _ => CompareText(x.Name, y.Name, descending)
             };
 

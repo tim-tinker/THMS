@@ -35,6 +35,7 @@ namespace THMS.UI.WinForms
         private Controls.ThmsButton btnAddStatement;
         private Label lblStatementStatus;
         private Controls.CategoryManagerControl categoryManager;
+        private Controls.HistoryPeriodBar historyBar;
 
         protected override void Dispose(bool disposing)
         {
@@ -77,6 +78,7 @@ namespace THMS.UI.WinForms
             btnAddStatement = new Controls.ThmsButton();
             lblStatementStatus = new Label();
             categoryManager = new Controls.CategoryManagerControl();
+            historyBar = new Controls.HistoryPeriodBar();
             ((System.ComponentModel.ISupportInitialize)split).BeginInit();
             split.Panel1.SuspendLayout();
             split.Panel2.SuspendLayout();
@@ -144,11 +146,7 @@ namespace THMS.UI.WinForms
             split.Dock = DockStyle.Fill;
             split.Name = "split";
             split.Orientation = Orientation.Horizontal;
-            split.Size = new Size(1100, 760);
-            split.Panel1MinSize = 140;
-            split.Panel2MinSize = 180;
-            split.SplitterDistance = 260;
-            split.Panel1.Controls.Add(tabsTop);
+            split.Panel1.Controls.Add(accountUpdater);
             split.Panel2.Controls.Add(pnlAccountTabs);
             //
             // tabsTop
@@ -161,7 +159,7 @@ namespace THMS.UI.WinForms
             //
             // tabAccounts
             //
-            tabAccounts.Controls.Add(accountUpdater);
+            tabAccounts.Controls.Add(split);
             tabAccounts.Name = "tabAccounts";
             tabAccounts.Padding = new Padding(4);
             tabAccounts.Text = "Accounts";
@@ -265,6 +263,12 @@ namespace THMS.UI.WinForms
             categoryManager.ShowCloseButton = false;
             categoryManager.ShowImportButton = false;
             //
+            // historyBar
+            //
+            historyBar.Dock = DockStyle.Top;
+            historyBar.Name = "historyBar";
+            historyBar.Padding = new Padding(8, 4, 8, 8);
+            //
             // pnlStatements
             //
             pnlStatements.Controls.Add(gridStatements);
@@ -317,7 +321,8 @@ namespace THMS.UI.WinForms
             // RegisterForm
             //
             ClientSize = new Size(1100, 760);
-            Controls.Add(split);
+            Controls.Add(tabsTop);
+            Controls.Add(historyBar);
             Controls.Add(menu);
             MainMenuStrip = menu;
             Name = "RegisterForm";

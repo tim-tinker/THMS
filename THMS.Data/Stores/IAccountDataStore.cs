@@ -13,5 +13,9 @@ namespace THMS.Data.Stores
         // Retrieve all accounts
         IEnumerable<Account> GetAllAccounts();
         void DeleteAccount(Guid id);
+
+        IReadOnlyList<PlaidItemSyncState> GetPlaidItemSyncStates();
+        PlaidItemSyncState? GetPlaidItemSyncState(string itemId);
+        void UpsertPlaidItemSyncState(PlaidItemSyncState state);
     }
 }

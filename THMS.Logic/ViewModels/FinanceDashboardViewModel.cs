@@ -51,9 +51,7 @@ namespace THMS.Logic.ViewModels.Finance
                 transfers.AddRange(_transactions.GetPostedTransferTransactions(account.Id));
             }
 
-            var rules = _transactions.GetAllExpenseBudgetRules()
-                .Where(r => accountIds.Contains(r.AccountId))
-                .ToList();
+            var rules = _transactions.GetAllExpenseBudgetRules().ToList();
             var periods = rules.ToDictionary(r => r.Id, r => _budgets.GetActivePeriod(r.Id));
             var recurring = _transactions.GetAllRecurringSingleRules()
                 .Where(r => accountIds.Contains(r.AccountId))

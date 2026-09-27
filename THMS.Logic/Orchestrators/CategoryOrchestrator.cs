@@ -133,7 +133,7 @@ namespace THMS.Logic.Orchestrators
 
                 if (learn)
                     _categorizer.Learn(posted.Description, category.Id);
-                _budgets.RefreshAccount(posted.AccountId);
+                _budgets.RefreshAllActive();
                 return;
             }
 
@@ -157,7 +157,7 @@ namespace THMS.Logic.Orchestrators
 
             if (learn)
                 _categorizer.Learn(transfer.Description, category.Id);
-            _budgets.RefreshAccount(transfer.AccountId);
+            _budgets.RefreshAllActive();
         }
 
         public ExpenseCategory GetOrCreate(string name, Guid? parentId = null) =>

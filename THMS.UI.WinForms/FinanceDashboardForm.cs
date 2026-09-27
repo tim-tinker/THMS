@@ -1,4 +1,5 @@
 using System.Windows.Forms.DataVisualization.Charting;
+using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.ViewModels.Finance;
 using THMS.UI.WinForms.Charts;
@@ -145,19 +146,28 @@ namespace THMS.UI.WinForms
                 WrapContents = true,
                 Padding = new Padding(0, 0, 0, 4)
             };
+            var btnAdd = new ThmsButton { Text = "Add Budget" };
+            var btnEdit = new ThmsButton { Text = "Edit Budget" };
             var btnPeriod = new ThmsButton { Text = "Open Current Period" };
             var btnTransfer = new ThmsButton { Text = "Transfer Balance" };
             var btnHistory = new ThmsButton { Text = "View History" };
+            var btnDelete = new ThmsButton { Text = "Delete Budget", Destructive = true };
             var btnCategories = new ThmsButton { Text = "Manage Categories" };
             var btnLedger = new ThmsButton { Text = "Open Ledger" };
+            btnAdd.Click += (_, _) => OpenBudgetEditor(existing: false);
+            btnEdit.Click += (_, _) => OpenBudgetEditor(existing: true);
             btnPeriod.Click += (_, _) => OpenSelectedPeriod();
             btnTransfer.Click += (_, _) => OpenSelectedTransfer();
             btnHistory.Click += (_, _) => OpenSelectedHistory();
+            btnDelete.Click += (_, _) => DeleteSelectedBudget();
             btnCategories.Click += (_, _) => OpenCategories();
             btnLedger.Click += (_, _) => OpenLedger();
+            toolbar.Controls.Add(btnAdd);
+            toolbar.Controls.Add(btnEdit);
             toolbar.Controls.Add(btnPeriod);
             toolbar.Controls.Add(btnTransfer);
             toolbar.Controls.Add(btnHistory);
+            toolbar.Controls.Add(btnDelete);
             toolbar.Controls.Add(btnCategories);
             toolbar.Controls.Add(btnLedger);
 
@@ -165,7 +175,6 @@ namespace THMS.UI.WinForms
             _budgetGrid.DataSource = _budgetsSource;
             _budgetGrid.Columns.AddRange(
                 TextColumn("BudgetName", "Budget", DataGridViewAutoSizeColumnMode.AllCells, 140),
-                TextColumn("AccountName", "Account", DataGridViewAutoSizeColumnMode.AllCells, 100),
                 CurrencyColumn("Remaining", "Remaining"),
                 CurrencyColumn("Ending", "Ending"),
                 CurrencyColumn("Recommended", "Recommended"),
@@ -253,6 +262,36 @@ namespace THMS.UI.WinForms
 
         private FinanceDashboardBudgetRow? SelectedBudget() =>
             _budgetGrid.CurrentRow?.DataBoundItem as FinanceDashboardBudgetRow;
+
+        private void OpenBudgetEditor(bool existing)
+        {
+            ExpenseBudgetRule? rule = null;
+            if (existing)
+            {
+                if (SelectedBudget() is not FinanceDashboardBudgetRow row)
+                    return;
+                rule = _budgets.GetRule(row.RuleId);
+                if (rule is null)
+                    return;
+            }
+
+            using var editor = new BudgetRuleEditor(_budgets, rule);
+            if (editor.ShowDialog(FindForm()) == DialogResult.OK)
+                RefreshDashboard();
+        }
+
+        private void DeleteSelectedBudget()
+        {
+            if (SelectedBudget() is not FinanceDashboardBudgetRow row)
+                return;
+
+            if (MessageBox.Show(FindForm(), $"Delete budget '{row.BudgetName}' and its history?", "Delete Budget",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                return;
+
+            _budgets.DeleteRule(row.RuleId);
+            RefreshDashboard();
+        }
 
         private void OpenSelectedPeriod()
         {

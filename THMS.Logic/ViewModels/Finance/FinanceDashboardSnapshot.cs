@@ -22,7 +22,6 @@ namespace THMS.Logic.ViewModels.Finance
     public class FinanceDashboardBudgetRow
     {
         public Guid RuleId { get; init; }
-        public string AccountName { get; init; } = "";
         public string BudgetName { get; init; } = "";
         public string Frequency { get; init; } = "";
         public decimal Remaining { get; init; }

@@ -8,5 +8,6 @@ namespace THMS.Logic.ViewModels.Finance
         public string Account { get; set; } = "";
         public string Category { get; set; } = "";
         public Guid AccountId { get; set; }
+        public string ExternalTransactionId { get; set; } = "";
     }
 }

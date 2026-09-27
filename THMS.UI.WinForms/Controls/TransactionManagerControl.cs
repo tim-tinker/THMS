@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Diagnostics;
 
 using THMS.Data.Stores;
@@ -28,31 +28,18 @@ namespace THMS.UI.WinForms.Controls
         private readonly BindingSource _importedSource = new();
         private DataGridView importedGrid = null!;
         private Label? lblImported;
-        private readonly BudgetOrchestrator _budgetOrchestrator = new();
         private readonly CategoryOrchestrator _categoryOrchestrator = new();
         private readonly IAccountStatementDataStore _statements = new DataStoreFactory().GetAccountStatementStore();
 
         private BindingSource _accountsSource = new BindingSource();
         private BindingSource _transactionsSource = new BindingSource();
-        private BindingSource _categorySource = new BindingSource();
-        private BindingSource _budgetsSource = new BindingSource();
-        private DataGridView budgetGrid = null!;
-        private DataGridView categoryGrid = null!;
-        private DataGridViewTextBoxColumn categoryViewCategoryColumn = null!;
-        private ThmsButton btnCategorySplit = null!;
         private Label? lblLoadStatus;
         private ProgressBar? progressLoad;
-        private TabControl? _detailTabs;
-        private TabPage? _categoryPage;
-        private TabPage? _budgetsPage;
         private CancellationTokenSource? _txLoadCts;
         private bool _filterApplied;
         private bool _ready;
         private bool _suspendAccountChange;
         private bool _suspendHistoryChange;
-        private bool _suspendCategoryFilter;
-        private Label lblCategoryFilter = null!;
-        private ComboBox cmbCategoryFilter = null!;
         private decimal _postedBalanceBeforeEdit;
         private bool _hostProvidesHistory;
         private bool _hostProvidesAccounts;
@@ -63,10 +50,9 @@ namespace THMS.UI.WinForms.Controls
             InitializeHistory();
             InitializeForecastPeriod();
             InitializeShowFilter();
-            InitializeCategoryFilter();
             LayoutForecastToolbar();
             InitializeGrids();
-            HostBudgetUi();
+            HostLedgerDetail();
             _ready = true;
         }
 
@@ -158,9 +144,6 @@ namespace THMS.UI.WinForms.Controls
             cmbShow.Width = 200;
             cmbShow.DropDownWidth = 220;
             cmbShow.IntegralHeight = false;
-            cmbCategoryFilter.Width = 220;
-            cmbCategoryFilter.DropDownWidth = 280;
-            cmbCategoryFilter.IntegralHeight = false;
             btnAddRule.AutoSize = true;
             btnDeleteRule.AutoSize = true;
             btnSplitTransaction.AutoSize = true;
@@ -191,51 +174,6 @@ namespace THMS.UI.WinForms.Controls
             btnAddRule.Click += OnAddRuleClicked;
             btnDeleteRule.Click += OnDeleteRuleClicked;
             btnSplitTransaction.Click += OnSplitTransactionClicked;
-        }
-
-        private void InitializeCategoryFilter()
-        {
-            lblCategoryFilter = new Label
-            {
-                Anchor = AnchorStyles.Left,
-                AutoSize = true,
-                Margin = new Padding(12, 8, 8, 4),
-                Text = "Category:"
-            };
-            cmbCategoryFilter = new ComboBox
-            {
-                Anchor = AnchorStyles.Left,
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Margin = new Padding(4, 4, 8, 4)
-            };
-            cmbCategoryFilter.SelectedIndexChanged += OnCategoryFilterChanged;
-            BindCategoryFilter();
-        }
-
-        private void BindCategoryFilter()
-        {
-            var selected = cmbCategoryFilter.SelectedItem as CategoryFilterChoice;
-            var items = CategoryFilterChoice.ForCategories(_categoryOrchestrator.GetActiveCategories());
-            _suspendCategoryFilter = true;
-            cmbCategoryFilter.DisplayMember = nameof(CategoryFilterChoice.Name);
-            cmbCategoryFilter.DataSource = items;
-            if (selected is not null)
-            {
-                var match = items.FirstOrDefault(i =>
-                    i.UncategorizedOnly == selected.UncategorizedOnly && i.CategoryId == selected.CategoryId);
-                if (match is not null)
-                    cmbCategoryFilter.SelectedItem = match;
-            }
-
-            _suspendCategoryFilter = false;
-        }
-
-        private void OnCategoryFilterChanged(object? sender, EventArgs e)
-        {
-            if (_suspendCategoryFilter || !_ready)
-                return;
-
-            LoadCategoryRowsForSelectedAccount();
         }
 
         private void InitializeGrids()
@@ -284,14 +222,10 @@ namespace THMS.UI.WinForms.Controls
             detailGrid.MouseDown += OnLedgerMouseDown;
         }
 
-        private void HostBudgetUi()
+        private void HostLedgerDetail()
         {
             if (LicenseManager.UsageMode == LicenseUsageMode.Designtime)
                 return;
-            var tabDetails = new ThmsTabControl { Dock = DockStyle.Fill, Name = "tabDetails" };
-            var transactionsPage = new TabPage("Transactions");
-            var categoryPage = new TabPage("By Category");
-            var budgetsPage = new TabPage("Budgets");
 
             splitContainer.Panel2.Controls.Remove(detailGrid);
             splitContainer.Panel2.Controls.Remove(forecastPanel);
@@ -331,75 +265,8 @@ namespace THMS.UI.WinForms.Controls
             forecastBar.Controls.Add(lblLoadStatus);
             forecastBar.Controls.Add(progressLoad);
 
-            transactionsPage.Controls.Add(BuildTransactionSplit());
-            transactionsPage.Controls.Add(forecastBar);
-
-            HostCategoryUi(categoryPage);
-
-            var toolbar = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                Padding = new Padding(8, 6, 8, 6),
-                WrapContents = true
-            };
-            var btnAddBudget = new ThmsButton { Text = "Add Budget" };
-            var btnEditBudget = new ThmsButton { Text = "Edit Budget" };
-            var btnDeleteBudget = new ThmsButton { Text = "Delete Budget", Destructive = true };
-            var btnViewHistory = new ThmsButton { Text = "View History" };
-            var btnOpenPeriod = new ThmsButton { Text = "Open Current Period" };
-            var btnTransferBalance = new ThmsButton { Text = "Transfer Balance" };
-            btnAddBudget.Click += (_, _) => OpenBudgetRuleEditor(existing: false);
-            btnEditBudget.Click += (_, _) => OpenBudgetRuleEditor(existing: true);
-            btnDeleteBudget.Click += (_, _) => DeleteSelectedBudget();
-            btnViewHistory.Click += (_, _) => OpenBudgetHistory();
-            btnOpenPeriod.Click += (_, _) => OpenBudgetPeriod();
-            btnTransferBalance.Click += (_, _) => OpenBudgetTransfer();
-            toolbar.Controls.Add(btnAddBudget);
-            toolbar.Controls.Add(btnEditBudget);
-            toolbar.Controls.Add(btnViewHistory);
-            toolbar.Controls.Add(btnOpenPeriod);
-            toolbar.Controls.Add(btnTransferBalance);
-            toolbar.Controls.Add(btnDeleteBudget);
-
-            budgetGrid = new DataGridView
-            {
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                AutoGenerateColumns = false,
-                Dock = DockStyle.Fill,
-                MultiSelect = false,
-                ReadOnly = true,
-                RowHeadersVisible = false,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect
-            };
-            DataGridViewUtil.EnableDoubleBuffering(budgetGrid);
-            budgetGrid.Columns.AddRange(
-                TextColumn("BudgetName", "Budget"),
-                TextColumn("Frequency", "Frequency"),
-                CurrencyColumn("StartingBalance", "Starting"),
-                CurrencyColumn("PeriodBudget", "Budget"),
-                CurrencyColumn("Actual", "Actual"),
-                CurrencyColumn("Remaining", "Remaining"),
-                CurrencyColumn("EndingBalance", "Ending"));
-            budgetGrid.DataSource = _budgetsSource;
-            budgetGrid.CellDoubleClick += (_, e) =>
-            {
-                if (e.RowIndex >= 0)
-                    OpenBudgetRuleEditor(existing: true);
-            };
-
-            budgetsPage.Controls.Add(budgetGrid);
-            budgetsPage.Controls.Add(toolbar);
-            tabDetails.TabPages.Add(transactionsPage);
-            tabDetails.TabPages.Add(categoryPage);
-            tabDetails.TabPages.Add(budgetsPage);
-            tabDetails.SelectedIndexChanged += (_, _) => RefreshCurrentAccount();
-            _detailTabs = tabDetails;
-            _categoryPage = categoryPage;
-            _budgetsPage = budgetsPage;
-            splitContainer.Panel2.Controls.Add(tabDetails);
+            splitContainer.Panel2.Controls.Add(BuildTransactionSplit());
+            splitContainer.Panel2.Controls.Add(forecastBar);
         }
 
         private Control BuildTransactionSplit()
@@ -464,60 +331,6 @@ namespace THMS.UI.WinForms.Controls
             split.Panel1.Controls.Add(detailGrid);
             split.Panel2.Controls.Add(importedPanel);
             return split;
-        }
-
-        private void HostCategoryUi(TabPage categoryPage)
-        {
-            var toolbar = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                Padding = new Padding(8, 6, 8, 6),
-                WrapContents = true
-            };
-            lblCategoryFilter.Margin = new Padding(4, 8, 8, 4);
-            cmbCategoryFilter.Margin = new Padding(4, 4, 8, 4);
-            toolbar.Controls.Add(lblCategoryFilter);
-            toolbar.Controls.Add(cmbCategoryFilter);
-            btnCategorySplit = new ThmsButton { Text = "Split Transaction" };
-            btnCategorySplit.Click += OnCategorySplitTransactionClicked;
-            toolbar.Controls.Add(btnCategorySplit);
-
-            categoryViewCategoryColumn = TextColumn("Category", "Category");
-            var dateColumn = TextColumn("Date", "Date");
-            dateColumn.DefaultCellStyle.Format = "d";
-            var descriptionColumn = TextColumn("Description", "Description");
-            descriptionColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            categoryGrid = new DataGridView
-            {
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                AllowUserToResizeRows = false,
-                AutoGenerateColumns = false,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                Dock = DockStyle.Fill,
-                EditMode = DataGridViewEditMode.EditProgrammatically,
-                MultiSelect = false,
-                ReadOnly = true,
-                RowHeadersVisible = false,
-                SelectionMode = DataGridViewSelectionMode.CellSelect
-            };
-            DataGridViewUtil.EnableDoubleBuffering(categoryGrid);
-            categoryGrid.Columns.AddRange(
-                dateColumn,
-                CurrencyColumn("Amount", "Amount"),
-                categoryViewCategoryColumn,
-                TextColumn("TypeLabel", "Type"),
-                descriptionColumn);
-            categoryGrid.DataSource = _categorySource;
-            categoryGrid.CellDoubleClick += OnCategoryViewCellDoubleClick;
-            categoryGrid.CellMouseClick += OnCategoryViewCellMouseClick;
-            categoryGrid.KeyDown += OnCategoryViewKeyDown;
-            categoryGrid.SelectionChanged += (_, _) => UpdateCategorySplitButton();
-
-            categoryPage.Controls.Add(categoryGrid);
-            categoryPage.Controls.Add(toolbar);
         }
 
         private static DataGridViewTextBoxColumn TextColumn(string property, string header) =>
@@ -1138,68 +951,6 @@ namespace THMS.UI.WinForms.Controls
             ShowCategoryMenu(detailGrid, CategoryColumn, e.RowIndex);
         }
 
-        private void OnCategoryViewCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
-        {
-            if (e.RowIndex < 0)
-                return;
-
-            if (IsCategoryColumn(categoryGrid, categoryViewCategoryColumn, e.ColumnIndex))
-            {
-                ShowCategoryMenu(categoryGrid, categoryViewCategoryColumn, e.RowIndex);
-                return;
-            }
-
-            if (categoryGrid.Rows[e.RowIndex].DataBoundItem is UnifiedTransactionView view && CanSplit(view))
-                OpenSplitEditor(view);
-        }
-
-        private void OnCategoryViewCellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
-        {
-            if (e.RowIndex < 0 || !IsCategoryColumn(categoryGrid, categoryViewCategoryColumn, e.ColumnIndex))
-                return;
-            if (e.Button is not (MouseButtons.Left or MouseButtons.Right))
-                return;
-            if (!CanEditCategory(categoryGrid, e.RowIndex))
-                return;
-
-            categoryGrid.CurrentCell = categoryGrid[e.ColumnIndex, e.RowIndex];
-            ShowCategoryMenu(categoryGrid, categoryViewCategoryColumn, e.RowIndex);
-        }
-
-        private void OnCategoryViewKeyDown(object? sender, KeyEventArgs e)
-        {
-            if (categoryGrid.CurrentCell is { RowIndex: >= 0 } cell
-                && IsCategoryColumn(categoryGrid, categoryViewCategoryColumn, cell.ColumnIndex)
-                && e.KeyCode is Keys.F2 or Keys.Enter or Keys.Space
-                && CanEditCategory(categoryGrid, cell.RowIndex))
-            {
-                ShowCategoryMenu(categoryGrid, categoryViewCategoryColumn, cell.RowIndex);
-                e.Handled = true;
-            }
-        }
-
-        private void OnCategorySplitTransactionClicked(object? sender, EventArgs e)
-        {
-            if (GetSelectedCategoryRow() is not UnifiedTransactionView view)
-            {
-                MessageBox.Show(FindForm(), "Select a category row to split its posted transaction.", "Split Transaction",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            OpenSplitEditor(view);
-        }
-
-        private UnifiedTransactionView? GetSelectedCategoryRow() =>
-            categoryGrid?.CurrentRow?.DataBoundItem as UnifiedTransactionView;
-
-        private void UpdateCategorySplitButton()
-        {
-            if (btnCategorySplit is null)
-                return;
-            btnCategorySplit.Enabled = GetSelectedCategoryRow() is UnifiedTransactionView view && CanSplit(view);
-        }
-
         private static bool IsCategoryColumn(DataGridView grid, DataGridViewColumn categoryColumn, int columnIndex) =>
             columnIndex >= 0 && grid.Columns[columnIndex] == categoryColumn;
 
@@ -1450,7 +1201,6 @@ namespace THMS.UI.WinForms.Controls
 
         public void RefreshAll()
         {
-            BindCategoryFilter();
             LoadAccounts();
             RefreshCurrentAccount();
         }
@@ -1471,55 +1221,13 @@ namespace THMS.UI.WinForms.Controls
 
             try
             {
-                if (IsBudgetsTabSelected())
-                    LoadBudgetsForAccount(account.Id);
-                else if (IsCategoryTabSelected())
-                    LoadCategoryRowsForAccount(account.Id);
-                else
-                    await LoadTransactionsForAccountAsync(account.Id, cts.Token);
+                await LoadTransactionsForAccountAsync(account.Id, cts.Token);
             }
             finally
             {
                 if (ReferenceEquals(_txLoadCts, cts) && !cts.IsCancellationRequested)
                     HideLoadProgress();
             }
-        }
-
-        private bool IsBudgetsTabSelected() =>
-            _detailTabs is not null && _budgetsPage is not null && _detailTabs.SelectedTab == _budgetsPage;
-
-        private bool IsCategoryTabSelected() =>
-            _detailTabs is not null && _categoryPage is not null && _detailTabs.SelectedTab == _categoryPage;
-
-        private void LoadCategoryRowsForSelectedAccount()
-        {
-            if (_accountsSource.Current is UnifiedAccountView account)
-                LoadCategoryRowsForAccount(account.Id);
-        }
-
-        private void LoadCategoryRowsForAccount(Guid accountId)
-        {
-            if (categoryGrid is null)
-                return;
-            var history = SelectedHistory();
-            var start = BaseOrchestrator.GetStartDate(DateTime.Today, history);
-            var txs = history == HistoryLifetime
-                ? _txOrchestrator.GetTransactionsForAccount(accountId)
-                : _txOrchestrator.GetTransactionsForAccount(accountId, start, DateTime.Today);
-            var rows = UnifiedTransactionViewBuilder.BuildCategoryRows(txs.Posted, txs.PostedTransfers);
-            ApplyCategoryDisplayNames(rows);
-            var filtered = UnifiedTransactionViewBuilder.FilterCategoryRows(
-                rows,
-                cmbCategoryFilter.SelectedItem as CategoryFilterChoice ?? CategoryFilterChoice.All,
-                _categoryOrchestrator.GetAllCategories(includeInactive: true));
-            _categorySource.DataSource = UnifiedTransactionView.OrderForDisplay(filtered).ToList();
-            UpdateCategorySplitButton();
-        }
-
-        private void LoadBudgetsForSelectedAccount()
-        {
-            if (_accountsSource.Current is UnifiedAccountView account)
-                LoadBudgetsForAccount(account.Id);
         }
 
         private void ShowLoadProgress(string status)
@@ -1544,99 +1252,7 @@ namespace THMS.UI.WinForms.Controls
             lblLoadStatus.Text = "";
         }
 
-        private void LoadBudgetsForAccount(Guid accountId)
-        {
-            _budgetOrchestrator.EnsureSuggestedRules(accountId);
-            _budgetOrchestrator.RefreshAccount(accountId);
-
-            var views = new List<UnifiedBudgetView>();
-            foreach (var rule in _budgetOrchestrator.GetRules(accountId))
-            {
-                var period = _budgetOrchestrator.GetActivePeriod(rule.Id);
-                views.Add(new UnifiedBudgetView
-                {
-                    Id = rule.Id,
-                    BudgetName = rule.BudgetName,
-                    Frequency = rule.BudgetFrequency.ToString(),
-                    StartingBalance = period?.StartingBalance,
-                    PeriodBudget = period?.BudgetAmount,
-                    Actual = period?.ActualExpenses,
-                    Remaining = period?.Remaining,
-                    EndingBalance = period?.EndingBalance,
-                    IsActive = rule.IsActive,
-                    Status = !rule.IsActive ? "Inactive" : period is null ? "No period" : period.IsClosed ? "Closed" : "Open"
-                });
-            }
-
-            _budgetsSource.DataSource = views;
-        }
-
-        private UnifiedBudgetView? GetSelectedBudget() =>
-            budgetGrid.CurrentRow?.DataBoundItem as UnifiedBudgetView;
-
         private Guid? CurrentAccountId =>
             (_accountsSource.Current as UnifiedAccountView)?.Id;
-
-        private void OpenBudgetRuleEditor(bool existing)
-        {
-            if (CurrentAccountId is not Guid accountId)
-                return;
-
-            ExpenseBudgetRule? rule = null;
-            if (existing)
-            {
-                if (GetSelectedBudget() is not UnifiedBudgetView view)
-                    return;
-                rule = _budgetOrchestrator.GetRule(view.Id);
-                if (rule is null)
-                    return;
-            }
-
-            using var editor = new BudgetRuleEditor(accountId, rule);
-            if (editor.ShowDialog(FindForm()) == DialogResult.OK)
-                RefreshAll();
-        }
-
-        private void DeleteSelectedBudget()
-        {
-            if (GetSelectedBudget() is not UnifiedBudgetView view)
-                return;
-
-            if (MessageBox.Show(FindForm(), $"Delete budget '{view.BudgetName}' and its history?", "Delete Budget",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-                return;
-
-            _budgetOrchestrator.DeleteRule(view.Id);
-            RefreshAll();
-        }
-
-        private void OpenBudgetHistory()
-        {
-            if (GetSelectedBudget() is not UnifiedBudgetView view)
-                return;
-
-            using var viewer = new BudgetHistoryViewer(view.Id);
-            viewer.ShowDialog(FindForm());
-        }
-
-        private void OpenBudgetPeriod()
-        {
-            if (GetSelectedBudget() is not UnifiedBudgetView view)
-                return;
-
-            using var editor = new BudgetPeriodEditor(_budgetOrchestrator, view.Id);
-            if (editor.ShowDialog(FindForm()) == DialogResult.OK)
-                RefreshAll();
-        }
-
-        private void OpenBudgetTransfer()
-        {
-            if (GetSelectedBudget() is not UnifiedBudgetView view)
-                return;
-
-            using var dialog = new BudgetBalanceTransferDialog(_budgetOrchestrator, view.Id);
-            if (dialog.ShowDialog(FindForm()) == DialogResult.OK)
-                RefreshAll();
-        }
     }
 }
