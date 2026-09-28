@@ -29,9 +29,9 @@ namespace THMS.Logic.Finance.Aggregation
                     Name = ExpenseCategoryTree.IndentedName(catalog, category),
                     Active = category.IsActive ? "Active" : "Inactive",
                     Remaining = period?.Remaining,
-                    Ending = period?.EndingBalance,
+                    PeriodStart = period?.PeriodStart.Date,
+                    PeriodEnd = period?.PeriodEnd.Date,
                     Recommended = period?.RecommendedAmount,
-                    Frequency = rule is null ? "" : rule.BudgetFrequency.ToString(),
                     Status = StatusOf(rule, period, today)
                 });
             }
@@ -51,7 +51,6 @@ namespace THMS.Logic.Finance.Aggregation
                     BudgetAmount = h.BudgetAmount,
                     Actual = h.ActualExpenses,
                     Remaining = h.Remaining,
-                    Ending = h.EndingBalance,
                     Recommended = h.RecommendedAmount,
                     Status = h.IsClosed ? "Closed" : "Open",
                     IsClosed = h.IsClosed
@@ -106,7 +105,7 @@ namespace THMS.Logic.Finance.Aggregation
                 return "";
             if (!rule.IsActive)
                 return "Inactive";
-            return period is null ? "" : FinanceDashboardComposer.BudgetStatus(period, today);
+            return period is null ? "" : FinanceDashboardComposer.BudgetStatus(period, today, rule.BudgetFrequency);
         }
     }
 }

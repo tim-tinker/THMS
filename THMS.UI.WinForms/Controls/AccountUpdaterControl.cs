@@ -24,6 +24,7 @@ namespace THMS.UI.WinForms.Controls
         private readonly IAccountDataStore _accounts = new DataStoreFactory().GetAccountStore();
         private readonly ContextMenuStrip _accountMenu = new();
         private bool _suppressSelectionEvents;
+        private Font? _unreconciledAccountFont;
 
         public event EventHandler? SelectedAccountChanged;
 
@@ -53,9 +54,13 @@ namespace THMS.UI.WinForms.Controls
         private void LoadAccounts()
         {
             var selectedId = GetSelectedAccount()?.Id;
+            var firstDisplayed = gridAccounts.RowCount > 0
+                ? gridAccounts.FirstDisplayedScrollingRowIndex
+                : -1;
             var sortColumn = gridAccounts.SortedColumn?.Name;
             var sortOrder = gridAccounts.SortOrder;
             var posted = _transactions.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
+            var unreconciled = new ReconciliationOrchestrator(_transactions).AccountIdsWithUnreconciled();
             var itemState = _accounts.GetPlaidItemSyncStates()
                 .ToDictionary(s => s.ItemId, StringComparer.Ordinal);
             var accounts = _accountOrchestrator.GetAllAccounts()
@@ -66,7 +71,8 @@ namespace THMS.UI.WinForms.Controls
                         account,
                         _statements.GetForAccount(account.Id).ToList(),
                         posted.Where(tx => tx.AccountId == account.Id),
-                        AccountRegisterRow.PlaidStatusOf(account, state));
+                        AccountRegisterRow.PlaidStatusOf(account, state),
+                        unreconciled.Contains(account.Id));
                 })
                 .ToList();
             _suppressSelectionEvents = true;
@@ -92,6 +98,7 @@ namespace THMS.UI.WinForms.Controls
                             : ListSortDirection.Ascending);
                 }
                 SelectAccount(selectedId);
+                RestoreScrollPosition(firstDisplayed);
             }
             finally
             {
@@ -101,8 +108,6 @@ namespace THMS.UI.WinForms.Controls
             UpdateActionButtons();
             SelectedAccountChanged?.Invoke(this, EventArgs.Empty);
         }
-
-        public void SetImportStatus(string message) => lblStatus.Text = message;
 
         private void SelectAccount(Guid? id)
         {
@@ -119,6 +124,28 @@ namespace THMS.UI.WinForms.Controls
                     return;
                 }
             }
+        }
+
+        private void RestoreScrollPosition(int firstDisplayed)
+        {
+            if (firstDisplayed < 0 || gridAccounts.RowCount == 0)
+                return;
+
+            ApplyScrollPosition(firstDisplayed);
+            if (gridAccounts.IsHandleCreated)
+                gridAccounts.BeginInvoke(() => ApplyScrollPosition(firstDisplayed));
+        }
+
+        private void ApplyScrollPosition(int firstDisplayed)
+        {
+            if (gridAccounts.IsDisposed || gridAccounts.RowCount == 0)
+                return;
+
+            var visible = Math.Max(1, gridAccounts.DisplayedRowCount(includePartialRow: false));
+            var maxFirst = Math.Max(0, gridAccounts.RowCount - visible);
+            var index = Math.Clamp(firstDisplayed, 0, maxFirst);
+            if (gridAccounts.FirstDisplayedScrollingRowIndex != index)
+                gridAccounts.FirstDisplayedScrollingRowIndex = index;
         }
 
         private void OnAccountSelectionChanged()
@@ -146,23 +173,23 @@ namespace THMS.UI.WinForms.Controls
 
             try
             {
+                AppStatus.Set("Importing accounts...", busy: true);
                 var rows = _importOrchestrator.LoadAccountsFromFile(fileDialog.FileName);
                 if (rows.Count == 0)
                 {
+                    AppStatus.Set("Ready.");
                     MessageBox.Show(FindForm(), "The selected file did not contain any accounts.", "Import Accounts",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
-                using var preview = new AccountImportPreviewDialog(rows, _importOrchestrator);
-                if (preview.ShowDialog(FindForm()) != DialogResult.OK)
-                    return;
-
+                var result = _importOrchestrator.ImportAccounts(rows, AppStatus.ForImport());
                 LoadAccounts();
-                SetImportStatus(ImportStatusText.Imported(preview.Result, "account", "accounts"));
+                AppStatus.Set(ImportStatusText.Imported(result, "account", "accounts"));
             }
             catch (Exception ex)
             {
+                AppStatus.Set("Import failed.");
                 MessageBox.Show(FindForm(), $"Could not parse the file.\n{ex.Message}", "Import Accounts",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
@@ -432,27 +459,23 @@ namespace THMS.UI.WinForms.Controls
         {
             if (e.RowIndex < 0 || e.ColumnIndex < 0)
                 return;
-            if (gridAccounts.Columns[e.ColumnIndex].Name != "Name")
-                return;
             if (gridAccounts.Rows[e.RowIndex].DataBoundItem is not AccountRegisterRow row)
+                return;
+
+            e.CellStyle.Font = row.HasUnreconciled
+                ? _unreconciledAccountFont ??= new Font(gridAccounts.Font, FontStyle.Bold)
+                : gridAccounts.Font;
+
+            if (gridAccounts.Columns[e.ColumnIndex].Name != "Name")
                 return;
             if (gridAccounts.Rows[e.RowIndex].Cells[e.ColumnIndex] is not DataGridViewLinkCell cell)
                 return;
 
-            if (string.IsNullOrWhiteSpace(row.WebsiteUrl))
-            {
-                cell.LinkBehavior = LinkBehavior.NeverUnderline;
-                cell.LinkColor = gridAccounts.DefaultCellStyle.ForeColor;
-                cell.ActiveLinkColor = gridAccounts.DefaultCellStyle.ForeColor;
-                cell.VisitedLinkColor = gridAccounts.DefaultCellStyle.ForeColor;
-            }
-            else
-            {
-                cell.LinkBehavior = LinkBehavior.HoverUnderline;
-                cell.LinkColor = Color.FromArgb(0, 99, 177);
-                cell.ActiveLinkColor = Color.FromArgb(0, 70, 127);
-                cell.VisitedLinkColor = Color.FromArgb(0, 99, 177);
-            }
+            DataGridViewUtil.ApplyLinkAppearance(
+                cell,
+                e.CellStyle,
+                !string.IsNullOrWhiteSpace(row.WebsiteUrl),
+                gridAccounts.DefaultCellStyle.ForeColor);
         }
 
         private static void OpenWebsite(string? url)

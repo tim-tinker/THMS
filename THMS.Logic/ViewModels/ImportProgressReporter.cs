@@ -7,14 +7,15 @@ namespace THMS.Logic.ViewModels
             int completed,
             int total,
             string? phase = null,
-            int stride = 25)
+            int stride = 25,
+            string? activity = null)
         {
             if (progress is null)
                 return;
             if (phase is null && completed != 0 && completed != total && stride > 0 && completed % stride != 0)
                 return;
 
-            progress.Report(new ImportProgress(completed, total, phase));
+            progress.Report(new ImportProgress(completed, total, phase, activity));
         }
     }
 }

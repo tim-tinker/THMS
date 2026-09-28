@@ -183,24 +183,24 @@ namespace THMS.UI.WinForms
 
             try
             {
+                AppStatus.Set("Importing EV charge sessions...", busy: true);
                 var rows = _evChargeImport.LoadSessionsFromFiles(fileDialog.FileNames, vehicle);
                 if (rows.Count == 0)
                 {
+                    AppStatus.Set("Ready.");
                     MessageBox.Show(this, "The selected file(s) did not contain any complete charge sessions.",
                         "Import EV Charge Sessions", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
-                using var preview = new EvChargeSessionImportPreviewDialog(rows, _evChargeImport);
-                if (preview.ShowDialog(this) != DialogResult.OK)
-                    return;
-
+                var result = _evChargeImport.ImportSessions(rows, AppStatus.ForImport());
                 ReloadCurrentTab();
-                SetCurrentImportStatus(ImportStatusText.Imported(
-                    preview.Result, "EV charge session", "EV charge sessions", includeTime: true));
+                AppStatus.Set(ImportStatusText.Imported(
+                    result, "EV charge session", "EV charge sessions", includeTime: true));
             }
             catch (Exception ex)
             {
+                AppStatus.Set("Import failed.");
                 MessageBox.Show(this, $"Could not parse the file(s).\n{ex.Message}",
                     "Import EV Charge Sessions", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
@@ -239,24 +239,24 @@ namespace THMS.UI.WinForms
 
             try
             {
+                AppStatus.Set("Importing circuit intervals...", busy: true);
                 var rows = _homeCircuitImport.LoadReadingsFromFiles(fileDialog.FileNames);
                 if (rows.Count == 0)
                 {
+                    AppStatus.Set("Ready.");
                     MessageBox.Show(this, "The selected file(s) did not contain any circuit intervals.",
                         "Import Circuit Intervals", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
-                using var preview = new HomeCircuitImportPreviewDialog(rows, _homeCircuitImport);
-                if (preview.ShowDialog(this) != DialogResult.OK)
-                    return;
-
+                var result = _homeCircuitImport.ImportReadings(rows, AppStatus.ForImport());
                 ReloadCurrentTab();
-                SetCurrentImportStatus(ImportStatusText.Imported(
-                    preview.Result, "circuit interval", "circuit intervals", includeTime: true));
+                AppStatus.Set(ImportStatusText.Imported(
+                    result, "circuit interval", "circuit intervals", includeTime: true));
             }
             catch (Exception ex)
             {
+                AppStatus.Set("Import failed.");
                 MessageBox.Show(this, $"Could not parse the file(s).\n{ex.Message}",
                     "Import Circuit Intervals", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
@@ -275,42 +275,26 @@ namespace THMS.UI.WinForms
 
             try
             {
+                AppStatus.Set("Importing solar intervals...", busy: true);
                 var rows = _solarImport.LoadIntervalsFromFiles(fileDialog.FileNames);
                 if (rows.Count == 0)
                 {
+                    AppStatus.Set("Ready.");
                     MessageBox.Show(this, "The selected file(s) did not contain any solar intervals.",
                         "Import Solar Intervals", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
-                using var preview = new SolarIntervalImportPreviewDialog(rows, _solarImport);
-                if (preview.ShowDialog(this) != DialogResult.OK)
-                    return;
-
+                var result = _solarImport.ImportIntervals(rows, AppStatus.ForImport());
                 ReloadCurrentTab();
-                SetCurrentImportStatus(ImportStatusText.Imported(
-                    preview.Result, "solar interval", "solar intervals", includeTime: true));
+                AppStatus.Set(ImportStatusText.Imported(
+                    result, "solar interval", "solar intervals", includeTime: true));
             }
             catch (Exception ex)
             {
+                AppStatus.Set("Import failed.");
                 MessageBox.Show(this, $"Could not parse the file(s).\n{ex.Message}",
                     "Import Solar Intervals", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        }
-
-        private void SetCurrentImportStatus(string message)
-        {
-            switch (FindManager(tabs.SelectedTab))
-            {
-                case EvChargeSessionManagerControl ev:
-                    ev.SetImportStatus(message);
-                    break;
-                case HomeCircuitManagerControl circuit:
-                    circuit.SetImportStatus(message);
-                    break;
-                case SolarIntervalManagerControl solar:
-                    solar.SetImportStatus(message);
-                    break;
             }
         }
 

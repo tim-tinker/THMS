@@ -81,7 +81,7 @@ namespace THMS.UI.WinForms.Controls
             base.OnShown(e);
             SizeDialogInputs();
             FitToWorkingArea();
-            ShowObligationFields(SelectedType() is StatementType type && type != StatementType.Bank);
+            ShowObligationFields(SelectedType() is StatementType type && !StatementAccountMatch.IsNonPayable(type));
         }
 
         private void WireComboDrawing()
@@ -217,7 +217,8 @@ namespace THMS.UI.WinForms.Controls
                 new("Utility", StatementType.Utility),
                 new("Service", StatementType.Service),
                 new("Insurance", StatementType.Insurance),
-                new("Bank", StatementType.Bank)
+                new("Bank", StatementType.Bank),
+                new("Investment", StatementType.Investment)
             };
             cboStatementType.SelectedIndex = -1;
         }
@@ -255,7 +256,7 @@ namespace THMS.UI.WinForms.Controls
             dtStatementDate.Value = SafeDate(_existingStatement.StatementDate);
             dtDueDate.Value = SafeDate(_existingStatement.DueDate);
             txtNotes.Text = _existingStatement.Notes ?? "";
-            if (_existingStatement is not BankStatement)
+            if (!StatementAccountMatch.IsNonPayable(_existingStatement))
             {
                 txtAmountDue.Text = _existingStatement.AmountDue.ToString("0.00");
             }
@@ -359,7 +360,7 @@ namespace THMS.UI.WinForms.Controls
 
             Control panel = type switch
             {
-                StatementType.Bank => BuildBankPanel(),
+                StatementType.Bank or StatementType.Investment => BuildBankPanel(),
                 StatementType.Loan => BuildLoanPanel(),
                 StatementType.Mortgage => BuildMortgagePanel(),
                 StatementType.CreditCard => BuildCreditCardPanel(),
@@ -370,11 +371,11 @@ namespace THMS.UI.WinForms.Controls
             panel.Dock = UsesFixedFields(type) ? DockStyle.Top : DockStyle.Fill;
             pnlTypeSpecific.Controls.Add(panel);
             pnlTypeSpecific.ResumeLayout();
-            ShowObligationFields(type != StatementType.Bank);
+            ShowObligationFields(!StatementAccountMatch.IsNonPayable(type));
         }
 
         private static bool UsesFixedFields(StatementType type) =>
-            type is StatementType.Bank or StatementType.Loan or StatementType.Mortgage;
+            type is StatementType.Bank or StatementType.Investment or StatementType.Loan or StatementType.Mortgage;
 
         private void ShowObligationFields(bool visible)
         {
@@ -511,6 +512,9 @@ namespace THMS.UI.WinForms.Controls
             {
                 case BankStatement bank:
                     SetMoney(numStatementBalance, bank.StatementBalance);
+                    break;
+                case InvestmentStatement investment:
+                    SetMoney(numStatementBalance, investment.StatementBalance);
                     break;
                 case LoanStatement loan:
                     SetMoney(numStatementBalance, loan.StatementBalance);
@@ -662,13 +666,17 @@ namespace THMS.UI.WinForms.Controls
             }
 
             decimal amountDue = 0;
-            if (type != StatementType.Bank &&
+            if (!StatementAccountMatch.IsNonPayable(type) &&
                 !TryParseMoney(txtAmountDue.Text, "Amount due", out amountDue, out error))
                 return false;
 
             statement = type switch
             {
                 StatementType.Bank => new BankStatement
+                {
+                    StatementBalance = ValueOf(numStatementBalance)
+                },
+                StatementType.Investment => new InvestmentStatement
                 {
                     StatementBalance = ValueOf(numStatementBalance)
                 },
@@ -730,7 +738,7 @@ namespace THMS.UI.WinForms.Controls
             statement.Id = _existingStatement?.Id ?? Guid.NewGuid();
             statement.AccountId = account.Id;
             statement.StatementDate = dtStatementDate.Value.Date;
-            statement.DueDate = type == StatementType.Bank
+            statement.DueDate = StatementAccountMatch.IsNonPayable(type)
                 ? statement.StatementDate
                 : dtDueDate.Value.Date;
             statement.AmountDue = amountDue;

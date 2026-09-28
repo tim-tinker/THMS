@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Windows.Forms;
 using THMS.Domain.Transportation;
+using THMS.UI.WinForms.Controls;
 
 namespace THMS.UI.WinForms
 {
@@ -12,6 +13,7 @@ namespace THMS.UI.WinForms
         public VehicleSelectionForm(IEnumerable<VehicleBase> vehicles)
         {
             InitializeComponent();
+            DataGridViewUtil.EnableDoubleBuffering(gridVehicles);
 
             gridVehicles.AutoGenerateColumns = false;
             gridVehicles.DataSource = vehicles;

@@ -3,11 +3,11 @@ namespace THMS.UI.WinForms.Controls
     public sealed class AcceptBeforeDateDialog : Form
     {
         private readonly DateTimePicker _date = new();
-        public DateTime BeforeDate => _date.Value.Date;
+        public DateTime OnOrBeforeDate => _date.Value.Date;
 
         public AcceptBeforeDateDialog(DateTime suggested)
         {
-            Text = "Accept Unreconciled Before";
+            Text = "Accept Unreconciled Up To Last Statement";
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MinimizeBox = false;
@@ -37,7 +37,7 @@ namespace THMS.UI.WinForms.Controls
                 AutoSize = true,
                 Margin = new Padding(0, 0, 0, 12),
                 MaximumSize = new Size(400, 0),
-                Text = "Accept all unreconciled imports before this date as new:"
+                Text = "Accept all unreconciled imports on or before this date as new:"
             };
 
             _date.Anchor = AnchorStyles.Left | AnchorStyles.Right;

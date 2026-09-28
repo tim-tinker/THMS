@@ -124,6 +124,73 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void CashRemaining_AddsPaychecksAndCountsOverdue()
+        {
+            var (accounts, transactions, statements, checking, _) = SeedCheckingAndCard();
+            checking.PostedBalance = 1000;
+            accounts.UpsertAccount(checking);
+            transactions.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = checking.Id,
+                Description = "Paycheck",
+                Amount = 2000,
+                Frequency = RecurrenceFrequency.BiWeekly,
+                NextOccurrence = DateTime.Today.AddDays(2),
+                IsActive = true
+            });
+            transactions.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = checking.Id,
+                Description = "Overdue donation",
+                Amount = -25,
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = DateTime.Today.AddDays(-10),
+                IsActive = true
+            });
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var rows = orchestrator.GetBills(checking.Id, DateTime.Today);
+            foreach (var row in rows)
+                row.Pay = true;
+
+            Assert.That(orchestrator.CashRemaining(checking.Id, rows), Is.EqualTo(2975m));
+        }
+
+        [Test]
+        public void CashRemaining_UsesSelectedBankStatementNotOtherBanks()
+        {
+            var (accounts, transactions, statements, checking, _) = SeedCheckingAndCard();
+            checking.PostedBalance = 99999;
+            accounts.UpsertAccount(checking);
+            var savings = new BankAccount
+            {
+                Name = "Savings",
+                Institution = "X",
+                AccountNumber = "9",
+                WebsiteUrl = "",
+                PostedBalance = 8000
+            };
+            accounts.UpsertAccount(savings);
+            statements.Save(new BankStatement
+            {
+                AccountId = checking.Id,
+                StatementDate = new DateTime(2026, 9, 8),
+                DueDate = new DateTime(2026, 9, 8),
+                StatementBalance = 1090.73m
+            });
+            transactions.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = checking.Id,
+                Date = new DateTime(2026, 9, 10),
+                Amount = -40m,
+                Description = "Coffee"
+            });
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+
+            Assert.That(orchestrator.CashRemaining(checking.Id), Is.EqualTo(1050.73m));
+            Assert.That(orchestrator.CashRemaining(), Is.EqualTo(9050.73m));
+        }
+
+        [Test]
         public void MatchScheduled_ClearsIntentAndAdvancesRule()
         {
             var (accounts, transactions, statements, checking, _) = SeedCheckingAndCard();

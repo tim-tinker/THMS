@@ -127,6 +127,7 @@ namespace THMS.UI.WinForms.Controls
             _grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             _grid.MultiSelect = false;
             _grid.DataSource = _rows;
+            DataGridViewUtil.EnableDoubleBuffering(_grid);
 
             var amount = new DataGridViewTextBoxColumn
             {

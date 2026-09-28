@@ -95,6 +95,7 @@ namespace THMS.UI.WinForms.Controls
             _grid.RowHeadersVisible = false;
             _grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             _grid.DataError += (_, e) => e.ThrowException = false;
+            DataGridViewUtil.EnableDoubleBuffering(_grid);
             _grid.CurrentCellDirtyStateChanged += (_, _) =>
             {
                 if (_grid.IsCurrentCellDirty)

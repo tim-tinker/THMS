@@ -7,7 +7,7 @@ namespace THMS.Logic.Finance.Planning
         public static AccountStatement? Latest(IEnumerable<AccountStatement> statements)
         {
             var latest = statements
-                .Where(statement => statement is not BankStatement)
+                .Where(statement => !StatementAccountMatch.IsNonPayable(statement))
                 .OrderByDescending(statement => statement.StatementDate)
                 .ThenByDescending(statement => statement.DueDate)
                 .FirstOrDefault();

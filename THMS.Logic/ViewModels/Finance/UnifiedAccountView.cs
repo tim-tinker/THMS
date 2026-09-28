@@ -19,5 +19,6 @@
         public decimal? CreditLimit { get; set; }
         public decimal? APR { get; set; }
         public DateTime? DueDate { get; set; }
+        public bool HasUnreconciled { get; set; }
     }
 }

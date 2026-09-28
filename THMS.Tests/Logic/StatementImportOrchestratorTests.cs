@@ -23,7 +23,7 @@ namespace THMS.Tests.Logic
                 var (orchestrator, _, _, _) = Create();
                 var rows = orchestrator.LoadStatementsFromFile(path);
 
-                Assert.That(rows, Has.Count.EqualTo(2));
+                Assert.That(rows, Has.Count.EqualTo(3));
                 Assert.That(rows[0].Account, Is.EqualTo("Checking"));
                 Assert.That(rows[0].Type, Is.EqualTo("Bank"));
                 Assert.That(rows[0].AmountDue, Is.EqualTo(0m));
@@ -31,8 +31,11 @@ namespace THMS.Tests.Logic
                 Assert.That(rows[1].Account, Is.EqualTo("Visa"));
                 Assert.That(rows[1].Type, Is.EqualTo("Credit Card"));
                 Assert.That(rows[1].AmountDue, Is.EqualTo(125m));
+                Assert.That(rows[2].Account, Is.EqualTo("Brokerage"));
+                Assert.That(rows[2].Type, Is.EqualTo("Investment"));
+                Assert.That(rows[2].StatementBalance, Is.EqualTo(50m));
+                Assert.That(rows[2].AmountDue, Is.EqualTo(0m));
                 Assert.That(rows.Any(r => r.Account == "Unknown"), Is.False);
-                Assert.That(rows.Any(r => r.Account == "Brokerage"), Is.False);
             }
             finally
             {
@@ -82,6 +85,33 @@ namespace THMS.Tests.Logic
                 var second = orchestrator.ImportStatements(rows);
                 Assert.That(second.Count, Is.EqualTo(0));
                 Assert.That(statements.GetForAccount(card.AccountId), Has.Count.EqualTo(1));
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Test]
+        public void ImportStatements_CreatesInvestmentStatement()
+        {
+            var path = WriteCsv("""
+                Account,Statement Date,Due Date,Amount Due,Statement Balance
+                Brokerage,2026-03-31,2026-04-15,25,12890.40
+                """);
+            try
+            {
+                var (orchestrator, _, statements, _) = Create();
+                var rows = orchestrator.LoadStatementsFromFile(path);
+                var imported = orchestrator.ImportStatements(rows);
+
+                Assert.That(imported.Count, Is.EqualTo(1));
+                var saved = statements.GetForAccount(rows[0].AccountId).Single();
+                Assert.That(saved, Is.TypeOf<InvestmentStatement>());
+                Assert.That(saved.StatementDate, Is.EqualTo(new DateTime(2026, 3, 31)));
+                Assert.That(saved.DueDate, Is.EqualTo(new DateTime(2026, 3, 31)));
+                Assert.That(saved.AmountDue, Is.EqualTo(0m));
+                Assert.That(((InvestmentStatement)saved).StatementBalance, Is.EqualTo(12890.40m));
             }
             finally
             {

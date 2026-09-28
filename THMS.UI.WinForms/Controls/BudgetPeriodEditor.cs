@@ -8,6 +8,7 @@ namespace THMS.UI.WinForms.Controls
     {
         private BudgetOrchestrator? _orchestrator;
         private ExpenseBudgetHistory? _history;
+        private Guid _ruleId;
         private bool _changed;
 
         public BudgetPeriodEditor()
@@ -27,6 +28,7 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             _orchestrator = orchestrator;
+            _ruleId = ruleId;
             _history = historyId is Guid id
                 ? orchestrator.GetPeriod(id) ?? orchestrator.GetActivePeriod(ruleId)
                 : orchestrator.GetActivePeriod(ruleId);
@@ -45,10 +47,8 @@ namespace THMS.UI.WinForms.Controls
             {
                 lblPeriod.Text = "No active period.";
                 btnSave.Enabled = false;
-                btnClosePeriod.Enabled = false;
-                btnRollForward.Enabled = false;
-                btnResetStarting.Enabled = false;
                 btnTransfer.Enabled = false;
+                btnEditBudget.Enabled = _ruleId != Guid.Empty;
                 numStarting.Enabled = false;
                 numBudgetAmount.Enabled = false;
                 return;
@@ -62,19 +62,20 @@ namespace THMS.UI.WinForms.Controls
             numBudgetAmount.Value = Clamp(_history.BudgetAmount);
             UpdateDerived();
             btnSave.Enabled = open;
-            btnClosePeriod.Enabled = open;
-            btnRollForward.Enabled = true;
-            btnResetStarting.Enabled = open;
-            btnTransfer.Enabled = open;
+            btnEditBudget.Enabled = true;
             numStarting.Enabled = open;
             numBudgetAmount.Enabled = open;
+            UpdateTransferEnabled();
 
             numStarting.ValueChanged += OnEnvelopeChanged;
             numBudgetAmount.ValueChanged += OnEnvelopeChanged;
         }
 
-        private void OnEnvelopeChanged(object? sender, EventArgs e) =>
+        private void OnEnvelopeChanged(object? sender, EventArgs e)
+        {
             UpdateDerived();
+            UpdateTransferEnabled();
+        }
 
         private void UpdateDerived()
         {
@@ -83,7 +84,34 @@ namespace THMS.UI.WinForms.Controls
 
             var remaining = numStarting.Value + Math.Abs(numBudgetAmount.Value) - _history.ActualExpenses;
             txtRemaining.Text = remaining.ToString("c2");
-            txtEnding.Text = remaining.ToString("c2");
+        }
+
+        private void UpdateTransferEnabled() =>
+            btnTransfer.Enabled = _history is { IsClosed: false } && numStarting.Value > 0;
+
+        private void OnEditBudget(object? sender, EventArgs e)
+        {
+            var rule = Orchestrator.GetRule(_history?.BudgetRuleId ?? _ruleId);
+            if (rule is null)
+                return;
+
+            using var editor = new BudgetRuleEditor(Orchestrator, rule);
+            if (editor.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            _changed = true;
+            var ruleId = _history?.BudgetRuleId ?? _ruleId;
+            if (Orchestrator.GetRule(ruleId) is null)
+            {
+                DialogResult = DialogResult.OK;
+                Close();
+                return;
+            }
+
+            _history = _history is null
+                ? Orchestrator.GetActivePeriod(ruleId)
+                : Orchestrator.GetPeriod(_history.Id) ?? Orchestrator.GetActivePeriod(ruleId);
+            Bind();
         }
 
         private void OnSave(object? sender, EventArgs e)
@@ -98,21 +126,6 @@ namespace THMS.UI.WinForms.Controls
             Close();
         }
 
-        private void OnResetStarting(object? sender, EventArgs e)
-        {
-            if (_history is null)
-                return;
-
-            if (MessageBox.Show(this, "Set starting balance to $0.00 for this period?", "Reset Starting Balance",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-                return;
-
-            Orchestrator.SetStartingBalance(_history.Id, 0);
-            _changed = true;
-            _history = Orchestrator.GetActivePeriod(_history.BudgetRuleId);
-            Bind();
-        }
-
         private void OnTransfer(object? sender, EventArgs e)
         {
             if (_history is null)
@@ -125,26 +138,6 @@ namespace THMS.UI.WinForms.Controls
             _changed = true;
             _history = Orchestrator.GetActivePeriod(_history.BudgetRuleId);
             Bind();
-        }
-
-        private void OnClosePeriod(object? sender, EventArgs e)
-        {
-            if (_history is null)
-                return;
-
-            Orchestrator.ClosePeriod(_history.Id);
-            DialogResult = DialogResult.OK;
-            Close();
-        }
-
-        private void OnRollForward(object? sender, EventArgs e)
-        {
-            if (_history is null)
-                return;
-
-            Orchestrator.RollForward(_history.BudgetRuleId);
-            DialogResult = DialogResult.OK;
-            Close();
         }
 
         private void OnClose(object? sender, EventArgs e)

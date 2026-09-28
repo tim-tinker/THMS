@@ -96,16 +96,46 @@ namespace THMS.UI
                 dashboard.RefreshDashboard();
         }
 
-        private void SetAppStatus(string message, bool busy = false)
+        private void SetAppStatus(string message, bool busy = false, int? completed = null, int? total = null)
         {
             if (InvokeRequired)
             {
-                BeginInvoke(() => SetAppStatus(message, busy));
+                BeginInvoke(() => SetAppStatus(message, busy, completed, total));
                 return;
             }
 
             lblPlaidStatus.Text = string.IsNullOrWhiteSpace(message) ? "Ready." : message;
-            syncProgress.Visible = busy;
+            UseWaitCursor = busy;
+            Cursor = busy ? Cursors.WaitCursor : Cursors.Default;
+            if (!busy)
+            {
+                syncProgress.Visible = false;
+                if (syncProgress.Style != ProgressBarStyle.Marquee)
+                {
+                    syncProgress.Value = 0;
+                    syncProgress.Style = ProgressBarStyle.Marquee;
+                }
+
+                return;
+            }
+
+            if (total is int max && max > 0)
+            {
+                if (syncProgress.Style != ProgressBarStyle.Continuous)
+                    syncProgress.Style = ProgressBarStyle.Continuous;
+                syncProgress.Maximum = Math.Max(1, max);
+                syncProgress.Value = Math.Clamp(completed ?? 0, 0, syncProgress.Maximum);
+            }
+            else if (syncProgress.Style != ProgressBarStyle.Marquee)
+            {
+                syncProgress.Value = 0;
+                syncProgress.Style = ProgressBarStyle.Marquee;
+            }
+
+            syncProgress.Visible = true;
+            lblPlaidStatus.Update();
+            syncProgress.Update();
+            Application.DoEvents();
         }
 
         private void OnStatusStripPaint(object? sender, PaintEventArgs e)

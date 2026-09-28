@@ -244,14 +244,21 @@ namespace THMS.Tests.Logic
                     StatementDate = DateTime.Today.AddDays(-8),
                     DueDate = DateTime.Today.AddDays(20),
                     AmountDue = 110
+                },
+                new InvestmentStatement
+                {
+                    AccountId = accountId,
+                    StatementDate = DateTime.Today,
+                    DueDate = DateTime.Today,
+                    StatementBalance = 12890.40m
                 }
             ];
 
             foreach (var statement in statements)
                 store.Save(statement);
 
-            Assert.That(store.GetForAccount(accountId), Has.Count.EqualTo(7));
-            Assert.That(store.GetUpcoming(DateTime.Today), Has.Count.EqualTo(7));
+            Assert.That(store.GetForAccount(accountId), Has.Count.EqualTo(8));
+            Assert.That(store.GetUpcoming(DateTime.Today), Has.Count.EqualTo(8));
             var bank = (BankStatement)store.Get(statements[0].Id)!;
             Assert.That(bank.StatementBalance, Is.EqualTo(1090.73m));
             Assert.That(((LoanStatement)store.Get(statements[1].Id)!).StatementBalance, Is.EqualTo(5000m));
@@ -270,31 +277,38 @@ namespace THMS.Tests.Logic
             Assert.That(utility.Charges[0].Amount, Is.EqualTo(80m));
             Assert.That(((ServiceStatement)store.Get(statements[5].Id)!).Charges[0].Description, Is.EqualTo("Streaming"));
             Assert.That(((InsuranceStatement)store.Get(statements[6].Id)!).AmountDue, Is.EqualTo(110m));
+            Assert.That(((InvestmentStatement)store.Get(statements[7].Id)!).StatementBalance, Is.EqualTo(12890.40m));
 
             store.Delete(statements[2].Id);
             Assert.That(store.Get(statements[2].Id), Is.Null);
-            Assert.That(store.GetForAccount(accountId), Has.Count.EqualTo(6));
+            Assert.That(store.GetForAccount(accountId), Has.Count.EqualTo(7));
         }
 
         [Test]
         public void StatementAccountMatch_FiltersTrackedAndUntrackedAccounts()
         {
             var bank = new BankAccount { Name = "Checking" };
+            var ira = new InvestmentAccount { Name = "Tim IRA", Type = AccountType.Investment };
             var utility = new UntrackedAccount { Type = AccountType.Utility };
             var service = new UntrackedAccount { Type = AccountType.Service };
             var insurance = new UntrackedAccount { Type = AccountType.Insurance };
 
             Assert.That(StatementAccountMatch.Matches(bank, StatementType.Bank), Is.True);
+            Assert.That(StatementAccountMatch.Matches(ira, StatementType.Investment), Is.True);
+            Assert.That(StatementAccountMatch.Matches(ira, StatementType.Bank), Is.False);
             Assert.That(StatementAccountMatch.Matches(bank, StatementType.Utility), Is.False);
             Assert.That(StatementAccountMatch.Matches(utility, StatementType.Utility), Is.True);
             Assert.That(StatementAccountMatch.Matches(utility, StatementType.Bank), Is.False);
             Assert.That(StatementAccountMatch.Matches(service, StatementType.Service), Is.True);
             Assert.That(StatementAccountMatch.Matches(insurance, StatementType.Insurance), Is.True);
             Assert.That(StatementAccountMatch.ForAccount(bank), Is.EqualTo(StatementType.Bank));
+            Assert.That(StatementAccountMatch.ForAccount(ira), Is.EqualTo(StatementType.Investment));
             Assert.That(StatementAccountMatch.ForAccount(utility), Is.EqualTo(StatementType.Utility));
             Assert.That(StatementAccountMatch.CreateAccount(StatementType.Utility), Is.TypeOf<UntrackedAccount>());
             Assert.That(StatementAccountMatch.CreateAccount(StatementType.Utility).Type, Is.EqualTo(AccountType.Utility));
+            Assert.That(StatementAccountMatch.CreateAccount(StatementType.Investment), Is.TypeOf<InvestmentAccount>());
             Assert.That(StatementAccountMatch.CreateStatement(StatementType.Bank), Is.TypeOf<BankStatement>());
+            Assert.That(StatementAccountMatch.CreateStatement(StatementType.Investment), Is.TypeOf<InvestmentStatement>());
             Assert.That(StatementAccountMatch.CreateStatement(StatementType.Utility), Is.TypeOf<UtilityStatement>());
         }
 
@@ -480,6 +494,25 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void AccountStatementListRow_InvestmentLeavesObligationFieldsNotApplicable()
+        {
+            var investment = new InvestmentStatement
+            {
+                StatementDate = new DateTime(2026, 3, 31),
+                DueDate = new DateTime(2026, 3, 31),
+                StatementBalance = 12890.40m,
+                Notes = "Q1 IRA"
+            };
+
+            var row = AccountStatementListRow.From(investment);
+            Assert.That(row.Type, Is.EqualTo("Investment"));
+            Assert.That(row.DueDate, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(row.AmountDue, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(row.StatementBalance, Is.EqualTo(12890.40m.ToString("c2")));
+            Assert.That(row.Notes, Is.EqualTo("Q1 IRA"));
+        }
+
+        [Test]
         public void AccountRegisterRow_UsesLatestStatementAndNaWhenMissing()
         {
             var checking = new BankAccount
@@ -529,6 +562,25 @@ namespace THMS.Tests.Logic
             Assert.That(credit.AmountDue, Is.EqualTo(53m.ToString("c2")));
             Assert.That(credit.StatementBalance, Is.EqualTo(5224.55m.ToString("c2")));
             Assert.That(credit.Paid, Is.EqualTo(AccountRegisterRow.NotAutoPaid));
+
+            var ira = new InvestmentAccount
+            {
+                Name = "Tim IRA",
+                Institution = "Fidelity",
+                AccountNumber = "3",
+                WebsiteUrl = ""
+            };
+            var investment = AccountRegisterRow.From(ira, new InvestmentStatement
+            {
+                AccountId = ira.Id,
+                StatementDate = new DateTime(2026, 3, 31),
+                DueDate = new DateTime(2026, 3, 31),
+                StatementBalance = 12890.40m
+            });
+            Assert.That(investment.StatementDate, Is.EqualTo(new DateTime(2026, 3, 31).ToString("d")));
+            Assert.That(investment.StatementBalance, Is.EqualTo(12890.40m.ToString("c2")));
+            Assert.That(investment.DueDate, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(investment.AmountDue, Is.EqualTo(AccountStatementListRow.NotApplicable));
         }
 
         [Test]

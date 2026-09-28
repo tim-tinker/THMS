@@ -120,24 +120,27 @@ namespace THMS.Logic.Finance.Aggregation
                 {
                     RuleId = rule.Id,
                     BudgetName = rule.BudgetName,
-                    Frequency = rule.BudgetFrequency.ToString(),
                     Remaining = period.Remaining,
-                    Ending = period.EndingBalance,
+                    PeriodStart = period.PeriodStart.Date,
+                    PeriodEnd = period.PeriodEnd.Date,
                     Recommended = period.RecommendedAmount,
-                    Status = BudgetStatus(period, today)
+                    Status = BudgetStatus(period, today, rule.BudgetFrequency)
                 });
             }
 
             return rows;
         }
 
-        public static string BudgetStatus(ExpenseBudgetHistory period, DateTime today)
+        public static string BudgetStatus(
+            ExpenseBudgetHistory period,
+            DateTime today,
+            BudgetFrequency frequency)
         {
             var parts = new List<string>();
             if (period.Remaining < 0)
                 parts.Add("Overspent");
             var daysLeft = (period.PeriodEnd.Date - today.Date).TotalDays;
-            if (daysLeft >= 0 && daysLeft <= SoonDays)
+            if (daysLeft >= 0 && daysLeft <= frequency.SoonDays())
                 parts.Add("Ends soon");
             return parts.Count == 0 ? "OK" : string.Join(", ", parts);
         }

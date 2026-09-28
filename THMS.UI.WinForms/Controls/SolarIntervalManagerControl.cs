@@ -13,6 +13,7 @@ namespace THMS.UI.WinForms.Controls
         public SolarIntervalManagerControl()
         {
             InitializeComponent();
+            DataGridViewUtil.EnableDoubleBuffering(gridSolarIntervals);
             gridSolarIntervals.AutoGenerateColumns = false;
         }
 
@@ -27,8 +28,6 @@ namespace THMS.UI.WinForms.Controls
             _intervals = new BindingList<SolarProductionInterval>(_orchestrator.GetSolarIntervals(period).ToList());
             gridSolarIntervals.DataSource = _intervals;
         }
-
-        public void SetImportStatus(string message) => lblStatus.Text = message;
 
         private void OnLoad(object sender, EventArgs e)
         {

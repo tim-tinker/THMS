@@ -100,7 +100,7 @@ namespace THMS.Ingestion.Importers.Finance
             if (payFrom is not null && payFrom.Id == account.Id)
                 payFrom = null;
 
-            if (type == StatementType.Bank)
+            if (StatementAccountMatch.IsNonPayable(type.Value))
             {
                 dueDate = statementDate.Value;
                 amountDue = 0;

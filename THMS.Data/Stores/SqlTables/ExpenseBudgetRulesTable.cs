@@ -19,10 +19,13 @@ namespace THMS.Data.Stores.SqlTables
                         IncludedCategories TEXT NOT NULL,
                         BudgetFrequency TEXT NOT NULL,
                         DefaultBudgetAmount REAL NOT NULL,
-                        IsActive INTEGER NOT NULL
+                        IsActive INTEGER NOT NULL,
+                        PeriodStart TEXT
                     );";
                 cmd.ExecuteNonQuery();
             }
+
+            EnsureColumn(conn, "PeriodStart", "TEXT");
         }
 
         public void Add(SqliteConnection conn, ExpenseBudgetRule rule)
@@ -30,9 +33,9 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO ExpenseBudgetRules
-                (Id, AccountId, BudgetName, IncludedCategories, BudgetFrequency, DefaultBudgetAmount, IsActive)
+                (Id, AccountId, BudgetName, IncludedCategories, BudgetFrequency, DefaultBudgetAmount, IsActive, PeriodStart)
                 VALUES
-                (@Id, @AccountId, @BudgetName, @IncludedCategories, @BudgetFrequency, @DefaultBudgetAmount, @IsActive);";
+                (@Id, @AccountId, @BudgetName, @IncludedCategories, @BudgetFrequency, @DefaultBudgetAmount, @IsActive, @PeriodStart);";
             Bind(cmd, rule);
             cmd.ExecuteNonQuery();
         }
@@ -47,7 +50,8 @@ namespace THMS.Data.Stores.SqlTables
                     IncludedCategories = @IncludedCategories,
                     BudgetFrequency = @BudgetFrequency,
                     DefaultBudgetAmount = @DefaultBudgetAmount,
-                    IsActive = @IsActive
+                    IsActive = @IsActive,
+                    PeriodStart = @PeriodStart
                 WHERE Id = @Id;";
             Bind(cmd, rule);
             cmd.ExecuteNonQuery();
@@ -91,7 +95,7 @@ namespace THMS.Data.Stores.SqlTables
         }
 
         private const string SelectColumns =
-            @"SELECT Id, AccountId, BudgetName, IncludedCategories, BudgetFrequency, DefaultBudgetAmount, IsActive";
+            @"SELECT Id, AccountId, BudgetName, IncludedCategories, BudgetFrequency, DefaultBudgetAmount, IsActive, PeriodStart";
 
         private static void Bind(SqliteCommand cmd, ExpenseBudgetRule rule)
         {
@@ -102,6 +106,7 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@BudgetFrequency", rule.BudgetFrequency.ToString());
             cmd.Parameters.AddWithValue("@DefaultBudgetAmount", rule.DefaultBudgetAmount);
             cmd.Parameters.AddWithValue("@IsActive", rule.IsActive ? 1 : 0);
+            cmd.Parameters.AddWithValue("@PeriodStart", rule.PeriodStart is DateTime start ? start.Date : DBNull.Value);
         }
 
         private static ExpenseBudgetRule Read(SqliteDataReader reader)
@@ -114,7 +119,8 @@ namespace THMS.Data.Stores.SqlTables
                 IncludedCategoryIds = SplitCategoryIds(reader.IsDBNull(3) ? "" : reader.GetString(3)),
                 BudgetFrequency = Enum.Parse<BudgetFrequency>(reader.GetString(4)),
                 DefaultBudgetAmount = (decimal)(double)reader.GetDouble(5),
-                IsActive = reader.GetInt32(6) == 1
+                IsActive = reader.GetInt32(6) == 1,
+                PeriodStart = ReadOptionalDate(reader, 7)
             };
         }
 
@@ -131,6 +137,17 @@ namespace THMS.Data.Stores.SqlTables
             }
 
             return ids;
+        }
+
+        private static DateTime? ReadOptionalDate(SqliteDataReader reader, int index)
+        {
+            if (reader.FieldCount <= index || reader.IsDBNull(index))
+                return null;
+
+            var value = reader.GetValue(index);
+            if (value is DateTime date)
+                return date.Date;
+            return DateTime.TryParse(value.ToString(), out var parsed) ? parsed.Date : null;
         }
 
         private static IEnumerable<ExpenseBudgetRule> ReadAll(SqliteCommand cmd)
@@ -222,6 +239,13 @@ namespace THMS.Data.Stores.SqlTables
                 SELECT Id, AccountId, Category, 'Electric|Water|Gas|Utilities', 'Monthly', CurrentAverage, 1
                 FROM UtilityBudgetRules;";
             migrate.ExecuteNonQuery();
+        }
+
+        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
+        {
+            using var alter = conn.CreateCommand();
+            alter.CommandText = $"ALTER TABLE ExpenseBudgetRules ADD COLUMN IF NOT EXISTS {columnName} {columnDef};";
+            alter.ExecuteNonQuery();
         }
 
         private static bool TableExists(SqliteConnection conn, string tableName)

@@ -13,6 +13,7 @@ namespace THMS.UI.WinForms.Controls
         public ElectricContractManagerControl()
         {
             InitializeComponent();
+            DataGridViewUtil.EnableDoubleBuffering(_gridContracts);
             _gridContracts.AutoGenerateColumns = false;
             _gridContracts.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
             ApplyColumnAutoSize();

@@ -15,6 +15,7 @@ namespace THMS.UI.WinForms.Controls
             CurrentCellDirtyStateChanged += OnCurrentCellDirtyStateChanged;
             CellClick += OnCellClickBeginEdit;
             DataError += (_, e) => e.ThrowException = false;
+            DataGridViewUtil.EnableDoubleBuffering(this);
         }
 
         protected override bool ProcessDataGridViewKey(KeyEventArgs e)

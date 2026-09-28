@@ -31,109 +31,6 @@ namespace THMS.Logic.Orchestrators
             return _store.GetAllCategories();
         }
 
-        public int EnsureSuggestedRules()
-        {
-            if (_store.GetAllExpenseBudgetRules().Any())
-                return 0;
-
-            _store.EnsureDefaultCategories();
-            var posted = _store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
-            if (posted.Count == 0)
-                return 0;
-
-            var catalog = _store.GetAllCategories(includeInactive: true).ToList();
-            var suggestions = new List<(Guid CategoryId, string Name, decimal Amount)>();
-            foreach (var (categoryId, name) in CollectBudgetCategories(posted, catalog))
-            {
-                if (categoryId == DefaultExpenseCategories.PaymentId)
-                    continue;
-
-                var recommended = _detector.ComputeRecommendedAmount(
-                    [],
-                    BudgetFrequency.Monthly,
-                    posted,
-                    [categoryId],
-                    catalog);
-                if (recommended < 15m)
-                    continue;
-
-                suggestions.Add((categoryId, name, recommended));
-            }
-
-            var created = 0;
-            foreach (var suggestion in suggestions.OrderByDescending(s => s.Amount).Take(20))
-            {
-                _store.AddExpenseBudgetRule(new ExpenseBudgetRule
-                {
-                    Id = Guid.NewGuid(),
-                    BudgetName = suggestion.Name,
-                    IncludedCategoryIds = [suggestion.CategoryId],
-                    BudgetFrequency = BudgetFrequency.Monthly,
-                    DefaultBudgetAmount = suggestion.Amount,
-                    IsActive = true
-                });
-                created++;
-            }
-
-            if (created > 0)
-                RefreshAllActive();
-
-            return created;
-        }
-
-        private static Dictionary<Guid, string> CollectBudgetCategories(
-            IEnumerable<PostedTransaction> posted,
-            IReadOnlyList<ExpenseCategory> catalog)
-        {
-            var result = new Dictionary<Guid, string>();
-            foreach (var transaction in posted)
-            {
-                if (transaction.HasSplits)
-                {
-                    foreach (var split in transaction.Splits)
-                    {
-                        if (!SplitTransactionMath.AffectsBudget(split.Type))
-                            continue;
-                        TryAddCategory(result, split.CategoryId, split.Category, catalog);
-                    }
-
-                    continue;
-                }
-
-                TryAddCategory(result, transaction.CategoryId, transaction.Category, catalog);
-            }
-
-            return result;
-        }
-
-        private static void TryAddCategory(
-            Dictionary<Guid, string> result,
-            Guid? categoryId,
-            string? category,
-            IReadOnlyList<ExpenseCategory> catalog)
-        {
-            Guid resolved;
-            if (categoryId is Guid id && id != Guid.Empty)
-            {
-                resolved = id;
-            }
-            else
-            {
-                var canonical = DefaultExpenseCategories.CanonicalName(category);
-                var named = catalog.FirstOrDefault(c =>
-                    string.Equals(c.Name, canonical, StringComparison.OrdinalIgnoreCase));
-                if (named is null)
-                    return;
-                resolved = named.Id;
-            }
-
-            if (result.ContainsKey(resolved))
-                return;
-
-            result[resolved] = catalog.FirstOrDefault(c => c.Id == resolved)?.Name
-                ?? DefaultExpenseCategories.CanonicalName(category);
-        }
-
         public void AddRule(ExpenseBudgetRule rule)
         {
             ArgumentNullException.ThrowIfNull(rule);
@@ -152,8 +49,19 @@ namespace THMS.Logic.Orchestrators
         {
             ArgumentNullException.ThrowIfNull(rule);
             _store.UpdateExpenseBudgetRule(rule);
-            if (rule.IsActive)
-                RefreshRule(rule);
+            if (!rule.IsActive)
+                return;
+
+            var period = _store.GetActiveBudgetHistory(rule.Id);
+            if (period is not null && !period.IsClosed)
+            {
+                period.BudgetAmount = Math.Abs(rule.DefaultBudgetAmount);
+                AlignOpenPeriod(rule, period);
+                RefreshPeriod(rule, period);
+                return;
+            }
+
+            RefreshRule(rule);
         }
 
         public void DeleteRule(Guid ruleId) =>
@@ -206,6 +114,8 @@ namespace THMS.Logic.Orchestrators
                 ?? throw new InvalidOperationException($"Budget rule {toRuleId} was not found.");
             var fromPeriod = RequireActiveOpenPeriod(fromRuleId);
             var toPeriod = RequireActiveOpenPeriod(toRuleId);
+            if (amount > fromPeriod.StartingBalance)
+                throw new ArgumentException("Transfer amount cannot exceed the starting balance.");
 
             fromPeriod.StartingBalance -= amount;
             toPeriod.StartingBalance += amount;
@@ -265,7 +175,7 @@ namespace THMS.Logic.Orchestrators
 
             var lastEnd = previous?.PeriodEnd
                 ?? _store.GetExpenseBudgetHistory(ruleId).Select(h => h.PeriodEnd).DefaultIfEmpty(DateTime.Today.AddDays(-1)).Max();
-            var created = CreatePeriod(rule, BudgetPeriodCalculator.NextPeriod(lastEnd, rule.BudgetFrequency), previous);
+            var created = CreatePeriod(rule, BudgetPeriodCalculator.NextPeriod(lastEnd, rule), previous);
             RefreshPeriod(rule, created);
             return created;
         }
@@ -276,11 +186,38 @@ namespace THMS.Logic.Orchestrators
                 RefreshRule(rule);
         }
 
+        public void RefreshAffected(IEnumerable<PostedTransaction> posted)
+        {
+            var txs = posted as IList<PostedTransaction> ?? posted.ToList();
+            if (txs.Count == 0)
+                return;
+
+            var catalog = _store.GetAllCategories(includeInactive: true).ToList();
+            foreach (var rule in _store.GetAllExpenseBudgetRules().Where(r => r.IsActive))
+            {
+                if (!txs.Any(tx => _detector.IncludesTransaction(tx, rule.IncludedCategoryIds, catalog)))
+                    continue;
+                RefreshRule(rule);
+            }
+        }
+
         private void RefreshRule(ExpenseBudgetRule rule)
         {
             var period = EnsureActivePeriod(rule);
             if (period is not null && !period.IsClosed)
                 RefreshPeriod(rule, period);
+        }
+
+        private static void AlignOpenPeriod(ExpenseBudgetRule rule, ExpenseBudgetHistory period)
+        {
+            var today = DateTime.Today;
+            var anchor = today < period.PeriodStart.Date ? period.PeriodStart.Date : today;
+            var window = BudgetPeriodCalculator.PeriodContaining(anchor, rule);
+            if (period.PeriodStart.Date == window.Start && period.PeriodEnd.Date == window.End)
+                return;
+
+            period.PeriodStart = window.Start;
+            period.PeriodEnd = window.End;
         }
 
         private ExpenseBudgetHistory? EnsureActivePeriod(ExpenseBudgetRule rule)
@@ -294,7 +231,7 @@ namespace THMS.Logic.Orchestrators
                 _store.UpdateExpenseBudgetHistory(active);
                 active = CreatePeriod(
                     rule,
-                    BudgetPeriodCalculator.NextPeriod(active.PeriodEnd, rule.BudgetFrequency),
+                    BudgetPeriodCalculator.NextPeriod(active.PeriodEnd, rule),
                     previous: active);
             }
 
@@ -305,10 +242,10 @@ namespace THMS.Logic.Orchestrators
                 .OrderByDescending(h => h.PeriodEnd)
                 .FirstOrDefault();
             if (last is null)
-                return CreatePeriod(rule, BudgetPeriodCalculator.PeriodContaining(DateTime.Today, rule.BudgetFrequency));
+                return CreatePeriod(rule, BudgetPeriodCalculator.PeriodContaining(DateTime.Today, rule));
 
             if (DateTime.Today > last.PeriodEnd.Date)
-                return CreatePeriod(rule, BudgetPeriodCalculator.NextPeriod(last.PeriodEnd, rule.BudgetFrequency), last);
+                return CreatePeriod(rule, BudgetPeriodCalculator.NextPeriod(last.PeriodEnd, rule), last);
 
             return null;
         }
@@ -353,7 +290,8 @@ namespace THMS.Logic.Orchestrators
                 rule.BudgetFrequency,
                 posted,
                 rule.IncludedCategoryIds,
-                catalog);
+                catalog,
+                rule.PeriodStart);
             history.RecalculateRemaining();
             _store.UpdateExpenseBudgetHistory(history);
         }

@@ -782,6 +782,49 @@ namespace THMS.Tests.Logic
             Assert.That(next.Start, Is.EqualTo(new DateTime(2026, 10, 1)));
             Assert.That(next.End, Is.EqualTo(new DateTime(2026, 10, 31)));
         }
+
+        [Test]
+        public void PeriodContaining_WeeklyUsesCycleStartWeekday()
+        {
+            var payday = new DateTime(2026, 9, 25);
+            var period = BudgetPeriodCalculator.PeriodContaining(
+                new DateTime(2026, 9, 27),
+                BudgetFrequency.Weekly,
+                payday);
+
+            Assert.That(period.Start, Is.EqualTo(payday));
+            Assert.That(period.End, Is.EqualTo(new DateTime(2026, 10, 1)));
+        }
+
+        [Test]
+        public void PeriodContaining_BiweeklyUsesCycleStartEpoch()
+        {
+            var payday = new DateTime(2026, 9, 25);
+            var current = BudgetPeriodCalculator.PeriodContaining(
+                new DateTime(2026, 9, 27),
+                BudgetFrequency.Biweekly,
+                payday);
+            var next = BudgetPeriodCalculator.NextPeriod(current.End, BudgetFrequency.Biweekly, payday);
+
+            Assert.That(current.Start, Is.EqualTo(payday));
+            Assert.That(current.End, Is.EqualTo(new DateTime(2026, 10, 8)));
+            Assert.That(next.Start, Is.EqualTo(new DateTime(2026, 10, 9)));
+            Assert.That(next.End, Is.EqualTo(new DateTime(2026, 10, 22)));
+        }
+    }
+
+    [TestFixture]
+    public class BudgetFrequencyExtensionTests
+    {
+        [Test]
+        public void SoonDays_MatchesFrequencyWindows()
+        {
+            Assert.That(BudgetFrequency.Weekly.SoonDays(), Is.EqualTo(1));
+            Assert.That(BudgetFrequency.Biweekly.SoonDays(), Is.EqualTo(3));
+            Assert.That(BudgetFrequency.Monthly.SoonDays(), Is.EqualTo(7));
+            Assert.That(BudgetFrequency.Quarterly.SoonDays(), Is.EqualTo(18));
+            Assert.That(BudgetFrequency.Annual.SoonDays(), Is.EqualTo(30));
+        }
     }
 
     [TestFixture]

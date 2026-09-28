@@ -123,11 +123,11 @@ namespace THMS.UI.WinForms
             var split = new SplitContainer
             {
                 Dock = DockStyle.Fill,
-                Orientation = Orientation.Vertical,
-                SplitterWidth = 8
+                Orientation = Orientation.Vertical
             };
             split.Panel1.Controls.Add(BuildBudgetPanel());
             split.Panel2.Controls.Add(BuildSidePanel());
+            SplitContainerUtil.MakeSplitterVisible(split);
             Shown += (_, _) =>
             {
                 if (split.Width > 40)
@@ -176,9 +176,9 @@ namespace THMS.UI.WinForms
             _budgetGrid.Columns.AddRange(
                 TextColumn("BudgetName", "Budget", DataGridViewAutoSizeColumnMode.AllCells, 140),
                 CurrencyColumn("Remaining", "Remaining"),
-                CurrencyColumn("Ending", "Ending"),
+                DateColumn("PeriodStart", "Start"),
+                DateColumn("PeriodEnd", "End"),
                 CurrencyColumn("Recommended", "Recommended"),
-                TextColumn("Frequency", "Frequency", DataGridViewAutoSizeColumnMode.AllCells, 80),
                 TextColumn("Status", "Status", DataGridViewAutoSizeColumnMode.Fill, 120));
             _budgetGrid.CellFormatting += OnBudgetCellFormatting;
             _budgetGrid.CellDoubleClick += (_, _) => OpenSelectedPeriod();
@@ -193,8 +193,7 @@ namespace THMS.UI.WinForms
             var split = new SplitContainer
             {
                 Dock = DockStyle.Fill,
-                Orientation = Orientation.Horizontal,
-                SplitterWidth = 8
+                Orientation = Orientation.Horizontal
             };
             _alerts = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
             split.Panel1.Controls.Add(_alerts);
@@ -209,6 +208,7 @@ namespace THMS.UI.WinForms
                 CurrencyColumn("Amount", "Amount"));
             split.Panel2.Controls.Add(_paymentGrid);
             split.Panel2.Controls.Add(CreateSectionHeader("Upcoming payments"));
+            SplitContainerUtil.MakeSplitterVisible(split);
             Shown += (_, _) =>
             {
                 if (split.Height > 40)
@@ -338,7 +338,7 @@ namespace THMS.UI.WinForms
             if (_budgetGrid.Columns[e.ColumnIndex].DataPropertyName != "Remaining")
                 return;
             if (e.Value is decimal remaining && remaining < 0)
-                e.CellStyle.ForeColor = Color.Firebrick;
+                DataGridViewUtil.SetContentForeColor(e.CellStyle, Color.Firebrick);
         }
 
         private static void ReplaceChart(Panel host, Chart chart)
@@ -395,7 +395,7 @@ namespace THMS.UI.WinForms
 
         private static DataGridView CreateGrid()
         {
-            return new DataGridView
+            var grid = new DataGridView
             {
                 Dock = DockStyle.Fill,
                 AllowUserToAddRows = false,
@@ -406,6 +406,8 @@ namespace THMS.UI.WinForms
                 RowHeadersVisible = false,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect
             };
+            DataGridViewUtil.EnableDoubleBuffering(grid);
+            return grid;
         }
 
         private static DataGridViewTextBoxColumn TextColumn(string property, string header, DataGridViewAutoSizeColumnMode autoSizeMode, int width) =>

@@ -207,6 +207,20 @@ namespace THMS.Tests.Logic
             Assert.That(views[1].DueDate, Is.EqualTo(DateTime.Today));
             Assert.That(views[3].DueDate, Is.Null);
             Assert.That(views[4].DueDate, Is.Null);
+            Assert.That(views.TrueForAll(v => !v.HasUnreconciled), Is.True);
+        }
+
+        [Test]
+        public void UnifiedAccountViewBuilder_MarksAccountsWithUnreconciledImports()
+        {
+            var checking = new BankAccount { Name = "Checking", Institution = "Bank", AccountNumber = "1" };
+            var savings = new BankAccount { Name = "Savings", Institution = "Bank", AccountNumber = "2" };
+            var views = UnifiedAccountViewBuilder.Build(
+                [checking, savings],
+                unreconciledAccountIds: new HashSet<Guid> { checking.Id });
+
+            Assert.That(views.Single(v => v.Name == "Checking").HasUnreconciled, Is.True);
+            Assert.That(views.Single(v => v.Name == "Savings").HasUnreconciled, Is.False);
         }
 
         [Test]
@@ -584,7 +598,64 @@ namespace THMS.Tests.Logic
             Assert.That(snapshot.MonthlyTrend.Single(p => p.Month == new DateTime(2026, 9, 1)).Spending, Is.EqualTo(40m));
             Assert.That(snapshot.MonthlyTrend.Single(p => p.Month == new DateTime(2026, 9, 1)).Income, Is.EqualTo(2000m));
             Assert.That(snapshot.Alerts.Any(a => a.StartsWith("Overspent: Groceries")), Is.True);
+            Assert.That(snapshot.Budgets.Single().PeriodStart, Is.EqualTo(new DateTime(2026, 9, 1)));
+            Assert.That(snapshot.Budgets.Single().PeriodEnd, Is.EqualTo(new DateTime(2026, 9, 10)));
         }
+
+        [Test]
+        public void BudgetStatus_UsesFrequencySpecificSoonWindow()
+        {
+            var weekly = StatusPeriod(new DateTime(2026, 9, 13));
+            Assert.That(
+                FinanceDashboardComposer.BudgetStatus(weekly, new DateTime(2026, 9, 11), BudgetFrequency.Weekly),
+                Is.EqualTo("OK"));
+            Assert.That(
+                FinanceDashboardComposer.BudgetStatus(weekly, new DateTime(2026, 9, 12), BudgetFrequency.Weekly),
+                Is.EqualTo("Ends soon"));
+
+            var biweekly = StatusPeriod(new DateTime(2026, 10, 4));
+            Assert.That(
+                FinanceDashboardComposer.BudgetStatus(biweekly, new DateTime(2026, 9, 27), BudgetFrequency.Biweekly),
+                Is.EqualTo("OK"));
+            Assert.That(
+                FinanceDashboardComposer.BudgetStatus(biweekly, new DateTime(2026, 10, 1), BudgetFrequency.Biweekly),
+                Is.EqualTo("Ends soon"));
+
+            var monthly = StatusPeriod(new DateTime(2026, 9, 30));
+            Assert.That(
+                FinanceDashboardComposer.BudgetStatus(monthly, new DateTime(2026, 9, 22), BudgetFrequency.Monthly),
+                Is.EqualTo("OK"));
+            Assert.That(
+                FinanceDashboardComposer.BudgetStatus(monthly, new DateTime(2026, 9, 23), BudgetFrequency.Monthly),
+                Is.EqualTo("Ends soon"));
+
+            var quarterly = StatusPeriod(new DateTime(2026, 9, 30));
+            Assert.That(
+                FinanceDashboardComposer.BudgetStatus(quarterly, new DateTime(2026, 9, 11), BudgetFrequency.Quarterly),
+                Is.EqualTo("OK"));
+            Assert.That(
+                FinanceDashboardComposer.BudgetStatus(quarterly, new DateTime(2026, 9, 12), BudgetFrequency.Quarterly),
+                Is.EqualTo("Ends soon"));
+
+            var annual = StatusPeriod(new DateTime(2026, 12, 31));
+            Assert.That(
+                FinanceDashboardComposer.BudgetStatus(annual, new DateTime(2026, 11, 30), BudgetFrequency.Annual),
+                Is.EqualTo("OK"));
+            Assert.That(
+                FinanceDashboardComposer.BudgetStatus(annual, new DateTime(2026, 12, 1), BudgetFrequency.Annual),
+                Is.EqualTo("Ends soon"));
+        }
+
+        private static ExpenseBudgetHistory StatusPeriod(DateTime periodEnd) =>
+            new()
+            {
+                PeriodStart = periodEnd.AddDays(-13),
+                PeriodEnd = periodEnd,
+                StartingBalance = 0,
+                BudgetAmount = 100,
+                ActualExpenses = 40,
+                Remaining = 60
+            };
 
         [Test]
         public void CreditOwed_UsesNegativePostedBalance()
@@ -635,15 +706,16 @@ namespace THMS.Tests.Logic
             var groceryRow = rows.Single(r => r.CategoryId == groceries.Id);
             Assert.That(groceryRow.HasBudget, Is.True);
             Assert.That(groceryRow.Remaining, Is.EqualTo(150m));
-            Assert.That(groceryRow.Ending, Is.EqualTo(150m));
+            Assert.That(groceryRow.PeriodStart, Is.EqualTo(new DateTime(2026, 9, 1)));
+            Assert.That(groceryRow.PeriodEnd, Is.EqualTo(new DateTime(2026, 9, 30)));
             Assert.That(groceryRow.Recommended, Is.EqualTo(180m));
-            Assert.That(groceryRow.Frequency, Is.EqualTo("Monthly"));
             Assert.That(groceryRow.Status, Is.EqualTo("OK"));
 
             var dining = rows.Single(r => r.CategoryId == restaurants.Id);
             Assert.That(dining.HasBudget, Is.False);
             Assert.That(dining.Remaining, Is.Null);
-            Assert.That(dining.Frequency, Is.EqualTo(""));
+            Assert.That(dining.PeriodStart, Is.Null);
+            Assert.That(dining.PeriodEnd, Is.Null);
         }
 
         [Test]

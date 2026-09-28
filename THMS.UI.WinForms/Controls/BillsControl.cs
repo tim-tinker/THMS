@@ -11,7 +11,6 @@ namespace THMS.UI.WinForms.Controls
         private readonly BindingSource _source = new();
         private readonly DataGridView _grid = new();
         private readonly Label _lblCash = new();
-        private readonly Label _lblStatus = new();
         private Guid? _accountId;
         private bool _suppressCash;
 
@@ -47,20 +46,14 @@ namespace THMS.UI.WinForms.Controls
                     : [];
                 _source.DataSource = rows;
                 RefreshFundingCombo();
-                UpdateCashRemaining();
-                _lblStatus.Text = _accountId is null
-                    ? "Select an account to view bills."
-                    : rows.Count == 0
-                        ? "No expected activity for this account."
-                        : $"{rows.Count} item{(rows.Count == 1 ? "" : "s")}.";
             }
             finally
             {
                 _suppressCash = false;
             }
-        }
 
-        public void SetStatus(string message) => _lblStatus.Text = message;
+            UpdateCashRemaining();
+        }
 
         private void InitializeLayout()
         {
@@ -74,11 +67,6 @@ namespace THMS.UI.WinForms.Controls
             _lblCash.Font = new Font(Font.FontFamily, Font.Size + 2f, FontStyle.Bold);
             _lblCash.TextAlign = ContentAlignment.MiddleLeft;
             cashBar.Controls.Add(_lblCash);
-
-            _lblStatus.Dock = DockStyle.Bottom;
-            _lblStatus.Height = 24;
-            _lblStatus.Padding = new Padding(8, 0, 8, 0);
-            _lblStatus.TextAlign = ContentAlignment.MiddleLeft;
 
             var toolbar = new FlowLayoutPanel
             {
@@ -115,7 +103,6 @@ namespace THMS.UI.WinForms.Controls
 
             Controls.Add(_grid);
             Controls.Add(toolbar);
-            Controls.Add(_lblStatus);
             Controls.Add(cashBar);
         }
 
@@ -213,8 +200,8 @@ namespace THMS.UI.WinForms.Controls
             if (_suppressCash)
                 return;
             EndEdit();
-            var remaining = _orchestrator.CashRemaining(CurrentRows());
-            _lblCash.Text = $"Checking remaining: {remaining:c2}";
+            var remaining = _orchestrator.CashRemaining(_accountId, CurrentRows());
+            _lblCash.Text = $"{CashLabel()} remaining: {remaining:c2}";
             _lblCash.ForeColor = remaining < 0 ? Color.Firebrick : Color.FromArgb(32, 32, 32);
         }
 
@@ -240,20 +227,11 @@ namespace THMS.UI.WinForms.Controls
             if (name == nameof(BillRow.OtherAccountName)
                 && _grid.Rows[e.RowIndex].Cells[e.ColumnIndex] is DataGridViewLinkCell link)
             {
-                if (string.IsNullOrWhiteSpace(row.OtherWebsiteUrl))
-                {
-                    link.LinkBehavior = LinkBehavior.NeverUnderline;
-                    link.LinkColor = _grid.DefaultCellStyle.ForeColor;
-                    link.ActiveLinkColor = _grid.DefaultCellStyle.ForeColor;
-                    link.VisitedLinkColor = _grid.DefaultCellStyle.ForeColor;
-                }
-                else
-                {
-                    link.LinkBehavior = LinkBehavior.HoverUnderline;
-                    link.LinkColor = Color.FromArgb(0, 99, 177);
-                    link.ActiveLinkColor = Color.FromArgb(0, 70, 127);
-                    link.VisitedLinkColor = Color.FromArgb(0, 99, 177);
-                }
+                DataGridViewUtil.ApplyLinkAppearance(
+                    link,
+                    e.CellStyle,
+                    !string.IsNullOrWhiteSpace(row.OtherWebsiteUrl),
+                    _grid.DefaultCellStyle.ForeColor);
             }
 
             if (name == nameof(BillRow.FundingAccountId) && !row.CanChoosePayFrom)
@@ -302,9 +280,9 @@ namespace THMS.UI.WinForms.Controls
             {
                 var scheduled = _orchestrator.Schedule(CurrentRows());
                 Reload();
-                _lblStatus.Text = scheduled.Count == 0
+                AppStatus.Set(scheduled.Count == 0
                     ? "Check Pay on the bills you paid at the bank, then mark them paid."
-                    : $"Marked {scheduled.Count} bill{(scheduled.Count == 1 ? "" : "s")} as scheduled. Cash is held until import matches the bank actual.";
+                    : $"Marked {scheduled.Count} bill{(scheduled.Count == 1 ? "" : "s")} as scheduled. Cash is held until import matches the bank actual.");
                 DataChanged?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
@@ -412,6 +390,18 @@ namespace THMS.UI.WinForms.Controls
             var accountId = _accountId
                 ?? (_grid.CurrentRow?.DataBoundItem is BillRow row ? row.DestinationAccountId : (Guid?)null);
             AddStatementClicked?.Invoke(this, accountId);
+        }
+
+        private string CashLabel()
+        {
+            if (_accountId is Guid id)
+            {
+                var account = _orchestrator.GetAccounts().FirstOrDefault(a => a.Id == id);
+                if (account is BankAccount)
+                    return account.Name;
+            }
+
+            return "Bank";
         }
 
         private List<BillRow> CurrentRows()

@@ -28,12 +28,10 @@ namespace THMS.UI.WinForms
         private Controls.BillsControl billsControl;
         private Panel pnlLedger;
         private Controls.TransactionManagerControl ledger;
-        private Label lblLedgerStatus;
         private Panel pnlStatements;
         private DataGridView gridStatements;
         private FlowLayoutPanel pnlStatementButtons;
         private Controls.ThmsButton btnAddStatement;
-        private Label lblStatementStatus;
         private Controls.CategoryManagerControl categoryManager;
         private Controls.HistoryPeriodBar historyBar;
 
@@ -71,12 +69,10 @@ namespace THMS.UI.WinForms
             billsControl = new Controls.BillsControl();
             pnlLedger = new Panel();
             ledger = new Controls.TransactionManagerControl();
-            lblLedgerStatus = new Label();
             pnlStatements = new Panel();
             gridStatements = new DataGridView();
             pnlStatementButtons = new FlowLayoutPanel();
             btnAddStatement = new Controls.ThmsButton();
-            lblStatementStatus = new Label();
             categoryManager = new Controls.CategoryManagerControl();
             historyBar = new Controls.HistoryPeriodBar();
             ((System.ComponentModel.ISupportInitialize)split).BeginInit();
@@ -193,9 +189,9 @@ namespace THMS.UI.WinForms
             tabs.Dock = DockStyle.Fill;
             tabs.MaxTabWidth = 220;
             tabs.Name = "tabs";
-            tabs.TabPages.Add(tabBills);
             tabs.TabPages.Add(tabLedger);
             tabs.TabPages.Add(tabStatements);
+            tabs.TabPages.Add(tabBills);
             //
             // tabBills
             //
@@ -221,7 +217,6 @@ namespace THMS.UI.WinForms
             // pnlLedger
             //
             pnlLedger.Controls.Add(ledger);
-            pnlLedger.Controls.Add(lblLedgerStatus);
             pnlLedger.Dock = DockStyle.Fill;
             pnlLedger.Name = "pnlLedger";
             //
@@ -230,15 +225,6 @@ namespace THMS.UI.WinForms
             ledger.Dock = DockStyle.Fill;
             ledger.HostProvidesHistory = true;
             ledger.Name = "ledger";
-            //
-            // lblLedgerStatus
-            //
-            lblLedgerStatus.Dock = DockStyle.Bottom;
-            lblLedgerStatus.Height = 24;
-            lblLedgerStatus.Name = "lblLedgerStatus";
-            lblLedgerStatus.Padding = new Padding(8, 0, 8, 0);
-            lblLedgerStatus.Text = "Posted, forecast, and recurring rules for the selected account.";
-            lblLedgerStatus.TextAlign = ContentAlignment.MiddleLeft;
             //
             // tabStatements
             //
@@ -272,7 +258,6 @@ namespace THMS.UI.WinForms
             // pnlStatements
             //
             pnlStatements.Controls.Add(gridStatements);
-            pnlStatements.Controls.Add(lblStatementStatus);
             pnlStatements.Controls.Add(pnlStatementButtons);
             pnlStatements.Dock = DockStyle.Fill;
             pnlStatements.Name = "pnlStatements";
@@ -308,15 +293,6 @@ namespace THMS.UI.WinForms
             btnAddStatement.Name = "btnAddStatement";
             btnAddStatement.Text = "Add";
             btnAddStatement.Click += OnAddStatement;
-            //
-            // lblStatementStatus
-            //
-            lblStatementStatus.Dock = DockStyle.Bottom;
-            lblStatementStatus.Height = 24;
-            lblStatementStatus.Name = "lblStatementStatus";
-            lblStatementStatus.Padding = new Padding(8, 0, 8, 0);
-            lblStatementStatus.Text = "Select an account to view statements.";
-            lblStatementStatus.TextAlign = ContentAlignment.MiddleLeft;
             //
             // RegisterForm
             //

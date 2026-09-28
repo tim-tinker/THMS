@@ -36,6 +36,7 @@ namespace THMS.UI.WinForms.Controls
                 MultiSelect = false
             };
 
+            DataGridViewUtil.EnableDoubleBuffering(_statsGrid);
             statsTab.Controls.Add(_statsGrid);
 
             _analyticsPanel = new TableLayoutPanel

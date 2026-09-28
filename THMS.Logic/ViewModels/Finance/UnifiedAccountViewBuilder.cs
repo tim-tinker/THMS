@@ -9,7 +9,8 @@ namespace THMS.Logic.ViewModels.Finance
             IEnumerable<Account> accounts,
             IReadOnlyDictionary<Guid, DateTime?>? nextPaymentByAccount = null,
             IReadOnlySet<Guid>? usablePostedBalanceAccountIds = null,
-            IReadOnlyDictionary<Guid, PostedBalanceDisplay>? livePostedBalances = null)
+            IReadOnlyDictionary<Guid, PostedBalanceDisplay>? livePostedBalances = null,
+            IReadOnlySet<Guid>? unreconciledAccountIds = null)
         {
             var list = new List<UnifiedAccountView>();
 
@@ -26,7 +27,8 @@ namespace THMS.Logic.ViewModels.Finance
                     AccountNumber = acct.AccountNumber,
                     AccountType = Kind(acct),
                     WebsiteUrl = acct.WebsiteUrl ?? "",
-                    AsOfDate = live?.AsOf ?? acct.BalanceAsOf
+                    AsOfDate = live?.AsOf ?? acct.BalanceAsOf,
+                    HasUnreconciled = unreconciledAccountIds?.Contains(acct.Id) == true
                 };
 
                 if (live is PostedBalanceDisplay snapshot)

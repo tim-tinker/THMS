@@ -30,6 +30,7 @@ namespace THMS.Logic.ViewModels.Finance
         public string CreditLimit { get; init; } = "";
         public decimal? CreditLimitValue { get; init; }
         public string PlaidStatus { get; init; } = "";
+        public bool HasUnreconciled { get; init; }
 
         public static AccountRegisterRow From(Account account, AccountStatement? latestStatement) =>
             From(account, latestStatement is null ? [] : [latestStatement], posted: []);
@@ -38,7 +39,8 @@ namespace THMS.Logic.ViewModels.Finance
             Account account,
             IReadOnlyList<AccountStatement> statements,
             IEnumerable<PostedTransaction> posted,
-            string? plaidStatus = null)
+            string? plaidStatus = null,
+            bool hasUnreconciled = false)
         {
             ArgumentNullException.ThrowIfNull(account);
             ArgumentNullException.ThrowIfNull(statements);
@@ -56,7 +58,7 @@ namespace THMS.Logic.ViewModels.Finance
             var creditLimit = account is CreditAccount credit && credit.CreditLimit > 0
                 ? credit.CreditLimit
                 : (decimal?)null;
-            var hasDue = latest is not null and not BankStatement;
+            var hasDue = latest is not null && !StatementAccountMatch.IsNonPayable(latest);
 
             return new AccountRegisterRow
             {
@@ -79,7 +81,9 @@ namespace THMS.Logic.ViewModels.Finance
                 AprValue = apr,
                 CreditLimit = creditLimit is decimal limit ? limit.ToString("c2") : "",
                 CreditLimitValue = creditLimit,
-                PlaidStatus = plaidStatus ?? PlaidStatusOf(account, itemState: null)
+                PlaidStatus = plaidStatus ?? PlaidStatusOf(account, itemState: null),
+                HasUnreconciled = hasUnreconciled
+                    || posted.Any(tx => tx.ImportedStatus == ImportedStatus.Unreconciled)
             };
         }
 
@@ -140,6 +144,7 @@ namespace THMS.Logic.ViewModels.Finance
         private static decimal? BalanceValue(AccountStatement? latest) => latest switch
         {
             BankStatement bank => bank.StatementBalance,
+            InvestmentStatement investment => investment.StatementBalance,
             LoanStatement loan => loan.StatementBalance,
             MortgageStatement mortgage => mortgage.StatementBalance,
             CreditCardStatement card => card.StatementBalance,

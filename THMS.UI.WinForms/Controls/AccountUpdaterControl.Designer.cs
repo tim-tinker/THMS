@@ -8,7 +8,6 @@
         private ThmsButton btnAdd;
         private ThmsButton btnDelete;
         private ThmsButton btnDiagnostics;
-        private Label lblStatus;
 
         protected override void Dispose(bool disposing)
         {
@@ -24,7 +23,6 @@
             btnAdd = new ThmsButton();
             btnDelete = new ThmsButton();
             btnDiagnostics = new ThmsButton();
-            lblStatus = new Label();
             ((System.ComponentModel.ISupportInitialize)gridAccounts).BeginInit();
             pnlButtons.SuspendLayout();
             SuspendLayout();
@@ -72,14 +70,6 @@
             pnlButtons.TabIndex = 1;
             pnlButtons.WrapContents = true;
             // 
-            // lblStatus
-            // 
-            lblStatus.Dock = DockStyle.Bottom;
-            lblStatus.Height = 24;
-            lblStatus.Name = "lblStatus";
-            lblStatus.Padding = new Padding(8, 0, 8, 0);
-            lblStatus.TextAlign = ContentAlignment.MiddleLeft;
-            // 
             // btnAdd
             // 
             btnAdd.Name = "btnAdd";
@@ -105,7 +95,6 @@
             // AccountUpdaterControl
             // 
             Controls.Add(gridAccounts);
-            Controls.Add(lblStatus);
             Controls.Add(pnlButtons);
             Name = "AccountUpdaterControl";
             Size = new Size(800, 600);

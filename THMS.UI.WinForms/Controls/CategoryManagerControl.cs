@@ -1,8 +1,6 @@
 using System.ComponentModel;
-using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Aggregation;
-using THMS.Logic.Finance.Categories;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
@@ -19,6 +17,7 @@ namespace THMS.UI.WinForms.Controls
         private readonly BindingSource _periodsSource = new();
         private readonly BindingSource _transactionsSource = new();
         private DataGridViewTextBoxColumn _transactionCategoryColumn = null!;
+        private Label lblTransactionHint = null!;
         private Guid? _selectedCategoryId;
         private string _historyPeriod = HistoryPeriodBar.Month;
         private bool _loading;
@@ -49,6 +48,7 @@ namespace THMS.UI.WinForms.Controls
         public CategoryManagerControl()
         {
             InitializeComponent();
+            SplitContainerUtil.MakeSplitterVisible(splitMain);
             ConfigureGrids();
             tabsDetail.RecalculateItemSize();
         }
@@ -127,15 +127,14 @@ namespace THMS.UI.WinForms.Controls
                 TextColumn(nameof(CategoryBudgetRow.Name), "Category", DataGridViewAutoSizeColumnMode.Fill, 180),
                 TextColumn(nameof(CategoryBudgetRow.Active), "Active", DataGridViewAutoSizeColumnMode.AllCells, 70),
                 CurrencyColumn(nameof(CategoryBudgetRow.Remaining), "Remaining"),
-                CurrencyColumn(nameof(CategoryBudgetRow.Ending), "Ending"),
+                DateColumn(nameof(CategoryBudgetRow.PeriodStart), "Start"),
+                DateColumn(nameof(CategoryBudgetRow.PeriodEnd), "End"),
                 CurrencyColumn(nameof(CategoryBudgetRow.Recommended), "Recommended"),
-                TextColumn(nameof(CategoryBudgetRow.Frequency), "Frequency", DataGridViewAutoSizeColumnMode.AllCells, 80),
                 TextColumn(nameof(CategoryBudgetRow.Status), "Status", DataGridViewAutoSizeColumnMode.AllCells, 120));
             gridCategories.DataSource = _categoriesSource;
             gridCategories.SelectionChanged += (_, _) => OnCategorySelectionChanged();
             gridCategories.CellDoubleClick += OnCategoryDoubleClick;
             gridCategories.CellFormatting += OnCategoryCellFormatting;
-            gridCategories.MouseDown += OnCategoryMouseDown;
 
             gridPeriods.Columns.AddRange(
                 TextColumn(nameof(CategoryBudgetPeriodRow.Period), "Period", DataGridViewAutoSizeColumnMode.AllCells, 160),
@@ -143,7 +142,6 @@ namespace THMS.UI.WinForms.Controls
                 CurrencyColumn(nameof(CategoryBudgetPeriodRow.BudgetAmount), "Budget"),
                 CurrencyColumn(nameof(CategoryBudgetPeriodRow.Actual), "Actual"),
                 CurrencyColumn(nameof(CategoryBudgetPeriodRow.Remaining), "Remaining"),
-                CurrencyColumn(nameof(CategoryBudgetPeriodRow.Ending), "Ending"),
                 CurrencyColumn(nameof(CategoryBudgetPeriodRow.Recommended), "Recommended"),
                 TextColumn(nameof(CategoryBudgetPeriodRow.Status), "Status", DataGridViewAutoSizeColumnMode.Fill, 80));
             gridPeriods.DataSource = _periodsSource;
@@ -164,16 +162,26 @@ namespace THMS.UI.WinForms.Controls
             gridTransactions.DataSource = _transactionsSource;
             gridTransactions.CellDoubleClick += OnTransactionDoubleClick;
             gridTransactions.CellMouseClick += OnTransactionCategoryMouseClick;
+            gridTransactions.MouseDown += OnTransactionGridMouseDown;
             gridTransactions.KeyDown += OnTransactionKeyDown;
-            gridTransactions.SelectionChanged += (_, _) => UpdateSplitButton();
-            UpdateSplitButton();
+            lblTransactionHint = new Label
+            {
+                AutoSize = false,
+                Dock = DockStyle.Top,
+                Height = 40,
+                Padding = new Padding(4, 2, 4, 2),
+                TextAlign = ContentAlignment.MiddleLeft,
+                UseMnemonic = false
+            };
+            tabTransactions.Controls.Add(lblTransactionHint);
+            lblTransactionHint.BringToFront();
         }
 
         private void Reload(Guid? selectId = null, bool refreshBudgets = true)
         {
             if (refreshBudgets)
                 _budgets.RefreshAllActive();
-            var selected = selectId ?? SelectedCategory()?.CategoryId ?? _selectedCategoryId;
+            var selected = selectId ?? _selectedCategoryId;
             var all = Orchestrator.GetAllCategories(includeInactive: true).ToList();
             var search = txtSearch.Text.Trim();
             if (!string.IsNullOrEmpty(search))
@@ -203,28 +211,45 @@ namespace THMS.UI.WinForms.Controls
             var rows = CategoryBudgetComposer.Build(all, rules, periods, DateTime.Today);
 
             _loading = true;
-            _categoriesSource.DataSource = rows;
-            _loading = false;
+            try
+            {
+                _categoriesSource.DataSource = rows;
+                SelectCategory(selected);
+                if (selected is Guid id)
+                    _selectedCategoryId = id;
+            }
+            finally
+            {
+                _loading = false;
+            }
 
-            SelectCategory(selected);
             LoadDetails();
+            UpdateBudgetButton();
         }
 
         private void SelectCategory(Guid? categoryId)
         {
-            if (categoryId is not Guid id)
-                return;
-
-            foreach (DataGridViewRow row in gridCategories.Rows)
+            DataGridViewRow? match = null;
+            if (categoryId is Guid id)
             {
-                if (row.DataBoundItem is CategoryBudgetRow bound && bound.CategoryId == id)
+                foreach (DataGridViewRow row in gridCategories.Rows)
                 {
-                    row.Selected = true;
-                    if (row.Cells.Count > 0)
-                        gridCategories.CurrentCell = row.Cells[0];
-                    break;
+                    if (row.DataBoundItem is CategoryBudgetRow bound && bound.CategoryId == id)
+                    {
+                        match = row;
+                        break;
+                    }
                 }
             }
+
+            if (match is null && gridCategories.Rows.Count > 0)
+                match = gridCategories.Rows[0];
+            if (match is null)
+                return;
+
+            match.Selected = true;
+            if (match.Cells.Count > 0 && match.Cells[0].Visible)
+                gridCategories.CurrentCell = match.Cells[0];
         }
 
         private CategoryBudgetRow? SelectedCategory() =>
@@ -237,7 +262,17 @@ namespace THMS.UI.WinForms.Controls
         {
             if (_loading)
                 return;
+            if (Visible)
+                _selectedCategoryId = SelectedCategory()?.CategoryId;
             LoadDetails();
+            UpdateBudgetButton();
+        }
+
+        private void UpdateBudgetButton()
+        {
+            var row = SelectedCategory();
+            btnAddBudget.Enabled = row is not null;
+            btnAddBudget.Text = row?.HasBudget == true ? "Edit Budget" : "Add Budget";
         }
 
         private void LoadDetails()
@@ -249,7 +284,6 @@ namespace THMS.UI.WinForms.Controls
         private void LoadPeriods()
         {
             var row = SelectedCategory();
-            _selectedCategoryId = row?.CategoryId;
             if (row is null || !row.HasBudget)
             {
                 _periodsSource.DataSource = new List<CategoryBudgetPeriodRow>();
@@ -259,7 +293,10 @@ namespace THMS.UI.WinForms.Controls
                 return;
             }
 
-            lblPeriodHint.Text = "Budget periods for the selected category.";
+            var current = _budgets.GetActivePeriod(row.BudgetRuleId!.Value);
+            lblPeriodHint.Text = current is null
+                ? "Budget periods for the selected category."
+                : $"Current period {current.PeriodStart:d} – {current.PeriodEnd:d}. Remaining counts spend in this window, including child categories.";
             _periodsSource.DataSource = CategoryBudgetComposer.BuildPeriods(_budgets.GetHistory(row.BudgetRuleId!.Value));
         }
 
@@ -268,11 +305,12 @@ namespace THMS.UI.WinForms.Controls
             var row = SelectedCategory();
             if (row is null)
             {
+                lblTransactionHint.Text = "";
                 _transactionsSource.DataSource = new List<UnifiedTransactionView>();
-                UpdateSplitButton();
                 return;
             }
 
+            lblTransactionHint.Text = TransactionHint(row);
             var start = BaseOrchestrator.GetStartDate(DateTime.Today, _historyPeriod);
             var activity = _transactions.GetPostedActivity(start, DateTime.Today);
             var views = UnifiedTransactionViewBuilder.BuildCategoryRows(activity.Posted, activity.Transfers);
@@ -285,7 +323,18 @@ namespace THMS.UI.WinForms.Controls
                 filter,
                 Orchestrator.GetAllCategories(includeInactive: true));
             _transactionsSource.DataSource = UnifiedTransactionView.OrderForDisplay(filtered).ToList();
-            UpdateSplitButton();
+        }
+
+        private string TransactionHint(CategoryBudgetRow row)
+        {
+            if (row.BudgetRuleId is not Guid ruleId)
+                return "Posted activity for this category and its children.";
+
+            var period = _budgets.GetActivePeriod(ruleId);
+            if (period is null)
+                return "Posted activity for this category and its children.";
+
+            return $"Remaining is for {period.PeriodStart:d} – {period.PeriodEnd:d}. The list below uses {_historyPeriod} history, so older spend can appear without changing Remaining.";
         }
 
         private void ApplyDisplayNames(IEnumerable<UnifiedTransactionView> views)
@@ -325,32 +374,6 @@ namespace THMS.UI.WinForms.Controls
             if (SelectedPeriod() is not CategoryBudgetPeriodRow period)
                 return;
             OpenPeriod(period.BudgetRuleId, period.HistoryId);
-        }
-
-        private void OnCategoryMouseDown(object? sender, MouseEventArgs e)
-        {
-            if (e.Button != MouseButtons.Right)
-                return;
-            var hit = gridCategories.HitTest(e.X, e.Y);
-            if (hit.RowIndex < 0)
-                return;
-            gridCategories.ClearSelection();
-            gridCategories.Rows[hit.RowIndex].Selected = true;
-            gridCategories.CurrentCell = gridCategories.Rows[hit.RowIndex].Cells[Math.Max(0, hit.ColumnIndex)];
-            ShowCategoryMenu(gridCategories.PointToScreen(e.Location));
-        }
-
-        private void ShowCategoryMenu(Point screen)
-        {
-            if (SelectedCategory() is not CategoryBudgetRow row)
-                return;
-
-            using var menu = new ContextMenuStrip();
-            menu.Items.Add("Edit Category", null, (_, _) => OpenCategoryEditor(row.CategoryId));
-            menu.Items.Add(row.HasBudget ? "Edit Budget" : "Add Budget", null, (_, _) => OpenBudgetEditor(row));
-            if (row.HasBudget)
-                menu.Items.Add("Open Current Period", null, (_, _) => OpenPeriod(row.BudgetRuleId!.Value));
-            menu.Show(screen);
         }
 
         private void OnAdd(object? sender, EventArgs e)
@@ -449,25 +472,25 @@ namespace THMS.UI.WinForms.Controls
 
             try
             {
+                AppStatus.Set("Importing categories...", busy: true);
                 var import = new CategoryImportOrchestrator();
                 var rows = import.LoadCategoriesFromFile(fileDialog.FileName);
                 if (rows.Count == 0)
                 {
+                    AppStatus.Set("Ready.");
                     MessageBox.Show(FindForm(), "The selected file did not contain any categories.", "Import Categories",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
-                using var preview = new CategoryImportPreviewDialog(rows, import);
-                if (preview.ShowDialog(FindForm()) != DialogResult.OK)
-                    return;
-
+                var result = import.ImportCategories(rows, AppStatus.ForImport());
                 NoteCatalogChanged();
                 Reload(_selectedCategoryId);
-                SetStatus(ImportStatusText.Imported(preview.Result, "category", "categories"));
+                AppStatus.Set(ImportStatusText.Imported(result, "category", "categories"));
             }
             catch (Exception ex)
             {
+                AppStatus.Set("Import failed.");
                 MessageBox.Show(FindForm(), $"Could not parse the file.\n{ex.Message}", "Import Categories",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
@@ -479,19 +502,29 @@ namespace THMS.UI.WinForms.Controls
         private UnifiedTransactionView? SelectedTransaction() =>
             gridTransactions.CurrentRow?.DataBoundItem as UnifiedTransactionView;
 
-        private void UpdateSplitButton() =>
-            btnSplitTransaction.Enabled = SelectedTransaction() is UnifiedTransactionView view && CanSplit(view);
-
-        private void OnSplitTransaction(object? sender, EventArgs e)
+        private void OnTransactionGridMouseDown(object? sender, MouseEventArgs e)
         {
-            if (SelectedTransaction() is not UnifiedTransactionView view)
-            {
-                MessageBox.Show(this, "Select a transaction to split.", "Split Transaction",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (e.Button != MouseButtons.Right)
                 return;
-            }
 
-            OpenSplitEditor(view);
+            var hit = gridTransactions.HitTest(e.X, e.Y);
+            if (hit.RowIndex < 0)
+                return;
+
+            gridTransactions.ClearSelection();
+            gridTransactions.Rows[hit.RowIndex].Selected = true;
+            if (hit.ColumnIndex >= 0)
+                gridTransactions.CurrentCell = gridTransactions[hit.ColumnIndex, hit.RowIndex];
+
+            if (SelectedTransaction() is not UnifiedTransactionView view || !CanSplit(view))
+                return;
+
+            var menu = new ContextMenuStrip();
+            var split = new ToolStripMenuItem("Split Transaction");
+            split.Click += (_, _) => OpenSplitEditor(view);
+            menu.Items.Add(split);
+            menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
+            menu.Show(gridTransactions, e.Location);
         }
 
         private void OnTransactionDoubleClick(object? sender, DataGridViewCellEventArgs e)
@@ -512,7 +545,7 @@ namespace THMS.UI.WinForms.Controls
         {
             if (e.RowIndex < 0 || !IsTransactionCategoryColumn(e.ColumnIndex))
                 return;
-            if (e.Button is not (MouseButtons.Left or MouseButtons.Right))
+            if (e.Button != MouseButtons.Left)
                 return;
             if (!CanEditTransactionCategory(e.RowIndex))
                 return;
@@ -553,23 +586,13 @@ namespace THMS.UI.WinForms.Controls
                 ? _transactions.GetParent(view.LookupId) as PostedTransaction
                 : null;
             var suggestion = posted is null ? null : Orchestrator.Suggest(posted);
-            var menu = new ContextMenuStrip();
-            var categories = Orchestrator.GetActiveCategories();
-            var currentId = view.CategoryId ?? suggestion?.CategoryId;
-            foreach (var root in ExpenseCategoryTree.Roots(categories))
-            {
-                menu.Items.Add(CategoryTreeUi.CreateMenuItem(
-                    categories,
-                    root,
-                    currentId,
-                    suggestion?.CategoryId,
-                    category => AssignTransactionCategory(view, category.Id)));
-            }
-
-            menu.Items.Add(new ToolStripSeparator());
-            var newItem = new ToolStripMenuItem("New Category…");
-            newItem.Click += (_, _) => CreateAndAssignCategory(view);
-            menu.Items.Add(newItem);
+            var menu = CategoryTreeUi.CreateAssignMenu(
+                Orchestrator.GetActiveCategories(),
+                view.CategoryId ?? suggestion?.CategoryId,
+                suggestion?.CategoryId,
+                category => AssignTransactionCategory(view, category.Id),
+                () => CreateAndAssignCategory(view),
+                OpenCategoryManager);
 
             var cell = gridTransactions.GetCellDisplayRectangle(
                 _transactionCategoryColumn.Index, rowIndex, cutOverflow: false);
@@ -590,6 +613,19 @@ namespace THMS.UI.WinForms.Controls
             if (editor.ShowDialog(FindForm()) != DialogResult.OK || editor.CreatedCategory is null)
                 return;
             AssignTransactionCategory(view, editor.CreatedCategory.Id);
+        }
+
+        private void OpenCategoryManager()
+        {
+            if (FindForm() is CategoryManager)
+                return;
+
+            using var manager = new CategoryManager(Orchestrator);
+            if (manager.ShowDialog(FindForm()) != DialogResult.OK)
+                return;
+
+            NoteCatalogChanged();
+            Reload(_selectedCategoryId);
         }
 
         private void OpenSplitEditor(UnifiedTransactionView view)
@@ -628,13 +664,7 @@ namespace THMS.UI.WinForms.Controls
             if (gridCategories.Columns[e.ColumnIndex].DataPropertyName != nameof(CategoryBudgetRow.Remaining))
                 return;
             if (e.Value is decimal remaining && remaining < 0)
-                e.CellStyle.ForeColor = Color.Firebrick;
-        }
-
-        private void SetStatus(string text)
-        {
-            lblStatus.Text = text;
-            lblStatus.Visible = !string.IsNullOrWhiteSpace(text);
+                DataGridViewUtil.SetContentForeColor(e.CellStyle, Color.Firebrick);
         }
 
         private void NoteCatalogChanged()
@@ -665,6 +695,14 @@ namespace THMS.UI.WinForms.Controls
             column.DefaultCellStyle.NullValue = "";
             column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             column.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+            return column;
+        }
+
+        private static DataGridViewTextBoxColumn DateColumn(string property, string header)
+        {
+            var column = TextColumn(property, header, DataGridViewAutoSizeColumnMode.AllCells, 90);
+            column.DefaultCellStyle.Format = "d";
+            column.DefaultCellStyle.NullValue = "";
             return column;
         }
     }

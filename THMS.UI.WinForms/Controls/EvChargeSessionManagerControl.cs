@@ -16,6 +16,7 @@ namespace THMS.UI.WinForms.Controls
         public EvChargeSessionManagerControl()
         {
             InitializeComponent();
+            DataGridViewUtil.EnableDoubleBuffering(_gridSessions);
 
             _gridSessions.AutoGenerateColumns = false;
             _gridSessions.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
@@ -36,8 +37,6 @@ namespace THMS.UI.WinForms.Controls
             _gridSessions.DataSource = _sessions;
             ApplyColumnAutoSize();
         }
-
-        public void SetImportStatus(string message) => lblStatus.Text = message;
 
         private static readonly Color EstimatedBack = Color.FromArgb(255, 243, 196);
         private static readonly Color EstimatedFore = Color.FromArgb(102, 73, 0);
@@ -62,13 +61,14 @@ namespace THMS.UI.WinForms.Controls
                 case EvChargeEnergyCellKind.NotApplicable:
                     e.Value = "N/A";
                     e.FormattingApplied = true;
-                    e.CellStyle.ForeColor = UnavailableFore;
+                    DataGridViewUtil.SetContentForeColor(e.CellStyle, UnavailableFore);
                     e.CellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
                     e.CellStyle.Font = _unavailableFont;
                     break;
                 case EvChargeEnergyCellKind.Estimated:
                     e.CellStyle.BackColor = EstimatedBack;
-                    e.CellStyle.ForeColor = EstimatedFore;
+                    e.CellStyle.SelectionBackColor = EstimatedBack;
+                    DataGridViewUtil.SetContentForeColor(e.CellStyle, EstimatedFore);
                     break;
             }
         }

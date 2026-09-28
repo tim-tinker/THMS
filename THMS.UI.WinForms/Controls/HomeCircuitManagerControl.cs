@@ -13,6 +13,7 @@ namespace THMS.UI.WinForms.Controls
         public HomeCircuitManagerControl()
         {
             InitializeComponent();
+            DataGridViewUtil.EnableDoubleBuffering(gridHomeCircuit);
             gridHomeCircuit.AutoGenerateColumns = false;
         }
 
@@ -27,8 +28,6 @@ namespace THMS.UI.WinForms.Controls
             _readings = new BindingList<HomeCircuitReading>(_orchestrator.GetHomeCircuitReadings(period).ToList());
             gridHomeCircuit.DataSource = _readings;
         }
-
-        public void SetImportStatus(string message) => lblStatus.Text = message;
 
         private void OnLoad(object sender, EventArgs e)
         {

@@ -9,6 +9,7 @@ namespace THMS.UI.WinForms.Controls
         public BudgetHistoryViewer()
         {
             InitializeComponent();
+            DataGridViewUtil.EnableDoubleBuffering(gridHistory);
         }
 
         public BudgetHistoryViewer(Guid ruleId)
@@ -42,7 +43,6 @@ namespace THMS.UI.WinForms.Controls
                 BudgetAmount = history.BudgetAmount;
                 Actual = history.ActualExpenses;
                 Remaining = history.Remaining;
-                Ending = history.EndingBalance;
                 Recommended = history.RecommendedAmount;
                 Status = history.IsClosed ? "Closed" : "Open";
             }
@@ -52,7 +52,6 @@ namespace THMS.UI.WinForms.Controls
             public decimal BudgetAmount { get; }
             public decimal Actual { get; }
             public decimal Remaining { get; }
-            public decimal Ending { get; }
             public decimal Recommended { get; }
             public string Status { get; }
         }

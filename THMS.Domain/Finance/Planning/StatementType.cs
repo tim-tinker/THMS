@@ -8,6 +8,7 @@ namespace THMS.Domain.Finance.Planning
         Utility,
         Service,
         Insurance,
-        Bank
+        Bank,
+        Investment
     }
 }

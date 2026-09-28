@@ -23,9 +23,9 @@ namespace THMS.Logic.ViewModels.Finance
     {
         public Guid RuleId { get; init; }
         public string BudgetName { get; init; } = "";
-        public string Frequency { get; init; } = "";
         public decimal Remaining { get; init; }
-        public decimal Ending { get; init; }
+        public DateTime PeriodStart { get; init; }
+        public DateTime PeriodEnd { get; init; }
         public decimal Recommended { get; init; }
         public string Status { get; init; } = "";
     }

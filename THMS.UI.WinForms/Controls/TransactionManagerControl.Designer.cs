@@ -16,7 +16,6 @@ namespace THMS.UI.WinForms.Controls
         private System.Windows.Forms.ComboBox cmbShow;
         private ThmsButton btnAddRule;
         private ThmsButton btnDeleteRule;
-        private ThmsButton btnSplitTransaction;
 
         protected override void Dispose(bool disposing)
         {
@@ -60,7 +59,6 @@ namespace THMS.UI.WinForms.Controls
             cmbShow = new ComboBox();
             btnAddRule = new ThmsButton();
             btnDeleteRule = new ThmsButton();
-            btnSplitTransaction = new ThmsButton();
             NameColumn = new DataGridViewTextBoxColumn();
             AccountTypeColumn = new DataGridViewTextBoxColumn();
             StatementDateColumn = new DataGridViewTextBoxColumn();
@@ -213,7 +211,6 @@ namespace THMS.UI.WinForms.Controls
             forecastPanel.Controls.Add(lblShow);
             forecastPanel.Controls.Add(cmbShow);
             forecastPanel.Controls.Add(btnAddRule);
-            forecastPanel.Controls.Add(btnSplitTransaction);
             forecastPanel.Controls.Add(btnDeleteRule);
             forecastPanel.AutoSize = true;
             forecastPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -315,17 +312,6 @@ namespace THMS.UI.WinForms.Controls
             btnDeleteRule.TabIndex = 7;
             btnDeleteRule.Text = "Delete Rule";
             btnDeleteRule.UseVisualStyleBackColor = true;
-            // 
-            // btnSplitTransaction
-            // 
-            btnSplitTransaction.AutoSize = true;
-            btnSplitTransaction.Location = new Point(883, 10);
-            btnSplitTransaction.Margin = new Padding(4, 4, 8, 4);
-            btnSplitTransaction.Name = "btnSplitTransaction";
-            btnSplitTransaction.Size = new Size(140, 34);
-            btnSplitTransaction.TabIndex = 8;
-            btnSplitTransaction.Text = "Split Transaction";
-            btnSplitTransaction.UseVisualStyleBackColor = true;
             // 
             // NameColumn
             // 

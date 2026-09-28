@@ -53,18 +53,6 @@
     <Compile Update="Controls\PlaidHostedLinkDialog.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="Controls\AccountImportPreviewDialog.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Controls\CategoryImportPreviewDialog.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Controls\StatementImportPreviewDialog.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Controls\RecurringRuleImportPreviewDialog.cs">
-      <SubType>Form</SubType>
-    </Compile>
             <Compile Update="Controls\PlaidAccountSetupDialog.cs">
                 <SubType>Form</SubType>
             </Compile>
@@ -77,12 +65,6 @@
     <Compile Update="RegisterForm.cs">
       <SubType>Form</SubType>
     </Compile>
-            <Compile Update="Controls\TransactionImportPreviewDialog.cs">
-                <SubType>Form</SubType>
-            </Compile>
-            <Compile Update="Controls\EvChargeSessionImportPreviewDialog.cs">
-                <SubType>Form</SubType>
-            </Compile>
             <Compile Update="Controls\TransactionIngestionControl.cs">
                 <SubType>UserControl</SubType>
             </Compile>

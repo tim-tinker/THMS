@@ -43,6 +43,28 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
+        public static ContextMenuStrip CreateAssignMenu(
+            IReadOnlyList<ExpenseCategory> categories,
+            Guid? currentId,
+            Guid? suggestedId,
+            Action<ExpenseCategory> onAssign,
+            Action onNewCategory,
+            Action onManageCategories)
+        {
+            var menu = new ContextMenuStrip();
+            foreach (var root in ExpenseCategoryTree.Roots(categories))
+                menu.Items.Add(CreateMenuItem(categories, root, currentId, suggestedId, onAssign));
+
+            menu.Items.Add(new ToolStripSeparator());
+            var newItem = new ToolStripMenuItem("New Category…");
+            newItem.Click += (_, _) => onNewCategory();
+            menu.Items.Add(newItem);
+            var manageItem = new ToolStripMenuItem("Manage Categories…");
+            manageItem.Click += (_, _) => onManageCategories();
+            menu.Items.Add(manageItem);
+            return menu;
+        }
+
         public static ToolStripMenuItem CreateMenuItem(
             IReadOnlyList<ExpenseCategory> categories,
             ExpenseCategory category,

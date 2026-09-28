@@ -431,6 +431,7 @@ namespace THMS.Tests.Logic
             Assert.That(posted, Has.Count.EqualTo(1));
             Assert.That(posted[0].Category, Is.EqualTo("Restaurants"));
             Assert.That(posted[0].CategoryId, Is.Not.Null);
+            Assert.That(posted[0].ImportedStatus, Is.EqualTo(ImportedStatus.Unreconciled));
         }
 
         [Test]

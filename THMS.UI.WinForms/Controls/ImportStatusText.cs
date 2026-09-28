@@ -4,24 +4,20 @@ namespace THMS.UI.WinForms.Controls
 {
     internal static class ImportStatusText
     {
-        public static string Loaded(int count, string singular, string plural) =>
-            $"{count:N0} {Noun(count, singular, plural)} loaded. Edit cells or delete rows, then click OK to import.";
+        public static string Imported(ImportResult result, string singular, string plural, bool includeTime = false) =>
+            Completed("Imported", result, singular, plural, includeTime);
 
-        public static string Remaining(int count, string singular, string plural) =>
-            $"{count:N0} {Noun(count, singular, plural)} remaining.";
+        public static string Reconciled(ImportResult result) =>
+            Completed("Reconciled", result, "transaction", "transactions");
 
-        public static string Importing(ImportProgress progress)
+        private static string Completed(
+            string verb,
+            ImportResult result,
+            string singular,
+            string plural,
+            bool includeTime = false)
         {
-            if (!string.IsNullOrWhiteSpace(progress.Phase))
-                return progress.Phase!;
-            if (progress.Total == 0 || progress.Completed >= progress.Total)
-                return "Finishing...";
-            return $"Importing {progress.Completed:N0} of {progress.Total:N0}...";
-        }
-
-        public static string Imported(ImportResult result, string singular, string plural, bool includeTime = false)
-        {
-            var text = $"Imported {result.Count:N0} {Noun(result.Count, singular, plural)}";
+            var text = $"{verb} {result.Count:N0} {Noun(result.Count, singular, plural)}";
             if (result.Start is DateTime start && result.End is DateTime end)
             {
                 var format = includeTime ? "g" : "d";

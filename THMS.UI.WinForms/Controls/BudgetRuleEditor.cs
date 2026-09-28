@@ -54,13 +54,20 @@ namespace THMS.UI.WinForms.Controls
                 selected.Add(_seedCategory.Id);
             BindCategoryTree(selected);
 
+            dtPeriodStart.Value = DateTime.Today;
+            dtPeriodStart.Checked = false;
+
             if (_existing is null)
             {
                 txtName.Text = _seedCategory?.Name ?? "";
                 numAmount.Value = 0;
                 chkActive.Checked = true;
-                btnSave.Enabled = false;
-                btnDelete.Enabled = false;
+                Text = "Add Budget";
+                btnAdd.Visible = true;
+                btnSave.Visible = false;
+                btnDelete.Visible = false;
+                AcceptButton = btnAdd;
+                UpdatePeriodStartVisibility();
                 return;
             }
 
@@ -68,8 +75,31 @@ namespace THMS.UI.WinForms.Controls
             numAmount.Value = Clamp(_existing.DefaultBudgetAmount);
             chkActive.Checked = _existing.IsActive;
             cmbFrequency.SelectedItem = ToLabel(_existing.BudgetFrequency);
-            btnSave.Enabled = true;
-            btnDelete.Enabled = true;
+            if (_existing.PeriodStart is DateTime start)
+            {
+                dtPeriodStart.Value = start.Date;
+                dtPeriodStart.Checked = true;
+            }
+            Text = "Edit Budget";
+            btnAdd.Visible = false;
+            btnSave.Visible = true;
+            btnDelete.Visible = true;
+            btnSave.Location = new Point(12, 12);
+            btnDelete.Location = new Point(110, 12);
+            AcceptButton = btnSave;
+            UpdatePeriodStartVisibility();
+        }
+
+        private void OnFrequencyChanged(object? sender, EventArgs e) =>
+            UpdatePeriodStartVisibility();
+
+        private void UpdatePeriodStartVisibility()
+        {
+            var cycle = UsesCycleStart(ParseFrequency(cmbFrequency.SelectedItem?.ToString()));
+            lblPeriodStart.Enabled = cycle;
+            dtPeriodStart.Enabled = cycle;
+            if (!cycle)
+                dtPeriodStart.Checked = false;
         }
 
         private void BindCategoryTree(HashSet<Guid> selected)
@@ -142,13 +172,17 @@ namespace THMS.UI.WinForms.Controls
                 return false;
             }
 
+            var frequency = ParseFrequency(cmbFrequency.SelectedItem?.ToString());
             rule = new ExpenseBudgetRule
             {
                 Id = newId || _existing is null ? Guid.NewGuid() : _existing.Id,
                 BudgetName = txtName.Text.Trim(),
                 IncludedCategoryIds = categories,
-                BudgetFrequency = ParseFrequency(cmbFrequency.SelectedItem?.ToString()),
+                BudgetFrequency = frequency,
                 DefaultBudgetAmount = numAmount.Value,
+                PeriodStart = UsesCycleStart(frequency) && dtPeriodStart.Checked
+                    ? dtPeriodStart.Value.Date
+                    : null,
                 IsActive = chkActive.Checked
             };
             return true;
@@ -174,6 +208,9 @@ namespace THMS.UI.WinForms.Controls
             BudgetFrequency.Annual => "Annual",
             _ => "Monthly"
         };
+
+        private static bool UsesCycleStart(BudgetFrequency frequency) =>
+            frequency is BudgetFrequency.Weekly or BudgetFrequency.Biweekly;
 
         private static decimal Clamp(decimal value)
         {

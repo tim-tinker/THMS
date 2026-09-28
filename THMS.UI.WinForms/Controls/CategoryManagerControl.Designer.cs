@@ -24,15 +24,12 @@ namespace THMS.UI.WinForms.Controls
             gridPeriods = new DataGridView();
             lblPeriodHint = new Label();
             gridTransactions = new DataGridView();
-            pnlTransactionBar = new FlowLayoutPanel();
-            btnSplitTransaction = new ThmsButton();
             pnlBottom = new FlowLayoutPanel();
             btnAdd = new ThmsButton();
             btnMerge = new ThmsButton();
             btnAddBudget = new ThmsButton();
             btnImport = new ThmsButton();
             btnClose = new ThmsButton();
-            lblStatus = new Label();
             ((System.ComponentModel.ISupportInitialize)splitMain).BeginInit();
             splitMain.Panel1.SuspendLayout();
             splitMain.Panel2.SuspendLayout();
@@ -43,7 +40,6 @@ namespace THMS.UI.WinForms.Controls
             tabsDetail.SuspendLayout();
             tabPeriods.SuspendLayout();
             tabTransactions.SuspendLayout();
-            pnlTransactionBar.SuspendLayout();
             pnlBottom.SuspendLayout();
             SuspendLayout();
             splitMain.Dock = DockStyle.Fill;
@@ -83,7 +79,6 @@ namespace THMS.UI.WinForms.Controls
             tabTransactions.Padding = new Padding(4);
             tabTransactions.Text = "Transactions";
             tabTransactions.Controls.Add(gridTransactions);
-            tabTransactions.Controls.Add(pnlTransactionBar);
             lblPeriodHint.AutoSize = false;
             lblPeriodHint.Dock = DockStyle.Top;
             lblPeriodHint.Height = 24;
@@ -103,16 +98,6 @@ namespace THMS.UI.WinForms.Controls
             gridPeriods.ReadOnly = true;
             gridPeriods.RowHeadersVisible = false;
             gridPeriods.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            pnlTransactionBar.AutoSize = true;
-            pnlTransactionBar.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-            pnlTransactionBar.Dock = DockStyle.Top;
-            pnlTransactionBar.Name = "pnlTransactionBar";
-            pnlTransactionBar.Padding = new Padding(4, 4, 4, 4);
-            pnlTransactionBar.WrapContents = true;
-            pnlTransactionBar.Controls.Add(btnSplitTransaction);
-            btnSplitTransaction.Name = "btnSplitTransaction";
-            btnSplitTransaction.Text = "Split Transaction";
-            btnSplitTransaction.Click += OnSplitTransaction;
             gridTransactions.AllowUserToAddRows = false;
             gridTransactions.AllowUserToDeleteRows = false;
             gridTransactions.AllowUserToResizeRows = false;
@@ -151,17 +136,10 @@ namespace THMS.UI.WinForms.Controls
             btnClose.Name = "btnClose";
             btnClose.Text = "Close";
             btnClose.Click += OnClose;
-            lblStatus.Dock = DockStyle.Bottom;
-            lblStatus.Height = 24;
-            lblStatus.Name = "lblStatus";
-            lblStatus.Padding = new Padding(8, 0, 8, 0);
-            lblStatus.TextAlign = ContentAlignment.MiddleLeft;
-            lblStatus.Visible = false;
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             AutoSize = false;
             Controls.Add(splitMain);
-            Controls.Add(lblStatus);
             Controls.Add(pnlBottom);
             Dock = DockStyle.Fill;
             Name = "CategoryManagerControl";
@@ -177,7 +155,6 @@ namespace THMS.UI.WinForms.Controls
             ((System.ComponentModel.ISupportInitialize)gridCategories).EndInit();
             ((System.ComponentModel.ISupportInitialize)gridPeriods).EndInit();
             ((System.ComponentModel.ISupportInitialize)gridTransactions).EndInit();
-            pnlTransactionBar.ResumeLayout(false);
             pnlBottom.ResumeLayout(false);
             pnlBottom.PerformLayout();
             ResumeLayout(false);
@@ -193,8 +170,6 @@ namespace THMS.UI.WinForms.Controls
         private TabPage tabTransactions;
         private Label lblPeriodHint;
         private DataGridView gridPeriods;
-        private FlowLayoutPanel pnlTransactionBar;
-        private ThmsButton btnSplitTransaction;
         private DataGridView gridTransactions;
         private FlowLayoutPanel pnlBottom;
         private ThmsButton btnAdd;
@@ -202,6 +177,5 @@ namespace THMS.UI.WinForms.Controls
         private ThmsButton btnAddBudget;
         private ThmsButton btnImport;
         private ThmsButton btnClose;
-        private Label lblStatus;
     }
 }

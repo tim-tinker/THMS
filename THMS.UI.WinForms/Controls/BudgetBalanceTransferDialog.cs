@@ -57,13 +57,19 @@ namespace THMS.UI.WinForms.Controls
                 .Where(t => t.Period is { IsClosed: false })
                 .ToList();
 
+            var available = Math.Max(0, _sourcePeriod.StartingBalance);
             cmbTarget.DisplayMember = nameof(TransferTarget.Label);
             cmbTarget.DataSource = targets;
-            cmbTarget.Enabled = targets.Count > 0;
-            numAmount.Enabled = targets.Count > 0;
-            btnTransfer.Enabled = targets.Count > 0;
-            numAmount.Value = Clamp(_sourcePeriod.StartingBalance > 0 ? _sourcePeriod.StartingBalance : 0);
-            if (targets.Count == 0)
+            numAmount.Minimum = 0;
+            numAmount.Maximum = available;
+            numAmount.Value = available;
+            var canTransfer = targets.Count > 0 && available > 0;
+            cmbTarget.Enabled = canTransfer;
+            numAmount.Enabled = canTransfer;
+            btnTransfer.Enabled = canTransfer;
+            if (available <= 0)
+                lblHelp.Text = "Starting balance must be greater than zero to transfer.";
+            else if (targets.Count == 0)
                 lblHelp.Text = "No other open budgets are available to receive a transfer.";
         }
 
@@ -80,6 +86,13 @@ namespace THMS.UI.WinForms.Controls
             if (amount <= 0)
             {
                 MessageBox.Show(this, "Enter an amount greater than zero.", "Transfer Balance",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (amount > _sourcePeriod.StartingBalance)
+            {
+                MessageBox.Show(this, "Amount cannot be greater than the starting balance.", "Transfer Balance",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -108,15 +121,6 @@ namespace THMS.UI.WinForms.Controls
         {
             DialogResult = DialogResult.Cancel;
             Close();
-        }
-
-        private static decimal Clamp(decimal value)
-        {
-            if (value < 0)
-                return 0;
-            if (value > 100_000_000m)
-                return 100_000_000m;
-            return value;
         }
 
         private sealed class TransferTarget

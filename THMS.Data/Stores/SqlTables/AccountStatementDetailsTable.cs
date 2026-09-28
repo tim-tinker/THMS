@@ -75,6 +75,7 @@ namespace THMS.Data.Stores.SqlTables
             statement switch
             {
                 BankStatement bank => new(0, bank.StatementBalance),
+                InvestmentStatement investment => new(0, investment.StatementBalance),
                 LoanStatement loan => new(0, loan.StatementBalance),
                 MortgageStatement mortgage => new(mortgage.EscrowBalance, mortgage.StatementBalance),
                 CreditCardStatement card => new(0, card.StatementBalance),

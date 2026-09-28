@@ -14,7 +14,10 @@ namespace THMS.Logic.Finance.Planning
             switch (statement)
             {
                 case BankStatement bank:
-                    ValidateBank(bank, findings);
+                    ValidateBalanceOnly(bank.StatementBalance, findings);
+                    break;
+                case InvestmentStatement investment:
+                    ValidateBalanceOnly(investment.StatementBalance, findings);
                     break;
                 case LoanStatement loan:
                     ValidateLoan(loan, findings);
@@ -51,9 +54,9 @@ namespace THMS.Logic.Finance.Planning
                 findings.Add("Amount due cannot be negative.");
         }
 
-        private static void ValidateBank(BankStatement bank, List<string> findings)
+        private static void ValidateBalanceOnly(decimal statementBalance, List<string> findings)
         {
-            if (bank.StatementBalance < 0)
+            if (statementBalance < 0)
                 findings.Add("Statement balance cannot be negative.");
         }
 

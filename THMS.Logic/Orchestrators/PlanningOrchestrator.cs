@@ -116,7 +116,7 @@ namespace THMS.Logic.Orchestrators.Finance
                                      && p.OriginId == statement.Id);
             var latest = PayableStatements.Latest(_statements.GetForAccount(statement.AccountId));
 
-            if (statement is BankStatement || statement.AmountDue <= 0 || latest?.Id != statement.Id)
+            if (StatementAccountMatch.IsNonPayable(statement) || statement.AmountDue <= 0 || latest?.Id != statement.Id)
             {
                 if (existing is not null)
                     _transactions.DeleteFutureTransferTransaction(existing.Id);

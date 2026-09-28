@@ -1,6 +1,7 @@
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Forecast;
+using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Logic.Orchestrators.Finance
@@ -47,7 +48,10 @@ namespace THMS.Logic.Orchestrators.Finance
             return recommendations.Count;
         }
 
-        public TransactionReconciliation AcceptMatch(Guid importedId, Guid? expectedId = null)
+        public TransactionReconciliation AcceptMatch(
+            Guid importedId,
+            Guid? expectedId = null,
+            bool refreshBudgets = true)
         {
             var imported = RequireUnreconciled(importedId);
             var expected = ResolveExpected(expectedId ?? imported.RecommendedExpectedId)
@@ -57,12 +61,56 @@ namespace THMS.Logic.Orchestrators.Finance
             if (expected is FutureTransferTransaction realizedTransfer && realizedTransfer.IsRealized)
                 throw new InvalidOperationException("That expected transaction is already reconciled.");
 
-            return CompleteMatch(imported, expected);
+            var reconciliation = CompleteMatch(imported, expected);
+            if (refreshBudgets)
+                RefreshBudgets(imported);
+            return reconciliation;
         }
 
-        public TransactionReconciliation AcceptAsNew(Guid importedId)
+        public TransactionReconciliation AcceptAsNew(Guid importedId, bool refreshBudgets = true)
         {
             var imported = RequireUnreconciled(importedId);
+            var reconciliation = PersistAcceptedNew(imported);
+            if (refreshBudgets)
+                RefreshBudgets(imported);
+            return reconciliation;
+        }
+
+        public ImportResult AcceptAsNewOnOrBefore(
+            Guid accountId,
+            DateTime onOrBefore,
+            IProgress<ImportProgress>? progress = null)
+        {
+            var cutoff = onOrBefore.Date;
+            var imported = UnreconciledForAccount(accountId)
+                .Where(p => p.Date.Date <= cutoff)
+                .ToList();
+            var total = imported.Count;
+            ImportProgressReporter.Report(progress, 0, total, activity: "Reconciling");
+            for (var i = 0; i < imported.Count; i++)
+            {
+                PersistAcceptedNew(imported[i]);
+                ImportProgressReporter.Report(progress, i + 1, total, activity: "Reconciling");
+            }
+
+            RefreshBudgets(imported.ToArray());
+            return ImportResult.FromDates(total, imported.Select(p => p.Date));
+        }
+
+        public void RefreshBudgetsFor(IEnumerable<Guid> transactionIds)
+        {
+            var posted = transactionIds
+                .Select(FindImported)
+                .OfType<PostedTransaction>()
+                .ToList();
+            RefreshBudgets(posted.ToArray());
+        }
+
+        private TransactionReconciliation PersistAcceptedNew(PostedTransaction imported)
+        {
+            if (imported.ImportedStatus != ImportedStatus.Unreconciled)
+                throw new InvalidOperationException("That transaction is already reconciled.");
+
             var recommended = imported.RecommendedExpectedId;
             imported.ImportedStatus = ImportedStatus.AcceptedNew;
             imported.RecommendedExpectedId = null;
@@ -78,16 +126,8 @@ namespace THMS.Logic.Orchestrators.Finance
             return reconciliation;
         }
 
-        public int AcceptAsNewBefore(Guid accountId, DateTime before)
-        {
-            var cutoff = before.Date;
-            var imported = UnreconciledForAccount(accountId)
-                .Where(p => p.Date.Date < cutoff)
-                .ToList();
-            foreach (var row in imported)
-                AcceptAsNew(row.Id);
-            return imported.Count;
-        }
+        private TransactionReconciliation PersistAcceptedNew(Guid importedId) =>
+            PersistAcceptedNew(RequireUnreconciled(importedId));
 
         public void UndoMatch(Guid importedId)
         {
@@ -107,7 +147,30 @@ namespace THMS.Logic.Orchestrators.Finance
             }
 
             _transactions.DeleteReconciliation(reconciliation.Id);
+            RefreshBudgets(imported);
         }
+
+        public HashSet<Guid> AccountIdsWithUnreconciled()
+        {
+            var ids = new HashSet<Guid>();
+            foreach (var posted in _transactions.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue)
+                         .Where(p => p.ImportedStatus == ImportedStatus.Unreconciled))
+            {
+                ids.Add(posted.AccountId);
+            }
+
+            foreach (var transfer in _transactions.GetPostedTransferTransactions(DateTime.MinValue, DateTime.MaxValue)
+                         .Where(p => p.ImportedStatus == ImportedStatus.Unreconciled))
+            {
+                ids.Add(transfer.AccountId);
+            }
+
+            ids.Remove(Guid.Empty);
+            return ids;
+        }
+
+        private void RefreshBudgets(params PostedTransaction[] posted) =>
+            new BudgetOrchestrator(_transactions).RefreshAffected(posted);
 
         public void MaterializePlannedFromRules()
         {

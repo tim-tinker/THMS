@@ -14,6 +14,11 @@ namespace THMS.UI.WinForms
         public VehicleDetailForm()
         {
             InitializeComponent();
+            SplitContainerUtil.MakeSplitterVisible(_splitFuelMaintenance);
+            SplitContainerUtil.MakeSplitterVisible(_splitFuelCharge);
+            DataGridViewUtil.EnableDoubleBuffering(chargingGrid);
+            DataGridViewUtil.EnableDoubleBuffering(fuelGrid);
+            DataGridViewUtil.EnableDoubleBuffering(maintenanceGrid);
 
             _splitFuelMaintenance.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         }

@@ -33,6 +33,14 @@ namespace THMS.Logic.ViewModels.Finance
                     Notes = bank.Notes ?? "",
                     StatementBalance = Money(bank.StatementBalance)
                 },
+                InvestmentStatement investment => new AccountStatementListRow
+                {
+                    Id = investment.Id,
+                    Type = DisplayType(investment.Type),
+                    StatementDate = Date(investment.StatementDate),
+                    Notes = investment.Notes ?? "",
+                    StatementBalance = Money(investment.StatementBalance)
+                },
                 LoanStatement loan => ObligationRow(loan) with
                 {
                     StatementBalance = Money(loan.StatementBalance)
@@ -74,6 +82,7 @@ namespace THMS.Logic.ViewModels.Finance
         {
             StatementType.CreditCard => "Credit Card",
             StatementType.Bank => "Bank",
+            StatementType.Investment => "Investment",
             StatementType.Loan => "Loan",
             StatementType.Mortgage => "Mortgage",
             StatementType.Utility => "Utility",

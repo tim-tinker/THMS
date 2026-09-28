@@ -7,6 +7,7 @@ using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Model;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
+using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.UI.WinForms.Controls
@@ -43,10 +44,19 @@ namespace THMS.UI.WinForms.Controls
         private decimal _postedBalanceBeforeEdit;
         private bool _hostProvidesHistory;
         private bool _hostProvidesAccounts;
+        private Font? _unreconciledAccountFont;
+        private List<UnifiedTransactionView> _allTransactions = [];
+        private HashSet<string>? _categoryFilter;
+        private string _descriptionSearch = "";
+        private bool _suppressBalanceRecompute;
+        private TextBox txtDescriptionSearch = null!;
+
+        public event EventHandler? DataChanged;
 
         public TransactionManagerControl()
         {
             InitializeComponent();
+            SplitContainerUtil.MakeSplitterVisible(splitContainer);
             InitializeHistory();
             InitializeForecastPeriod();
             InitializeShowFilter();
@@ -146,7 +156,6 @@ namespace THMS.UI.WinForms.Controls
             cmbShow.IntegralHeight = false;
             btnAddRule.AutoSize = true;
             btnDeleteRule.AutoSize = true;
-            btnSplitTransaction.AutoSize = true;
         }
 
         private void InitializeHistory()
@@ -173,7 +182,6 @@ namespace THMS.UI.WinForms.Controls
             cmbShow.SelectedIndexChanged += OnShowFilterChanged;
             btnAddRule.Click += OnAddRuleClicked;
             btnDeleteRule.Click += OnDeleteRuleClicked;
-            btnSplitTransaction.Click += OnSplitTransactionClicked;
         }
 
         private void InitializeGrids()
@@ -187,6 +195,7 @@ namespace THMS.UI.WinForms.Controls
             detailGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             detailGrid.MultiSelect = true;
             CategoryColumn.ReadOnly = true;
+            CategoryColumn.SortMode = DataGridViewColumnSortMode.NotSortable;
             if (detailGrid.Columns["Status"] is null)
             {
                 detailGrid.Columns.Insert(4, new DataGridViewTextBoxColumn
@@ -218,6 +227,8 @@ namespace THMS.UI.WinForms.Controls
             detailGrid.CellDoubleClick += OnTransactionCellDoubleClick;
             detailGrid.KeyDown += OnTransactionGridKeyDown;
             detailGrid.CellMouseClick += OnCategoryCellMouseClick;
+            detailGrid.ColumnHeaderMouseClick += OnLedgerHeaderMouseClick;
+            detailGrid.CellFormatting += OnLedgerCellFormatting;
             detailGrid.SelectionChanged += (_, _) => UpdateRuleActionButtons();
             detailGrid.MouseDown += OnLedgerMouseDown;
         }
@@ -264,6 +275,26 @@ namespace THMS.UI.WinForms.Controls
             };
             forecastBar.Controls.Add(lblLoadStatus);
             forecastBar.Controls.Add(progressLoad);
+
+            var lblDescription = new Label
+            {
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                Margin = new Padding(4, 8, 8, 4),
+                Text = "Description:",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            txtDescriptionSearch = new TextBox
+            {
+                AutoSize = false,
+                Anchor = AnchorStyles.Left,
+                Size = new Size(360, cmbShow.Height),
+                Margin = new Padding(4, 4, 8, 4),
+                PlaceholderText = "Search"
+            };
+            txtDescriptionSearch.TextChanged += OnDescriptionSearchChanged;
+            forecastBar.Controls.Add(lblDescription);
+            forecastBar.Controls.Add(txtDescriptionSearch);
 
             splitContainer.Panel2.Controls.Add(BuildTransactionSplit());
             splitContainer.Panel2.Controls.Add(forecastBar);
@@ -328,6 +359,7 @@ namespace THMS.UI.WinForms.Controls
                 Orientation = Orientation.Horizontal,
                 SplitterDistance = 280
             };
+            SplitContainerUtil.MakeSplitterVisible(split);
             split.Panel1.Controls.Add(detailGrid);
             split.Panel2.Controls.Add(importedPanel);
             return split;
@@ -368,7 +400,8 @@ namespace THMS.UI.WinForms.Controls
                 _accountsSource.DataSource = UnifiedAccountViewBuilder.Build(
                     accounts,
                     nextPayments,
-                    livePostedBalances: liveBalances);
+                    livePostedBalances: liveBalances,
+                    unreconciledAccountIds: _reconciliationOrchestrator.AccountIdsWithUnreconciled());
             }
             finally
             {
@@ -429,9 +462,9 @@ namespace THMS.UI.WinForms.Controls
             var asNew = new ToolStripMenuItem("Accept as New");
             asNew.Enabled = selected.Count > 0;
             asNew.Click += (_, _) => AcceptImportedAsNew(selected);
-            var before = new ToolStripMenuItem("Accept all unreconciled before date…");
+            var before = new ToolStripMenuItem("Accept all unreconciled up to last statement");
             before.Enabled = CurrentAccountId is Guid;
-            before.Click += (_, _) => AcceptImportedBeforeDate();
+            before.Click += (_, _) => AcceptImportedUpToLastStatement();
             menu.Items.Add(accept);
             menu.Items.Add(change);
             menu.Items.Add(asNew);
@@ -451,21 +484,47 @@ namespace THMS.UI.WinForms.Controls
             {
                 detailGrid.ClearSelection();
                 detailGrid.Rows[hit.RowIndex].Selected = true;
+                if (hit.ColumnIndex >= 0)
+                    detailGrid.CurrentCell = detailGrid[hit.ColumnIndex, hit.RowIndex];
             }
 
             var selected = detailGrid.SelectedRows
                 .Cast<DataGridViewRow>()
                 .Select(r => r.DataBoundItem)
                 .OfType<UnifiedTransactionView>()
-                .Where(v => v.Status is TransactionStatuses.Reconciled or TransactionStatuses.New)
                 .ToList();
-            if (selected.Count == 0)
-                return;
+            var current = detailGrid.Rows[hit.RowIndex].DataBoundItem as UnifiedTransactionView;
 
             var menu = new ContextMenuStrip();
-            var undo = new ToolStripMenuItem("Undo Match");
-            undo.Click += (_, _) => UndoLedgerMatches(selected);
-            menu.Items.Add(undo);
+            if (current is not null && TryGetRule(current, out _, out _))
+            {
+                var edit = new ToolStripMenuItem("Edit Rule…");
+                edit.Click += (_, _) => OpenRuleEditor(current);
+                menu.Items.Add(edit);
+            }
+            else if (current is not null && CanSplit(current))
+            {
+                var split = new ToolStripMenuItem("Split Transaction");
+                split.Click += (_, _) => OpenSplitEditor(current);
+                menu.Items.Add(split);
+            }
+
+            var undoable = selected
+                .Where(v => v.Status is TransactionStatuses.Reconciled or TransactionStatuses.New)
+                .ToList();
+            if (undoable.Count > 0)
+            {
+                if (menu.Items.Count > 0)
+                    menu.Items.Add(new ToolStripSeparator());
+                var undo = new ToolStripMenuItem("Undo Match");
+                undo.Click += (_, _) => UndoLedgerMatches(undoable);
+                menu.Items.Add(undo);
+            }
+
+            if (menu.Items.Count == 0)
+                return;
+
+            menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
             menu.Show(detailGrid, e.Location);
         }
 
@@ -480,33 +539,17 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
-        private void AcceptImportedMatches(IReadOnlyList<ImportedTransactionView> rows)
-        {
-            try
-            {
-                foreach (var row in rows)
-                    _reconciliationOrchestrator.AcceptMatch(row.Id);
-                RefreshAll();
-            }
-            catch (InvalidOperationException ex)
-            {
-                MessageBox.Show(FindForm(), ex.Message, "Accept Match", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-        }
+        private void AcceptImportedMatches(IReadOnlyList<ImportedTransactionView> rows) =>
+            ReconcileMany(
+                rows,
+                row => _reconciliationOrchestrator.AcceptMatch(row.Id, refreshBudgets: false),
+                "Accept Match");
 
-        private void AcceptImportedAsNew(IReadOnlyList<ImportedTransactionView> rows)
-        {
-            try
-            {
-                foreach (var row in rows)
-                    _reconciliationOrchestrator.AcceptAsNew(row.Id);
-                RefreshAll();
-            }
-            catch (InvalidOperationException ex)
-            {
-                MessageBox.Show(FindForm(), ex.Message, "Accept as New", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-        }
+        private void AcceptImportedAsNew(IReadOnlyList<ImportedTransactionView> rows) =>
+            ReconcileMany(
+                rows,
+                row => _reconciliationOrchestrator.AcceptAsNew(row.Id, refreshBudgets: false),
+                "Accept as New");
 
         private void ChangeImportedMatch(ImportedTransactionView imported)
         {
@@ -530,21 +573,75 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
-        private void AcceptImportedBeforeDate()
+        private void AcceptImportedUpToLastStatement()
         {
             if (CurrentAccountId is not Guid accountId)
                 return;
-            var suggested = _statements.GetForAccount(accountId)
+            var lastStatement = _statements.GetForAccount(accountId)
                 .OrderByDescending(s => s.StatementDate)
                 .Select(s => s.StatementDate.Date)
                 .FirstOrDefault();
-            if (suggested == default)
-                suggested = DateTime.Today;
-            using var dialog = new AcceptBeforeDateDialog(suggested);
+            if (lastStatement == default)
+            {
+                MessageBox.Show(FindForm(),
+                    "This account has no statements. Add a statement before accepting unreconciled transactions up to the last statement date.",
+                    "Accept Unreconciled",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using var dialog = new AcceptBeforeDateDialog(lastStatement);
             if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
-            _reconciliationOrchestrator.AcceptAsNewBefore(accountId, dialog.BeforeDate);
-            RefreshAll();
+
+            try
+            {
+                AppStatus.Set("Reconciling transactions...", busy: true);
+                var result = _reconciliationOrchestrator.AcceptAsNewOnOrBefore(
+                    accountId, dialog.OnOrBeforeDate, AppStatus.ForImport());
+                RefreshAll();
+                AppStatus.Set(ImportStatusText.Reconciled(result));
+            }
+            catch (Exception ex)
+            {
+                AppStatus.Set("Reconcile failed.");
+                MessageBox.Show(FindForm(), ex.Message, "Accept Unreconciled",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void ReconcileMany(
+            IReadOnlyList<ImportedTransactionView> rows,
+            Action<ImportedTransactionView> accept,
+            string title)
+        {
+            if (rows.Count == 0)
+                return;
+
+            var bulk = rows.Count > 1;
+            try
+            {
+                if (bulk)
+                    AppStatus.Set("Reconciling transactions...", busy: true);
+                var progress = bulk ? AppStatus.ForImport() : null;
+                ImportProgressReporter.Report(progress, 0, rows.Count, activity: "Reconciling", stride: 1);
+                for (var i = 0; i < rows.Count; i++)
+                {
+                    accept(rows[i]);
+                    ImportProgressReporter.Report(progress, i + 1, rows.Count, activity: "Reconciling", stride: 1);
+                }
+
+                _reconciliationOrchestrator.RefreshBudgetsFor(rows.Select(row => row.Id));
+                RefreshAll();
+                if (bulk)
+                    AppStatus.Set(ImportStatusText.Reconciled(ImportResult.FromDates(rows.Count, rows.Select(r => r.Date))));
+            }
+            catch (InvalidOperationException ex)
+            {
+                if (bulk)
+                    AppStatus.Set("Reconcile failed.");
+                MessageBox.Show(FindForm(), ex.Message, title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
 
         private void UndoLedgerMatches(IReadOnlyList<UnifiedTransactionView> rows)
@@ -607,13 +704,13 @@ namespace THMS.UI.WinForms.Controls
             try
             {
                 var views = await Task.Run(
-                    () => BuildTransactionViews(accountId, show, history, forecastEnd, token),
-                    token);
-                if (token.IsCancellationRequested || CurrentAccountId != accountId)
+                    () => BuildTransactionViews(accountId, show, history, forecastEnd, token));
+                if (views is null || token.IsCancellationRequested || CurrentAccountId != accountId)
                     return;
 
                 ShowLoadProgress("Updating grid...");
-                _transactionsSource.DataSource = views;
+                _allTransactions = views;
+                ApplyLedgerRowFilter();
                 LoadImported(accountId);
                 UpdateRuleActionButtons();
             }
@@ -622,14 +719,15 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
-        private List<UnifiedTransactionView> BuildTransactionViews(
+        private List<UnifiedTransactionView>? BuildTransactionViews(
             Guid accountId,
             string show,
             string history,
             DateTime forecastEnd,
             CancellationToken token)
         {
-            token.ThrowIfCancellationRequested();
+            if (token.IsCancellationRequested)
+                return null;
             if (show == ShowRecurringRules)
             {
                 var rules = UnifiedTransactionViewBuilder.BuildRecurringRules(
@@ -640,8 +738,9 @@ namespace THMS.UI.WinForms.Controls
                 return rules;
             }
 
-            var chronological = BuildUnifiedTransactions(accountId, show, history, forecastEnd);
-            token.ThrowIfCancellationRequested();
+            var chronological = BuildUnifiedTransactions(accountId, show, history, forecastEnd, token);
+            if (chronological is null || token.IsCancellationRequested)
+                return null;
             ApplyCategoryDisplayNames(chronological);
 
             if (show != ShowAll)
@@ -657,16 +756,23 @@ namespace THMS.UI.WinForms.Controls
             return UnifiedTransactionView.OrderForDisplay(chronological).ToList();
         }
 
-        private List<UnifiedTransactionView> BuildUnifiedTransactions(
+        private List<UnifiedTransactionView>? BuildUnifiedTransactions(
             Guid accountId,
             string show,
             string history,
-            DateTime forecastEnd)
+            DateTime forecastEnd,
+            CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+                return null;
+
             var start = BaseOrchestrator.GetStartDate(DateTime.Today, history);
             var txs = history == HistoryLifetime
                 ? _txOrchestrator.GetTransactionsForAccount(accountId)
                 : _txOrchestrator.GetTransactionsForAccount(accountId, start, DateTime.Today);
+            if (token.IsCancellationRequested)
+                return null;
+
             var posted = UnifiedTransactionViewBuilder.Build(
                 txs.Posted,
                 txs.PostedTransfers,
@@ -678,11 +784,15 @@ namespace THMS.UI.WinForms.Controls
 
             if (show == ShowPosted)
                 return posted;
+            if (token.IsCancellationRequested)
+                return null;
 
             var forecast = _txOrchestrator.GenerateForecast(
                 accountId,
                 DateTime.Today,
                 forecastEnd);
+            if (token.IsCancellationRequested)
+                return null;
 
             if (show == ShowForecast)
                 return forecast;
@@ -836,8 +946,13 @@ namespace THMS.UI.WinForms.Controls
 
         private void OnAccountGridCellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
         {
-            if (e.ColumnIndex < 0)
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
                 return;
+
+            var hasUnreconciled = masterGrid.Rows[e.RowIndex].DataBoundItem is UnifiedAccountView { HasUnreconciled: true };
+            e.CellStyle.Font = hasUnreconciled
+                ? _unreconciledAccountFont ??= new Font(masterGrid.Font, FontStyle.Bold)
+                : masterGrid.Font;
 
             var column = masterGrid.Columns[e.ColumnIndex];
             if (column != BalanceColumn && column != AvailableColumn)
@@ -898,6 +1013,8 @@ namespace THMS.UI.WinForms.Controls
 
         private void OnTransactionsListChanged(object? sender, ListChangedEventArgs e)
         {
+            if (_suppressBalanceRecompute || LedgerRowFilterActive)
+                return;
             if (_accountsSource.Current is not UnifiedAccountView account)
                 return;
 
@@ -938,11 +1055,86 @@ namespace THMS.UI.WinForms.Controls
                 OpenSplitEditor(view);
         }
 
+        private bool LedgerRowFilterActive =>
+            _categoryFilter is not null || !string.IsNullOrWhiteSpace(_descriptionSearch);
+
+        private void OnDescriptionSearchChanged(object? sender, EventArgs e)
+        {
+            _descriptionSearch = txtDescriptionSearch.Text.Trim();
+            ApplyLedgerRowFilter();
+        }
+
+        private void OnLedgerHeaderMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
+        {
+            if (e.RowIndex != -1 || e.ColumnIndex != CategoryColumn.Index)
+                return;
+            if (_allTransactions.Count == 0)
+                return;
+
+            var header = detailGrid.GetCellDisplayRectangle(e.ColumnIndex, -1, cutOverflow: false);
+            var screen = detailGrid.RectangleToScreen(header);
+            ExcelColumnFilterDropDown.Show(
+                this,
+                screen,
+                _allTransactions.Select(CategoryKey),
+                _categoryFilter,
+                chosen =>
+                {
+                    _categoryFilter = chosen;
+                    CategoryColumn.HeaderText = _categoryFilter is null ? "Category" : "Category ▼";
+                    ApplyLedgerRowFilter();
+                });
+        }
+
+        private void OnLedgerCellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                return;
+            if (detailGrid.Columns[e.ColumnIndex] != ForecastColumn)
+                return;
+            if (!LedgerRowFilterActive)
+                return;
+
+            e.Value = "TBD";
+            e.FormattingApplied = true;
+        }
+
+        private void ApplyLedgerRowFilter()
+        {
+            IEnumerable<UnifiedTransactionView> rows = _allTransactions;
+            if (_categoryFilter is not null)
+                rows = rows.Where(t => _categoryFilter.Contains(CategoryKey(t)));
+            if (!string.IsNullOrWhiteSpace(_descriptionSearch))
+            {
+                rows = rows.Where(t =>
+                    (t.Description ?? "").Contains(_descriptionSearch, StringComparison.CurrentCultureIgnoreCase));
+            }
+
+            var list = SelectedShowMode() == ShowAll && !LedgerRowFilterActive
+                ? rows.ToList()
+                : UnifiedTransactionView.OrderForDisplay(rows).ToList();
+
+            _suppressBalanceRecompute = true;
+            try
+            {
+                _transactionsSource.DataSource = list;
+            }
+            finally
+            {
+                _suppressBalanceRecompute = false;
+            }
+
+            detailGrid.Refresh();
+        }
+
+        private static string CategoryKey(UnifiedTransactionView view) =>
+            ExcelColumnFilterDropDown.Normalize(view.Category);
+
         private void OnCategoryCellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
         {
             if (e.RowIndex < 0 || !IsCategoryColumn(detailGrid, CategoryColumn, e.ColumnIndex))
                 return;
-            if (e.Button is not (MouseButtons.Left or MouseButtons.Right))
+            if (e.Button != MouseButtons.Left)
                 return;
             if (!CanEditCategory(detailGrid, e.RowIndex))
                 return;
@@ -971,26 +1163,13 @@ namespace THMS.UI.WinForms.Controls
                 ? _txOrchestrator.GetTransactionsForAccount(view.AccountId).Posted.FirstOrDefault(t => t.Id == view.LookupId)
                 : null;
             var suggestion = posted is null ? null : _categoryOrchestrator.Suggest(posted);
-
-            var menu = new ContextMenuStrip();
-            var categories = _categoryOrchestrator.GetActiveCategories();
-            var currentId = view.CategoryId ?? suggestion?.CategoryId;
-
-            foreach (var root in THMS.Logic.Finance.Categories.ExpenseCategoryTree.Roots(categories))
-                menu.Items.Add(CategoryTreeUi.CreateMenuItem(
-                    categories,
-                    root,
-                    currentId,
-                    suggestion?.CategoryId,
-                    category => AssignCategory(view, category.Id)));
-
-            menu.Items.Add(new ToolStripSeparator());
-            var newItem = new ToolStripMenuItem("New Category…");
-            newItem.Click += (_, _) => CreateAndAssignCategory(view);
-            menu.Items.Add(newItem);
-            var manageItem = new ToolStripMenuItem("Manage Categories…");
-            manageItem.Click += (_, _) => OpenCategoryManager();
-            menu.Items.Add(manageItem);
+            var menu = CategoryTreeUi.CreateAssignMenu(
+                _categoryOrchestrator.GetActiveCategories(),
+                view.CategoryId ?? suggestion?.CategoryId,
+                suggestion?.CategoryId,
+                category => AssignCategory(view, category.Id),
+                () => CreateAndAssignCategory(view),
+                OpenCategoryManager);
 
             var cell = grid.GetCellDisplayRectangle(categoryColumn.Index, rowIndex, cutOverflow: false);
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
@@ -1055,24 +1234,6 @@ namespace THMS.UI.WinForms.Controls
             using var editor = new RecurringRuleEditor(accountId);
             if (editor.ShowDialog(FindForm()) == DialogResult.OK)
                 RefreshAll();
-        }
-
-        private void OnSplitTransactionClicked(object? sender, EventArgs e)
-        {
-            if (detailGrid.CurrentRow?.DataBoundItem is not UnifiedTransactionView view)
-            {
-                MessageBox.Show(FindForm(), "Select a transaction or rule to split.", "Split Transaction",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            if (TryGetRule(view, out _, out _))
-            {
-                OpenRuleEditor(view);
-                return;
-            }
-
-            OpenSplitEditor(view);
         }
 
         private static bool CanSplit(UnifiedTransactionView view) =>
@@ -1203,6 +1364,7 @@ namespace THMS.UI.WinForms.Controls
         {
             LoadAccounts();
             RefreshCurrentAccount();
+            DataChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public void RefreshCurrentAccount()
@@ -1223,10 +1385,15 @@ namespace THMS.UI.WinForms.Controls
             {
                 await LoadTransactionsForAccountAsync(account.Id, cts.Token);
             }
+            catch (OperationCanceledException)
+            {
+            }
             finally
             {
                 if (ReferenceEquals(_txLoadCts, cts) && !cts.IsCancellationRequested)
                     HideLoadProgress();
+                else if (!ReferenceEquals(_txLoadCts, cts))
+                    cts.Dispose();
             }
         }
 

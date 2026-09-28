@@ -13,6 +13,7 @@ namespace THMS.UI.WinForms.Controls
         public HomeCircuitAttributionManagerControl()
         {
             InitializeComponent();
+            DataGridViewUtil.EnableDoubleBuffering(gridHomeCircuit);
             gridHomeCircuit.AutoGenerateColumns = false;
         }
 

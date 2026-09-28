@@ -28,6 +28,7 @@ namespace THMS.Logic.Finance.Planning
         public static decimal? StatementBalanceOf(AccountStatement? statement) => statement switch
         {
             BankStatement bank => bank.StatementBalance,
+            InvestmentStatement investment => investment.StatementBalance,
             LoanStatement loan => loan.StatementBalance,
             MortgageStatement mortgage => mortgage.StatementBalance,
             CreditCardStatement card => card.StatementBalance,

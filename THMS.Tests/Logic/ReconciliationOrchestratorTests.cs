@@ -1,5 +1,6 @@
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Transactions;
+using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
 
 namespace THMS.Tests.Logic
@@ -76,7 +77,7 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void AcceptAsNew_AndBulkBeforeDate()
+        public void AcceptAsNew_AndBulkOnOrBeforeDate()
         {
             var store = new InMemoryTransactionDataStore();
             var account = Guid.NewGuid();
@@ -90,17 +91,145 @@ namespace THMS.Tests.Logic
             store.AddPostedTransaction(new PostedTransaction
             {
                 AccountId = account,
+                Date = new DateTime(2026, 2, 1),
+                Amount = -7,
+                Description = "OnCutoff"
+            });
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = account,
                 Date = new DateTime(2026, 3, 1),
                 Amount = -6,
                 Description = "Open"
             });
             var orchestrator = new ReconciliationOrchestrator(store);
 
-            Assert.That(orchestrator.AcceptAsNewBefore(account, new DateTime(2026, 2, 1)), Is.EqualTo(1));
+            var result = orchestrator.AcceptAsNewOnOrBefore(account, new DateTime(2026, 2, 1));
+            Assert.That(result.Count, Is.EqualTo(2));
+            Assert.That(result.Start, Is.EqualTo(new DateTime(2026, 1, 1)));
+            Assert.That(result.End, Is.EqualTo(new DateTime(2026, 2, 1)));
             Assert.That(store.GetPostedTransactions(account).Single(p => p.Description == "Old").ImportedStatus,
+                Is.EqualTo(ImportedStatus.AcceptedNew));
+            Assert.That(store.GetPostedTransactions(account).Single(p => p.Description == "OnCutoff").ImportedStatus,
                 Is.EqualTo(ImportedStatus.AcceptedNew));
             Assert.That(store.GetPostedTransactions(account).Single(p => p.Description == "Open").ImportedStatus,
                 Is.EqualTo(ImportedStatus.Unreconciled));
+        }
+
+        [Test]
+        public void AcceptAsNew_RefreshesBudgetPeriodActuals()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var account = Guid.NewGuid();
+            var budgets = new BudgetOrchestrator(store);
+            budgets.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = account,
+                BudgetName = "Electric",
+                IncludedCategoryIds = [DefaultExpenseCategories.ElectricId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = -100,
+                IsActive = true
+            });
+
+            var ruleId = budgets.GetRules().Single().Id;
+            Assert.That(budgets.GetActivePeriod(ruleId)!.ActualExpenses, Is.EqualTo(0m));
+
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = account,
+                Date = DateTime.Today,
+                Amount = -48,
+                Category = "Electric",
+                CategoryId = DefaultExpenseCategories.ElectricId,
+                Description = "Bill",
+                ImportedStatus = ImportedStatus.Unreconciled
+            });
+
+            new ReconciliationOrchestrator(store).AcceptAsNew(store.GetPostedTransactions(account).Single().Id);
+
+            var period = budgets.GetActivePeriod(ruleId)!;
+            Assert.That(period.ActualExpenses, Is.EqualTo(48m));
+            Assert.That(period.Remaining, Is.EqualTo(52m));
+        }
+
+        [Test]
+        public void AcceptAsNew_DoesNotChangeBudgetWhenCategoryIsNotBudgeted()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var budgets = new BudgetOrchestrator(store);
+            budgets.AddRule(new ExpenseBudgetRule
+            {
+                BudgetName = "Electric",
+                IncludedCategoryIds = [DefaultExpenseCategories.ElectricId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = -100,
+                IsActive = true
+            });
+            var ruleId = budgets.GetRules().Single().Id;
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = Guid.NewGuid(),
+                Date = DateTime.Today,
+                Amount = -75,
+                Category = "Misc",
+                Description = "Uncategorized import",
+                ImportedStatus = ImportedStatus.Unreconciled
+            });
+
+            new ReconciliationOrchestrator(store).AcceptAsNew(store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).Single().Id);
+
+            Assert.That(budgets.GetActivePeriod(ruleId)!.ActualExpenses, Is.EqualTo(0m));
+        }
+
+        [Test]
+        public void AccountIdsWithUnreconciled_IncludesAccountsThatStillHaveImports()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var pending = Guid.NewGuid();
+            var cleared = Guid.NewGuid();
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = pending,
+                Date = DateTime.Today,
+                Amount = -12,
+                Description = "Open",
+                ImportedStatus = ImportedStatus.Unreconciled
+            });
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = cleared,
+                Date = DateTime.Today,
+                Amount = -9,
+                Description = "Done",
+                ImportedStatus = ImportedStatus.AcceptedNew
+            });
+
+            var ids = new ReconciliationOrchestrator(store).AccountIdsWithUnreconciled();
+
+            Assert.That(ids.Contains(pending), Is.True);
+            Assert.That(ids.Contains(cleared), Is.False);
+        }
+
+        [Test]
+        public void AccountIdsWithUnreconciled_ClearsAccountAfterAcceptAsNew()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var account = Guid.NewGuid();
+            var imported = new PostedTransaction
+            {
+                AccountId = account,
+                Date = DateTime.Today,
+                Amount = -18,
+                Description = "Only import",
+                ImportedStatus = ImportedStatus.Unreconciled
+            };
+            store.AddPostedTransaction(imported);
+            var orchestrator = new ReconciliationOrchestrator(store);
+
+            Assert.That(orchestrator.AccountIdsWithUnreconciled().Contains(account), Is.True);
+            orchestrator.AcceptAsNew(imported.Id);
+            Assert.That(orchestrator.AccountIdsWithUnreconciled().Contains(account), Is.False);
         }
 
         [Test]

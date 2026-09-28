@@ -151,6 +151,14 @@ namespace THMS.Logic.Orchestrators
                 return bank;
             }
 
+            if (statement is InvestmentStatement investment)
+            {
+                investment.DueDate = investment.StatementDate;
+                investment.AmountDue = 0;
+                investment.StatementBalance = row.StatementBalance;
+                return investment;
+            }
+
             statement.DueDate = row.DueDate == default ? statement.StatementDate : row.DueDate.Date;
             statement.AmountDue = row.AmountDue;
 

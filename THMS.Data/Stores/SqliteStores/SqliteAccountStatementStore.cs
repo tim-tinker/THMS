@@ -99,6 +99,10 @@ namespace THMS.Data.Stores.SqliteStores
                 {
                     StatementBalance = details.StatementBalance
                 },
+                StatementType.Investment => new InvestmentStatement
+                {
+                    StatementBalance = details.StatementBalance
+                },
                 StatementType.Loan => new LoanStatement
                 {
                     StatementBalance = details.StatementBalance

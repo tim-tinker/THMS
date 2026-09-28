@@ -47,12 +47,35 @@ namespace THMS.Logic.Finance.Budget
             return Math.Max(actual, 0);
         }
 
+        public bool IncludesTransaction(
+            PostedTransaction transaction,
+            IEnumerable<Guid> includedCategoryIds,
+            IEnumerable<ExpenseCategory>? categories = null)
+        {
+            var included = Expand(includedCategoryIds, categories);
+            if (transaction.HasSplits)
+            {
+                foreach (var split in transaction.Splits)
+                {
+                    if (!SplitTransactionMath.AffectsBudget(split.Type))
+                        continue;
+                    if (Matches(split.CategoryId, split.Category, included, categories))
+                        return true;
+                }
+
+                return false;
+            }
+
+            return Matches(transaction.CategoryId, transaction.Category, included, categories);
+        }
+
         public decimal ComputeRecommendedAmount(
             IEnumerable<ExpenseBudgetHistory> history,
             BudgetFrequency frequency,
             IEnumerable<PostedTransaction>? posted = null,
             IEnumerable<Guid>? includedCategoryIds = null,
-            IEnumerable<ExpenseCategory>? categories = null)
+            IEnumerable<ExpenseCategory>? categories = null,
+            DateTime? cycleStart = null)
         {
             var samples = history
                 .Select(h => (Start: h.PeriodStart.Date, End: h.PeriodEnd.Date, Actual: h.ActualExpenses))
@@ -69,7 +92,8 @@ namespace THMS.Logic.Finance.Budget
                     foreach (var (start, end) in BudgetPeriodCalculator.PeriodsOverlapping(
                                  dates.Min(),
                                  dates.Max(),
-                                 frequency))
+                                 frequency,
+                                 cycleStart))
                     {
                         if (covered.Contains((start, end)))
                             continue;

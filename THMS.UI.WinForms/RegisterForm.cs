@@ -24,6 +24,7 @@ namespace THMS.UI.WinForms
         public RegisterForm()
         {
             InitializeComponent();
+            SplitContainerUtil.MakeSplitterVisible(split);
             ledger.HostProvidesAccounts = true;
             categoryManager.Bind(new CategoryOrchestrator());
             categoryManager.CatalogChanged += (_, _) => ledger.RefreshCurrentAccount();
@@ -57,6 +58,7 @@ namespace THMS.UI.WinForms
                 accountUpdater.RefreshAccounts();
                 ledger.SelectAccount(accountUpdater.SelectedAccount?.Id);
             };
+            ledger.DataChanged += (_, _) => accountUpdater.RefreshAccounts();
             accountUpdater.SelectedAccountChanged += (_, _) => LoadSelectedAccount();
             historyBar.SelectedPeriodChanged += (_, _) => ApplyHistoryPeriod();
             ApplyHistoryPeriod();
@@ -186,6 +188,7 @@ namespace THMS.UI.WinForms
             detailsHost.Controls.Add(lblDetails);
             splitStatements.Panel2.Controls.Add(detailsHost);
             pnlStatements.Controls.Add(splitStatements);
+            SplitContainerUtil.MakeSplitterVisible(splitStatements);
             splitStatements.SendToBack();
         }
 
@@ -234,7 +237,6 @@ namespace THMS.UI.WinForms
             {
                 _statementsSource.DataSource = new List<AccountStatementListRow>();
                 _statementDetailsSource.DataSource = new List<StatementChildRow>();
-                lblStatementStatus.Text = "Select an account to view statements.";
                 btnAddStatement.Enabled = false;
                 return;
             }
@@ -247,13 +249,10 @@ namespace THMS.UI.WinForms
 
             if (!canAdd)
             {
-                lblStatementStatus.Text = $"Statements are not supported for {account.Name}.";
+                _statementDetailsSource.DataSource = new List<StatementChildRow>();
                 return;
             }
 
-            lblStatementStatus.Text = rows.Count == 0
-                ? $"No statements for {account.Name}."
-                : $"{rows.Count} statement{(rows.Count == 1 ? "" : "s")} for {account.Name}.";
             LoadStatementDetails();
         }
 
@@ -311,25 +310,23 @@ namespace THMS.UI.WinForms
 
             try
             {
+                AppStatus.Set("Importing transactions...", busy: true);
                 var rows = _importOrchestrator.LoadTransactionsFromFiles(fileDialog.FileNames);
                 if (rows.Count == 0)
                 {
+                    AppStatus.Set("Ready.");
                     MessageBox.Show(this, "The selected file(s) did not contain any transactions.", "Import Transactions",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
-                using var preview = new TransactionImportPreviewDialog(rows, _importOrchestrator);
-                if (preview.ShowDialog(this) != DialogResult.OK)
-                    return;
-
+                var result = _importOrchestrator.ImportTransactions(rows, AppStatus.ForImport());
                 AfterImport();
-                var status = ImportStatusText.Imported(preview.Result, "transaction", "transactions");
-                billsControl.SetStatus(status);
-                lblLedgerStatus.Text = status;
+                AppStatus.Set(ImportStatusText.Imported(result, "transaction", "transactions"));
             }
             catch (Exception ex)
             {
+                AppStatus.Set("Import failed.");
                 MessageBox.Show(this, $"Could not parse the file(s).\n{ex.Message}", "Import Transactions",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
@@ -371,9 +368,11 @@ namespace THMS.UI.WinForms
 
             try
             {
+                AppStatus.Set("Importing transaction rules...", busy: true);
                 var rows = _ruleImportOrchestrator.LoadRulesFromFile(fileDialog.FileName);
                 if (rows.Count == 0)
                 {
+                    AppStatus.Set("Ready.");
                     MessageBox.Show(this,
                         "The selected file did not contain any transaction rules for known accounts.",
                         "Import Transaction Rules",
@@ -381,17 +380,13 @@ namespace THMS.UI.WinForms
                     return;
                 }
 
-                using var preview = new RecurringRuleImportPreviewDialog(rows, _ruleImportOrchestrator);
-                if (preview.ShowDialog(this) != DialogResult.OK)
-                    return;
-
+                var result = _ruleImportOrchestrator.ImportRules(rows, AppStatus.ForImport());
                 AfterImport();
-                var status = ImportStatusText.Imported(preview.Result, "transaction rule", "transaction rules");
-                billsControl.SetStatus(status);
-                lblLedgerStatus.Text = status;
+                AppStatus.Set(ImportStatusText.Imported(result, "transaction rule", "transaction rules"));
             }
             catch (Exception ex)
             {
+                AppStatus.Set("Import failed.");
                 MessageBox.Show(this, $"Could not parse the file.\n{ex.Message}", "Import Transaction Rules",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
@@ -409,9 +404,11 @@ namespace THMS.UI.WinForms
 
             try
             {
+                AppStatus.Set("Importing transfer rules...", busy: true);
                 var rows = _transferImportOrchestrator.LoadRulesFromFile(fileDialog.FileName);
                 if (rows.Count == 0)
                 {
+                    AppStatus.Set("Ready.");
                     MessageBox.Show(this,
                         "The selected file did not contain any transfer rules for known accounts.",
                         "Import Transfer Rules",
@@ -419,17 +416,13 @@ namespace THMS.UI.WinForms
                     return;
                 }
 
-                using var preview = new RecurringTransferImportPreviewDialog(rows, _transferImportOrchestrator);
-                if (preview.ShowDialog(this) != DialogResult.OK)
-                    return;
-
+                var result = _transferImportOrchestrator.ImportRules(rows, AppStatus.ForImport());
                 AfterImport();
-                var status = ImportStatusText.Imported(preview.Result, "transfer rule", "transfer rules");
-                billsControl.SetStatus(status);
-                lblLedgerStatus.Text = status;
+                AppStatus.Set(ImportStatusText.Imported(result, "transfer rule", "transfer rules"));
             }
             catch (Exception ex)
             {
+                AppStatus.Set("Import failed.");
                 MessageBox.Show(this, $"Could not parse the file.\n{ex.Message}", "Import Transfer Rules",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
@@ -511,10 +504,12 @@ namespace THMS.UI.WinForms
 
             try
             {
+                AppStatus.Set("Importing statements...", busy: true);
                 var import = new StatementImportOrchestrator();
                 var rows = import.LoadStatementsFromFile(fileDialog.FileName);
                 if (rows.Count == 0)
                 {
+                    AppStatus.Set("Ready.");
                     MessageBox.Show(this,
                         "The selected file did not contain any statements for accounts that already exist.",
                         "Import Statements",
@@ -522,17 +517,15 @@ namespace THMS.UI.WinForms
                     return;
                 }
 
-                using var preview = new StatementImportPreviewDialog(rows, import);
-                if (preview.ShowDialog(this) != DialogResult.OK)
-                    return;
-
+                var result = import.ImportStatements(rows, AppStatus.ForImport());
                 LoadStatementsForSelectedAccount();
                 billsControl.Reload();
                 accountUpdater.RefreshAccounts();
-                lblStatementStatus.Text = ImportStatusText.Imported(preview.Result, "statement", "statements");
+                AppStatus.Set(ImportStatusText.Imported(result, "statement", "statements"));
             }
             catch (Exception ex)
             {
+                AppStatus.Set("Import failed.");
                 MessageBox.Show(this, $"Could not parse the file.\n{ex.Message}", "Import Statements",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }

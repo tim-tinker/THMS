@@ -15,6 +15,7 @@ namespace THMS.UI.WinForms
         public VehicleListDashboardForm()
         {
             InitializeComponent();
+            DataGridViewUtil.EnableDoubleBuffering(vehicleGrid);
             historyBar.SelectedPeriodChanged += (_, _) =>
             {
                 if (ViewModel is null)

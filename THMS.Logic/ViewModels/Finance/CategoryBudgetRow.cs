@@ -7,9 +7,9 @@ namespace THMS.Logic.ViewModels.Finance
         public string Name { get; init; } = "";
         public string Active { get; init; } = "";
         public decimal? Remaining { get; init; }
-        public decimal? Ending { get; init; }
+        public DateTime? PeriodStart { get; init; }
+        public DateTime? PeriodEnd { get; init; }
         public decimal? Recommended { get; init; }
-        public string Frequency { get; init; } = "";
         public string Status { get; init; } = "";
         public bool HasBudget => BudgetRuleId is Guid id && id != Guid.Empty;
     }
@@ -23,7 +23,6 @@ namespace THMS.Logic.ViewModels.Finance
         public decimal BudgetAmount { get; init; }
         public decimal Actual { get; init; }
         public decimal Remaining { get; init; }
-        public decimal Ending { get; init; }
         public decimal Recommended { get; init; }
         public string Status { get; init; } = "";
         public bool IsClosed { get; init; }

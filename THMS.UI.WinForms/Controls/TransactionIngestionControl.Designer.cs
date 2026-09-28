@@ -8,15 +8,12 @@ namespace THMS.UI.WinForms.Controls
         private Label lblFileImport;
         private TextBox txtFilePaths;
         private ThmsButton btnBrowseFiles;
-        private ThmsButton btnLoadFiles;
         private ThmsButton btnImportFiles;
-        private DataGridView gridFilePreview;
-        private Label lblFileStatus;
+        private Label lblFileHelp;
         private Panel pnlPlaidImport;
         private Label lblPlaidImport;
         private Label lblPlaidHelp;
         private ThmsButton btnSyncPlaid;
-        private Label lblPlaidStatus;
         private Panel pnlLedger;
         private Label lblLedger;
         private TransactionUpdaterControl transactionUpdater;
@@ -35,19 +32,15 @@ namespace THMS.UI.WinForms.Controls
             lblFileImport = new Label();
             txtFilePaths = new TextBox();
             btnBrowseFiles = new ThmsButton();
-            btnLoadFiles = new ThmsButton();
             btnImportFiles = new ThmsButton();
-            gridFilePreview = new DataGridView();
-            lblFileStatus = new Label();
+            lblFileHelp = new Label();
             pnlPlaidImport = new Panel();
             lblPlaidImport = new Label();
             lblPlaidHelp = new Label();
             btnSyncPlaid = new ThmsButton();
-            lblPlaidStatus = new Label();
             pnlLedger = new Panel();
             lblLedger = new Label();
             transactionUpdater = new TransactionUpdaterControl();
-            ((System.ComponentModel.ISupportInitialize)gridFilePreview).BeginInit();
             layout.SuspendLayout();
             pnlFileImport.SuspendLayout();
             pnlPlaidImport.SuspendLayout();
@@ -64,16 +57,15 @@ namespace THMS.UI.WinForms.Controls
             layout.Dock = DockStyle.Fill;
             layout.Name = "layout";
             layout.RowCount = 3;
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 120F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 116F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             // 
             // pnlFileImport
             // 
-            pnlFileImport.Controls.Add(gridFilePreview);
+            pnlFileImport.Controls.Add(lblFileHelp);
             pnlFileImport.Controls.Add(CreateFileToolbar());
             pnlFileImport.Controls.Add(lblFileImport);
-            pnlFileImport.Controls.Add(lblFileStatus);
             pnlFileImport.Dock = DockStyle.Fill;
             pnlFileImport.Name = "pnlFileImport";
             pnlFileImport.Padding = new Padding(8);
@@ -88,32 +80,18 @@ namespace THMS.UI.WinForms.Controls
             lblFileImport.Text = "Import Transaction Data";
             lblFileImport.TextAlign = ContentAlignment.MiddleLeft;
             // 
-            // lblFileStatus
+            // lblFileHelp
             // 
-            lblFileStatus.Dock = DockStyle.Bottom;
-            lblFileStatus.Height = 24;
-            lblFileStatus.Name = "lblFileStatus";
-            lblFileStatus.Text = "Ready.";
-            lblFileStatus.TextAlign = ContentAlignment.MiddleLeft;
-            // 
-            // gridFilePreview
-            // 
-            gridFilePreview.AllowUserToAddRows = false;
-            gridFilePreview.AllowUserToDeleteRows = false;
-            gridFilePreview.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            gridFilePreview.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            gridFilePreview.Dock = DockStyle.Fill;
-            gridFilePreview.Name = "gridFilePreview";
-            gridFilePreview.ReadOnly = true;
-            gridFilePreview.RowHeadersVisible = false;
-            gridFilePreview.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            lblFileHelp.Dock = DockStyle.Fill;
+            lblFileHelp.Name = "lblFileHelp";
+            lblFileHelp.Padding = new Padding(0, 4, 0, 0);
+            lblFileHelp.Text = "Spreadsheet transactions import into Unreconciled.";
             // 
             // pnlPlaidImport
             // 
             pnlPlaidImport.Controls.Add(lblPlaidHelp);
             pnlPlaidImport.Controls.Add(CreatePlaidToolbar());
             pnlPlaidImport.Controls.Add(lblPlaidImport);
-            pnlPlaidImport.Controls.Add(lblPlaidStatus);
             pnlPlaidImport.Dock = DockStyle.Fill;
             pnlPlaidImport.Name = "pnlPlaidImport";
             pnlPlaidImport.Padding = new Padding(8);
@@ -134,14 +112,6 @@ namespace THMS.UI.WinForms.Controls
             lblPlaidHelp.Name = "lblPlaidHelp";
             lblPlaidHelp.Padding = new Padding(0, 4, 0, 0);
             lblPlaidHelp.Text = "Posted activity imports into Unreconciled. First history is imported from Link Accounts.";
-            // 
-            // lblPlaidStatus
-            // 
-            lblPlaidStatus.Dock = DockStyle.Bottom;
-            lblPlaidStatus.Height = 24;
-            lblPlaidStatus.Name = "lblPlaidStatus";
-            lblPlaidStatus.Text = "";
-            lblPlaidStatus.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // pnlLedger
             // 
@@ -172,7 +142,6 @@ namespace THMS.UI.WinForms.Controls
             Controls.Add(layout);
             Name = "TransactionIngestionControl";
             Size = new Size(1000, 720);
-            ((System.ComponentModel.ISupportInitialize)gridFilePreview).EndInit();
             layout.ResumeLayout(false);
             pnlFileImport.ResumeLayout(false);
             pnlPlaidImport.ResumeLayout(false);
@@ -186,11 +155,10 @@ namespace THMS.UI.WinForms.Controls
             {
                 Dock = DockStyle.Top,
                 Height = 40,
-                ColumnCount = 4,
+                ColumnCount = 3,
                 Name = "fileToolbar"
             };
             toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             txtFilePaths.Dock = DockStyle.Fill;
@@ -199,18 +167,13 @@ namespace THMS.UI.WinForms.Controls
             btnBrowseFiles.AutoSize = true;
             btnBrowseFiles.Name = "btnBrowseFiles";
             btnBrowseFiles.Click += OnBrowseFiles;
-            btnLoadFiles.Text = "Load Files";
-            btnLoadFiles.AutoSize = true;
-            btnLoadFiles.Name = "btnLoadFiles";
-            btnLoadFiles.Click += OnLoadFiles;
             btnImportFiles.Text = "Import Transactions";
             btnImportFiles.AutoSize = true;
             btnImportFiles.Name = "btnImportFiles";
             btnImportFiles.Click += OnImportFiles;
             toolbar.Controls.Add(txtFilePaths, 0, 0);
             toolbar.Controls.Add(btnBrowseFiles, 1, 0);
-            toolbar.Controls.Add(btnLoadFiles, 2, 0);
-            toolbar.Controls.Add(btnImportFiles, 3, 0);
+            toolbar.Controls.Add(btnImportFiles, 2, 0);
             return toolbar;
         }
 

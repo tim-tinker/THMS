@@ -1,6 +1,9 @@
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Transactions;
+using THMS.Ingestion.Importers.Finance;
+using THMS.Logic.Finance.Budget;
 using THMS.Logic.Orchestrators;
+using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Tests.Logic
 {
@@ -40,6 +43,30 @@ namespace THMS.Tests.Logic
             {
                 File.Delete(path);
             }
+        }
+
+        [Test]
+        public void ParseRows_NameParentAllowsNestedLevelsAndBudgetColumns()
+        {
+            var rows = SpreadsheetCategoryImporter.ParseRows(
+            [
+                ["Category", "Parent", "Frequency", "Amount", "Period Start"],
+                ["Food", null, "Monthly", "400", null],
+                ["Groceries", "Food", null, null, null],
+                ["Produce", "Groceries", null, null, null],
+                ["Paycheck", "Income", "Biweekly", "150", "9/25/2026"]
+            ]);
+
+            Assert.That(rows.Single(r => r.Name == "Food").ParentName, Is.Null);
+            Assert.That(rows.Single(r => r.Name == "Groceries").ParentName, Is.EqualTo("Food"));
+            Assert.That(rows.Single(r => r.Name == "Produce").ParentName, Is.EqualTo("Groceries"));
+            Assert.That(rows.Single(r => r.Name == "Food").Frequency, Is.EqualTo(BudgetFrequency.Monthly));
+            Assert.That(rows.Single(r => r.Name == "Food").Amount, Is.EqualTo(400m));
+            var paycheck = rows.Single(r => r.Name == "Paycheck");
+            Assert.That(paycheck.ParentName, Is.EqualTo("Income"));
+            Assert.That(paycheck.Frequency, Is.EqualTo(BudgetFrequency.Biweekly));
+            Assert.That(paycheck.Amount, Is.EqualTo(150m));
+            Assert.That(paycheck.PeriodStart, Is.EqualTo(new DateTime(2026, 9, 25)));
         }
 
         [Test]
@@ -105,6 +132,48 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void ImportCategories_CreatesNestedParentsAndParentBudgetIncludesChildren()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new CategoryImportOrchestrator(store);
+            orchestrator.ImportCategories(
+            [
+                new() { Name = "Food", Frequency = "Monthly", Amount = 400 },
+                new() { Name = "Groceries", Parent = "Food" },
+                new() { Name = "Produce", Parent = "Groceries" },
+                new() { Name = "Paycheck", Parent = "Income", Frequency = "Biweekly", Amount = 150, PeriodStart = new DateTime(2026, 9, 25) },
+                new() { Name = "Produce", Parent = "Groceries", Frequency = "Weekly", Amount = 50 }
+            ]);
+
+            var catalog = store.GetAllCategories(includeInactive: true).ToList();
+            var food = catalog.Single(c => c.Name == "Food");
+            var groceries = catalog.Single(c => c.Name == "Groceries");
+            var produce = catalog.Single(c => c.Name == "Produce");
+            Assert.That(groceries.ParentCategoryId, Is.EqualTo(food.Id));
+            Assert.That(produce.ParentCategoryId, Is.EqualTo(groceries.Id));
+
+            var rules = store.GetAllExpenseBudgetRules().ToList();
+            Assert.That(rules, Has.Count.EqualTo(2));
+            var foodBudget = rules.Single(r => r.BudgetName == "Food");
+            Assert.That(foodBudget.BudgetFrequency, Is.EqualTo(BudgetFrequency.Monthly));
+            Assert.That(foodBudget.DefaultBudgetAmount, Is.EqualTo(400m));
+            Assert.That(foodBudget.IncludedCategoryIds, Is.EquivalentTo(new[] { food.Id, groceries.Id, produce.Id }));
+            Assert.That(rules.Any(r => r.BudgetName == "Produce"), Is.False);
+
+            var paycheck = rules.Single(r => r.BudgetName == "Paycheck");
+            Assert.That(paycheck.BudgetFrequency, Is.EqualTo(BudgetFrequency.Biweekly));
+            Assert.That(paycheck.PeriodStart, Is.EqualTo(new DateTime(2026, 9, 25)));
+            var expected = BudgetPeriodCalculator.PeriodContaining(
+                DateTime.Today,
+                BudgetFrequency.Biweekly,
+                paycheck.PeriodStart);
+            var period = store.GetActiveBudgetHistory(paycheck.Id);
+            Assert.That(period, Is.Not.Null);
+            Assert.That(period!.PeriodStart, Is.EqualTo(expected.Start));
+            Assert.That(period.PeriodEnd, Is.EqualTo(expected.End));
+        }
+
+        [Test]
         public void ImportCategories_ReactivatesInactiveCategory()
         {
             var store = new InMemoryTransactionDataStore();
@@ -133,8 +202,17 @@ namespace THMS.Tests.Logic
             if (path is null)
                 Assert.Ignore("Category List.xlsx was not found.");
 
-            var rows = new CategoryImportOrchestrator(new InMemoryTransactionDataStore())
-                .LoadCategoriesFromFile(path);
+            List<CategoryImportPreview> rows;
+            try
+            {
+                rows = new CategoryImportOrchestrator(new InMemoryTransactionDataStore())
+                    .LoadCategoriesFromFile(path);
+            }
+            catch (IOException)
+            {
+                Assert.Ignore("Category List.xlsx is in use.");
+                return;
+            }
 
             Assert.That(rows, Has.Count.GreaterThan(50));
             Assert.That(rows.Any(r => r.Name == "Income" && r.Parent == ""), Is.True);

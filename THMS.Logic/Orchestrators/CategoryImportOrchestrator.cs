@@ -1,6 +1,7 @@
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Transactions;
 using THMS.Ingestion.Importers.Finance;
+using THMS.Logic.Finance.Aggregation;
 using THMS.Logic.Finance.Categories;
 using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Finance;
@@ -10,6 +11,7 @@ namespace THMS.Logic.Orchestrators
     public class CategoryImportOrchestrator
     {
         private readonly ICategoryDataStore _categories;
+        private readonly ITransactionDataStore? _transactions;
         private readonly SpreadsheetCategoryImporter _importer;
 
         public CategoryImportOrchestrator()
@@ -25,6 +27,7 @@ namespace THMS.Logic.Orchestrators
         public CategoryImportOrchestrator(ICategoryDataStore categories, SpreadsheetCategoryImporter importer)
         {
             _categories = categories;
+            _transactions = categories as ITransactionDataStore;
             _importer = importer;
         }
 
@@ -39,7 +42,10 @@ namespace THMS.Logic.Orchestrators
                 .Select(row => new CategoryImportPreview
                 {
                     Name = row.Name,
-                    Parent = row.ParentName ?? ""
+                    Parent = row.ParentName ?? "",
+                    Frequency = row.Frequency?.ToString() ?? "",
+                    Amount = row.Amount,
+                    PeriodStart = row.PeriodStart
                 })
                 .ToList();
         }
@@ -88,7 +94,93 @@ namespace THMS.Logic.Orchestrators
                 ImportProgressReporter.Report(progress, i + 1, total, stride: 1);
             }
 
+            ImportBudgets(rows, catalog);
             return ImportResult.CountOnly(rows.Count(r => !string.IsNullOrWhiteSpace(r.Name)));
+        }
+
+        private void ImportBudgets(IReadOnlyList<CategoryImportPreview> rows, List<ExpenseCategory> catalog)
+        {
+            if (_transactions is null)
+                return;
+
+            var budgets = new BudgetOrchestrator(_transactions);
+            catalog = _categories.GetAllCategories(includeInactive: true).ToList();
+            var existing = budgets.GetRules();
+            var homes = CategoryBudgetComposer.AssignBudgets(catalog, existing);
+            var covered = ExpenseCategoryTree.ExpandWithDescendants(
+                existing.SelectMany(rule => rule.IncludedCategoryIds),
+                catalog);
+
+            var budgetRows = rows
+                .Where(HasBudget)
+                .Select(row => (Row: row, Category: Find(catalog, row.Name)))
+                .Where(item => item.Category is not null)
+                .OrderBy(item => ExpenseCategoryTree.Depth(catalog, item.Category!))
+                .ToList();
+
+            foreach (var (row, category) in budgetRows)
+            {
+                if (homes.ContainsKey(category!.Id))
+                {
+                    UpdateBudget(budgets, homes[category.Id], row, category, catalog);
+                    covered.UnionWith(ExpenseCategoryTree.ExpandWithDescendants([category.Id], catalog));
+                    continue;
+                }
+
+                if (covered.Contains(category.Id))
+                    continue;
+
+                var rule = BuildRule(row, category, catalog);
+                budgets.AddRule(rule);
+                homes[category.Id] = rule;
+                covered.UnionWith(rule.IncludedCategoryIds);
+            }
+        }
+
+        private static void UpdateBudget(
+            BudgetOrchestrator budgets,
+            ExpenseBudgetRule existing,
+            CategoryImportPreview row,
+            ExpenseCategory category,
+            List<ExpenseCategory> catalog)
+        {
+            existing.BudgetName = category.Name;
+            existing.IncludedCategoryIds = IncludedIds(category, catalog);
+            existing.BudgetFrequency = ParseFrequency(row.Frequency) ?? existing.BudgetFrequency;
+            existing.DefaultBudgetAmount = row.Amount ?? existing.DefaultBudgetAmount;
+            existing.PeriodStart = row.PeriodStart ?? existing.PeriodStart;
+            existing.IsActive = true;
+            budgets.UpdateRule(existing);
+        }
+
+        private static ExpenseBudgetRule BuildRule(
+            CategoryImportPreview row,
+            ExpenseCategory category,
+            List<ExpenseCategory> catalog) =>
+            new()
+            {
+                Id = Guid.NewGuid(),
+                BudgetName = category.Name,
+                IncludedCategoryIds = IncludedIds(category, catalog),
+                BudgetFrequency = ParseFrequency(row.Frequency) ?? BudgetFrequency.Monthly,
+                DefaultBudgetAmount = row.Amount ?? 0,
+                PeriodStart = row.PeriodStart,
+                IsActive = true
+            };
+
+        private static List<Guid> IncludedIds(ExpenseCategory category, List<ExpenseCategory> catalog) =>
+            ExpenseCategoryTree.ExpandWithDescendants([category.Id], catalog).ToList();
+
+        private static bool HasBudget(CategoryImportPreview row) =>
+            !string.IsNullOrWhiteSpace(row.Frequency) || row.Amount is not null;
+
+        private static BudgetFrequency? ParseFrequency(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+            return Enum.TryParse<BudgetFrequency>(value.Trim(), true, out var frequency)
+                ? frequency
+                : null;
         }
 
         private ExpenseCategory Upsert(

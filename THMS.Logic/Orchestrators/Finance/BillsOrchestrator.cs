@@ -2,6 +2,7 @@ using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
+using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Planning;
 using THMS.Logic.ViewModels.Finance;
 
@@ -141,29 +142,77 @@ namespace THMS.Logic.Orchestrators.Finance
                 .ToList();
         }
 
-        public decimal CashRemaining(IEnumerable<BillRow>? pending = null)
+        public decimal CashRemaining(IEnumerable<BillRow>? pending = null) =>
+            CashRemaining(accountId: null, pending);
+
+        public decimal CashRemaining(Guid? accountId, IEnumerable<BillRow>? pending = null)
         {
             DropSupersededStatementExpected();
             var banks = _accounts.GetAllAccounts().OfType<BankAccount>().ToList();
             var bankIds = banks.Select(b => b.Id).ToHashSet();
-            var current = banks.Sum(b => b.PostedBalance);
-            var held = UnmatchedTransfers()
-                .Where(p => p.Status == ExpectedStatus.Scheduled && bankIds.Contains(p.FromAccountId))
-                .Sum(p => Math.Abs(p.Amount))
-                + UnmatchedSingles()
-                .Where(p => p.Status == ExpectedStatus.Scheduled && bankIds.Contains(p.AccountId))
-                .Sum(p => Math.Abs(p.Amount));
-            var extra = 0m;
-            if (pending is not null)
-            {
-                extra = pending
-                    .Where(r => r.Pay
-                        && r.Status == BillStatuses.Due
-                        && bankIds.Contains(r.FundingAccountId))
-                    .Sum(r => Math.Abs(r.Amount));
-            }
+            var focusId = accountId is Guid id && bankIds.Contains(id) ? id : (Guid?)null;
+            var current = focusId is Guid focus
+                ? LiveBankCash(banks.First(b => b.Id == focus))
+                : banks.Sum(LiveBankCash);
+            var impact = pending is not null
+                ? pending.Where(r => r.Pay).Sum(r => CashImpact(r, focusId, bankIds))
+                : ScheduledCashImpact(focusId, bankIds);
+            return current + impact;
+        }
 
-            return current - held - extra;
+        private decimal LiveBankCash(BankAccount bank)
+        {
+            var statements = _statements.GetForAccount(bank.Id);
+            if (!PostedBalanceCalculator.TryResolveAnchor(bank, statements, out var anchor))
+                return bank.PostedBalance;
+
+            var activity = _transactions.SumPostedAmountsAfter(bank.Id, anchor.AsOf)
+                + _transactions.SumPostedTransferAmountsAfter(bank.Id, anchor.AsOf);
+            return PostedBalanceCalculator.ComputeFromAnchor(anchor, activity);
+        }
+
+        private static decimal CashImpact(BillRow row, Guid? focusBankId, HashSet<Guid> bankIds)
+        {
+            if (focusBankId is Guid)
+                return row.Amount;
+
+            var fromBank = bankIds.Contains(row.FundingAccountId);
+            var toBank = bankIds.Contains(row.DestinationAccountId);
+            if (fromBank && toBank && row.FundingAccountId != row.DestinationAccountId)
+                return 0m;
+            if (fromBank && toBank)
+                return row.Amount;
+            if (fromBank)
+                return -Math.Abs(row.Amount);
+            if (toBank)
+                return Math.Abs(row.Amount);
+            return 0m;
+        }
+
+        private decimal ScheduledCashImpact(Guid? focusBankId, HashSet<Guid> bankIds)
+        {
+            var singles = UnmatchedSingles()
+                .Where(p => p.Status == ExpectedStatus.Scheduled)
+                .Where(p => focusBankId is Guid focus ? p.AccountId == focus : bankIds.Contains(p.AccountId))
+                .Sum(p => p.Amount);
+            var transfers = UnmatchedTransfers()
+                .Where(p => p.Status == ExpectedStatus.Scheduled)
+                .Sum(p =>
+                {
+                    if (focusBankId is Guid focus)
+                        return SplitTransactionMath.TransferAmountForAccount(
+                            p.FromAccountId, p.ToAccountId, p.Amount, focus);
+                    var fromBank = bankIds.Contains(p.FromAccountId);
+                    var toBank = bankIds.Contains(p.ToAccountId);
+                    if (fromBank && toBank)
+                        return 0m;
+                    if (fromBank)
+                        return -Math.Abs(p.Amount);
+                    if (toBank)
+                        return Math.Abs(p.Amount);
+                    return 0m;
+                });
+            return singles + transfers;
         }
 
         public IReadOnlyList<Account> GetFundingAccounts() =>
