@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using THMS.Data.Stores.SqliteStores;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores.SQLite
 {
@@ -68,6 +69,18 @@ namespace THMS.Data.Stores.SQLite
             using var conn = OpenConnection();
             _accountStore.UpsertPlaidItemSyncState(conn, state);
             FinanceDataRevision.NoteChanged();
+        }
+
+        public TransactionFileColumnMap? GetTransactionFileColumnMap(Guid accountId)
+        {
+            using var conn = OpenConnection();
+            return _accountStore.GetTransactionFileColumnMap(conn, accountId);
+        }
+
+        public void UpsertTransactionFileColumnMap(TransactionFileColumnMap map)
+        {
+            using var conn = OpenConnection();
+            _accountStore.UpsertTransactionFileColumnMap(conn, map);
         }
     }
 }

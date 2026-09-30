@@ -115,6 +115,12 @@
     <Compile Update="Controls\ThmsTabControl.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Update="Controls\TransactionColumnMapDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Controls\TransactionFileImportPreviewDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Controls\TransactionIngestionControl.cs">
       <SubType>UserControl</SubType>
     </Compile>

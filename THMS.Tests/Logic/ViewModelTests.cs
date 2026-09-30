@@ -518,6 +518,12 @@ namespace THMS.Tests.Logic
             Assert.That(vm.Snapshot.BankBalance, Is.EqualTo(1200m));
             Assert.That(vm.Snapshot.CreditOwed, Is.EqualTo(400m));
             Assert.That(vm.Snapshot.NetLiquid, Is.EqualTo(800m));
+            Assert.That(vm.Snapshot.BankAccounts.Single().Name, Is.EqualTo("Checking"));
+            Assert.That(vm.Snapshot.BankAccounts.Single().Balance, Is.EqualTo(1200m));
+            Assert.That(vm.Snapshot.CreditAccounts.Single().Name, Is.EqualTo("Visa"));
+            Assert.That(vm.Snapshot.CreditAccounts.Single().Balance, Is.EqualTo(400m));
+            Assert.That(vm.Snapshot.LoanAccounts, Is.Empty);
+            Assert.That(vm.Snapshot.InvestmentAccounts, Is.Empty);
             Assert.That(vm.Snapshot.UncategorizedCount, Is.EqualTo(1));
             Assert.That(vm.Snapshot.Alerts.Any(a => a.Contains("High utilization")), Is.True);
             Assert.That(vm.Snapshot.UpcomingPayments.Any(p => p.Description == "Rent"), Is.True);
@@ -593,6 +599,9 @@ namespace THMS.Tests.Logic
                 [],
                 DefaultExpenseCategories.All.ToList());
 
+            Assert.That(snapshot.BankAccounts.Single().Name, Is.EqualTo("Checking"));
+            Assert.That(snapshot.BankAccounts.Single().Balance, Is.EqualTo(50m));
+            Assert.That(snapshot.BankBalance, Is.EqualTo(snapshot.BankAccounts.Sum(a => a.Balance)));
             Assert.That(snapshot.Budgets.Single().Status, Is.EqualTo("Overspent, Ends soon"));
             Assert.That(snapshot.CategorySlices.Single(s => s.Name == DefaultExpenseCategories.Groceries).Amount, Is.EqualTo(40m));
             Assert.That(snapshot.MonthlyTrend.Single(p => p.Month == new DateTime(2026, 9, 1)).Spending, Is.EqualTo(40m));

@@ -65,6 +65,13 @@ namespace THMS.UI.WinForms
             LoadSelectedAccount();
         }
 
+        public void ShowAccount(Guid accountId)
+        {
+            tabsTop.SelectedTab = tabAccounts;
+            tabs.SelectedTab = tabLedger;
+            accountUpdater.SelectAccount(accountId);
+        }
+
         private void LayoutAccountSplit()
         {
             if (_accountSplitReady)

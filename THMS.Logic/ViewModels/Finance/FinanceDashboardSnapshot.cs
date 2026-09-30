@@ -9,6 +9,11 @@ namespace THMS.Logic.ViewModels.Finance
         public decimal NetLiquid { get; init; }
         public decimal NetPosition { get; init; }
 
+        public List<FinanceDashboardAccountLine> BankAccounts { get; init; } = [];
+        public List<FinanceDashboardAccountLine> CreditAccounts { get; init; } = [];
+        public List<FinanceDashboardAccountLine> LoanAccounts { get; init; } = [];
+        public List<FinanceDashboardAccountLine> InvestmentAccounts { get; init; } = [];
+
         public List<FinanceDashboardBudgetRow> Budgets { get; init; } = [];
         public List<FinanceDashboardPaymentRow> UpcomingPayments { get; init; } = [];
         public List<string> Alerts { get; init; } = [];
@@ -17,6 +22,13 @@ namespace THMS.Logic.ViewModels.Finance
         public List<UnifiedTransactionView> RecentPosted { get; init; } = [];
         public List<UnifiedTransactionView> UpcomingForecast { get; init; } = [];
         public int UncategorizedCount { get; init; }
+    }
+
+    public class FinanceDashboardAccountLine
+    {
+        public Guid AccountId { get; init; }
+        public string Name { get; init; } = "";
+        public decimal Balance { get; init; }
     }
 
     public class FinanceDashboardBudgetRow

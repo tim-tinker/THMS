@@ -55,6 +55,10 @@ namespace THMS.Logic.Finance.Aggregation
                 InvestmentCash = totals.Investment,
                 NetLiquid = totals.Bank + totals.Investment - totals.Credit,
                 NetPosition = totals.Bank + totals.Investment - totals.Credit - totals.Loans,
+                BankAccounts = totals.Banks,
+                CreditAccounts = totals.Credits,
+                LoanAccounts = totals.LoansAccounts,
+                InvestmentAccounts = totals.Investments,
                 Budgets = budgets,
                 UpcomingPayments = payments,
                 Alerts = alerts,
@@ -66,33 +70,66 @@ namespace THMS.Logic.Finance.Aggregation
             };
         }
 
-        private static (decimal Bank, decimal Credit, decimal Loans, decimal Investment) SumAccounts(
-            IReadOnlyList<Account> accounts)
+        private static AccountTotals SumAccounts(IReadOnlyList<Account> accounts)
         {
-            decimal bank = 0, credit = 0, loans = 0, investment = 0;
+            var totals = new AccountTotals();
             foreach (var account in accounts)
             {
                 switch (account)
                 {
                     case BankAccount bankAccount:
-                        bank += bankAccount.PostedBalance;
+                        totals.Bank += bankAccount.PostedBalance;
+                        totals.Banks.Add(Line(bankAccount, bankAccount.PostedBalance));
                         break;
                     case CreditAccount creditAccount:
-                        credit += CreditOwed(creditAccount);
+                        var owed = CreditOwed(creditAccount);
+                        totals.Credit += owed;
+                        totals.Credits.Add(Line(creditAccount, owed));
                         break;
                     case LoanAccount loan:
-                        loans += loan.Principal;
+                        totals.Loans += loan.Principal;
+                        totals.LoansAccounts.Add(Line(loan, loan.Principal));
                         break;
                     case MortgageAccount mortgage:
-                        loans += mortgage.Principal;
+                        totals.Loans += mortgage.Principal;
+                        totals.LoansAccounts.Add(Line(mortgage, mortgage.Principal));
                         break;
                     case InvestmentAccount invested:
-                        investment += invested.CashBalance;
+                        totals.Investment += invested.CashBalance;
+                        totals.Investments.Add(Line(invested, invested.CashBalance));
                         break;
                 }
             }
 
-            return (bank, credit, loans, investment);
+            Sort(totals.Banks);
+            Sort(totals.Credits);
+            Sort(totals.LoansAccounts);
+            Sort(totals.Investments);
+            return totals;
+        }
+
+        private static FinanceDashboardAccountLine Line(Account account, decimal balance) =>
+            new()
+            {
+                AccountId = account.Id,
+                Name = account.Name ?? "",
+                Balance = balance
+            };
+
+        private static void Sort(List<FinanceDashboardAccountLine> lines) =>
+            lines.Sort((left, right) =>
+                string.Compare(left.Name, right.Name, StringComparison.CurrentCultureIgnoreCase));
+
+        private sealed class AccountTotals
+        {
+            public decimal Bank { get; set; }
+            public decimal Credit { get; set; }
+            public decimal Loans { get; set; }
+            public decimal Investment { get; set; }
+            public List<FinanceDashboardAccountLine> Banks { get; } = [];
+            public List<FinanceDashboardAccountLine> Credits { get; } = [];
+            public List<FinanceDashboardAccountLine> LoansAccounts { get; } = [];
+            public List<FinanceDashboardAccountLine> Investments { get; } = [];
         }
 
         public static decimal CreditOwed(CreditAccount credit) =>

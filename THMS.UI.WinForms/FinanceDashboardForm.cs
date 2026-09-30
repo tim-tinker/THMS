@@ -1,5 +1,4 @@
 using System.Windows.Forms.DataVisualization.Charting;
-using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.ViewModels.Finance;
 using THMS.UI.WinForms.Charts;
@@ -12,7 +11,6 @@ namespace THMS.UI.WinForms
         private FinanceDashboardViewModel _vm = null!;
         private bool _initialized;
         private readonly BudgetOrchestrator _budgets = new();
-        private readonly CategoryOrchestrator _categories = new();
 
         private readonly Label _valueBank = NewValueLabel();
         private readonly Label _valueCredit = NewValueLabel();
@@ -20,6 +18,10 @@ namespace THMS.UI.WinForms
         private readonly Label _valueInvest = NewValueLabel();
         private readonly Label _valueLiquid = NewValueLabel();
         private readonly Label _valueNet = NewValueLabel();
+        private readonly AccountBreakdown _bankAccounts = new();
+        private readonly AccountBreakdown _creditAccounts = new();
+        private readonly AccountBreakdown _loanAccounts = new();
+        private readonly AccountBreakdown _investmentAccounts = new();
 
         private DataGridView _budgetGrid = null!;
         private DataGridView _paymentGrid = null!;
@@ -32,6 +34,10 @@ namespace THMS.UI.WinForms
         private BindingSource _paymentsSource = new();
         private BindingSource _recentSource = new();
         private BindingSource _forecastSource = new();
+        private ToolStripDropDown? _openDrop;
+        private Control? _openAnchor;
+        private Control? _closedByClickAnchor;
+        private int _closedByClickTick;
 
         public FinanceDashboardForm()
         {
@@ -66,6 +72,10 @@ namespace THMS.UI.WinForms
             _valueInvest.Text = snapshot.InvestmentCash.ToString("c2");
             _valueLiquid.Text = snapshot.NetLiquid.ToString("c2");
             _valueNet.Text = snapshot.NetPosition.ToString("c2");
+            _bankAccounts.Accounts = snapshot.BankAccounts;
+            _creditAccounts.Accounts = snapshot.CreditAccounts;
+            _loanAccounts.Accounts = snapshot.LoanAccounts;
+            _investmentAccounts.Accounts = snapshot.InvestmentAccounts;
 
             _budgetsSource.DataSource = snapshot.Budgets.ToList();
             _paymentsSource.DataSource = snapshot.UpcomingPayments.ToList();
@@ -109,10 +119,10 @@ namespace THMS.UI.WinForms
             for (var i = 0; i < 6; i++)
                 table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16.66F));
 
-            table.Controls.Add(CreateCard("Bank", _valueBank), 0, 0);
-            table.Controls.Add(CreateCard("Credit owed", _valueCredit), 1, 0);
-            table.Controls.Add(CreateCard("Loans / mortgages", _valueLoans), 2, 0);
-            table.Controls.Add(CreateCard("Investment cash", _valueInvest), 3, 0);
+            table.Controls.Add(CreateCard("Bank", _valueBank, _bankAccounts), 0, 0);
+            table.Controls.Add(CreateCard("Credit owed", _valueCredit, _creditAccounts), 1, 0);
+            table.Controls.Add(CreateCard("Loans / mortgages", _valueLoans, _loanAccounts), 2, 0);
+            table.Controls.Add(CreateCard("Investment cash", _valueInvest, _investmentAccounts), 3, 0);
             table.Controls.Add(CreateCard("Net liquid", _valueLiquid), 4, 0);
             table.Controls.Add(CreateCard("Net position", _valueNet), 5, 0);
             return table;
@@ -139,37 +149,6 @@ namespace THMS.UI.WinForms
         private Control BuildBudgetPanel()
         {
             var panel = new Panel { Dock = DockStyle.Fill };
-            var toolbar = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                WrapContents = true,
-                Padding = new Padding(0, 0, 0, 4)
-            };
-            var btnAdd = new ThmsButton { Text = "Add Budget" };
-            var btnEdit = new ThmsButton { Text = "Edit Budget" };
-            var btnPeriod = new ThmsButton { Text = "Open Current Period" };
-            var btnTransfer = new ThmsButton { Text = "Transfer Balance" };
-            var btnHistory = new ThmsButton { Text = "View History" };
-            var btnDelete = new ThmsButton { Text = "Delete Budget", Destructive = true };
-            var btnCategories = new ThmsButton { Text = "Manage Categories" };
-            var btnLedger = new ThmsButton { Text = "Open Ledger" };
-            btnAdd.Click += (_, _) => OpenBudgetEditor(existing: false);
-            btnEdit.Click += (_, _) => OpenBudgetEditor(existing: true);
-            btnPeriod.Click += (_, _) => OpenSelectedPeriod();
-            btnTransfer.Click += (_, _) => OpenSelectedTransfer();
-            btnHistory.Click += (_, _) => OpenSelectedHistory();
-            btnDelete.Click += (_, _) => DeleteSelectedBudget();
-            btnCategories.Click += (_, _) => OpenCategories();
-            btnLedger.Click += (_, _) => OpenLedger();
-            toolbar.Controls.Add(btnAdd);
-            toolbar.Controls.Add(btnEdit);
-            toolbar.Controls.Add(btnPeriod);
-            toolbar.Controls.Add(btnTransfer);
-            toolbar.Controls.Add(btnHistory);
-            toolbar.Controls.Add(btnDelete);
-            toolbar.Controls.Add(btnCategories);
-            toolbar.Controls.Add(btnLedger);
 
             _budgetGrid = CreateGrid();
             _budgetGrid.DataSource = _budgetsSource;
@@ -184,7 +163,6 @@ namespace THMS.UI.WinForms
             _budgetGrid.CellDoubleClick += (_, _) => OpenSelectedPeriod();
 
             panel.Controls.Add(_budgetGrid);
-            panel.Controls.Add(toolbar);
             return panel;
         }
 
@@ -263,36 +241,6 @@ namespace THMS.UI.WinForms
         private FinanceDashboardBudgetRow? SelectedBudget() =>
             _budgetGrid.CurrentRow?.DataBoundItem as FinanceDashboardBudgetRow;
 
-        private void OpenBudgetEditor(bool existing)
-        {
-            ExpenseBudgetRule? rule = null;
-            if (existing)
-            {
-                if (SelectedBudget() is not FinanceDashboardBudgetRow row)
-                    return;
-                rule = _budgets.GetRule(row.RuleId);
-                if (rule is null)
-                    return;
-            }
-
-            using var editor = new BudgetRuleEditor(_budgets, rule);
-            if (editor.ShowDialog(FindForm()) == DialogResult.OK)
-                RefreshDashboard();
-        }
-
-        private void DeleteSelectedBudget()
-        {
-            if (SelectedBudget() is not FinanceDashboardBudgetRow row)
-                return;
-
-            if (MessageBox.Show(FindForm(), $"Delete budget '{row.BudgetName}' and its history?", "Delete Budget",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-                return;
-
-            _budgets.DeleteRule(row.RuleId);
-            RefreshDashboard();
-        }
-
         private void OpenSelectedPeriod()
         {
             if (SelectedBudget() is not FinanceDashboardBudgetRow row)
@@ -300,37 +248,6 @@ namespace THMS.UI.WinForms
             using var editor = new BudgetPeriodEditor(_budgets, row.RuleId);
             if (editor.ShowDialog(FindForm()) == DialogResult.OK)
                 RefreshDashboard();
-        }
-
-        private void OpenSelectedTransfer()
-        {
-            if (SelectedBudget() is not FinanceDashboardBudgetRow row)
-                return;
-            using var dialog = new BudgetBalanceTransferDialog(_budgets, row.RuleId);
-            if (dialog.ShowDialog(FindForm()) == DialogResult.OK)
-                RefreshDashboard();
-        }
-
-        private void OpenSelectedHistory()
-        {
-            if (SelectedBudget() is not FinanceDashboardBudgetRow row)
-                return;
-            using var viewer = new BudgetHistoryViewer(_budgets, row.RuleId);
-            viewer.ShowDialog(FindForm());
-        }
-
-        private void OpenCategories()
-        {
-            using var manager = new CategoryManager(_categories);
-            manager.ShowDialog(FindForm());
-            RefreshDashboard();
-        }
-
-        private void OpenLedger()
-        {
-            using var ledger = new TransactionLedgerForm();
-            ledger.ShowDialog(FindForm());
-            RefreshDashboard();
         }
 
         private void OnBudgetCellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
@@ -364,7 +281,7 @@ namespace THMS.UI.WinForms
             };
         }
 
-        private static Control CreateCard(string caption, Label value)
+        private Control CreateCard(string caption, Label value, AccountBreakdown? breakdown = null)
         {
             var cell = new TableLayoutPanel
             {
@@ -375,16 +292,179 @@ namespace THMS.UI.WinForms
             };
             cell.RowStyles.Add(new RowStyle(SizeType.Percent, 40));
             cell.RowStyles.Add(new RowStyle(SizeType.Percent, 60));
-            cell.Controls.Add(new Label
+            var captionLabel = new Label
             {
-                Text = caption,
+                Text = breakdown is null ? caption : caption + "  ▾",
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.BottomLeft
-            }, 0, 0);
+            };
+            cell.Controls.Add(captionLabel, 0, 0);
             value.Dock = DockStyle.Fill;
             value.TextAlign = ContentAlignment.TopLeft;
             cell.Controls.Add(value, 0, 1);
+            if (breakdown is not null)
+            {
+                captionLabel.Cursor = Cursors.Hand;
+                value.Cursor = Cursors.Hand;
+                cell.Cursor = Cursors.Hand;
+                captionLabel.Click += (_, _) => ShowAccountDropDown(cell, breakdown);
+                value.Click += (_, _) => ShowAccountDropDown(cell, breakdown);
+                cell.Click += (_, _) => ShowAccountDropDown(cell, breakdown);
+            }
+
             return cell;
+        }
+
+        private void ShowAccountDropDown(Control anchor, AccountBreakdown breakdown)
+        {
+            // The opening click is also seen as a click outside the menu, so the menu
+            // closes before this handler runs. Skip the reopen when that click was on
+            // the same total.
+            if (ReferenceEquals(_closedByClickAnchor, anchor)
+                && (uint)(Environment.TickCount - _closedByClickTick) < 500)
+            {
+                _closedByClickAnchor = null;
+                return;
+            }
+
+            if (_openDrop is { Visible: true, IsDisposed: false } open && ReferenceEquals(_openAnchor, anchor))
+            {
+                open.Close(ToolStripDropDownCloseReason.CloseCalled);
+                return;
+            }
+
+            var accounts = breakdown.Accounts;
+            var list = new ListView
+            {
+                View = View.Details,
+                FullRowSelect = true,
+                HeaderStyle = ColumnHeaderStyle.None,
+                BorderStyle = BorderStyle.None,
+                MultiSelect = false,
+                HideSelection = false,
+                Font = Font
+            };
+            list.Columns.Add("Account", 160);
+            list.Columns.Add("Balance", 100, HorizontalAlignment.Right);
+
+            if (accounts.Count == 0)
+            {
+                list.Items.Add("No accounts");
+            }
+            else
+            {
+                foreach (var account in accounts)
+                {
+                    var item = list.Items.Add(account.Name);
+                    item.SubItems.Add(account.Balance.ToString("c2"));
+                    item.Tag = account.AccountId;
+                }
+            }
+
+            var nameWidth = 140;
+            var balanceWidth = 90;
+            foreach (ListViewItem item in list.Items)
+            {
+                nameWidth = Math.Max(nameWidth, TextRenderer.MeasureText(item.Text, list.Font).Width + 16);
+                if (item.SubItems.Count > 1)
+                    balanceWidth = Math.Max(balanceWidth, TextRenderer.MeasureText(item.SubItems[1].Text, list.Font).Width + 16);
+            }
+
+            nameWidth = Math.Min(nameWidth, 360);
+            var rowHeight = list.Font.Height + 10;
+            var height = Math.Clamp((Math.Max(1, list.Items.Count) * rowHeight) + 6, rowHeight + 8, 320);
+            var scroll = list.Items.Count * rowHeight + 6 > 320;
+            var width = Math.Max(anchor.Width, nameWidth + balanceWidth + (scroll ? SystemInformation.VerticalScrollBarWidth : 0) + 4);
+            list.Columns[0].Width = width - balanceWidth - (scroll ? SystemInformation.VerticalScrollBarWidth : 0) - 4;
+            list.Columns[1].Width = balanceWidth;
+            list.Size = new Size(width, height);
+
+            var panel = new Panel { Size = list.Size };
+            list.Dock = DockStyle.Fill;
+            panel.Controls.Add(list);
+
+            var drop = new ToolStripDropDown
+            {
+                Padding = Padding.Empty,
+                AutoClose = true
+            };
+            var host = new ToolStripControlHost(panel)
+            {
+                AutoSize = false,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+                Size = panel.Size
+            };
+            drop.Items.Add(host);
+            list.MouseClick += (_, e) =>
+            {
+                if (list.HitTest(e.Location).Item?.Tag is not Guid accountId)
+                    return;
+
+                drop.Close(ToolStripDropDownCloseReason.ItemClicked);
+                OpenAccount(accountId);
+            };
+
+            // Closed runs inside SetVisibleCore. Disposing there leaves the menu
+            // filter holding a dead dropdown, and the next click throws.
+            var owner = FindForm() as Control ?? anchor;
+            drop.Closed += (_, e) =>
+            {
+                if (ReferenceEquals(_openDrop, drop))
+                {
+                    _openDrop = null;
+                    _openAnchor = null;
+                }
+
+                if (e.CloseReason == ToolStripDropDownCloseReason.AppClicked
+                    && !anchor.IsDisposed
+                    && anchor.ClientRectangle.Contains(anchor.PointToClient(System.Windows.Forms.Cursor.Position)))
+                {
+                    _closedByClickAnchor = anchor;
+                    _closedByClickTick = Environment.TickCount;
+                }
+
+                DeferDispose(owner, drop);
+            };
+            if (owner.IsHandleCreated && !owner.IsDisposed)
+            {
+                owner.BeginInvoke(() =>
+                {
+                    if (drop.IsDisposed || anchor.IsDisposed)
+                        return;
+
+                    _openDrop = drop;
+                    _openAnchor = anchor;
+                    drop.Show(anchor, new Point(0, anchor.Height));
+                });
+            }
+        }
+
+        private static void DeferDispose(Control owner, ToolStripDropDown drop)
+        {
+            if (owner.IsDisposed || !owner.IsHandleCreated)
+            {
+                if (!drop.IsDisposed)
+                    drop.Dispose();
+                return;
+            }
+
+            owner.BeginInvoke(() =>
+            {
+                if (!drop.IsDisposed)
+                    drop.Dispose();
+            });
+        }
+
+        private void OpenAccount(Guid accountId)
+        {
+            if (FindForm() is THMS.UI.MainForm main)
+                main.ShowRegisterAccount(accountId);
+        }
+
+        private sealed class AccountBreakdown
+        {
+            public IReadOnlyList<FinanceDashboardAccountLine> Accounts { get; set; } = [];
         }
 
         private static Label NewValueLabel() => new()

@@ -28,6 +28,8 @@ namespace THMS.UI.WinForms.Controls
         private readonly ReconciliationOrchestrator _reconciliationOrchestrator = new();
         private readonly BindingSource _importedSource = new();
         private DataGridView importedGrid = null!;
+        private SplitContainer? _ledgerSplit;
+        private bool _importedSplitPending;
         private Label? lblImported;
         private readonly CategoryOrchestrator _categoryOrchestrator = new();
         private readonly IAccountStatementDataStore _statements = new DataStoreFactory().GetAccountStatementStore();
@@ -196,16 +198,8 @@ namespace THMS.UI.WinForms.Controls
             detailGrid.MultiSelect = true;
             CategoryColumn.ReadOnly = true;
             CategoryColumn.SortMode = DataGridViewColumnSortMode.NotSortable;
-            if (detailGrid.Columns["Status"] is null)
-            {
-                detailGrid.Columns.Insert(4, new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = nameof(UnifiedTransactionView.Status),
-                    HeaderText = "Status",
-                    Name = "Status",
-                    AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
-                });
-            }
+            ForecastColumn.Visible = false;
+            TypeColumn.Visible = false;
 
             detailGrid.DataSource = _transactionsSource;
             masterGrid.DataSource = _accountsSource;
@@ -231,6 +225,10 @@ namespace THMS.UI.WinForms.Controls
             detailGrid.CellFormatting += OnLedgerCellFormatting;
             detailGrid.SelectionChanged += (_, _) => UpdateRuleActionButtons();
             detailGrid.MouseDown += OnLedgerMouseDown;
+            detailGrid.AllowDrop = true;
+            detailGrid.DragEnter += OnLedgerDrag;
+            detailGrid.DragOver += OnLedgerDrag;
+            detailGrid.DragDrop += OnLedgerDragDrop;
         }
 
         private void HostLedgerDetail()
@@ -254,6 +252,8 @@ namespace THMS.UI.WinForms.Controls
             forecastPanel.Controls.Clear();
             foreach (var child in forecastControls)
             {
+                if (child == btnAddRule || child == btnDeleteRule)
+                    continue;
                 child.Margin = new Padding(4, 4, 8, 4);
                 forecastBar.Controls.Add(child);
             }
@@ -288,19 +288,19 @@ namespace THMS.UI.WinForms.Controls
             {
                 AutoSize = false,
                 Anchor = AnchorStyles.Left,
-                Size = new Size(360, cmbShow.Height),
+                Size = new Size(180, cmbShow.Height),
                 Margin = new Padding(4, 4, 8, 4),
                 PlaceholderText = "Search"
             };
             txtDescriptionSearch.TextChanged += OnDescriptionSearchChanged;
             forecastBar.Controls.Add(lblDescription);
             forecastBar.Controls.Add(txtDescriptionSearch);
+            forecastBar.WrapContents = false;
 
-            splitContainer.Panel2.Controls.Add(BuildTransactionSplit());
-            splitContainer.Panel2.Controls.Add(forecastBar);
+            splitContainer.Panel2.Controls.Add(BuildTransactionSplit(forecastBar));
         }
 
-        private Control BuildTransactionSplit()
+        private Control BuildTransactionSplit(Control ledgerHeader)
         {
             importedGrid = new DataGridView
             {
@@ -341,28 +341,81 @@ namespace THMS.UI.WinForms.Controls
             lblImported = new Label
             {
                 AutoSize = false,
-                Dock = DockStyle.Top,
+                Dock = DockStyle.Fill,
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                Padding = new Padding(8, 10, 8, 8),
+                Padding = new Padding(8, 0, 8, 0),
                 Text = "Imported (unreconciled)",
                 TextAlign = ContentAlignment.MiddleLeft
             };
-            lblImported.Height = lblImported.PreferredHeight;
+            var importedHeader = new Panel { Dock = DockStyle.Top };
+            importedHeader.Controls.Add(lblImported);
+            var headerHeight = ledgerHeader.GetPreferredSize(Size.Empty).Height;
+            if (headerHeight > 0)
+                importedHeader.Height = headerHeight;
+            ledgerHeader.SizeChanged += (_, _) =>
+            {
+                if (ledgerHeader.Height > 0 && importedHeader.Height != ledgerHeader.Height)
+                    importedHeader.Height = ledgerHeader.Height;
+            };
+
+            var ledgerPanel = new Panel { Dock = DockStyle.Fill };
+            ledgerPanel.Controls.Add(detailGrid);
+            ledgerPanel.Controls.Add(ledgerHeader);
 
             var importedPanel = new Panel { Dock = DockStyle.Fill };
             importedPanel.Controls.Add(importedGrid);
-            importedPanel.Controls.Add(lblImported);
+            importedPanel.Controls.Add(importedHeader);
 
             var split = new SplitContainer
             {
                 Dock = DockStyle.Fill,
-                Orientation = Orientation.Horizontal,
-                SplitterDistance = 280
+                Orientation = Orientation.Vertical,
+                Panel2Collapsed = true
             };
             SplitContainerUtil.MakeSplitterVisible(split);
-            split.Panel1.Controls.Add(detailGrid);
+            split.Panel1.Controls.Add(ledgerPanel);
             split.Panel2.Controls.Add(importedPanel);
+            split.SizeChanged += (_, _) => TryApplyImportedSplitDistance();
+            _ledgerSplit = split;
+            _importedSource.ListChanged += (_, _) => UpdateImportedSplit();
             return split;
+        }
+
+        private void UpdateImportedSplit()
+        {
+            if (_ledgerSplit is null || _ledgerSplit.IsDisposed)
+                return;
+
+            var show = _importedSource.Count > 0;
+            if (_ledgerSplit.Panel2Collapsed == !show)
+                return;
+
+            if (!show)
+            {
+                _importedSplitPending = false;
+                _ledgerSplit.Panel2Collapsed = true;
+                return;
+            }
+
+            _importedSplitPending = true;
+            _ledgerSplit.Panel2Collapsed = false;
+            TryApplyImportedSplitDistance();
+        }
+
+        private void TryApplyImportedSplitDistance()
+        {
+            if (!_importedSplitPending || _ledgerSplit is null || _ledgerSplit.Panel2Collapsed || !_ledgerSplit.IsHandleCreated)
+                return;
+
+            const int min = 180;
+            var available = _ledgerSplit.Width - _ledgerSplit.SplitterWidth;
+            if (available < min * 2)
+                return;
+
+            _ledgerSplit.Panel1MinSize = min;
+            _ledgerSplit.Panel2MinSize = min;
+            _ledgerSplit.SplitterDistance = available / 2;
+            _importedSplitPending = false;
         }
 
         private static DataGridViewTextBoxColumn TextColumn(string property, string header) =>
@@ -423,6 +476,15 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             RefreshCurrentAccount();
+        }
+
+        private void ClearImportedWaitCursor()
+        {
+            if (importedGrid is null || importedGrid.Cursor != Cursors.WaitCursor)
+                return;
+
+            importedGrid.Cursor = Cursors.Default;
+            Cursor.Current = Cursors.Default;
         }
 
         private void LoadImported(Guid accountId)
@@ -526,6 +588,51 @@ namespace THMS.UI.WinForms.Controls
 
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
             menu.Show(detailGrid, e.Location);
+        }
+
+        private void OnLedgerDrag(object? sender, DragEventArgs e)
+        {
+            e.Effect = DroppedSpreadsheet(e) is not null && CurrentAccountId is Guid
+                ? DragDropEffects.Copy
+                : DragDropEffects.None;
+        }
+
+        private void OnLedgerDragDrop(object? sender, DragEventArgs e)
+        {
+            e.Effect = DragDropEffects.Copy;
+            var path = DroppedSpreadsheet(e);
+            if (path is null)
+                return;
+
+            var accountId = CurrentAccountId;
+            // The browser stays inside its drag until this handler returns. Open the
+            // modal import only after the drop has completed.
+            BeginInvoke(() => ImportDroppedFile(path, accountId));
+        }
+
+        private void ImportDroppedFile(string path, Guid? accountId)
+        {
+            if (accountId is not Guid id)
+            {
+                MessageBox.Show(FindForm(), "Select an account before importing transactions.", "Import Transactions",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var account = _accountOrchestrator.GetAccount(id);
+            if (account is null)
+                return;
+
+            TransactionFileImportLauncher.ImportFile(FindForm(), account, path, RefreshAll);
+        }
+
+        private static string? DroppedSpreadsheet(DragEventArgs e)
+        {
+            if (e.Data?.GetData(DataFormats.FileDrop) is not string[] files)
+                return null;
+
+            var spreadsheets = files.Where(TransactionFileImportLauncher.IsSpreadsheet).ToList();
+            return spreadsheets.Count == 1 ? spreadsheets[0] : null;
         }
 
         private IEnumerable<ImportedTransactionView> SelectedImported()
@@ -1417,6 +1524,7 @@ namespace THMS.UI.WinForms.Controls
             progressLoad.Visible = false;
             lblLoadStatus.Visible = false;
             lblLoadStatus.Text = "";
+            ClearImportedWaitCursor();
         }
 
         private Guid? CurrentAccountId =>

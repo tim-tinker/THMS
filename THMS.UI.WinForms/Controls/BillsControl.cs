@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Planning;
+using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
 
@@ -8,9 +10,11 @@ namespace THMS.UI.WinForms.Controls
     public class BillsControl : UserControl
     {
         private readonly BillsOrchestrator _orchestrator;
+        private readonly RecurringRuleOrchestrator _rules = new();
         private readonly BindingSource _source = new();
         private readonly DataGridView _grid = new();
         private readonly Label _lblCash = new();
+        private ThmsButton _deleteRule = null!;
         private Guid? _accountId;
         private bool _suppressCash;
 
@@ -53,6 +57,7 @@ namespace THMS.UI.WinForms.Controls
             }
 
             UpdateCashRemaining();
+            UpdateDeleteRule();
         }
 
         private void InitializeLayout()
@@ -80,6 +85,11 @@ namespace THMS.UI.WinForms.Controls
             toolbar.Controls.Add(ActionButton("Unschedule", OnUnschedule));
             toolbar.Controls.Add(ActionButton("Match import", OnMatchImport));
             toolbar.Controls.Add(ActionButton("Add bill", OnAddBill));
+            toolbar.Controls.Add(ActionButton("Add Rule", OnAddRule));
+            _deleteRule = ActionButton("Delete Rule", OnDeleteRule);
+            _deleteRule.Destructive = true;
+            _deleteRule.Enabled = false;
+            toolbar.Controls.Add(_deleteRule);
             toolbar.Controls.Add(ActionButton("Add statement", OnAddStatement));
 
             DataGridViewUtil.EnableDoubleBuffering(_grid);
@@ -100,6 +110,7 @@ namespace THMS.UI.WinForms.Controls
             _grid.CellFormatting += OnBillCellFormatting;
             _grid.CellBeginEdit += OnPayFromBeginEdit;
             _grid.DataError += (_, e) => e.ThrowException = false;
+            _grid.SelectionChanged += (_, _) => UpdateDeleteRule();
 
             Controls.Add(_grid);
             Controls.Add(toolbar);
@@ -391,6 +402,49 @@ namespace THMS.UI.WinForms.Controls
                 ?? (_grid.CurrentRow?.DataBoundItem is BillRow row ? row.DestinationAccountId : (Guid?)null);
             AddStatementClicked?.Invoke(this, accountId);
         }
+
+        private void OnAddRule(object? sender, EventArgs e)
+        {
+            using var editor = new RecurringRuleEditor(_accountId);
+            if (editor.ShowDialog(FindForm()) != DialogResult.OK)
+                return;
+
+            Reload();
+            DataChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void OnDeleteRule(object? sender, EventArgs e)
+        {
+            if (SelectedRule() is not BillRow row || row.SourceId is not Guid ruleId)
+                return;
+
+            var name = string.IsNullOrWhiteSpace(row.Notes) ? row.Kind : row.Notes;
+            if (MessageBox.Show(
+                    FindForm(),
+                    $"Delete recurring rule '{name}'?",
+                    "Delete Rule",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning) != DialogResult.Yes)
+                return;
+
+            if (row.Source == PaymentIntentSource.RecurringSingle)
+                _rules.DeleteSingleRule(ruleId);
+            else
+                _rules.DeleteTransferRule(ruleId);
+
+            Reload();
+            DataChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private BillRow? SelectedRule() =>
+            _grid.CurrentRow?.DataBoundItem is BillRow row
+            && row.SourceId is Guid
+            && row.Source is PaymentIntentSource.RecurringSingle or PaymentIntentSource.RecurringTransfer
+                ? row
+                : null;
+
+        private void UpdateDeleteRule() =>
+            _deleteRule.Enabled = SelectedRule() is not null;
 
         private string CashLabel()
         {

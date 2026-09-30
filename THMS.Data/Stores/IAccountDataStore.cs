@@ -1,4 +1,5 @@
 ﻿using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores
 {
@@ -17,5 +18,8 @@ namespace THMS.Data.Stores
         IReadOnlyList<PlaidItemSyncState> GetPlaidItemSyncStates();
         PlaidItemSyncState? GetPlaidItemSyncState(string itemId);
         void UpsertPlaidItemSyncState(PlaidItemSyncState state);
+
+        TransactionFileColumnMap? GetTransactionFileColumnMap(Guid accountId);
+        void UpsertTransactionFileColumnMap(TransactionFileColumnMap map);
     }
 }

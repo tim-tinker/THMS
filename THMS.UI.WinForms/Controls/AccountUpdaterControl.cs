@@ -109,7 +109,7 @@ namespace THMS.UI.WinForms.Controls
             SelectedAccountChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        private void SelectAccount(Guid? id)
+        public void SelectAccount(Guid? id)
         {
             if (id is null)
                 return;
@@ -195,6 +195,19 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
+        private void ImportTransactionsForAccount(Account account)
+        {
+            using var fileDialog = new OpenFileDialog
+            {
+                Filter = "Spreadsheets (*.csv;*.xlsx;*.xls)|*.csv;*.xlsx;*.xls|CSV files (*.csv)|*.csv|Excel files (*.xlsx;*.xls)|*.xlsx;*.xls|All files (*.*)|*.*",
+                Title = $"Import transactions for {account.Name}"
+            };
+            if (fileDialog.ShowDialog(FindForm()) != DialogResult.OK)
+                return;
+
+            TransactionFileImportLauncher.ImportFile(FindForm(), account, fileDialog.FileName, LoadAccounts);
+        }
+
         private void OnRunDiagnostics(object sender, EventArgs e)
         {
             using var dialog = new AccountDiagnosticsDialog();
@@ -245,6 +258,7 @@ namespace THMS.UI.WinForms.Controls
             var addStatement = MenuItem("Add Statement", (_, _) => AddStatement(account));
             addStatement.Enabled = canStatement;
             _accountMenu.Items.Add(addStatement);
+            _accountMenu.Items.Add(MenuItem("Import Transactions", (_, _) => ImportTransactionsForAccount(account)));
 
             switch (account)
             {

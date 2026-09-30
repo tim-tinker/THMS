@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using THMS.Data.Stores.SqlTables;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores.SqliteStores
 {
@@ -15,6 +16,7 @@ namespace THMS.Data.Stores.SqliteStores
         private readonly InvestmentAccountTable _investmentAccountTable = new();
         private readonly InternalAccountTable _internalAccountTable = new();
         private readonly PlaidItemSyncStateTable _plaidItemSync = new();
+        private readonly AccountTransactionImportMapTable _transactionFileMaps = new();
 
         public void InitializeSchema(SqliteConnection conn)
         {
@@ -27,6 +29,7 @@ namespace THMS.Data.Stores.SqliteStores
             _investmentAccountTable.InitializeSchema(conn);
             _internalAccountTable.InitializeSchema(conn);
             _plaidItemSync.InitializeSchema(conn);
+            _transactionFileMaps.InitializeSchema(conn);
         }
 
         public void Upsert(SqliteConnection conn, Account account)
@@ -125,6 +128,7 @@ namespace THMS.Data.Stores.SqliteStores
             _mortgageAccountTable.Delete(conn, id);
             _investmentAccountTable.Delete(conn, id);
             _internalAccountTable.Delete(conn, id);
+            _transactionFileMaps.Delete(conn, id);
             _accountTable.Delete(conn, id);
         }
 
@@ -228,5 +232,11 @@ namespace THMS.Data.Stores.SqliteStores
 
         public void UpsertPlaidItemSyncState(SqliteConnection conn, PlaidItemSyncState state) =>
             _plaidItemSync.Upsert(conn, state);
+
+        public TransactionFileColumnMap? GetTransactionFileColumnMap(SqliteConnection conn, Guid accountId) =>
+            _transactionFileMaps.Get(conn, accountId);
+
+        public void UpsertTransactionFileColumnMap(SqliteConnection conn, TransactionFileColumnMap map) =>
+            _transactionFileMaps.Upsert(conn, map);
     }
 }

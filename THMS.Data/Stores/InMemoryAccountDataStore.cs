@@ -1,5 +1,6 @@
 using THMS.Data.Stores.InMemoryStores;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores
 {
@@ -7,6 +8,7 @@ namespace THMS.Data.Stores
     {
         private readonly InMemoryAccountStore _accountStore = new();
         private readonly Dictionary<string, PlaidItemSyncState> _itemSync = new(StringComparer.Ordinal);
+        private readonly Dictionary<Guid, TransactionFileColumnMap> _transactionFileMaps = new();
 
         public void UpsertAccount(Account account)
         {
@@ -23,6 +25,7 @@ namespace THMS.Data.Stores
         public void DeleteAccount(Guid id)
         {
             _accountStore.Delete(id);
+            _transactionFileMaps.Remove(id);
             FinanceDataRevision.NoteChanged();
         }
 
@@ -35,6 +38,15 @@ namespace THMS.Data.Stores
         {
             _itemSync[state.ItemId] = state;
             FinanceDataRevision.NoteChanged();
+        }
+
+        public TransactionFileColumnMap? GetTransactionFileColumnMap(Guid accountId) =>
+            _transactionFileMaps.TryGetValue(accountId, out var map) ? map : null;
+
+        public void UpsertTransactionFileColumnMap(TransactionFileColumnMap map)
+        {
+            ArgumentNullException.ThrowIfNull(map);
+            _transactionFileMaps[map.AccountId] = map;
         }
     }
 }

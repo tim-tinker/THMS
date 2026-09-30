@@ -105,10 +105,16 @@ namespace THMS.UI
             }
 
             lblPlaidStatus.Text = string.IsNullOrWhiteSpace(message) ? "Ready." : message;
-            UseWaitCursor = busy;
-            Cursor = busy ? Cursors.WaitCursor : Cursors.Default;
             if (!busy)
             {
+                // Clear the stored cursor before UseWaitCursor. Turning the flag off
+                // broadcasts the current cursor, and a stored WaitCursor sticks on the
+                // control under the mouse (the unreconciled grid after accept-as-new).
+                Cursor = Cursors.Default;
+                UseWaitCursor = false;
+                ClearStuckWaitCursor(this);
+                Cursor.Current = Cursors.Default;
+
                 syncProgress.Visible = false;
                 if (syncProgress.Style != ProgressBarStyle.Marquee)
                 {
@@ -132,10 +138,23 @@ namespace THMS.UI
                 syncProgress.Style = ProgressBarStyle.Marquee;
             }
 
+            UseWaitCursor = true;
             syncProgress.Visible = true;
             lblPlaidStatus.Update();
             syncProgress.Update();
             Application.DoEvents();
+        }
+
+        private static void ClearStuckWaitCursor(Control control)
+        {
+            foreach (Control child in control.Controls)
+            {
+                if (child.UseWaitCursor)
+                    child.UseWaitCursor = false;
+                if (child.Cursor == Cursors.WaitCursor)
+                    child.Cursor = Cursors.Default;
+                ClearStuckWaitCursor(child);
+            }
         }
 
         private void OnStatusStripPaint(object? sender, PaintEventArgs e)
@@ -251,6 +270,13 @@ namespace THMS.UI
             {
                 dashboardHostPanel.ResumeLayout(true);
             }
+        }
+
+        public void ShowRegisterAccount(Guid accountId)
+        {
+            ShowFormInMainPanel("Register");
+            if (_embeddedForms.TryGetValue("Register", out var embedded) && embedded is RegisterForm register)
+                register.ShowAccount(accountId);
         }
 
         private void ShowFormInMainPanel(string formName, Button? navButton = null)
