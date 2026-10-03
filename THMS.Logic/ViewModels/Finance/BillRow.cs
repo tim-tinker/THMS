@@ -45,6 +45,21 @@ namespace THMS.Logic.ViewModels.Finance
         public const string Pending = "Pending";
     }
 
+    public sealed class BillDraft
+    {
+        public PaymentIntentSource? Source { get; init; }
+        public Guid? RuleId { get; init; }
+        public Guid? ExpectedId { get; init; }
+        public Guid BillAccountId { get; init; }
+        public string Description { get; init; } = "";
+        public decimal Amount { get; init; }
+        public Guid? BillCategoryId { get; init; }
+        public DateTime Date { get; init; }
+        public Guid? CreditAccountId { get; init; }
+        public Guid? CreditCategoryId { get; init; }
+        public RecurrenceFrequency? Frequency { get; init; }
+    }
+
     public static class BillKinds
     {
         public const string Statement = "Statement";

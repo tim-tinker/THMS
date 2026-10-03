@@ -12,12 +12,12 @@ namespace THMS.Tests.Logic
         public void LoadRulesFromFile_ParsesKnownAccountsAndSkipsUnknown()
         {
             var path = WriteCsv("""
-                From Account,To Account,Description,Frequency,Last Occurrence,Last Amount,Date,Amount,Category
-                WF Checking,Credit: Amazon Store Card,Payment,Bi-weekly,2026-08-31,20,2026-09-14,0,Credit Card Payment
-                WF Checking,Fidelity HSA (Julie),HSA Transfer,Monthly,2026-08-28,448,2026-09-27,448,Transfer
-                WF Checking,Unknown Destination,Skip me,Monthly,2026-01-01,1,2026-02-01,1,Transfer
-                Missing Source,WF Checking,Also skip,Yearly,2025-01-01,900,2026-12-01,900,Transfer
-                WF Checking,WF Checking,Same account,Monthly,2026-01-01,10,2026-02-01,10,Transfer
+                From Account,To Account,Description,Frequency,Last Occurrence,Last Amount,Date,Amount,From Category,To Category
+                WF Checking,Credit: Amazon Store Card,Payment,Bi-weekly,2026-08-31,20,2026-09-14,0,Credit Card Payment,Card Receipt
+                WF Checking,Fidelity HSA (Julie),HSA Transfer,Monthly,2026-08-28,448,2026-09-27,448,HSA Contribution,HSA Deposit
+                WF Checking,Unknown Destination,Skip me,Monthly,2026-01-01,1,2026-02-01,1,Transfer,Transfer
+                Missing Source,WF Checking,Also skip,Yearly,2025-01-01,900,2026-12-01,900,Transfer,Transfer
+                WF Checking,WF Checking,Same account,Monthly,2026-01-01,10,2026-02-01,10,Transfer,Transfer
                 """);
             try
             {
@@ -32,7 +32,8 @@ namespace THMS.Tests.Logic
                 Assert.That(rows[0].LastOccurrence, Is.EqualTo(new DateTime(2026, 8, 31)));
                 Assert.That(rows[0].NextOccurrence, Is.EqualTo(new DateTime(2026, 9, 14)));
                 Assert.That(rows[0].Amount, Is.EqualTo(20m));
-                Assert.That(rows[0].Category, Is.EqualTo("Credit Card Payment"));
+                Assert.That(rows[0].FromCategory, Is.EqualTo("Credit Card Payment"));
+                Assert.That(rows[0].ToCategory, Is.EqualTo("Card Receipt"));
                 Assert.That(rows[1].Description, Is.EqualTo("HSA Transfer"));
                 Assert.That(rows[1].Frequency, Is.EqualTo("Monthly"));
                 Assert.That(rows[1].Amount, Is.EqualTo(448m));
@@ -48,8 +49,8 @@ namespace THMS.Tests.Logic
         public void ImportRules_CreatesUserRulesAndUpsertsMatchingPattern()
         {
             var path = WriteCsv("""
-                From Account,To Account,Description,Frequency,Last Occurrence,Last Amount,Date,Amount,Category
-                WF Checking,Credit: Amazon Store Card,Payment,Bi-weekly,2026-08-31,20,2026-09-14,20,Credit Card Payment
+                From Account,To Account,Description,Frequency,Last Occurrence,Last Amount,Date,Amount,From Category,To Category
+                WF Checking,Credit: Amazon Store Card,Payment,Bi-weekly,2026-08-31,20,2026-09-14,20,Credit Card Payment,Card Receipt
                 """);
             try
             {
@@ -66,6 +67,7 @@ namespace THMS.Tests.Logic
                 Assert.That(first.IsUserCreated, Is.True);
                 Assert.That(first.IsActive, Is.True);
                 Assert.That(first.Category, Is.EqualTo("Credit Card Payment"));
+                Assert.That(first.TargetCategory, Is.EqualTo("Card Receipt"));
                 Assert.That(first.NextOccurrence, Is.EqualTo(new DateTime(2026, 9, 14)));
                 Assert.That(first.LastOccurrence, Is.EqualTo(new DateTime(2026, 8, 31)));
 

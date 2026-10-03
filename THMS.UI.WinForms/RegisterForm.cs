@@ -52,7 +52,6 @@ namespace THMS.UI.WinForms
                 if (tabs.SelectedTab == tabLedger)
                     ledger.SelectAccount(accountUpdater.SelectedAccount?.Id);
             };
-            billsControl.AddStatementClicked += OnAddStatementFromBills;
             billsControl.DataChanged += (_, _) =>
             {
                 accountUpdater.RefreshAccounts();
@@ -437,14 +436,6 @@ namespace THMS.UI.WinForms
 
         private void OnAddStatement(object? sender, EventArgs e) =>
             OpenStatementEditor(existing: null, accountUpdater.SelectedAccount);
-
-        private void OnAddStatementFromBills(object? sender, Guid? accountId)
-        {
-            var account = accountId is Guid id
-                ? _accountOrchestrator.GetAccount(id) ?? accountUpdater.SelectedAccount
-                : accountUpdater.SelectedAccount;
-            OpenStatementEditor(existing: null, account);
-        }
 
         private void OnStatementCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {

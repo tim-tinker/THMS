@@ -100,9 +100,17 @@ namespace THMS.Logic.Orchestrators
                 IsUserCreated = true
             };
 
-            var categoryName = row.Category?.Trim() ?? "";
-            if (!string.IsNullOrWhiteSpace(categoryName))
-                rule.ApplyCategory(_categorizer.GetOrCreate(categoryName));
+            var fromCategory = row.FromCategory?.Trim() ?? "";
+            if (!string.IsNullOrWhiteSpace(fromCategory))
+                rule.ApplyCategory(_categorizer.GetOrCreate(fromCategory));
+
+            var toCategory = row.ToCategory?.Trim() ?? "";
+            if (!string.IsNullOrWhiteSpace(toCategory))
+            {
+                var category = _categorizer.GetOrCreate(toCategory);
+                rule.TargetCategoryId = category.Id;
+                rule.TargetCategory = category.Name;
+            }
 
             _rules.AddTransferRule(rule);
             return true;

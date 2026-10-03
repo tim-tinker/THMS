@@ -96,6 +96,56 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void Schedule_KeepsEveryBillDueOnTheSameDayOffTheLedger()
+        {
+            var (accounts, transactions, statements, checking, _) = SeedCheckingAndCard();
+            var due = DateTime.Today.AddDays(-4);
+            transactions.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = checking.Id,
+                Description = "Donation: St Laurence",
+                Amount = -80,
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = due,
+                IsActive = true
+            });
+            transactions.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = checking.Id,
+                Description = "Service: ARS Houston",
+                Amount = -22,
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = due,
+                IsActive = true
+            });
+            transactions.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = checking.Id,
+                Description = "Electric",
+                Amount = -40,
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = due,
+                IsActive = true
+            });
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var rows = orchestrator.GetBills(checking.Id, DateTime.Today);
+            foreach (var row in rows)
+                row.Pay = true;
+
+            orchestrator.Schedule(rows);
+
+            var bills = orchestrator.GetBills(checking.Id, DateTime.Today);
+            Assert.That(bills.Select(r => r.Notes), Is.EquivalentTo(new[]
+            {
+                "Donation: St Laurence",
+                "Service: ARS Houston",
+                "Electric"
+            }));
+            Assert.That(bills.Select(r => r.Status), Is.All.EqualTo(BillStatuses.Scheduled));
+            Assert.That(transactions.GetPostedTransactions(checking.Id), Is.Empty);
+        }
+
+        [Test]
         public void Schedule_HoldsCashAndDoesNotPost()
         {
             var (accounts, transactions, statements, checking, _) = SeedCheckingAndCard();
@@ -434,17 +484,18 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void GetBills_IncludesManualPendingChargeOnThatAccountOnly()
+        public void GetBills_RecordedChargeIsNotABill()
         {
             var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
-            new AccountActivityOrchestrator(transactions, transactions).AddPending(
-                card.Id, DateTime.Today.AddDays(1), -42.50m, "Coffee", DefaultExpenseCategories.RestaurantsId);
+            new AccountActivityOrchestrator(transactions, transactions).AddPosted(
+                card.Id, new DateTime(2026, 9, 28), -42.50m, "Coffee", DefaultExpenseCategories.RestaurantsId);
 
             var cardRows = new BillsOrchestrator(accounts, transactions, statements).GetBills(card.Id, DateTime.Today);
             var checkingRows = new BillsOrchestrator(accounts, transactions, statements).GetBills(checking.Id, DateTime.Today);
 
-            Assert.That(cardRows, Has.Some.Matches<BillRow>(r => r.Notes == "Coffee" && r.Amount == -42.50m && r.Kind == BillKinds.Manual));
+            Assert.That(cardRows, Has.None.Matches<BillRow>(r => r.Notes == "Coffee"));
             Assert.That(checkingRows, Has.None.Matches<BillRow>(r => r.Notes == "Coffee"));
+            Assert.That(transactions.GetPostedTransactions(card.Id).Single().ImportedStatus, Is.EqualTo(ImportedStatus.Unmatched));
         }
 
         [Test]
@@ -516,6 +567,114 @@ namespace THMS.Tests.Logic
             Assert.That(transactions.GetPostedTransaction(posted.Id)!.ImportedStatus, Is.EqualTo(ImportedStatus.Matched));
             Assert.That(orchestrator.GetBills(checking.Id, DateTime.Today)
                 .Any(r => r.Notes == "Netflix" && r.DueDate == due), Is.False);
+        }
+
+        [Test]
+        public void AddEnteredBill_OneTimeWithoutCredit_IsATransactionOnTheBills()
+        {
+            var (accounts, transactions, statements, checking, _) = SeedCheckingAndCard();
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var due = new DateTime(2026, 10, 20);
+
+            orchestrator.AddEnteredBill(
+                checking.Id, "Comcast", -80m, DefaultExpenseCategories.UtilityId, due,
+                creditAccountId: null, creditCategoryId: null, frequency: null);
+
+            var bill = orchestrator.GetBills(checking.Id, new DateTime(2026, 10, 2)).Single();
+            Assert.That(bill.Notes, Is.EqualTo("Comcast"));
+            Assert.That(bill.Amount, Is.EqualTo(-80m));
+            Assert.That(bill.DueDate, Is.EqualTo(due));
+            Assert.That(bill.Kind, Is.EqualTo(BillKinds.Manual));
+            Assert.That(transactions.GetAllRecurringSingleRules(), Is.Empty);
+            Assert.That(transactions.GetFutureSingleTransactions(checking.Id).Single().CategoryId,
+                Is.EqualTo(DefaultExpenseCategories.UtilityId));
+        }
+
+        [Test]
+        public void AddEnteredBill_OneTimeWithCredit_IsATransferOnTheBills()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var due = new DateTime(2026, 10, 20);
+
+            orchestrator.AddEnteredBill(
+                card.Id, "Promo installment", 150m, DefaultExpenseCategories.PaymentId, due,
+                checking.Id, DefaultExpenseCategories.PaymentId, frequency: null);
+
+            var cardBill = orchestrator.GetBills(card.Id, new DateTime(2026, 10, 2)).Single();
+            var checkingBill = orchestrator.GetBills(checking.Id, new DateTime(2026, 10, 2)).Single();
+            Assert.That(cardBill.Amount, Is.EqualTo(150m));
+            Assert.That(cardBill.OtherAccountId, Is.EqualTo(checking.Id));
+            Assert.That(checkingBill.Amount, Is.EqualTo(-150m));
+            Assert.That(transactions.GetAllRecurringTransferRules(), Is.Empty);
+            var transfer = transactions.GetAllFutureTransferTransactions().Single();
+            Assert.That(transfer.FromAccountId, Is.EqualTo(checking.Id));
+            Assert.That(transfer.ToAccountId, Is.EqualTo(card.Id));
+            Assert.That(transfer.CategoryId, Is.EqualTo(DefaultExpenseCategories.PaymentId));
+            Assert.That(transfer.TargetCategoryId, Is.EqualTo(DefaultExpenseCategories.PaymentId));
+        }
+
+        [Test]
+        public void DeleteEnteredBill_RemovesOneTimeTransactionAndTransfer()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var due = new DateTime(2026, 10, 20);
+            orchestrator.AddEnteredBill(
+                checking.Id, "Comcast", -80m, DefaultExpenseCategories.UtilityId, due,
+                creditAccountId: null, creditCategoryId: null, frequency: null);
+            orchestrator.AddEnteredBill(
+                card.Id, "Promo installment", 150m, DefaultExpenseCategories.PaymentId, due,
+                checking.Id, DefaultExpenseCategories.PaymentId, frequency: null);
+
+            var single = orchestrator.GetBills(checking.Id, new DateTime(2026, 10, 2)).Single(r => r.Notes == "Comcast");
+            var transfer = orchestrator.GetBills(card.Id, new DateTime(2026, 10, 2)).Single();
+            orchestrator.DeleteEnteredBill(single.IntentId!.Value);
+            orchestrator.DeleteEnteredBill(transfer.IntentId!.Value);
+
+            Assert.That(orchestrator.GetBills(checking.Id, new DateTime(2026, 10, 2)), Is.Empty);
+            Assert.That(orchestrator.GetBills(card.Id, new DateTime(2026, 10, 2)), Is.Empty);
+        }
+
+        [Test]
+        public void AddEnteredBill_RecurringWithoutCredit_IsASingleAccountBill()
+        {
+            var (accounts, transactions, statements, checking, _) = SeedCheckingAndCard();
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var due = new DateTime(2026, 10, 20);
+
+            orchestrator.AddEnteredBill(
+                checking.Id, "Spotify", -11.96m, DefaultExpenseCategories.UncategorizedId, due,
+                creditAccountId: null, creditCategoryId: null, RecurrenceFrequency.Monthly);
+
+            var rule = transactions.GetAllRecurringSingleRules().Single();
+            Assert.That(rule.AccountId, Is.EqualTo(checking.Id));
+            Assert.That(rule.Frequency, Is.EqualTo(RecurrenceFrequency.Monthly));
+            Assert.That(rule.Amount, Is.EqualTo(-11.96m));
+            Assert.That(rule.CategoryId, Is.EqualTo(DefaultExpenseCategories.UncategorizedId));
+            Assert.That(orchestrator.GetBills(checking.Id, new DateTime(2026, 10, 2)).Single().Notes, Is.EqualTo("Spotify"));
+        }
+
+        [Test]
+        public void AddEnteredBill_RecurringWithCredit_IsATransferBillWithBothCategories()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var due = new DateTime(2026, 10, 20);
+
+            orchestrator.AddEnteredBill(
+                card.Id, "Promo installment", 75m, DefaultExpenseCategories.InterestId, due,
+                checking.Id, DefaultExpenseCategories.PaymentId, RecurrenceFrequency.BiWeekly);
+
+            var rule = transactions.GetAllRecurringTransferRules().Single();
+            Assert.That(rule.FromAccountId, Is.EqualTo(checking.Id));
+            Assert.That(rule.ToAccountId, Is.EqualTo(card.Id));
+            Assert.That(rule.Frequency, Is.EqualTo(RecurrenceFrequency.BiWeekly));
+            Assert.That(rule.Amount, Is.EqualTo(75m));
+            Assert.That(rule.CategoryId, Is.EqualTo(DefaultExpenseCategories.PaymentId));
+            Assert.That(rule.TargetCategoryId, Is.EqualTo(DefaultExpenseCategories.InterestId));
+            Assert.That(orchestrator.GetBills(card.Id, new DateTime(2026, 10, 2)), Has.Count.EqualTo(1));
+            Assert.That(orchestrator.GetBills(checking.Id, new DateTime(2026, 10, 2)), Has.Count.EqualTo(1));
         }
 
         private static (InMemoryAccountDataStore accounts, InMemoryTransactionDataStore transactions, InMemoryAccountStatementDataStore statements, BankAccount checking, CreditAccount card) SeedCheckingAndCard()

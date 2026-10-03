@@ -29,6 +29,8 @@ namespace THMS.Data.Stores.SqlTables
             EnsureColumn(conn, "LastOccurrence", "TEXT");
             EnsureColumn(conn, "IsUserCreated", "INTEGER NOT NULL DEFAULT 0");
             SqliteCategoryColumns.EnsureCategoryId(conn, "RecurringTransferRules");
+            EnsureColumn(conn, "TargetCategory", "TEXT");
+            EnsureColumn(conn, "TargetCategoryId", "TEXT");
         }
 
         public void Add(SqliteConnection conn, RecurringTransferRule rule)
@@ -37,10 +39,12 @@ namespace THMS.Data.Stores.SqlTables
             cmd.CommandText = @"
                 INSERT INTO RecurringTransferRules
                 (Id, Date, Description, Amount, Category, CategoryId, FromAccountId, ToAccountId,
-                 Frequency, LastOccurrence, EndDate, IsActive, IsFinalPaymentDifferent, FinalPaymentAmount, IsUserCreated)
+                 Frequency, LastOccurrence, EndDate, IsActive, IsFinalPaymentDifferent, FinalPaymentAmount, IsUserCreated,
+                 TargetCategory, TargetCategoryId)
                 VALUES
                 (@Id, @Date, @Description, @Amount, @Category, @CategoryId, @FromAccountId, @ToAccountId,
-                 @Frequency, @LastOccurrence, @EndDate, @IsActive, @IsFinalPaymentDifferent, @FinalPaymentAmount, @IsUserCreated);";
+                 @Frequency, @LastOccurrence, @EndDate, @IsActive, @IsFinalPaymentDifferent, @FinalPaymentAmount, @IsUserCreated,
+                 @TargetCategory, @TargetCategoryId);";
             Bind(cmd, rule);
             cmd.ExecuteNonQuery();
         }
@@ -63,7 +67,9 @@ namespace THMS.Data.Stores.SqlTables
                     IsActive = @IsActive,
                     IsFinalPaymentDifferent = @IsFinalPaymentDifferent,
                     FinalPaymentAmount = @FinalPaymentAmount,
-                    IsUserCreated = @IsUserCreated
+                    IsUserCreated = @IsUserCreated,
+                    TargetCategory = @TargetCategory,
+                    TargetCategoryId = @TargetCategoryId
                 WHERE Id = @Id;";
             Bind(cmd, rule);
             cmd.ExecuteNonQuery();
@@ -106,7 +112,7 @@ namespace THMS.Data.Stores.SqlTables
 
         private const string SelectColumns =
             @"SELECT Id, Date, Description, Amount, Category, FromAccountId, ToAccountId,
-                     Frequency, LastOccurrence, EndDate, IsActive, IsFinalPaymentDifferent, FinalPaymentAmount, IsUserCreated, CategoryId";
+                     Frequency, LastOccurrence, EndDate, IsActive, IsFinalPaymentDifferent, FinalPaymentAmount, IsUserCreated, CategoryId, TargetCategory, TargetCategoryId";
 
         private static void Bind(SqliteCommand cmd, RecurringTransferRule rule)
         {
@@ -125,6 +131,8 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@IsFinalPaymentDifferent", rule.IsFinalPaymentDifferent ? 1 : 0);
             cmd.Parameters.AddWithValue("@FinalPaymentAmount", (object?)rule.FinalPaymentAmount ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@IsUserCreated", rule.IsUserCreated ? 1 : 0);
+            cmd.Parameters.AddWithValue("@TargetCategory", (object?)rule.TargetCategory ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@TargetCategoryId", SqliteCategoryColumns.BindId(rule.TargetCategoryId));
         }
 
         private static RecurringTransferRule Read(SqliteDataReader reader)
@@ -145,7 +153,9 @@ namespace THMS.Data.Stores.SqlTables
                 IsFinalPaymentDifferent = reader.GetInt32(11) == 1,
                 FinalPaymentAmount = reader.IsDBNull(12) ? null : (decimal)(double)reader.GetDouble(12),
                 IsUserCreated = reader.FieldCount > 13 && !reader.IsDBNull(13) && reader.GetInt32(13) == 1,
-                CategoryId = SqliteCategoryColumns.ReadId(reader, 14)
+                CategoryId = SqliteCategoryColumns.ReadId(reader, 14),
+                TargetCategory = reader.FieldCount > 15 && !reader.IsDBNull(15) ? reader.GetString(15) : null,
+                TargetCategoryId = SqliteCategoryColumns.ReadId(reader, 16)
             };
         }
 

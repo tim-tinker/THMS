@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
+using THMS.Logic.Finance.Categories;
 using THMS.Logic.Finance.Transactions;
 
 namespace THMS.UI.WinForms.Controls
@@ -58,8 +59,8 @@ namespace THMS.UI.WinForms.Controls
             MinimizeBox = false;
             MaximizeBox = true;
             StartPosition = FormStartPosition.CenterParent;
-            Size = new Size(860, 420);
-            MinimumSize = new Size(720, 320);
+            Size = new Size(980, 420);
+            MinimumSize = new Size(860, 320);
 
             _lblParent.AutoEllipsis = true;
             _lblParent.Dock = DockStyle.Fill;
@@ -138,7 +139,8 @@ namespace THMS.UI.WinForms.Controls
             amount.DefaultCellStyle.Format = "c2";
 
             var categories = new List<CategoryOption> { new("(none)", Guid.Empty) };
-            categories.AddRange(_categories.OrderBy(c => c.Name).Select(c => new CategoryOption(c.Name, c.Id)));
+            categories.AddRange(ExpenseCategoryTree.Flatten(_categories, includeInactive: false)
+                .Select(c => new CategoryOption(ExpenseCategoryTree.IndentedName(_categories, c), c.Id)));
             var category = new DataGridViewComboBoxColumn
             {
                 DataPropertyName = nameof(SplitRowEdit.CategoryId),
@@ -160,15 +162,31 @@ namespace THMS.UI.WinForms.Controls
                 FlatStyle = FlatStyle.Flat
             };
 
-            var accounts = new List<AccountOption> { new("(none)", Guid.Empty) };
-            accounts.AddRange(_accounts.OrderBy(a => a.Name).Select(a => new AccountOption(a.Name, a.Id)));
-            var transfer = new DataGridViewComboBoxColumn
+            var fromAccounts = new List<AccountOption> { new("(none)", Guid.Empty) };
+            var toAccounts = new List<AccountOption> { new("(none)", Guid.Empty) };
+            foreach (var account in _accounts.OrderBy(a => a.Name))
             {
-                DataPropertyName = nameof(SplitRowEdit.TransferAccountId),
-                HeaderText = "Transfer Account",
+                fromAccounts.Add(new AccountOption(account.Name, account.Id));
+                toAccounts.Add(new AccountOption(account.Name, account.Id));
+            }
+
+            var fromAccount = new DataGridViewComboBoxColumn
+            {
+                DataPropertyName = nameof(SplitRowEdit.FromAccountId),
+                HeaderText = "From Account",
                 DisplayMember = nameof(AccountOption.Name),
                 ValueMember = nameof(AccountOption.Id),
-                DataSource = accounts,
+                DataSource = fromAccounts,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FlatStyle = FlatStyle.Flat
+            };
+            var toAccount = new DataGridViewComboBoxColumn
+            {
+                DataPropertyName = nameof(SplitRowEdit.ToAccountId),
+                HeaderText = "To Account",
+                DisplayMember = nameof(AccountOption.Name),
+                ValueMember = nameof(AccountOption.Id),
+                DataSource = toAccounts,
                 AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
                 FlatStyle = FlatStyle.Flat
             };
@@ -180,7 +198,7 @@ namespace THMS.UI.WinForms.Controls
                 AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
             };
 
-            _grid.Columns.AddRange(amount, category, type, transfer, notes);
+            _grid.Columns.AddRange(amount, category, type, fromAccount, toAccount, notes);
             _grid.DataError += (_, e) =>
             {
                 e.ThrowException = false;
@@ -267,7 +285,8 @@ namespace THMS.UI.WinForms.Controls
                 Amount = split.Amount,
                 CategoryId = split.CategoryId ?? Guid.Empty,
                 Type = split.Type,
-                TransferAccountId = split.TransferAccountId ?? Guid.Empty,
+                FromAccountId = split.FromAccountId ?? Guid.Empty,
+                ToAccountId = split.ToAccountId ?? split.TransferAccountId ?? Guid.Empty,
                 Notes = split.Notes ?? ""
             };
 
@@ -281,7 +300,9 @@ namespace THMS.UI.WinForms.Controls
                 CategoryId = row.CategoryId == Guid.Empty ? null : row.CategoryId,
                 Category = category?.Name,
                 Type = row.Type,
-                TransferAccountId = row.TransferAccountId == Guid.Empty ? null : row.TransferAccountId,
+                FromAccountId = row.FromAccountId == Guid.Empty ? null : row.FromAccountId,
+                ToAccountId = row.ToAccountId == Guid.Empty ? null : row.ToAccountId,
+                TransferAccountId = row.ToAccountId == Guid.Empty ? null : row.ToAccountId,
                 Notes = string.IsNullOrWhiteSpace(row.Notes) ? null : row.Notes.Trim()
             };
         }
@@ -292,7 +313,8 @@ namespace THMS.UI.WinForms.Controls
             public decimal Amount { get; set; }
             public Guid CategoryId { get; set; }
             public SplitType Type { get; set; }
-            public Guid TransferAccountId { get; set; }
+            public Guid FromAccountId { get; set; }
+            public Guid ToAccountId { get; set; }
             public string Notes { get; set; } = "";
         }
 

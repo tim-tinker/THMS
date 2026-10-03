@@ -15,6 +15,9 @@ namespace THMS.UI.WinForms.Controls
         private Guid? _existingSingleId;
         private Guid? _existingTransferId;
         private List<SplitTransactionRow> _pendingSplits = [];
+        private Label? _lblTargetCategory;
+        private ComboBox? _cmbTargetCategory;
+        private bool _targetCategoryShifted;
 
         public RecurringRuleEditor()
         {
@@ -111,7 +114,7 @@ namespace THMS.UI.WinForms.Controls
             SelectAccount(cmbAccount, rule.AccountId);
             txtDescription.Text = rule.Description ?? "";
             numAmount.Value = ClampAmount(rule.Amount);
-            SelectCategory(rule.CategoryId, rule.Category);
+            SelectCategory(cmbCategory, rule.CategoryId, rule.Category);
             cmbFrequency.SelectedItem = ToFrequencyLabel(rule.Frequency);
             dtNextOccurrence.Value = rule.NextOccurrence == default ? DateTime.Today : rule.NextOccurrence;
             _pendingSplits = rule.Splits.Select(s => s.Clone()).ToList();
@@ -127,21 +130,22 @@ namespace THMS.UI.WinForms.Controls
             SelectAccount(cmbToAccount, rule.ToAccountId);
             txtDescription.Text = rule.Description ?? "";
             numAmount.Value = ClampAmount(rule.Amount);
-            SelectCategory(rule.CategoryId, rule.Category);
+            SelectCategory(cmbCategory, rule.CategoryId, rule.Category);
+            SelectCategory(_cmbTargetCategory, rule.TargetCategoryId ?? rule.CategoryId, rule.TargetCategory ?? rule.Category);
             cmbFrequency.SelectedItem = ToFrequencyLabel(rule.Frequency);
             dtNextOccurrence.Value = rule.NextOccurrence == default ? DateTime.Today : rule.NextOccurrence;
             _pendingSplits = rule.Splits.Select(s => s.Clone()).ToList();
         }
 
-        private void SelectCategory(Guid? categoryId, string? name)
+        private static void SelectCategory(ComboBox? combo, Guid? categoryId, string? name)
         {
-            if (cmbCategory.DataSource is not IEnumerable<ExpenseCategory> categories)
+            if (combo?.DataSource is not IEnumerable<ExpenseCategory> categories)
                 return;
 
             var match = categories.FirstOrDefault(c => c.Id == categoryId)
                 ?? categories.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
             if (match is not null)
-                cmbCategory.SelectedItem = match;
+                combo.SelectedItem = match;
         }
 
         private void ApplySelectedCategory(BaseTransaction transaction)
@@ -182,15 +186,65 @@ namespace THMS.UI.WinForms.Controls
             lblAccount.Visible = cmbAccount.Visible = true;
             lblFromAccount.Visible = cmbFromAccount.Visible = false;
             lblToAccount.Visible = cmbToAccount.Visible = false;
+            lblCategory.Text = "Category:";
+            if (_lblTargetCategory is not null)
+                _lblTargetCategory.Visible = false;
+            if (_cmbTargetCategory is not null)
+                _cmbTargetCategory.Visible = false;
+            ShiftForTargetCategory(shown: false);
             btnEditSplits.Enabled = true;
         }
 
         private void ShowTransferFields()
         {
+            EnsureTargetCategoryControls();
             lblAccount.Visible = cmbAccount.Visible = false;
             lblFromAccount.Visible = cmbFromAccount.Visible = true;
             lblToAccount.Visible = cmbToAccount.Visible = true;
+            lblCategory.Text = "From category:";
+            _lblTargetCategory!.Visible = true;
+            _cmbTargetCategory!.Visible = true;
+            ShiftForTargetCategory(shown: true);
             btnEditSplits.Enabled = true;
+        }
+
+        private void EnsureTargetCategoryControls()
+        {
+            if (_cmbTargetCategory is not null)
+                return;
+
+            _lblTargetCategory = new Label
+            {
+                AutoSize = true,
+                Location = new Point(lblCategory.Left, lblCategory.Top + 40),
+                Text = "To category:"
+            };
+            _cmbTargetCategory = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                FormattingEnabled = true,
+                Location = new Point(cmbCategory.Left, cmbCategory.Top + 40),
+                Size = cmbCategory.Size,
+                DisplayMember = nameof(ExpenseCategory.Name),
+                ValueMember = nameof(ExpenseCategory.Id),
+                DataSource = Rules.GetCategories().ToList()
+            };
+            Controls.Add(_lblTargetCategory);
+            Controls.Add(_cmbTargetCategory);
+            _lblTargetCategory.BringToFront();
+            _cmbTargetCategory.BringToFront();
+        }
+
+        private void ShiftForTargetCategory(bool shown)
+        {
+            if (_targetCategoryShifted == shown)
+                return;
+
+            var delta = shown ? 40 : -40;
+            foreach (var control in new Control[] { lblFrequency, cmbFrequency, lblNextOccurrence, dtNextOccurrence, btnEditSplits, pnlButtons })
+                control.Top += delta;
+            Height += delta;
+            _targetCategoryShifted = shown;
         }
 
         private void UpdateButtonState()
@@ -340,6 +394,11 @@ namespace THMS.UI.WinForms.Controls
                     IsUserCreated = true
                 };
                 ApplySelectedCategory(transfer);
+                if (_cmbTargetCategory?.SelectedItem is ExpenseCategory target)
+                {
+                    transfer.TargetCategoryId = target.Id;
+                    transfer.TargetCategory = target.Name;
+                }
                 transfer.Splits = _pendingSplits.Select(s => s.Clone()).ToList();
                 return true;
             }

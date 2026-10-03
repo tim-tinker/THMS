@@ -8,6 +8,9 @@
         // Direction relative to THIS account
         public TransferDirection Direction { get; set; }
 
+        public Guid FromAccountId { get; set; }
+        public Guid ToAccountId { get; set; }
+
         public PostedTransferTransaction()
         { }
 

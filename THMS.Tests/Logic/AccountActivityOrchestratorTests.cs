@@ -8,25 +8,32 @@ namespace THMS.Tests.Logic
     public class AccountActivityOrchestratorTests
     {
         [Test]
-        public void AddPending_CreatesUserFutureOnAccount()
+        public void AddPosted_RecordsUnmatchedChargeOnTheEnteredDate()
         {
             var store = new InMemoryTransactionDataStore();
             var orchestrator = new AccountActivityOrchestrator(store, store);
             var accountId = Guid.NewGuid();
+            var bought = new DateTime(2026, 9, 28);
 
-            var pending = orchestrator.AddPending(
+            var posted = orchestrator.AddPosted(
                 accountId,
-                new DateTime(2026, 9, 20),
-                -42.50m,
-                "Coffee",
-                DefaultExpenseCategories.RestaurantsId);
+                bought,
+                -1093.94m,
+                "Charge",
+                DefaultExpenseCategories.UncategorizedId);
 
-            Assert.That(pending.IsUserCreated, Is.True);
-            Assert.That(pending.IsRealized, Is.False);
-            Assert.That(pending.AccountId, Is.EqualTo(accountId));
-            Assert.That(pending.Amount, Is.EqualTo(-42.50m));
-            Assert.That(pending.CategoryId, Is.EqualTo(DefaultExpenseCategories.RestaurantsId));
-            Assert.That(store.GetFutureSingleTransactions(accountId).Single().Id, Is.EqualTo(pending.Id));
+            Assert.That(posted.Date, Is.EqualTo(bought));
+            Assert.That(posted.Amount, Is.EqualTo(-1093.94m));
+            Assert.That(posted.ImportedStatus, Is.EqualTo(ImportedStatus.Unmatched));
+            Assert.That(store.GetPostedTransactions(accountId).Single().Id, Is.EqualTo(posted.Id));
+            Assert.That(store.GetFutureSingleTransactions(accountId), Is.Empty);
+
+            var ledger = THMS.Logic.ViewModels.Finance.UnifiedTransactionViewBuilder.Build(
+                store.GetPostedTransactions(accountId),
+                store.GetPostedTransferTransactions(accountId),
+                forAccountId: accountId);
+            Assert.That(ledger.Single().Date, Is.EqualTo(bought));
+            Assert.That(ledger.Single().Status, Is.EqualTo(TransactionStatuses.Unmatched));
         }
 
         [Test]
@@ -44,6 +51,7 @@ namespace THMS.Tests.Logic
                 DefaultExpenseCategories.InterestId);
 
             Assert.That(posted.Amount, Is.EqualTo(170.94m));
+            Assert.That(posted.ImportedStatus, Is.EqualTo(ImportedStatus.Unmatched));
             Assert.That(posted.CategoryId, Is.EqualTo(DefaultExpenseCategories.InterestId));
             Assert.That(store.GetPostedTransactions(accountId).Single().Id, Is.EqualTo(posted.Id));
             Assert.That(store.GetFutureSingleTransactions(accountId), Is.Empty);
@@ -68,12 +76,12 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void AddPending_RejectsZeroAmount()
+        public void AddPosted_RejectsZeroAmount()
         {
             var store = new InMemoryTransactionDataStore();
             var orchestrator = new AccountActivityOrchestrator(store, store);
             Assert.That(
-                () => orchestrator.AddPending(Guid.NewGuid(), DateTime.Today, 0, "X", null),
+                () => orchestrator.AddPosted(Guid.NewGuid(), DateTime.Today, 0, "X", null),
                 Throws.InvalidOperationException.With.Message.Contains("zero"));
         }
     }

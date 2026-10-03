@@ -5,6 +5,7 @@ using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Model;
+using THMS.Logic.Finance.Transactions;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels;
@@ -200,6 +201,15 @@ namespace THMS.UI.WinForms.Controls
             CategoryColumn.SortMode = DataGridViewColumnSortMode.NotSortable;
             ForecastColumn.Visible = false;
             TypeColumn.Visible = false;
+            detailGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "StatusColumn",
+                DataPropertyName = nameof(UnifiedTransactionView.Status),
+                HeaderText = "Status",
+                ReadOnly = true,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells,
+                SortMode = DataGridViewColumnSortMode.NotSortable
+            });
 
             detailGrid.DataSource = _transactionsSource;
             masterGrid.DataSource = _accountsSource;
@@ -876,7 +886,7 @@ namespace THMS.UI.WinForms.Controls
             var start = BaseOrchestrator.GetStartDate(DateTime.Today, history);
             var txs = history == HistoryLifetime
                 ? _txOrchestrator.GetTransactionsForAccount(accountId)
-                : _txOrchestrator.GetTransactionsForAccount(accountId, start, DateTime.Today);
+                : _txOrchestrator.GetTransactionsForAccount(accountId, start, DateTime.MaxValue);
             if (token.IsCancellationRequested)
                 return null;
 
@@ -1349,6 +1359,23 @@ namespace THMS.UI.WinForms.Controls
                 or UnifiedTransactionView.FutureType
                 or UnifiedTransactionView.FutureTransferType;
 
+        private List<SplitTransactionRow> SeedSplits(
+            BaseTransaction parent,
+            Guid accountId,
+            IReadOnlyList<ExpenseCategory> categories,
+            IReadOnlyList<Account> accounts)
+        {
+            var existing = parent.Splits.Select(s => s.Clone()).ToList();
+            if (existing.Count > 0)
+                return existing;
+
+            var ownerId = parent is BaseSingleAccountTransaction single && single.AccountId != Guid.Empty
+                ? single.AccountId
+                : accountId;
+            var counterpart = _txOrchestrator.FindTransferCounterpartAccount(parent, ownerId, accounts);
+            return [SplitTransactionSeed.Create(parent, counterpart, categories)];
+        }
+
         private void OpenSplitEditor(UnifiedTransactionView view)
         {
             if (!CanSplit(view))
@@ -1361,20 +1388,24 @@ namespace THMS.UI.WinForms.Controls
 
             var amount = parent.Amount;
             var description = parent.Description ?? view.Description;
-            var existing = parent.Splits.Select(s => s.Clone()).ToList();
+            var categories = _categoryOrchestrator.GetActiveCategories();
+            var accounts = _accountOrchestrator.GetAllAccounts().ToList();
+            var existing = SeedSplits(parent, view.AccountId, categories, accounts);
 
             using var editor = new SplitTransactionEditor(
                 description,
                 amount,
                 existing,
-                _categoryOrchestrator.GetActiveCategories(),
-                _accountOrchestrator.GetAllAccounts().ToList());
+                categories,
+                accounts);
             if (editor.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
 
             try
             {
-                _txOrchestrator.ApplySplits(parentId, editor.Result);
+                if (!_txOrchestrator.TryApplyAsWholeTransfer(parentId, editor.Result))
+                    _txOrchestrator.ApplySplits(parentId, editor.Result);
+
                 RefreshAll();
             }
             catch (InvalidOperationException ex)

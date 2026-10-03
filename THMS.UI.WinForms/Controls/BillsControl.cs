@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
+using THMS.Domain.Finance.Transactions;
+using THMS.Logic.Finance.Transactions;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
@@ -14,11 +16,11 @@ namespace THMS.UI.WinForms.Controls
         private readonly BindingSource _source = new();
         private readonly DataGridView _grid = new();
         private readonly Label _lblCash = new();
-        private ThmsButton _deleteRule = null!;
+        private readonly ContextMenuStrip _menu = new();
+        private ThmsButton _delete = null!;
         private Guid? _accountId;
         private bool _suppressCash;
 
-        public event EventHandler<Guid?>? AddStatementClicked;
         public event EventHandler? DataChanged;
 
         public BillsControl()
@@ -57,7 +59,7 @@ namespace THMS.UI.WinForms.Controls
             }
 
             UpdateCashRemaining();
-            UpdateDeleteRule();
+            UpdateDelete();
         }
 
         private void InitializeLayout()
@@ -81,16 +83,12 @@ namespace THMS.UI.WinForms.Controls
                 WrapContents = true,
                 Padding = new Padding(8)
             };
-            toolbar.Controls.Add(ActionButton("Mark paid at bank", OnMarkPaid));
-            toolbar.Controls.Add(ActionButton("Unschedule", OnUnschedule));
             toolbar.Controls.Add(ActionButton("Match import", OnMatchImport));
-            toolbar.Controls.Add(ActionButton("Add bill", OnAddBill));
-            toolbar.Controls.Add(ActionButton("Add Rule", OnAddRule));
-            _deleteRule = ActionButton("Delete Rule", OnDeleteRule);
-            _deleteRule.Destructive = true;
-            _deleteRule.Enabled = false;
-            toolbar.Controls.Add(_deleteRule);
-            toolbar.Controls.Add(ActionButton("Add statement", OnAddStatement));
+            toolbar.Controls.Add(ActionButton("Add", OnAddBill));
+            _delete = ActionButton("Delete", OnDelete);
+            _delete.Destructive = true;
+            _delete.Enabled = false;
+            toolbar.Controls.Add(_delete);
 
             DataGridViewUtil.EnableDoubleBuffering(_grid);
             _grid.AllowUserToAddRows = false;
@@ -110,7 +108,11 @@ namespace THMS.UI.WinForms.Controls
             _grid.CellFormatting += OnBillCellFormatting;
             _grid.CellBeginEdit += OnPayFromBeginEdit;
             _grid.DataError += (_, e) => e.ThrowException = false;
-            _grid.SelectionChanged += (_, _) => UpdateDeleteRule();
+            _grid.SelectionChanged += (_, _) => UpdateDelete();
+            _grid.CellDoubleClick += OnBillDoubleClick;
+            _grid.MouseDown += OnGridMouseDown;
+            _grid.ContextMenuStrip = _menu;
+            _menu.Opening += OnMenuOpening;
 
             Controls.Add(_grid);
             Controls.Add(toolbar);
@@ -120,14 +122,6 @@ namespace THMS.UI.WinForms.Controls
         private void ConfigureGrid()
         {
             _grid.Columns.Clear();
-            _grid.Columns.Add(new DataGridViewCheckBoxColumn
-            {
-                DataPropertyName = nameof(BillRow.Pay),
-                HeaderText = "Pay",
-                Name = nameof(BillRow.Pay),
-                Width = 50,
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
-            });
             _grid.Columns.Add(new CalendarColumn
             {
                 DataPropertyName = nameof(BillRow.DueDate),
@@ -141,7 +135,7 @@ namespace THMS.UI.WinForms.Controls
                 HeaderText = "Notes",
                 Name = nameof(BillRow.Notes),
                 AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
-                ToolTipText = "Optional memo. Recurring bills and transfers use the rule description (for example Comcast or HSA)."
+                ToolTipText = "Optional memo. Recurring bills use this description (for example Comcast or HSA)."
             };
             _grid.Columns.Add(notes);
             var amount = TextColumn(nameof(BillRow.Amount), "Amount", readOnly: false);
@@ -216,6 +210,44 @@ namespace THMS.UI.WinForms.Controls
             _lblCash.ForeColor = remaining < 0 ? Color.Firebrick : Color.FromArgb(32, 32, 32);
         }
 
+        private void OnGridMouseDown(object? sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Right)
+                return;
+
+            var hit = _grid.HitTest(e.X, e.Y);
+            if (hit.RowIndex < 0)
+                return;
+
+            _grid.ClearSelection();
+            _grid.Rows[hit.RowIndex].Selected = true;
+            var cell = _grid.Rows[hit.RowIndex].Cells.Cast<DataGridViewCell>()
+                .FirstOrDefault(c => c.Visible);
+            if (cell is not null)
+                _grid.CurrentCell = cell;
+        }
+
+        private void OnMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
+        {
+            _menu.Items.Clear();
+            if (_grid.CurrentRow?.DataBoundItem is not BillRow row || row.DestinationAccountId == Guid.Empty)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            var scheduled = row.Status == BillStatuses.Scheduled;
+            var pay = new ToolStripMenuItem("Pay");
+            pay.Enabled = !scheduled;
+            pay.Click += (_, _) => OnPay(row);
+            _menu.Items.Add(pay);
+
+            var unschedule = new ToolStripMenuItem("Unschedule");
+            unschedule.Enabled = scheduled && row.IntentId is Guid;
+            unschedule.Click += (_, _) => OnUnschedule(row);
+            _menu.Items.Add(unschedule);
+        }
+
         private void OnOtherAccountClicked(object? sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0 || e.ColumnIndex < 0)
@@ -284,33 +316,27 @@ namespace THMS.UI.WinForms.Controls
             });
         }
 
-        private void OnMarkPaid(object? sender, EventArgs e)
+        private void OnPay(BillRow row)
         {
             EndEdit();
             try
             {
-                var scheduled = _orchestrator.Schedule(CurrentRows());
+                row.Pay = true;
+                _orchestrator.Schedule([row]);
                 Reload();
-                AppStatus.Set(scheduled.Count == 0
-                    ? "Check Pay on the bills you paid at the bank, then mark them paid."
-                    : $"Marked {scheduled.Count} bill{(scheduled.Count == 1 ? "" : "s")} as scheduled. Cash is held until import matches the bank actual.");
                 DataChanged?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Mark paid at bank",
+                MessageBox.Show(FindForm(), ex.Message, "Pay",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
-        private void OnUnschedule(object? sender, EventArgs e)
+        private void OnUnschedule(BillRow row)
         {
-            if (_grid.CurrentRow?.DataBoundItem is not BillRow row || row.IntentId is not Guid intentId)
-            {
-                MessageBox.Show(FindForm(), "Select a scheduled bill to unschedule.", "Unschedule",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (row.IntentId is not Guid intentId)
                 return;
-            }
 
             try
             {
@@ -369,82 +395,109 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
-        private void OnAddBill(object? sender, EventArgs e)
+        private void OnAddBill(object? sender, EventArgs e) =>
+            ShowBillDialog(existing: null);
+
+        private void OnBillDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
-            using var dialog = new AddManualBillDialog(
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                return;
+            var column = _grid.Columns[e.ColumnIndex].Name;
+            if (column == nameof(BillRow.FundingAccountId))
+                return;
+            if (_grid.Rows[e.RowIndex].DataBoundItem is not BillRow row)
+                return;
+
+            _grid.EndEdit();
+            var draft = _orchestrator.LoadBill(row);
+            if (draft is null)
+                return;
+            ShowBillDialog(draft);
+        }
+
+        private void ShowBillDialog(BillDraft? existing)
+        {
+            using var dialog = new AddBillDialog(
                 _orchestrator.GetAccounts(),
-                _orchestrator.GetFundingAccounts(),
-                _accountId);
+                _orchestrator.GetCategories(),
+                existing?.BillAccountId ?? _accountId,
+                existing);
             if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
 
             try
             {
-                _orchestrator.AddManual(
-                    dialog.DestinationAccountId,
-                    dialog.FundingAccountId,
-                    dialog.Amount,
-                    dialog.PayDate,
-                    dialog.Notes);
+                if (existing is null)
+                {
+                    _orchestrator.AddEnteredBill(
+                        dialog.BillAccountId,
+                        dialog.Description,
+                        dialog.Amount,
+                        dialog.BillCategoryId,
+                        dialog.Date,
+                        dialog.CreditAccountId,
+                        dialog.CreditCategoryId,
+                        dialog.Frequency);
+                }
+                else
+                {
+                    _orchestrator.SaveEditedBill(
+                        existing,
+                        dialog.BillAccountId,
+                        dialog.Description,
+                        dialog.Amount,
+                        dialog.BillCategoryId,
+                        dialog.Date,
+                        dialog.CreditAccountId,
+                        dialog.CreditCategoryId,
+                        dialog.Frequency);
+                }
+
                 Reload();
                 DataChanged?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Add bill",
+                MessageBox.Show(FindForm(), ex.Message, "Bill Details",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
-        private void OnAddStatement(object? sender, EventArgs e)
+        private void OnDelete(object? sender, EventArgs e)
         {
-            var accountId = _accountId
-                ?? (_grid.CurrentRow?.DataBoundItem is BillRow row ? row.DestinationAccountId : (Guid?)null);
-            AddStatementClicked?.Invoke(this, accountId);
-        }
-
-        private void OnAddRule(object? sender, EventArgs e)
-        {
-            using var editor = new RecurringRuleEditor(_accountId);
-            if (editor.ShowDialog(FindForm()) != DialogResult.OK)
-                return;
-
-            Reload();
-            DataChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void OnDeleteRule(object? sender, EventArgs e)
-        {
-            if (SelectedRule() is not BillRow row || row.SourceId is not Guid ruleId)
+            if (SelectedDeletable() is not BillRow row)
                 return;
 
             var name = string.IsNullOrWhiteSpace(row.Notes) ? row.Kind : row.Notes;
             if (MessageBox.Show(
                     FindForm(),
-                    $"Delete recurring rule '{name}'?",
-                    "Delete Rule",
+                    $"Delete '{name}'?",
+                    "Delete",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning) != DialogResult.Yes)
                 return;
 
-            if (row.Source == PaymentIntentSource.RecurringSingle)
-                _rules.DeleteSingleRule(ruleId);
-            else
-                _rules.DeleteTransferRule(ruleId);
+            if (row.Source == PaymentIntentSource.RecurringSingle && row.SourceId is Guid singleId)
+                _rules.DeleteSingleRule(singleId);
+            else if (row.Source == PaymentIntentSource.RecurringTransfer && row.SourceId is Guid transferRuleId)
+                _rules.DeleteTransferRule(transferRuleId);
+            else if (row.IntentId is Guid expectedId)
+                _orchestrator.DeleteEnteredBill(expectedId);
 
             Reload();
             DataChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        private BillRow? SelectedRule() =>
-            _grid.CurrentRow?.DataBoundItem is BillRow row
-            && row.SourceId is Guid
-            && row.Source is PaymentIntentSource.RecurringSingle or PaymentIntentSource.RecurringTransfer
-                ? row
-                : null;
+        private BillRow? SelectedDeletable() =>
+            _grid.CurrentRow?.DataBoundItem is BillRow row && CanDelete(row) ? row : null;
 
-        private void UpdateDeleteRule() =>
-            _deleteRule.Enabled = SelectedRule() is not null;
+        private static bool CanDelete(BillRow row) =>
+            (row.Source is PaymentIntentSource.RecurringSingle or PaymentIntentSource.RecurringTransfer
+                && row.SourceId is Guid)
+            || (row.Source == PaymentIntentSource.Manual && row.IntentId is Guid);
+
+        private void UpdateDelete() =>
+            _delete.Enabled = SelectedDeletable() is not null;
 
         private string CashLabel()
         {
@@ -471,111 +524,304 @@ namespace THMS.UI.WinForms.Controls
         }
     }
 
-    internal sealed class AddManualBillDialog : Form
+    internal sealed class AddBillDialog : Form
     {
-        private readonly ComboBox _cboDestination = new();
-        private readonly ComboBox _cboFunding = new();
+        private const string OneTime = "One Time";
+
+        private readonly ComboBox _billAccount = new();
+        private readonly TextBox _description = new();
         private readonly NumericUpDown _amount = new();
-        private readonly DateTimePicker _date = new();
-        private readonly TextBox _notes = new();
+        private readonly ComboBox _billCategory = new();
+        private readonly TextBox _date = new();
+        private readonly ComboBox _creditAccount = new();
+        private readonly Label _creditCategoryLabel;
+        private readonly ComboBox _creditCategory = new();
+        private readonly ComboBox _frequency = new();
+        private readonly ThmsButton _save = new() { Text = "Save" };
+        private readonly ThmsButton _cancel = new() { Text = "Cancel" };
 
-        public Guid DestinationAccountId { get; private set; }
-        public Guid FundingAccountId { get; private set; }
+        public Guid BillAccountId { get; private set; }
+        public string Description { get; private set; } = "";
         public decimal Amount { get; private set; }
-        public DateTime PayDate { get; private set; }
-        public string Notes { get; private set; } = "";
+        public Guid BillCategoryId { get; private set; }
+        public DateTime Date { get; private set; }
+        public Guid? CreditAccountId { get; private set; }
+        public Guid? CreditCategoryId { get; private set; }
+        public RecurrenceFrequency? Frequency { get; private set; }
 
-        public AddManualBillDialog(
-            IReadOnlyList<Account> destinations,
-            IReadOnlyList<Account> funding,
-            Guid? selectedAccountId = null)
+        public AddBillDialog(
+            IReadOnlyList<Account> accounts,
+            IReadOnlyList<ExpenseCategory> categories,
+            Guid? selectedAccountId = null,
+            BillDraft? existing = null)
         {
-            Text = "Add bill";
+            Text = "Bill Details";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false;
             MaximizeBox = false;
-            ClientSize = new Size(420, 296);
-            var y = 16;
-            Controls.Add(LabelAt("Account", 16, y));
-            BindCombo(_cboDestination, destinations, 140, y);
-            y += 40;
-            Controls.Add(LabelAt("Pay from", 16, y));
-            BindCombo(_cboFunding, funding, 140, y);
-            if (selectedAccountId is Guid id)
-            {
-                _cboDestination.SelectedValue = id;
-                if (funding.Any(a => a.Id == id))
-                    _cboFunding.SelectedValue = id;
-            }
-            y += 40;
-            Controls.Add(LabelAt("Amount", 16, y));
-            _amount.Left = 140;
-            _amount.Top = y;
-            _amount.Width = 240;
-            _amount.DecimalPlaces = 2;
-            _amount.Maximum = 1_000_000;
-            _amount.Minimum = 0.01m;
-            Controls.Add(_amount);
-            y += 40;
-            Controls.Add(LabelAt("Due date", 16, y));
-            _date.Left = 140;
-            _date.Top = y;
-            _date.Width = 240;
-            _date.Format = DateTimePickerFormat.Short;
-            _date.Value = DateTime.Today;
-            Controls.Add(_date);
-            y += 40;
-            Controls.Add(LabelAt("What", 16, y));
-            _notes.Left = 140;
-            _notes.Top = y;
-            _notes.Width = 240;
-            Controls.Add(_notes);
+            ShowInTaskbar = false;
+            AutoScaleMode = AutoScaleMode.None;
+            AutoSize = false;
+            AutoScroll = false;
 
-            var save = new ThmsButton { Text = "Save", Left = 140, Top = 220 };
-            save.Click += OnSave;
-            var cancel = new ThmsButton { Text = "Cancel", Left = 260, Top = 220 };
-            cancel.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
-            Controls.Add(save);
-            Controls.Add(cancel);
-            AcceptButton = save;
-            CancelButton = cancel;
+            var ordered = accounts.OrderBy(a => a.Name).ToList();
+            var categoryList = categories.OrderBy(c => c.Name).ToList();
+            BindAccounts(_billAccount, ordered, selectedAccountId);
+            BindAccounts(_creditAccount, BlankFirst(ordered), null);
+            BindCategories(_billCategory, categoryList);
+            BindCategories(_creditCategory, categoryList);
+
+            _description.Width = 280;
+            _amount.Width = 280;
+            _amount.DecimalPlaces = 2;
+            _amount.Minimum = -1_000_000;
+            _amount.Maximum = 1_000_000;
+            _date.Width = 280;
+            _date.Text = DateTime.Today.ToString("M/d/yyyy");
+            _frequency.Width = 280;
+            _frequency.DropDownStyle = ComboBoxStyle.DropDownList;
+            _frequency.Items.AddRange([OneTime, "Weekly", "Biweekly", "Monthly", "Quarterly", "Yearly"]);
+            _frequency.SelectedIndex = 0;
+
+            _creditCategoryLabel = LabelAt("Credit Category");
+            _creditCategory.Visible = false;
+            _creditCategoryLabel.Visible = false;
+
+            AddRow(LabelAt("Account to Bill"), _billAccount);
+            AddRow(LabelAt("Description"), _description);
+            AddRow(LabelAt("Amount"), _amount);
+            AddRow(LabelAt("Bill Category"), _billCategory);
+            AddRow(LabelAt("Date"), _date);
+            AddRow(LabelAt("Account to Credit"), _creditAccount);
+            AddRow(_creditCategoryLabel, _creditCategory);
+            AddRow(LabelAt("Frequency"), _frequency);
+            _save.Click += OnSave;
+            _cancel.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
+            Controls.Add(_save);
+            Controls.Add(_cancel);
+            AcceptButton = _save;
+            CancelButton = _cancel;
+            SelectAccount(_billAccount, selectedAccountId);
+            if (existing is not null)
+                ApplyDraft(existing);
+            LayoutFields();
+            _creditAccount.SelectedIndexChanged += (_, _) => ShowCreditCategory(HasCreditAccount());
         }
 
-        private void BindCombo(ComboBox combo, IReadOnlyList<Account> accounts, int left, int top)
+        protected override void OnShown(EventArgs e)
         {
-            combo.Left = left;
-            combo.Top = top;
-            combo.Width = 240;
+            base.OnShown(e);
+            LayoutFields();
+        }
+
+        private readonly List<(Label Label, Control Editor)> _rows = [];
+
+        private void AddRow(Label label, Control editor)
+        {
+            _rows.Add((label, editor));
+            Controls.Add(label);
+            Controls.Add(editor);
+        }
+
+        private void ShowCreditCategory(bool show)
+        {
+            _creditCategoryLabel.Visible = show;
+            _creditCategory.Visible = show;
+            LayoutFields();
+        }
+
+        private bool HasCreditAccount() =>
+            _creditAccount.SelectedItem is Account account && account.Id != Guid.Empty;
+
+        private void ApplyDraft(BillDraft draft)
+        {
+            SelectAccount(_billAccount, draft.BillAccountId);
+            _description.Text = draft.Description;
+            var amount = draft.Amount;
+            if (amount < _amount.Minimum)
+                amount = _amount.Minimum;
+            if (amount > _amount.Maximum)
+                amount = _amount.Maximum;
+            _amount.Value = amount;
+            SelectCategory(_billCategory, draft.BillCategoryId);
+            _date.Text = draft.Date.ToString("M/d/yyyy");
+            SelectAccount(_creditAccount, draft.CreditAccountId);
+            _creditCategory.Visible = HasCreditAccount();
+            _creditCategoryLabel.Visible = _creditCategory.Visible;
+            if (_creditCategory.Visible)
+                SelectCategory(_creditCategory, draft.CreditCategoryId);
+            _frequency.SelectedItem = draft.Frequency switch
+            {
+                RecurrenceFrequency.Weekly => "Weekly",
+                RecurrenceFrequency.BiWeekly => "Biweekly",
+                RecurrenceFrequency.Monthly => "Monthly",
+                RecurrenceFrequency.Quarterly => "Quarterly",
+                RecurrenceFrequency.Yearly => "Yearly",
+                _ => OneTime
+            };
+        }
+
+        private static void SelectAccount(ComboBox combo, Guid? id)
+        {
+            if (id is not Guid accountId || combo.DataSource is not IEnumerable<Account> accounts)
+                return;
+            var match = accounts.FirstOrDefault(a => a.Id == accountId);
+            if (match is not null)
+                combo.SelectedItem = match;
+        }
+
+        private static void SelectCategory(ComboBox combo, Guid? id)
+        {
+            if (combo.DataSource is not IEnumerable<ExpenseCategory> categories)
+                return;
+            var match = id is Guid categoryId
+                ? categories.FirstOrDefault(c => c.Id == categoryId)
+                : null;
+            match ??= categories.FirstOrDefault(c => c.Id == DefaultExpenseCategories.UncategorizedId)
+                ?? categories.FirstOrDefault();
+            if (match is not null)
+                combo.SelectedItem = match;
+        }
+
+        private void LayoutFields()
+        {
+            const int labelLeft = 16;
+            const int editorLeft = 190;
+            const int editorWidth = 340;
+            const int rowHeight = 52;
+            var y = 24;
+            foreach (var (label, editor) in _rows)
+            {
+                var show = editor != _creditCategory || HasCreditAccount();
+                label.Visible = show;
+                editor.Visible = show;
+                if (!show)
+                    continue;
+                label.Left = labelLeft;
+                label.Top = y + 8;
+                editor.Left = editorLeft;
+                editor.Top = y;
+                editor.Width = editorWidth;
+                editor.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+                y += rowHeight;
+            }
+
+            y += 16;
+            var buttonHeight = Math.Max(40, Math.Max(_save.Height, _save.PreferredSize.Height));
+            _cancel.Top = y;
+            _save.Top = y;
+            _cancel.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            _save.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            var cancelWidth = Math.Max(110, Math.Max(_cancel.Width, _cancel.PreferredSize.Width));
+            var saveWidth = Math.Max(110, Math.Max(_save.Width, _save.PreferredSize.Width));
+            _cancel.Left = editorLeft + editorWidth - cancelWidth;
+            _save.Left = _cancel.Left - saveWidth - 12;
+            var outer = SizeFromClientSize(new Size(editorLeft + editorWidth + 24, y + buttonHeight + 24));
+            outer = new Size(Math.Max(640, outer.Width), Math.Max(560, outer.Height));
+            MinimumSize = outer;
+            Size = outer;
+        }
+
+        private static Label LabelAt(string text) =>
+            new() { Text = text, AutoSize = true };
+
+        private static void BindAccounts(ComboBox combo, IReadOnlyList<Account> accounts, Guid? selectedId)
+        {
             combo.DropDownStyle = ComboBoxStyle.DropDownList;
             combo.DisplayMember = nameof(Account.Name);
             combo.ValueMember = nameof(Account.Id);
             combo.DataSource = accounts.ToList();
-            Controls.Add(combo);
+            if (selectedId is Guid id)
+                combo.SelectedValue = id;
         }
 
-        private static Label LabelAt(string text, int left, int top) =>
-            new() { Text = text, Left = left, Top = top + 4, AutoSize = true };
+        private static void BindCategories(ComboBox combo, List<ExpenseCategory> categories)
+        {
+            combo.DropDownStyle = ComboBoxStyle.DropDownList;
+            combo.DisplayMember = nameof(ExpenseCategory.Name);
+            combo.ValueMember = nameof(ExpenseCategory.Id);
+            combo.DataSource = categories.ToList();
+            combo.SelectedItem = categories.FirstOrDefault(c => c.Id == DefaultExpenseCategories.UncategorizedId)
+                ?? categories.FirstOrDefault();
+        }
+
+        private static List<Account> BlankFirst(IReadOnlyList<Account> accounts)
+        {
+            var list = new List<Account> { new BankAccount { Id = Guid.Empty, Name = "" } };
+            list.AddRange(accounts);
+            return list;
+        }
 
         private void OnSave(object? sender, EventArgs e)
         {
-            if (_cboDestination.SelectedItem is not Account destination)
+            if (_billAccount.SelectedItem is not Account bill || bill.Id == Guid.Empty)
             {
-                MessageBox.Show(this, "Select an account.", "Add bill", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, "Select an account to bill.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            if (_cboFunding.SelectedItem is not Account funding)
+            if (string.IsNullOrWhiteSpace(_description.Text))
             {
-                MessageBox.Show(this, "Select a pay-from account.", "Add bill", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, "Description is required.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            DestinationAccountId = destination.Id;
-            FundingAccountId = funding.Id;
+            if (_amount.Value == 0)
+            {
+                MessageBox.Show(this, "Amount cannot be zero.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (_billCategory.SelectedItem is not ExpenseCategory billCategory)
+            {
+                MessageBox.Show(this, "Select a bill category.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (!LedgerEntryDate.TryParse(_date.Text, out var date))
+            {
+                MessageBox.Show(this, "Enter a date like 9/28/2026.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            Guid? creditAccountId = null;
+            Guid? creditCategoryId = null;
+            if (HasCreditAccount() && _creditAccount.SelectedItem is Account credit)
+            {
+                if (credit.Id == bill.Id)
+                {
+                    MessageBox.Show(this, "Account to credit must be a different account.", Text,
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (_creditCategory.SelectedItem is not ExpenseCategory creditCategory)
+                {
+                    MessageBox.Show(this, "Select a credit category.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                creditAccountId = credit.Id;
+                creditCategoryId = creditCategory.Id;
+            }
+
+            BillAccountId = bill.Id;
+            Description = _description.Text.Trim();
             Amount = _amount.Value;
-            PayDate = _date.Value.Date;
-            Notes = _notes.Text;
+            BillCategoryId = billCategory.Id;
+            Date = date;
+            CreditAccountId = creditAccountId;
+            CreditCategoryId = creditCategoryId;
+            Frequency = _frequency.SelectedItem?.ToString() switch
+            {
+                "Weekly" => RecurrenceFrequency.Weekly,
+                "Biweekly" => RecurrenceFrequency.BiWeekly,
+                "Monthly" => RecurrenceFrequency.Monthly,
+                "Quarterly" => RecurrenceFrequency.Quarterly,
+                "Yearly" => RecurrenceFrequency.Yearly,
+                _ => null
+            };
             DialogResult = DialogResult.OK;
             Close();
         }

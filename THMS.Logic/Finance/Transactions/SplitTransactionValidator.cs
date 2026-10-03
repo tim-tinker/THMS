@@ -20,8 +20,13 @@ namespace THMS.Logic.Finance.Transactions
             {
                 if (split.Type == SplitType.Transfer)
                 {
-                    if (split.TransferAccountId is not Guid accountId || accountId == Guid.Empty)
-                        throw new InvalidOperationException("Transfer splits require a destination account.");
+                    if (split.FromAccountId is not Guid fromId || fromId == Guid.Empty
+                        || split.ToAccountId is not Guid toId || toId == Guid.Empty)
+                        throw new InvalidOperationException("Transfer splits require a From account and a To account.");
+                    if (fromId == toId)
+                        throw new InvalidOperationException("From and To accounts must be different.");
+                    if (SplitTransactionMath.IsUncategorized(split.CategoryId, split.Category))
+                        throw new InvalidOperationException("Transfer splits require a category.");
                     continue;
                 }
 

@@ -422,6 +422,8 @@ namespace THMS.Logic.Orchestrators.Finance
                 Description = rule.Description,
                 Category = rule.Category,
                 CategoryId = rule.CategoryId,
+                TargetCategory = rule.TargetCategory,
+                TargetCategoryId = rule.TargetCategoryId,
                 Origin = ExpectedOrigin.RecurringTransfer,
                 OriginId = rule.Id,
                 Status = ExpectedStatus.Planned,

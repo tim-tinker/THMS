@@ -17,7 +17,8 @@ namespace THMS.Ingestion.Importers.Finance
         public DateTime NextOccurrence { get; init; }
         public DateTime? LastOccurrence { get; init; }
         public decimal Amount { get; init; }
-        public string CategoryName { get; init; } = "";
+        public string FromCategoryName { get; init; } = "";
+        public string ToCategoryName { get; init; } = "";
     }
 
     public class SpreadsheetRecurringTransferImporter
@@ -110,7 +111,8 @@ namespace THMS.Ingestion.Importers.Finance
                 NextOccurrence = nextOccurrence.Value.Date,
                 LastOccurrence = lastOccurrence?.Date,
                 Amount = amount.Value,
-                CategoryName = ReadString(reader, Column(headers, "Category"))
+                FromCategoryName = ReadString(reader, Column(headers, "From Category", "FromCategory")),
+                ToCategoryName = ReadString(reader, Column(headers, "To Category", "ToCategory"))
             };
         }
 
@@ -167,7 +169,8 @@ namespace THMS.Ingestion.Importers.Finance
                 ["Last Amount"] = 5,
                 ["Date"] = 6,
                 ["Amount"] = 7,
-                ["Category"] = 8
+                ["From Category"] = 8,
+                ["To Category"] = 9
             };
             return headers.Where(pair => pair.Value < Math.Max(fieldCount, 1))
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);

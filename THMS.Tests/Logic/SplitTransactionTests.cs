@@ -1,9 +1,11 @@
 using THMS.Data.Stores;
+using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Budget;
 using THMS.Logic.Finance.Forecast;
 using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Transactions;
+using THMS.Logic.Finance.Transfer;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.ViewModels.Finance;
 
@@ -31,7 +33,10 @@ namespace THMS.Tests.Logic
             };
             Assert.That(() => SplitTransactionValidator.Validate(-50, transfer), Throws.InvalidOperationException);
 
-            transfer[0].TransferAccountId = Guid.NewGuid();
+            transfer[0].FromAccountId = Guid.NewGuid();
+            transfer[0].ToAccountId = Guid.NewGuid();
+            transfer[0].CategoryId = DefaultExpenseCategories.PaymentId;
+            transfer[0].Category = DefaultExpenseCategories.Payment;
             Assert.That(() => SplitTransactionValidator.Validate(-50, transfer), Throws.Nothing);
         }
 
@@ -384,6 +389,249 @@ namespace THMS.Tests.Logic
             Assert.That(orchestrator.SumPostedAmountsBefore(savings, new DateTime(2026, 1, 6)), Is.EqualTo(500m));
             Assert.That(orchestrator.SumPostedAmountsBefore(savings, new DateTime(2026, 1, 5)), Is.EqualTo(0m));
             Assert.That(orchestrator.GetParent(savingsTxs.IncomingTransferSplitPosted.First().Id)!.Amount, Is.EqualTo(1234m));
+        }
+
+        [Test]
+        public void WholeAmountTransfer_KeepsCategoryInsteadOfShowingSplit()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new TransactionOrchestrator(store);
+            var savings = Guid.NewGuid();
+            var checking = Guid.NewGuid();
+            var transferCategory = Guid.NewGuid();
+            var transportation = Guid.NewGuid();
+            var savingsTx = new PostedTransaction
+            {
+                AccountId = savings,
+                Date = new DateTime(2026, 9, 8),
+                Amount = -1000,
+                Description = "ONLINE TRANSFER TO TINKER T EVERYDAY CHECKING",
+                Category = "Transfer",
+                CategoryId = transferCategory,
+                ImportedStatus = ImportedStatus.Matched
+            };
+            var checkingTx = new PostedTransaction
+            {
+                AccountId = checking,
+                Date = new DateTime(2026, 9, 8),
+                Amount = 1000,
+                Description = "ONLINE TRANSFER FROM WAY2SAVE",
+                Category = "Transportation",
+                CategoryId = transportation,
+                ImportedStatus = ImportedStatus.Matched
+            };
+            store.AddPostedTransaction(savingsTx);
+            store.AddPostedTransaction(checkingTx);
+
+            var row = new SplitTransactionRow
+            {
+                Amount = -1000,
+                Type = SplitType.Transfer,
+                Category = "Transfer",
+                CategoryId = transferCategory,
+                FromAccountId = savings,
+                ToAccountId = checking
+            };
+            orchestrator.ApplySplits(savingsTx.Id, [row]);
+            var splitView = UnifiedTransactionViewBuilder.Build(
+                store.GetPostedTransactions(savings),
+                store.GetPostedTransferTransactions(savings),
+                forAccountId: savings).Single();
+            Assert.That(splitView.Category, Is.EqualTo(UnifiedTransactionView.SplitCategory));
+
+            Assert.That(orchestrator.TryApplyAsWholeTransfer(savingsTx.Id, [row.Clone()]), Is.True);
+
+            Assert.That(store.GetPostedTransaction(savingsTx.Id), Is.Null);
+            var transfer = store.GetPostedTransferTransaction(savingsTx.Id);
+            Assert.That(transfer, Is.Not.Null);
+            Assert.That(transfer!.Category, Is.EqualTo("Transfer"));
+            Assert.That(transfer.HasSplits, Is.False);
+            Assert.That(transfer.FromAccountId, Is.EqualTo(savings));
+            Assert.That(transfer.ToAccountId, Is.EqualTo(checking));
+            Assert.That(transfer.Direction, Is.EqualTo(TransferDirection.Outgoing));
+
+            var other = store.GetPostedTransferTransaction(checkingTx.Id);
+            Assert.That(other, Is.Not.Null);
+            Assert.That(other!.Category, Is.EqualTo("Transportation"));
+            Assert.That(other.FromAccountId, Is.EqualTo(savings));
+            Assert.That(other.ToAccountId, Is.EqualTo(checking));
+            Assert.That(other.Direction, Is.EqualTo(TransferDirection.Incoming));
+            Assert.That(transfer.RelatedPostedTransactionId, Is.EqualTo(checkingTx.Id));
+            Assert.That(other.RelatedPostedTransactionId, Is.EqualTo(savingsTx.Id));
+
+            var view = UnifiedTransactionViewBuilder.Build(
+                store.GetPostedTransactions(savings),
+                store.GetPostedTransferTransactions(savings),
+                forAccountId: savings).Single();
+            Assert.That(view.Category, Is.EqualTo("Transfer"));
+        }
+
+        [Test]
+        public void Seed_KeepsCategoryWithoutTreatingTransferCategoryAsTransferType()
+        {
+            var transferCategory = new ExpenseCategory { Id = Guid.NewGuid(), Name = "Transfer" };
+            var posted = new PostedTransaction
+            {
+                AccountId = Guid.NewGuid(),
+                Date = new DateTime(2026, 9, 8),
+                Amount = -1000,
+                Description = "ONLINE TRANSFER TO SAVINGS",
+                Category = "Transfer",
+                CategoryId = transferCategory.Id
+            };
+
+            var seed = SplitTransactionSeed.Create(posted, transferAccountId: Guid.NewGuid(), [transferCategory]);
+
+            Assert.That(seed.Category, Is.EqualTo("Transfer"));
+            Assert.That(seed.Type, Is.EqualTo(SplitType.Expense));
+            Assert.That(seed.FromAccountId, Is.Null);
+            Assert.That(seed.ToAccountId, Is.Null);
+        }
+
+        [Test]
+        public void Seed_UsesFromAndToOnAPostedTransfer()
+        {
+            var checking = Guid.NewGuid();
+            var savings = Guid.NewGuid();
+            var transferCategory = new ExpenseCategory { Id = Guid.NewGuid(), Name = "Transfer" };
+            var posted = new PostedTransferTransaction
+            {
+                AccountId = savings,
+                Date = new DateTime(2026, 9, 8),
+                Amount = -1000,
+                Description = "ONLINE TRANSFER TO CHECKING",
+                Category = "Transfer",
+                CategoryId = transferCategory.Id,
+                Direction = TransferDirection.Outgoing,
+                FromAccountId = savings,
+                ToAccountId = checking
+            };
+
+            var seed = SplitTransactionSeed.Create(posted, transferAccountId: null, [transferCategory]);
+
+            Assert.That(seed.Type, Is.EqualTo(SplitType.Transfer));
+            Assert.That(seed.CategoryId, Is.EqualTo(transferCategory.Id));
+            Assert.That(seed.FromAccountId, Is.EqualTo(savings));
+            Assert.That(seed.ToAccountId, Is.EqualTo(checking));
+        }
+
+        [Test]
+        public void Seed_KeepsExpenseTypeWhenTheTransactionIsNotATransfer()
+        {
+            var groceries = new ExpenseCategory { Id = DefaultExpenseCategories.GroceriesId, Name = DefaultExpenseCategories.Groceries };
+            var purchase = new PostedTransaction
+            {
+                AccountId = Guid.NewGuid(),
+                Date = new DateTime(2026, 9, 8),
+                Amount = -81.88m,
+                Description = "ZELLE FROM PANGELINAN ANNA",
+                CategoryId = groceries.Id,
+                Category = groceries.Name
+            };
+
+            var seed = SplitTransactionSeed.Create(purchase, transferAccountId: null, [groceries]);
+
+            Assert.That(seed.Type, Is.EqualTo(SplitType.Expense));
+            Assert.That(seed.CategoryId, Is.EqualTo(groceries.Id));
+            Assert.That(seed.TransferAccountId, Is.Null);
+        }
+
+        [Test]
+        public void ImportedTransferPairing_UsesSignForFromAndToAndRuleCategories()
+        {
+            var checking = Guid.NewGuid();
+            var savings = Guid.NewGuid();
+            var source = new ExpenseCategory { Id = Guid.NewGuid(), Name = "Savings transfer" };
+            var target = new ExpenseCategory { Id = Guid.NewGuid(), Name = "Checking receipt" };
+            var rule = new RecurringTransferRule
+            {
+                FromAccountId = savings,
+                ToAccountId = checking,
+                Amount = 1000,
+                NextOccurrence = new DateTime(2026, 9, 8),
+                IsActive = true,
+                CategoryId = source.Id,
+                Category = source.Name,
+                TargetCategoryId = target.Id,
+                TargetCategory = target.Name
+            };
+            var fromSide = new PostedTransaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = savings,
+                Date = new DateTime(2026, 9, 8),
+                Amount = -1000,
+                Description = "RECURRING TRANSFER TO CHECKING"
+            };
+            var toSide = new PostedTransaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = checking,
+                Date = new DateTime(2026, 9, 8),
+                Amount = 1000,
+                Description = "RECURRING TRANSFER FROM SAVINGS"
+            };
+
+            var pairs = ImportedTransferPairing.Find([fromSide], [toSide], [rule]);
+
+            Assert.That(pairs, Has.Count.EqualTo(1));
+            Assert.That(pairs[0].FromSide.AccountId, Is.EqualTo(savings));
+            Assert.That(pairs[0].ToSide.AccountId, Is.EqualTo(checking));
+            Assert.That(pairs[0].Rule, Is.SameAs(rule));
+        }
+
+        [Test]
+        public void ImportedTransferPairing_DefaultsWhenNoRuleMatchesTheDescription()
+        {
+            var fromSide = new PostedTransaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = Guid.NewGuid(),
+                Date = new DateTime(2026, 9, 4),
+                Amount = -1000,
+                Description = "ONLINE TRANSFER TO SAVINGS"
+            };
+            var toSide = new PostedTransaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = Guid.NewGuid(),
+                Date = new DateTime(2026, 9, 4),
+                Amount = 1000,
+                Description = "ONLINE TRANSFER FROM CHECKING"
+            };
+
+            var pairs = ImportedTransferPairing.Find([fromSide], [toSide], []);
+
+            Assert.That(pairs, Has.Count.EqualTo(1));
+            Assert.That(pairs[0].Rule, Is.Null);
+            Assert.That(pairs[0].FromSide.Id, Is.EqualTo(fromSide.Id));
+            Assert.That(pairs[0].ToSide.Id, Is.EqualTo(toSide.Id));
+        }
+
+        [Test]
+        public void ImportedTransferPairing_IgnoresACategoryNamedTransfer()
+        {
+            var fromSide = new PostedTransaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = Guid.NewGuid(),
+                Date = new DateTime(2026, 9, 4),
+                Amount = -40,
+                Description = "GROCERY",
+                Category = "Transfer"
+            };
+            var toSide = new PostedTransaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = Guid.NewGuid(),
+                Date = new DateTime(2026, 9, 4),
+                Amount = 40,
+                Description = "PAYCHECK"
+            };
+
+            var pairs = ImportedTransferPairing.Find([fromSide], [toSide], []);
+
+            Assert.That(pairs, Is.Empty);
         }
 
         [Test]

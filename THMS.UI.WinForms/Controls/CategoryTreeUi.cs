@@ -81,8 +81,24 @@ namespace THMS.UI.WinForms.Controls
                 Tag = category.Id,
                 Checked = currentId == category.Id
             };
-            item.Click += (_, _) => onAssign(category);
-            foreach (var child in ExpenseCategoryTree.Children(categories, category.Id))
+            var children = ExpenseCategoryTree.Children(categories, category.Id).ToList();
+            if (children.Count == 0)
+            {
+                item.Click += (_, _) => onAssign(category);
+                return item;
+            }
+
+            // A parent item with a submenu does not raise Click. Offer the parent
+            // itself as the first entry so it can be assigned.
+            var self = new ToolStripMenuItem(category.Name)
+            {
+                Tag = category.Id,
+                Checked = currentId == category.Id
+            };
+            self.Click += (_, _) => onAssign(category);
+            item.DropDownItems.Add(self);
+            item.DropDownItems.Add(new ToolStripSeparator());
+            foreach (var child in children)
                 item.DropDownItems.Add(CreateMenuItem(categories, child, currentId, suggestedId, onAssign));
             return item;
         }

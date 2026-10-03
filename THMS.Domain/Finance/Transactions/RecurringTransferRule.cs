@@ -16,5 +16,11 @@
 
         public bool IsFinalPaymentDifferent { get; set; }
         public decimal? FinalPaymentAmount { get; set; }
+
+        public Guid? TargetCategoryId { get; set; }
+        public string? TargetCategory { get; set; }
+
+        public Guid? SourceCategoryId => CategoryId;
+        public string? SourceCategory => Category;
     }
 }

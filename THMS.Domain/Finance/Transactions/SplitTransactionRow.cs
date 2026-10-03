@@ -12,6 +12,8 @@ namespace THMS.Domain.Finance.Transactions
         public SplitType Type { get; set; }
 
         public Guid? TransferAccountId { get; set; }
+        public Guid? FromAccountId { get; set; }
+        public Guid? ToAccountId { get; set; }
         public string? Notes { get; set; }
 
         public SplitTransactionRow Clone() =>
@@ -24,6 +26,8 @@ namespace THMS.Domain.Finance.Transactions
                 Category = Category,
                 Type = Type,
                 TransferAccountId = TransferAccountId,
+                FromAccountId = FromAccountId,
+                ToAccountId = ToAccountId,
                 Notes = Notes
             };
     }

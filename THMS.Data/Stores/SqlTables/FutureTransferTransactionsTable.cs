@@ -32,6 +32,8 @@ namespace THMS.Data.Stores.SqlTables
             EnsureColumn(conn, "Origin", "INTEGER NOT NULL DEFAULT 0");
             EnsureColumn(conn, "OriginId", "TEXT");
             EnsureColumn(conn, "Status", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn(conn, "TargetCategory", "TEXT");
+            EnsureColumn(conn, "TargetCategoryId", "TEXT");
         }
 
         public void Add(SqliteConnection conn, FutureTransferTransaction transaction)
@@ -41,11 +43,13 @@ namespace THMS.Data.Stores.SqlTables
                 INSERT INTO FutureTransferTransactions
                 (Id, Date, Description, Amount, Category, CategoryId, FromAccountId, ToAccountId,
                  IsRealized, PostedFromTransactionId, PostedToTransactionId, IsUserCreated,
-                 IsPlannedPayment, StatementId, PromotionalBalanceId, PlanningNote, Origin, OriginId, Status)
+                 IsPlannedPayment, StatementId, PromotionalBalanceId, PlanningNote, Origin, OriginId, Status,
+                 TargetCategory, TargetCategoryId)
                 VALUES
                 (@Id, @Date, @Description, @Amount, @Category, @CategoryId, @FromAccountId, @ToAccountId,
                  @IsRealized, @PostedFromTransactionId, @PostedToTransactionId, @IsUserCreated,
-                 @IsPlannedPayment, @StatementId, @PromotionalBalanceId, @PlanningNote, @Origin, @OriginId, @Status);";
+                 @IsPlannedPayment, @StatementId, @PromotionalBalanceId, @PlanningNote, @Origin, @OriginId, @Status,
+                 @TargetCategory, @TargetCategoryId);";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
         }
@@ -72,7 +76,9 @@ namespace THMS.Data.Stores.SqlTables
                     PlanningNote = @PlanningNote,
                     Origin = @Origin,
                     OriginId = @OriginId,
-                    Status = @Status
+                    Status = @Status,
+                    TargetCategory = @TargetCategory,
+                    TargetCategoryId = @TargetCategoryId
                 WHERE Id = @Id;";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
@@ -160,7 +166,8 @@ namespace THMS.Data.Stores.SqlTables
         private const string SelectColumns =
             @"SELECT Id, Date, Description, Amount, Category, FromAccountId, ToAccountId,
                      IsRealized, PostedFromTransactionId, PostedToTransactionId, IsUserCreated, CategoryId,
-                     IsPlannedPayment, StatementId, PromotionalBalanceId, PlanningNote, Origin, OriginId, Status";
+                     IsPlannedPayment, StatementId, PromotionalBalanceId, PlanningNote, Origin, OriginId, Status,
+                     TargetCategory, TargetCategoryId";
 
         private static void Bind(SqliteCommand cmd, FutureTransferTransaction transaction)
         {
@@ -191,6 +198,8 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@Origin", (int)transaction.Origin);
             cmd.Parameters.AddWithValue("@OriginId", BindGuid(transaction.OriginId));
             cmd.Parameters.AddWithValue("@Status", (int)transaction.Status);
+            cmd.Parameters.AddWithValue("@TargetCategory", (object?)transaction.TargetCategory ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@TargetCategoryId", SqliteCategoryColumns.BindId(transaction.TargetCategoryId));
         }
 
         private static FutureTransferTransaction Read(SqliteDataReader reader)
@@ -215,7 +224,9 @@ namespace THMS.Data.Stores.SqlTables
                 PlanningNote = reader.FieldCount > 15 && !reader.IsDBNull(15) ? reader.GetString(15) : null,
                 Origin = ReadEnum(reader, 16, ExpectedOrigin.Manual),
                 OriginId = SqliteCategoryColumns.ReadId(reader, 17),
-                Status = ReadEnum(reader, 18, ExpectedStatus.Planned)
+                Status = ReadEnum(reader, 18, ExpectedStatus.Planned),
+                TargetCategory = reader.FieldCount > 19 && !reader.IsDBNull(19) ? reader.GetString(19) : null,
+                TargetCategoryId = SqliteCategoryColumns.ReadId(reader, 20)
             };
         }
 

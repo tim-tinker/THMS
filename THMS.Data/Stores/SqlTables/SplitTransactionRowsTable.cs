@@ -22,6 +22,15 @@ namespace THMS.Data.Stores.SqlTables
                 CREATE INDEX IF NOT EXISTS IX_SplitTransactionRows_Parent
                     ON SplitTransactionRows (ParentTransactionId);";
             cmd.ExecuteNonQuery();
+            EnsureColumn(conn, "FromAccountId", "TEXT");
+            EnsureColumn(conn, "ToAccountId", "TEXT");
+        }
+
+        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
+        {
+            using var alter = conn.CreateCommand();
+            alter.CommandText = $"ALTER TABLE SplitTransactionRows ADD COLUMN IF NOT EXISTS {columnName} {columnDef};";
+            alter.ExecuteNonQuery();
         }
 
         public void ReplaceAll(SqliteConnection conn, Guid parentId, IEnumerable<SplitTransactionRow> splits)
@@ -89,9 +98,9 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO SplitTransactionRows
-                (Id, ParentTransactionId, Amount, Category, CategoryId, Type, TransferAccountId, Notes)
+                (Id, ParentTransactionId, Amount, Category, CategoryId, Type, TransferAccountId, Notes, FromAccountId, ToAccountId)
                 VALUES
-                (@Id, @ParentTransactionId, @Amount, @Category, @CategoryId, @Type, @TransferAccountId, @Notes);";
+                (@Id, @ParentTransactionId, @Amount, @Category, @CategoryId, @Type, @TransferAccountId, @Notes, @FromAccountId, @ToAccountId);";
             cmd.Parameters.AddWithValue("@Id", split.Id.ToString());
             cmd.Parameters.AddWithValue("@ParentTransactionId", split.ParentTransactionId.ToString());
             cmd.Parameters.AddWithValue("@Amount", split.Amount);
@@ -104,11 +113,13 @@ namespace THMS.Data.Stores.SqlTables
                     ? accountId.ToString()
                     : DBNull.Value);
             cmd.Parameters.AddWithValue("@Notes", (object?)split.Notes ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@FromAccountId", BindAccount(split.FromAccountId));
+            cmd.Parameters.AddWithValue("@ToAccountId", BindAccount(split.ToAccountId));
             cmd.ExecuteNonQuery();
         }
 
         private const string SelectColumns =
-            "SELECT Id, ParentTransactionId, Amount, Category, CategoryId, Type, TransferAccountId, Notes";
+            "SELECT Id, ParentTransactionId, Amount, Category, CategoryId, Type, TransferAccountId, Notes, FromAccountId, ToAccountId";
 
         private static List<SplitTransactionRow> ReadAll(SqliteCommand cmd)
         {
@@ -138,8 +149,18 @@ namespace THMS.Data.Stores.SqlTables
                 CategoryId = SqliteCategoryColumns.ReadId(reader, 4),
                 Type = type,
                 TransferAccountId = transferAccountId,
-                Notes = reader.IsDBNull(7) ? null : reader.GetString(7)
+                Notes = reader.IsDBNull(7) ? null : reader.GetString(7),
+                FromAccountId = ReadAccount(reader, 8),
+                ToAccountId = ReadAccount(reader, 9) ?? transferAccountId
             };
         }
+
+        private static object BindAccount(Guid? id) =>
+            id is Guid value && value != Guid.Empty ? value.ToString() : DBNull.Value;
+
+        private static Guid? ReadAccount(SqliteDataReader reader, int index) =>
+            reader.FieldCount > index && !reader.IsDBNull(index) && Guid.TryParse(reader.GetString(index), out var id) && id != Guid.Empty
+                ? id
+                : null;
     }
 }

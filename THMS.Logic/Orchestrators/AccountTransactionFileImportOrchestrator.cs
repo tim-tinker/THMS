@@ -1,6 +1,7 @@
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Transactions;
 using THMS.Ingestion.Importers.Finance;
+using THMS.Logic.Finance.Transfer;
 using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Finance;
 
@@ -103,6 +104,7 @@ namespace THMS.Logic.Orchestrators
                 .ToList();
 
             var total = selected.Count;
+            var postedRows = new List<PostedTransaction>(total);
             ImportProgressReporter.Report(progress, 0, total, activity: "Importing transactions");
             for (var i = 0; i < selected.Count; i++)
             {
@@ -117,8 +119,12 @@ namespace THMS.Logic.Orchestrators
                 };
                 _categorizer.ApplySuggestion(posted);
                 _transactions.AddPostedTransaction(posted);
+                postedRows.Add(posted);
                 ImportProgressReporter.Report(progress, i + 1, total, activity: "Importing transactions");
             }
+
+            if (postedRows.Count > 0)
+                PairTransfers(postedRows);
 
             if (total > 0)
             {
@@ -128,6 +134,57 @@ namespace THMS.Logic.Orchestrators
 
             ImportProgressReporter.Report(progress, total, total);
             return ImportResult.FromDates(total, selected.Select(row => row.Date!.Value));
+        }
+
+        private void PairTransfers(List<PostedTransaction> imported)
+        {
+            var start = imported.Min(t => t.Date).Date.AddDays(-ImportedTransferPairing.DayWindow);
+            var end = imported.Max(t => t.Date).Date.AddDays(ImportedTransferPairing.DayWindow);
+            var existing = _transactions.GetPostedTransactions(start, end).ToList();
+            var rules = _transactions.GetAllRecurringTransferRules().ToList();
+            var pairs = ImportedTransferPairing.Find(imported, existing, rules);
+            if (pairs.Count == 0)
+                return;
+
+            var transferCategory = _categorizer.GetOrCreate("Transfer");
+            foreach (var pair in pairs)
+            {
+                ConvertSide(pair.FromSide, pair.ToSide.Id, TransferDirection.Outgoing, pair.FromSide.AccountId, pair.ToSide.AccountId,
+                    SideCategory(pair.Rule, source: true, transferCategory));
+                ConvertSide(pair.ToSide, pair.FromSide.Id, TransferDirection.Incoming, pair.FromSide.AccountId, pair.ToSide.AccountId,
+                    SideCategory(pair.Rule, source: false, transferCategory));
+            }
+        }
+
+        private void ConvertSide(
+            PostedTransaction side,
+            Guid relatedId,
+            TransferDirection direction,
+            Guid fromAccountId,
+            Guid toAccountId,
+            ExpenseCategory category)
+        {
+            var transfer = new PostedTransferTransaction(side, relatedId, direction)
+            {
+                FromAccountId = fromAccountId,
+                ToAccountId = toAccountId
+            };
+            transfer.ApplyCategory(category);
+            _transactions.DeletePostedTransaction(side.Id);
+            _transactions.AddPostedTransferTransaction(transfer);
+        }
+
+        private static ExpenseCategory SideCategory(RecurringTransferRule? rule, bool source, ExpenseCategory fallback)
+        {
+            if (rule is null)
+                return fallback;
+
+            var id = source ? rule.CategoryId : rule.TargetCategoryId ?? rule.CategoryId;
+            var name = source ? rule.Category : rule.TargetCategory ?? rule.Category;
+            if (id is not Guid categoryId || categoryId == Guid.Empty || string.IsNullOrWhiteSpace(name))
+                return fallback;
+
+            return new ExpenseCategory { Id = categoryId, Name = name, IsActive = true };
         }
 
         private static DuplicateKey Key(DateTime date, decimal amount, string? description) =>

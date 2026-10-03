@@ -49,6 +49,17 @@ namespace THMS.UI.WinForms.Controls
 
         public void RefreshAccounts() => LoadAccounts();
 
+        public void Pay(Guid accountId)
+        {
+            var account = _accountOrchestrator.GetAccount(accountId);
+            if (account is null || !SupportsPay(account))
+                return;
+            PayAccount(account, LatestStatement(account));
+        }
+
+        private static bool SupportsPay(Account account) =>
+            account is CreditAccount or LoanAccount or MortgageAccount or UntrackedAccount;
+
         public void ImportAccountsFromFile() => OnImportAccounts(this, EventArgs.Empty);
 
         private void LoadAccounts()
@@ -342,7 +353,7 @@ namespace THMS.UI.WinForms.Controls
                 defaultDescription: "Charge");
             if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
-            RunActivity(() => _activityOrchestrator.AddPending(
+            RunActivity(() => _activityOrchestrator.AddPosted(
                 account.Id, dlg.Date, dlg.Amount, dlg.Description, dlg.CategoryId));
         }
 
@@ -368,7 +379,7 @@ namespace THMS.UI.WinForms.Controls
                 Categories());
             if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
-            RunActivity(() => _activityOrchestrator.AddPending(
+            RunActivity(() => _activityOrchestrator.AddPosted(
                 account.Id, dlg.Date, dlg.Amount, dlg.Description, dlg.CategoryId));
         }
 

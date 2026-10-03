@@ -19,6 +19,9 @@
         public Guid? OriginId { get; set; }
         public ExpectedStatus Status { get; set; } = ExpectedStatus.Planned;
 
+        public Guid? TargetCategoryId { get; set; }
+        public string? TargetCategory { get; set; }
+
         public string DisplayStatus(DateTime? asOf = null) =>
             TransactionStatuses.ForExpected(Date, IsRealized, Status, asOf);
     }

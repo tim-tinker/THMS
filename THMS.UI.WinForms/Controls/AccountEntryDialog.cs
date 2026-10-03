@@ -1,11 +1,12 @@
 using THMS.Domain.Finance.Transactions;
+using THMS.Logic.Finance.Transactions;
 
 namespace THMS.UI.WinForms.Controls
 {
     internal sealed class AccountEntryDialog : Form
     {
         private readonly NumericUpDown _amount = new();
-        private readonly DateTimePicker _date = new();
+        private readonly TextBox _date = new();
         private readonly TextBox _description = new();
         private readonly ComboBox _category = new();
         private readonly bool _requireCategory;
@@ -31,18 +32,21 @@ namespace THMS.UI.WinForms.Controls
             AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(460, 316);
 
-            var y = 16;
+            const int margin = 16;
+            const int contentWidth = 428;
+            var y = margin;
             if (!string.IsNullOrWhiteSpace(hint))
             {
-                Controls.Add(new Label
+                var hintLabel = new Label
                 {
                     Text = hint,
-                    Left = 16,
+                    Left = margin,
                     Top = y,
-                    Width = 420,
-                    Height = 40
-                });
-                y += 44;
+                    AutoSize = true,
+                    MaximumSize = new Size(contentWidth, 0)
+                };
+                Controls.Add(hintLabel);
+                y += hintLabel.Height + 12;
             }
 
             Controls.Add(LabelAt("Amount", 16, y));
@@ -59,8 +63,7 @@ namespace THMS.UI.WinForms.Controls
             _date.Left = 140;
             _date.Top = y;
             _date.Width = 280;
-            _date.Format = DateTimePickerFormat.Short;
-            _date.Value = DateTime.Today;
+            _date.Text = DateTime.Today.ToString("M/d/yyyy");
             Controls.Add(_date);
             y += 40;
 
@@ -94,12 +97,18 @@ namespace THMS.UI.WinForms.Controls
             }
             Controls.Add(_category);
 
-            var save = new ThmsButton { Text = "Save", Left = 220, Top = 244 };
+            y += 48;
+            var save = new ThmsButton { Text = "Save", Top = y };
             save.Click += OnSave;
-            var cancel = new ThmsButton { Text = "Cancel", Left = 330, Top = 244 };
+            var cancel = new ThmsButton { Text = "Cancel", Top = y };
             cancel.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
             Controls.Add(save);
             Controls.Add(cancel);
+            var cancelWidth = Math.Max(cancel.Width, cancel.PreferredSize.Width);
+            var saveWidth = Math.Max(save.Width, save.PreferredSize.Width);
+            cancel.Left = margin + contentWidth - cancelWidth;
+            save.Left = cancel.Left - saveWidth - 12;
+            ClientSize = new Size(margin + contentWidth + margin, y + save.Height + margin);
             AcceptButton = save;
             CancelButton = cancel;
         }
@@ -115,8 +124,14 @@ namespace THMS.UI.WinForms.Controls
                 return;
             }
 
+            if (!LedgerEntryDate.TryParse(_date.Text, out var date))
+            {
+                MessageBox.Show(this, "Enter a date like 9/28/2026.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             Amount = _amount.Value;
-            Date = _date.Value.Date;
+            Date = date;
             Description = _description.Text.Trim();
             CategoryId = _category.SelectedItem is ExpenseCategory category ? category.Id : null;
             if (_requireCategory && CategoryId is null)

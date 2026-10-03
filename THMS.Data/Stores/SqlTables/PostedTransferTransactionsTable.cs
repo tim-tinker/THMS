@@ -24,6 +24,8 @@ namespace THMS.Data.Stores.SqlTables
             EnsureColumn(conn, "ImportedStatus", "INTEGER NOT NULL DEFAULT 0");
             EnsureColumn(conn, "RecommendedExpectedId", "TEXT");
             EnsureColumn(conn, "ExternalTransactionId", "TEXT NOT NULL DEFAULT ''");
+            EnsureColumn(conn, "FromAccountId", "TEXT");
+            EnsureColumn(conn, "ToAccountId", "TEXT");
         }
 
         public void Add(SqliteConnection conn, PostedTransferTransaction transaction)
@@ -32,10 +34,10 @@ namespace THMS.Data.Stores.SqlTables
             cmd.CommandText = @"
                 INSERT INTO PostedTransferTransactions
                 (Id, AccountId, Date, Description, Amount, Category, CategoryId, RelatedPostedTransactionId, Direction,
-                 ImportedStatus, RecommendedExpectedId, ExternalTransactionId)
+                 ImportedStatus, RecommendedExpectedId, ExternalTransactionId, FromAccountId, ToAccountId)
                 VALUES
                 (@Id, @AccountId, @Date, @Description, @Amount, @Category, @CategoryId, @RelatedPostedTransactionId, @Direction,
-                 @ImportedStatus, @RecommendedExpectedId, @ExternalTransactionId);";
+                 @ImportedStatus, @RecommendedExpectedId, @ExternalTransactionId, @FromAccountId, @ToAccountId);";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
         }
@@ -55,7 +57,9 @@ namespace THMS.Data.Stores.SqlTables
                     Direction = @Direction,
                     ImportedStatus = @ImportedStatus,
                     RecommendedExpectedId = @RecommendedExpectedId,
-                    ExternalTransactionId = @ExternalTransactionId
+                    ExternalTransactionId = @ExternalTransactionId,
+                    FromAccountId = @FromAccountId,
+                    ToAccountId = @ToAccountId
                 WHERE Id = @Id;";
             Bind(cmd, transaction);
             cmd.ExecuteNonQuery();
@@ -171,7 +175,7 @@ namespace THMS.Data.Stores.SqlTables
         }
 
         private const string SelectColumns =
-            "SELECT Id, AccountId, Date, Description, Amount, Category, RelatedPostedTransactionId, Direction, CategoryId, ImportedStatus, RecommendedExpectedId, ExternalTransactionId";
+            "SELECT Id, AccountId, Date, Description, Amount, Category, RelatedPostedTransactionId, Direction, CategoryId, ImportedStatus, RecommendedExpectedId, ExternalTransactionId, FromAccountId, ToAccountId";
 
         private static void Bind(SqliteCommand cmd, PostedTransferTransaction transaction)
         {
@@ -195,7 +199,12 @@ namespace THMS.Data.Stores.SqlTables
                     ? expected.ToString()
                     : DBNull.Value);
             cmd.Parameters.AddWithValue("@ExternalTransactionId", transaction.ExternalTransactionId ?? "");
+            cmd.Parameters.AddWithValue("@FromAccountId", BindAccount(transaction.FromAccountId));
+            cmd.Parameters.AddWithValue("@ToAccountId", BindAccount(transaction.ToAccountId));
         }
+
+        private static object BindAccount(Guid id) =>
+            id == Guid.Empty ? DBNull.Value : id.ToString();
 
         private static PostedTransferTransaction Read(SqliteDataReader reader)
         {
@@ -212,9 +221,16 @@ namespace THMS.Data.Stores.SqlTables
                 CategoryId = SqliteCategoryColumns.ReadId(reader, 8),
                 ImportedStatus = ReadImportedStatus(reader, 9),
                 RecommendedExpectedId = SqliteCategoryColumns.ReadId(reader, 10),
-                ExternalTransactionId = ReadExternalId(reader, 11)
+                ExternalTransactionId = ReadExternalId(reader, 11),
+                FromAccountId = ReadAccount(reader, 12),
+                ToAccountId = ReadAccount(reader, 13)
             };
         }
+
+        private static Guid ReadAccount(SqliteDataReader reader, int index) =>
+            reader.FieldCount > index && !reader.IsDBNull(index) && Guid.TryParse(reader.GetString(index), out var id)
+                ? id
+                : Guid.Empty;
 
         private static string ReadExternalId(SqliteDataReader reader, int index) =>
             reader.FieldCount > index && !reader.IsDBNull(index) ? reader.GetString(index) : "";

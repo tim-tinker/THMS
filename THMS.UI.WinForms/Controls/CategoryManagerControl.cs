@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Aggregation;
+using THMS.Logic.Finance.Transactions;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
@@ -637,18 +638,32 @@ namespace THMS.UI.WinForms.Controls
             if (parent is null)
                 return;
 
+            var categories = Orchestrator.GetActiveCategories();
+            var accounts = _accounts.GetAllAccounts().ToList();
+            var existing = parent.Splits.Select(s => s.Clone()).ToList();
+            if (existing.Count == 0)
+            {
+                var ownerId = parent is BaseSingleAccountTransaction single && single.AccountId != Guid.Empty
+                    ? single.AccountId
+                    : view.AccountId;
+                var counterpart = _transactions.FindTransferCounterpartAccount(parent, ownerId, accounts);
+                existing = [SplitTransactionSeed.Create(parent, counterpart, categories)];
+            }
+
             using var editor = new SplitTransactionEditor(
                 parent.Description ?? view.Description,
                 parent.Amount,
-                parent.Splits.Select(s => s.Clone()).ToList(),
-                Orchestrator.GetActiveCategories(),
-                _accounts.GetAllAccounts().ToList());
+                existing,
+                categories,
+                accounts);
             if (editor.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
 
             try
             {
-                _transactions.ApplySplits(parent.Id, editor.Result);
+                if (!_transactions.TryApplyAsWholeTransfer(parent.Id, editor.Result))
+                    _transactions.ApplySplits(parent.Id, editor.Result);
+
                 NoteCatalogChanged();
                 Reload(_selectedCategoryId);
             }

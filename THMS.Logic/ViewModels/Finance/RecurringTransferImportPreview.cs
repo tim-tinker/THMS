@@ -13,7 +13,8 @@ namespace THMS.Logic.ViewModels.Finance
         public DateTime? LastOccurrence { get; set; }
         public DateTime NextOccurrence { get; set; }
         public decimal Amount { get; set; }
-        public string Category { get; set; } = "";
+        public string FromCategory { get; set; } = "";
+        public string ToCategory { get; set; } = "";
 
         public static RecurringTransferImportPreview FromParsed(ParsedSpreadsheetRecurringTransfer row) =>
             new()
@@ -27,7 +28,8 @@ namespace THMS.Logic.ViewModels.Finance
                 LastOccurrence = row.LastOccurrence,
                 NextOccurrence = row.NextOccurrence,
                 Amount = row.Amount,
-                Category = row.CategoryName
+                FromCategory = row.FromCategoryName,
+                ToCategory = row.ToCategoryName
             };
     }
 }

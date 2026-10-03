@@ -1,4 +1,5 @@
 ﻿using THMS.Data.Stores;
+using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Forecast;
 using THMS.Logic.Finance.Model;
@@ -154,11 +155,105 @@ namespace THMS.Logic.Orchestrators
 
         public BaseTransaction? GetParent(Guid transactionId) => FindParent(transactionId);
 
+        public Guid? FindTransferCounterpartAccount(
+            BaseTransaction parent,
+            Guid thisAccountId,
+            IReadOnlyList<Account> accounts)
+        {
+            if (parent is PostedTransferTransaction linked
+                && linked.RelatedPostedTransactionId != Guid.Empty
+                && FindParent(linked.RelatedPostedTransactionId) is BaseSingleAccountTransaction related
+                && related.AccountId != thisAccountId)
+            {
+                return related.AccountId;
+            }
+
+            if (parent is FutureTransferTransaction future)
+            {
+                if (thisAccountId == future.FromAccountId && future.ToAccountId != Guid.Empty)
+                    return future.ToAccountId;
+                if (thisAccountId == future.ToAccountId && future.FromAccountId != Guid.Empty)
+                    return future.FromAccountId;
+            }
+
+            if (parent is RecurringTransferRule rule)
+            {
+                if (thisAccountId == rule.FromAccountId && rule.ToAccountId != Guid.Empty)
+                    return rule.ToAccountId;
+                if (thisAccountId == rule.ToAccountId && rule.FromAccountId != Guid.Empty)
+                    return rule.FromAccountId;
+            }
+
+            var start = parent.Date.Date.AddDays(-SplitTransactionSeed.MatchDayWindow);
+            var end = parent.Date.Date.AddDays(SplitTransactionSeed.MatchDayWindow);
+            var activity = GetPostedActivity(start, end);
+            return SplitTransactionSeed.MatchCounterpartAccount(
+                parent,
+                thisAccountId,
+                accounts,
+                activity.Posted.Concat<PostedTransaction>(activity.Transfers));
+        }
+
         public void ReconcileRules(Guid accountId) =>
             new ReconciliationOrchestrator(_store).RecommendMatches();
 
         public List<SplitTransactionRow> GetSplits(Guid transactionId) =>
             _store.GetSplits(transactionId);
+
+        public bool TryApplyAsWholeTransfer(Guid transactionId, IReadOnlyList<SplitTransactionRow> splits)
+        {
+            if (splits.Count != 1)
+                return false;
+
+            var row = splits[0];
+            if (row.Type != SplitType.Transfer)
+                return false;
+            if (row.FromAccountId is not Guid fromId || fromId == Guid.Empty
+                || row.ToAccountId is not Guid toId || toId == Guid.Empty
+                || fromId == toId)
+                return false;
+
+            if (FindParent(transactionId) is not PostedTransaction posted || row.Amount != posted.Amount)
+                return false;
+            if (SplitTransactionMath.IsUncategorized(row.CategoryId, row.Category))
+                throw new InvalidOperationException("Transfer splits require a category.");
+
+            if (posted is PostedTransferTransaction)
+            {
+                ClearSplits(transactionId);
+                UpdateTransferPair(transactionId, fromId, toId, row.CategoryId, row.Category);
+                LinkUnlinkedCounterpart(transactionId, fromId, toId);
+                return true;
+            }
+
+            var transfer = CreateTransfer(posted, fromId, toId, row.CategoryId, row.Category, Guid.Empty);
+            _store.DeletePostedTransaction(posted.Id);
+            _store.AddPostedTransferTransaction(transfer);
+            LinkUnlinkedCounterpart(transfer.Id, fromId, toId);
+            RefreshBudgets(transfer);
+            return true;
+        }
+
+        public void UpdateTransferPair(Guid transactionId, Guid fromAccountId, Guid toAccountId, Guid? categoryId, string? category)
+        {
+            if (FindParent(transactionId) is not PostedTransferTransaction side)
+                throw new InvalidOperationException($"Transfer {transactionId} was not found.");
+
+            side.FromAccountId = fromAccountId;
+            side.ToAccountId = toAccountId;
+            side.CategoryId = categoryId;
+            side.Category = category;
+            _store.UpdatePostedTransferTransaction(side);
+
+            if (side.RelatedPostedTransactionId != Guid.Empty
+                && FindParent(side.RelatedPostedTransactionId) is PostedTransferTransaction other)
+            {
+                other.FromAccountId = fromAccountId;
+                other.ToAccountId = toAccountId;
+                other.RelatedPostedTransactionId = side.Id;
+                _store.UpdatePostedTransferTransaction(other);
+            }
+        }
 
         public void ApplySplits(Guid transactionId, List<SplitTransactionRow> splits)
         {
@@ -241,6 +336,80 @@ namespace THMS.Logic.Orchestrators
             (BaseTransaction?)_store.GetRecurringSingleRule(transactionId) ??
             _store.GetRecurringTransferRule(transactionId);
 
+        private void LinkUnlinkedCounterpart(Guid transactionId, Guid fromAccountId, Guid toAccountId)
+        {
+            if (FindParent(transactionId) is not PostedTransferTransaction side
+                || side.RelatedPostedTransactionId != Guid.Empty)
+                return;
+
+            var otherAccountId = side.AccountId == fromAccountId ? toAccountId
+                : side.AccountId == toAccountId ? fromAccountId
+                : Guid.Empty;
+            if (otherAccountId == Guid.Empty)
+                return;
+
+            var start = side.Date.Date.AddDays(-SplitTransactionSeed.MatchDayWindow);
+            var end = side.Date.Date.AddDays(SplitTransactionSeed.MatchDayWindow);
+            var candidates = _store.GetPostedTransactions(otherAccountId, start, end)
+                .Where(t => t.Amount == -side.Amount && CanAbsorbAsTransfer(t))
+                .Concat<PostedTransaction>(_store.GetPostedTransferTransactions(otherAccountId, start, end)
+                    .Where(t => t.Id != side.Id && t.Amount == -side.Amount && CanAbsorbAsTransfer(t)))
+                .ToList();
+            if (candidates.Count != 1)
+                return;
+
+            var match = candidates[0];
+            PostedTransferTransaction other;
+            if (match is PostedTransferTransaction existing)
+            {
+                existing.FromAccountId = fromAccountId;
+                existing.ToAccountId = toAccountId;
+                existing.RelatedPostedTransactionId = side.Id;
+                existing.Direction = existing.AccountId == toAccountId
+                    ? TransferDirection.Incoming
+                    : TransferDirection.Outgoing;
+                _store.DeleteSplits(existing.Id);
+                existing.Splits = [];
+                _store.UpdatePostedTransferTransaction(existing);
+                other = existing;
+            }
+            else
+            {
+                other = CreateTransfer(match, fromAccountId, toAccountId, match.CategoryId, match.Category, side.Id);
+                _store.DeletePostedTransaction(match.Id);
+                _store.AddPostedTransferTransaction(other);
+            }
+
+            side.RelatedPostedTransactionId = other.Id;
+            _store.UpdatePostedTransferTransaction(side);
+        }
+
+        private static bool CanAbsorbAsTransfer(PostedTransaction transaction) =>
+            transaction.Splits.Count == 0
+            || (transaction.Splits.Count == 1
+                && transaction.Splits[0].Type == SplitType.Transfer
+                && transaction.Splits[0].Amount == transaction.Amount);
+
+        private static PostedTransferTransaction CreateTransfer(
+            PostedTransaction source,
+            Guid fromAccountId,
+            Guid toAccountId,
+            Guid? categoryId,
+            string? category,
+            Guid relatedId)
+        {
+            return new PostedTransferTransaction(
+                source,
+                relatedId,
+                source.AccountId == toAccountId ? TransferDirection.Incoming : TransferDirection.Outgoing)
+            {
+                FromAccountId = fromAccountId,
+                ToAccountId = toAccountId,
+                CategoryId = categoryId,
+                Category = category
+            };
+        }
+
         private static List<SplitTransactionRow> PrepareSplits(Guid parentId, IEnumerable<SplitTransactionRow> splits)
         {
             var prepared = new List<SplitTransactionRow>();
@@ -250,8 +419,18 @@ namespace THMS.Logic.Orchestrators
                 if (copy.Id == Guid.Empty)
                     copy.Id = Guid.NewGuid();
                 copy.ParentTransactionId = parentId;
-                if (copy.Type != SplitType.Transfer)
+                if (copy.Type == SplitType.Transfer)
+                {
+                    if (copy.ToAccountId is null && copy.TransferAccountId is Guid destination && destination != Guid.Empty)
+                        copy.ToAccountId = destination;
+                    copy.TransferAccountId = copy.ToAccountId;
+                }
+                else
+                {
                     copy.TransferAccountId = null;
+                    copy.FromAccountId = null;
+                    copy.ToAccountId = null;
+                }
                 prepared.Add(copy);
             }
 

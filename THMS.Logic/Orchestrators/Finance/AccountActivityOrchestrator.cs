@@ -19,30 +19,6 @@ namespace THMS.Logic.Orchestrators.Finance
             _categories = categories;
         }
 
-        public FutureSingleTransaction AddPending(
-            Guid accountId,
-            DateTime date,
-            decimal amount,
-            string? description,
-            Guid? categoryId)
-        {
-            EnsureAccount(accountId);
-            EnsureAmount(amount);
-            var transaction = new FutureSingleTransaction
-            {
-                AccountId = accountId,
-                Date = date.Date,
-                Amount = amount,
-                Description = Normalize(description),
-                IsUserCreated = true,
-                Origin = ExpectedOrigin.Manual,
-                Status = ExpectedStatus.Planned
-            };
-            ApplyCategory(transaction, categoryId);
-            _transactions.AddFutureSingleTransaction(transaction);
-            return transaction;
-        }
-
         public PostedTransaction AddPosted(
             Guid accountId,
             DateTime date,
@@ -57,7 +33,8 @@ namespace THMS.Logic.Orchestrators.Finance
                 AccountId = accountId,
                 Date = date.Date,
                 Amount = amount,
-                Description = Normalize(description)
+                Description = Normalize(description),
+                ImportedStatus = ImportedStatus.Unmatched
             };
             ApplyCategory(transaction, categoryId);
             _transactions.AddPostedTransaction(transaction);

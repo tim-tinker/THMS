@@ -19,7 +19,8 @@ namespace THMS.Domain.Finance.Transactions
     {
         Unreconciled = 0,
         Matched = 1,
-        AcceptedNew = 2
+        AcceptedNew = 2,
+        Unmatched = 3
     }
 
     public static class TransactionStatuses
@@ -28,6 +29,7 @@ namespace THMS.Domain.Finance.Transactions
         public const string Scheduled = "Scheduled";
         public const string Pending = "Pending";
         public const string Unreconciled = "Unreconciled";
+        public const string Unmatched = "Unmatched";
         public const string Reconciled = "Reconciled";
         public const string New = "New";
 
@@ -35,9 +37,11 @@ namespace THMS.Domain.Finance.Transactions
         {
             if (realized)
                 return Reconciled;
+            if (status == ExpectedStatus.Scheduled)
+                return Scheduled;
             if (date.Date < (asOf ?? DateTime.Today).Date)
                 return Pending;
-            return status == ExpectedStatus.Scheduled ? Scheduled : Planned;
+            return Planned;
         }
 
         public static string ForImported(ImportedStatus status) =>
@@ -45,10 +49,11 @@ namespace THMS.Domain.Finance.Transactions
             {
                 ImportedStatus.Matched => Reconciled,
                 ImportedStatus.AcceptedNew => New,
+                ImportedStatus.Unmatched => Unmatched,
                 _ => Unreconciled
             };
 
         public static bool IsLedgerImported(ImportedStatus status) =>
-            status is ImportedStatus.Matched or ImportedStatus.AcceptedNew;
+            status is ImportedStatus.Matched or ImportedStatus.AcceptedNew or ImportedStatus.Unmatched;
     }
 }

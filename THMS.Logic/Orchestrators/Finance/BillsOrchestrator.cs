@@ -79,7 +79,8 @@ namespace THMS.Logic.Orchestrators.Finance
             foreach (var rule in _transactions.GetAllRecurringSingleRules()
                          .Where(r => r.IsActive && r.AccountId == accountId))
             {
-                if (IsCovered(PaymentIntentSource.RecurringSingle, rule.Id, rule.AccountId, rule.NextOccurrence.Date))
+                if (IsCovered(PaymentIntentSource.RecurringSingle, rule.Id, rule.AccountId, rule.NextOccurrence.Date)
+                    || OccurrenceExists(rule.AccountId, rule.NextOccurrence.Date, rule.Description))
                     continue;
 
                 rows.Add(new BillRow
@@ -105,7 +106,9 @@ namespace THMS.Logic.Orchestrators.Finance
             {
                 if (rule.FromAccountId == rule.ToAccountId)
                     continue;
-                if (IsCovered(PaymentIntentSource.RecurringTransfer, rule.Id, rule.ToAccountId, rule.NextOccurrence.Date))
+                if (IsCovered(PaymentIntentSource.RecurringTransfer, rule.Id, rule.ToAccountId, rule.NextOccurrence.Date)
+                    || OccurrenceExists(rule.FromAccountId, rule.NextOccurrence.Date, rule.Description)
+                    || OccurrenceExists(rule.ToAccountId, rule.NextOccurrence.Date, rule.Description))
                     continue;
                 if (accountId == rule.ToAccountId
                     && latest is not null
@@ -230,6 +233,254 @@ namespace THMS.Logic.Orchestrators.Finance
 
         public IReadOnlyList<Account> GetAccounts() =>
             _accounts.GetAllAccounts().OrderBy(a => a.Name).ToList();
+
+        public IReadOnlyList<ExpenseCategory> GetCategories()
+        {
+            _transactions.EnsureDefaultCategories();
+            return _transactions.GetAllCategories().OrderBy(c => c.Name).ToList();
+        }
+
+        public void DeleteEnteredBill(Guid expectedId)
+        {
+            if (_transactions.GetFutureSingleTransaction(expectedId) is not null)
+            {
+                _transactions.DeleteFutureSingleTransaction(expectedId);
+                return;
+            }
+
+            if (_transactions.GetFutureTransferTransaction(expectedId) is not null)
+                _transactions.DeleteFutureTransferTransaction(expectedId);
+        }
+
+        public void AddEnteredBill(
+            Guid billAccountId,
+            string description,
+            decimal amount,
+            Guid billCategoryId,
+            DateTime date,
+            Guid? creditAccountId,
+            Guid? creditCategoryId,
+            RecurrenceFrequency? frequency)
+        {
+            if (billAccountId == Guid.Empty)
+                throw new InvalidOperationException("Select an account to bill.");
+            if (string.IsNullOrWhiteSpace(description))
+                throw new InvalidOperationException("Description is required.");
+            if (amount == 0)
+                throw new InvalidOperationException("Amount cannot be zero.");
+
+            var credit = creditAccountId is Guid creditId && creditId != Guid.Empty ? creditId : (Guid?)null;
+            if (credit == billAccountId)
+                throw new InvalidOperationException("Account to credit must be a different account.");
+
+            var billCategory = RequireCategory(billCategoryId);
+            var when = date.Date;
+            var notes = description.Trim();
+            if (credit is null)
+            {
+                if (frequency is null)
+                {
+                    var single = new FutureSingleTransaction
+                    {
+                        AccountId = billAccountId,
+                        Date = when,
+                        Amount = amount,
+                        Description = notes,
+                        Origin = ExpectedOrigin.Manual,
+                        Status = ExpectedStatus.Planned,
+                        IsUserCreated = true
+                    };
+                    single.ApplyCategory(billCategory);
+                    _transactions.AddFutureSingleTransaction(single);
+                    return;
+                }
+
+                var rule = new RecurringSingleTransactionRule
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = billAccountId,
+                    Description = notes,
+                    Amount = amount,
+                    Frequency = frequency.Value,
+                    NextOccurrence = when,
+                    IsActive = true,
+                    IsUserCreated = true
+                };
+                rule.ApplyCategory(billCategory);
+                _transactions.AddRecurringSingleRule(rule);
+                new ReconciliationOrchestrator(_transactions).MaterializeRule(rule);
+                return;
+            }
+
+            var creditCategory = RequireCategory(creditCategoryId ?? Guid.Empty);
+            if (frequency is null)
+            {
+                var transfer = new FutureTransferTransaction
+                {
+                    FromAccountId = credit.Value,
+                    ToAccountId = billAccountId,
+                    Date = when,
+                    Amount = Math.Abs(amount),
+                    Description = notes,
+                    Origin = ExpectedOrigin.Manual,
+                    Status = ExpectedStatus.Planned,
+                    IsUserCreated = true
+                };
+                ApplyTransferCategories(transfer, creditCategory, billCategory);
+                _transactions.AddFutureTransferTransaction(transfer);
+                return;
+            }
+
+            var transferRule = new RecurringTransferRule
+            {
+                Id = Guid.NewGuid(),
+                FromAccountId = credit.Value,
+                ToAccountId = billAccountId,
+                Description = notes,
+                Amount = Math.Abs(amount),
+                Frequency = frequency.Value,
+                NextOccurrence = when,
+                IsActive = true,
+                IsUserCreated = true
+            };
+            transferRule.ApplyCategory(creditCategory);
+            transferRule.TargetCategoryId = billCategory.Id;
+            transferRule.TargetCategory = billCategory.Name;
+            _transactions.AddRecurringTransferRule(transferRule);
+            new ReconciliationOrchestrator(_transactions).MaterializeRule(transferRule);
+        }
+
+        public BillDraft? LoadBill(BillRow row)
+        {
+            ArgumentNullException.ThrowIfNull(row);
+            if (row.Source == PaymentIntentSource.RecurringSingle
+                && row.SourceId is Guid singleId
+                && _transactions.GetRecurringSingleRule(singleId) is { } single)
+            {
+                return new BillDraft
+                {
+                    Source = PaymentIntentSource.RecurringSingle,
+                    RuleId = single.Id,
+                    BillAccountId = single.AccountId,
+                    Description = single.Description ?? "",
+                    Amount = single.Amount,
+                    BillCategoryId = single.CategoryId,
+                    Date = single.NextOccurrence.Date,
+                    Frequency = single.Frequency
+                };
+            }
+
+            if (row.Source == PaymentIntentSource.RecurringTransfer
+                && row.SourceId is Guid transferId
+                && _transactions.GetRecurringTransferRule(transferId) is { } transfer)
+            {
+                return new BillDraft
+                {
+                    Source = PaymentIntentSource.RecurringTransfer,
+                    RuleId = transfer.Id,
+                    BillAccountId = transfer.ToAccountId,
+                    CreditAccountId = transfer.FromAccountId,
+                    Description = transfer.Description ?? "",
+                    Amount = Math.Abs(transfer.Amount),
+                    BillCategoryId = transfer.TargetCategoryId ?? transfer.CategoryId,
+                    CreditCategoryId = transfer.CategoryId,
+                    Date = transfer.NextOccurrence.Date,
+                    Frequency = transfer.Frequency
+                };
+            }
+
+            if (row.IntentId is not Guid expectedId)
+                return null;
+
+            if (_transactions.GetFutureSingleTransaction(expectedId) is { } futureSingle
+                && futureSingle.Origin is ExpectedOrigin.Manual or ExpectedOrigin.Pay)
+            {
+                return new BillDraft
+                {
+                    Source = PaymentIntentSource.Manual,
+                    ExpectedId = futureSingle.Id,
+                    BillAccountId = futureSingle.AccountId,
+                    Description = futureSingle.Description ?? "",
+                    Amount = futureSingle.Amount,
+                    BillCategoryId = futureSingle.CategoryId,
+                    Date = futureSingle.Date.Date
+                };
+            }
+
+            if (_transactions.GetFutureTransferTransaction(expectedId) is { } futureTransfer
+                && futureTransfer.Origin is ExpectedOrigin.Manual or ExpectedOrigin.Pay)
+            {
+                return new BillDraft
+                {
+                    Source = PaymentIntentSource.Manual,
+                    ExpectedId = futureTransfer.Id,
+                    BillAccountId = futureTransfer.ToAccountId,
+                    CreditAccountId = futureTransfer.FromAccountId,
+                    Description = futureTransfer.Description ?? "",
+                    Amount = Math.Abs(futureTransfer.Amount),
+                    BillCategoryId = futureTransfer.TargetCategoryId ?? futureTransfer.CategoryId,
+                    CreditCategoryId = futureTransfer.CategoryId,
+                    Date = futureTransfer.Date.Date
+                };
+            }
+
+            return null;
+        }
+
+        public void SaveEditedBill(
+            BillDraft existing,
+            Guid billAccountId,
+            string description,
+            decimal amount,
+            Guid billCategoryId,
+            DateTime date,
+            Guid? creditAccountId,
+            Guid? creditCategoryId,
+            RecurrenceFrequency? frequency)
+        {
+            ArgumentNullException.ThrowIfNull(existing);
+            if (existing.Source == PaymentIntentSource.RecurringSingle && existing.RuleId is Guid singleId)
+            {
+                new ReconciliationOrchestrator(_transactions).DropUnmatchedForRule(singleId);
+                _transactions.DeleteRecurringSingleRule(singleId);
+            }
+            else if (existing.Source == PaymentIntentSource.RecurringTransfer && existing.RuleId is Guid transferId)
+            {
+                new ReconciliationOrchestrator(_transactions).DropUnmatchedForRule(transferId);
+                _transactions.DeleteRecurringTransferRule(transferId);
+            }
+            else if (existing.ExpectedId is Guid expectedId)
+            {
+                DeleteEnteredBill(expectedId);
+            }
+
+            AddEnteredBill(
+                billAccountId,
+                description,
+                amount,
+                billCategoryId,
+                date,
+                creditAccountId,
+                creditCategoryId,
+                frequency);
+        }
+
+        private ExpenseCategory RequireCategory(Guid categoryId)
+        {
+            _transactions.EnsureDefaultCategories();
+            return _transactions.GetCategory(categoryId)
+                ?? throw new InvalidOperationException("Select a category.");
+        }
+
+        private static void ApplyTransferCategories(
+            FutureTransferTransaction transfer,
+            ExpenseCategory creditCategory,
+            ExpenseCategory billCategory)
+        {
+            transfer.ApplyCategory(creditCategory);
+            transfer.TargetCategoryId = billCategory.Id;
+            transfer.TargetCategory = billCategory.Name;
+        }
 
         public List<Guid> Schedule(IEnumerable<BillRow> rows)
         {
@@ -357,7 +608,7 @@ namespace THMS.Logic.Orchestrators.Finance
                 || (row.Source == PaymentIntentSource.Statement && row.FundingAccountId == Guid.Empty))
             {
                 var existingSingle = UnmatchedSingles()
-                    .FirstOrDefault(e => SameBill(e.Id, e.Origin, e.OriginId, e.AccountId, e.Date, row));
+                    .FirstOrDefault(e => SameBill(e.Id, e.Origin, e.OriginId, row));
                 if (existingSingle is not null)
                 {
                     ApplySingle(existingSingle, row, origin, status);
@@ -367,13 +618,13 @@ namespace THMS.Logic.Orchestrators.Finance
 
                 var single = new FutureSingleTransaction();
                 ApplySingle(single, row, origin, status);
-                ApplyPaymentCategory(single);
+                CopySourceCategory(single, row);
                 _transactions.AddFutureSingleTransaction(single);
                 return single.Id;
             }
 
             var existing = UnmatchedTransfers()
-                .FirstOrDefault(e => SameBill(e.Id, e.Origin, e.OriginId, e.ToAccountId, e.Date, row));
+                .FirstOrDefault(e => SameBill(e.Id, e.Origin, e.OriginId, row));
             if (existing is not null)
             {
                 ApplyTransfer(existing, row, origin, status);
@@ -383,7 +634,7 @@ namespace THMS.Logic.Orchestrators.Finance
 
             var transfer = new FutureTransferTransaction();
             ApplyTransfer(transfer, row, origin, status);
-            ApplyPaymentCategory(transfer);
+            CopySourceCategory(transfer, row);
             _transactions.AddFutureTransferTransaction(transfer);
             return transfer.Id;
         }
@@ -427,6 +678,17 @@ namespace THMS.Logic.Orchestrators.Finance
             }
         }
 
+        private bool OccurrenceExists(Guid accountId, DateTime due, string? description)
+        {
+            var notes = description ?? "";
+            return UnmatchedSingles().Any(p =>
+                    p.AccountId == accountId && p.Date.Date == due.Date && (p.Description ?? "") == notes)
+                || UnmatchedTransfers().Any(p =>
+                    (p.FromAccountId == accountId || p.ToAccountId == accountId)
+                    && p.Date.Date == due.Date
+                    && (p.Description ?? "") == notes);
+        }
+
         private bool IsCovered(
             PaymentIntentSource source,
             Guid sourceId,
@@ -434,30 +696,57 @@ namespace THMS.Logic.Orchestrators.Finance
             DateTime due)
         {
             var origin = OriginOf(source);
-            if (UnmatchedTransfers().Any(p =>
-                    (p.Origin == origin && p.OriginId == sourceId)
-                    || (p.ToAccountId == destinationId && p.Date.Date == due.Date)))
+            if (UnmatchedSingles().Any(p => p.Origin == origin && p.OriginId == sourceId)
+                || UnmatchedTransfers().Any(p => p.Origin == origin && p.OriginId == sourceId))
                 return true;
-            return UnmatchedSingles().Any(p =>
-                (p.Origin == origin && p.OriginId == sourceId)
-                || (p.AccountId == destinationId && p.Date.Date == due.Date));
+
+            if (source != PaymentIntentSource.Statement)
+                return false;
+
+            return UnmatchedTransfers().Any(p => p.ToAccountId == destinationId && p.Date.Date == due.Date)
+                || UnmatchedSingles().Any(p => p.AccountId == destinationId && p.Date.Date == due.Date);
         }
 
         private static bool SameBill(
             Guid id,
             ExpectedOrigin origin,
             Guid? originId,
-            Guid destinationId,
-            DateTime date,
             BillRow row)
         {
             if (row.IntentId is Guid existingId && id == existingId)
                 return true;
-            if (row.SourceId is Guid sourceId && origin == OriginOf(row.Source) && originId == sourceId)
-                return true;
-            return destinationId == row.DestinationAccountId
-                && date.Date == row.DueDate.Date
-                && origin == OriginOf(row.Source);
+            return row.SourceId is Guid sourceId
+                && origin == OriginOf(row.Source)
+                && originId == sourceId;
+        }
+
+        private void CopySourceCategory(BaseTransaction target, BillRow row)
+        {
+            if (row.Source == PaymentIntentSource.RecurringSingle
+                && row.SourceId is Guid singleId
+                && _transactions.GetRecurringSingleRule(singleId) is { } single)
+            {
+                target.CategoryId = single.CategoryId;
+                target.Category = single.Category;
+                return;
+            }
+
+            if (row.Source == PaymentIntentSource.RecurringTransfer
+                && row.SourceId is Guid transferId
+                && _transactions.GetRecurringTransferRule(transferId) is { } transferRule)
+            {
+                target.CategoryId = transferRule.CategoryId;
+                target.Category = transferRule.Category;
+                if (target is FutureTransferTransaction transfer)
+                {
+                    transfer.TargetCategoryId = transferRule.TargetCategoryId;
+                    transfer.TargetCategory = transferRule.TargetCategory;
+                }
+
+                return;
+            }
+
+            ApplyPaymentCategory(target);
         }
 
         private static void ApplyTransfer(
