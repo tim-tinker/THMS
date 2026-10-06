@@ -2,6 +2,7 @@ using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
+using THMS.Logic.Finance.Forecast;
 using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Planning;
 using THMS.Logic.ViewModels.Finance;
@@ -233,6 +234,99 @@ namespace THMS.Logic.Orchestrators.Finance
 
         public IReadOnlyList<Account> GetAccounts() =>
             _accounts.GetAllAccounts().OrderBy(a => a.Name).ToList();
+
+        public BalanceProjection GetProjection(Guid accountId, DateTime? asOf = null)
+        {
+            var asOfDate = (asOf ?? DateTime.Today).Date;
+            var account = _accounts.GetAllAccounts().FirstOrDefault(item => item.Id == accountId);
+            if (account is null)
+                return BalanceProjection.Empty(asOfDate);
+
+            return AccountBalanceProjection.Build(
+                account,
+                _statements.GetForAccount(accountId).ToList(),
+                _transactions,
+                asOfDate);
+        }
+
+        public RecurringTransferRule? GetPaymentPlan(Guid accountId) =>
+            PaymentPlans(accountId).FirstOrDefault(rule => rule.IsActive)
+            ?? PaymentPlans(accountId).FirstOrDefault();
+
+        public void SavePaymentPlan(
+            Guid accountId,
+            Guid fundingAccountId,
+            decimal amount,
+            RecurrenceFrequency frequency,
+            DateTime nextDate,
+            DateTime endDate)
+        {
+            if (amount <= 0)
+                throw new InvalidOperationException("Amount must be greater than zero.");
+            if (fundingAccountId == Guid.Empty)
+                throw new InvalidOperationException("Select a bank account.");
+            if (fundingAccountId == accountId)
+                throw new InvalidOperationException("Pay from a different account.");
+            if (endDate.Date < nextDate.Date)
+                throw new InvalidOperationException("End date must be on or after the next payment.");
+
+            var account = _accounts.GetAllAccounts().FirstOrDefault(a => a.Id == accountId)
+                ?? throw new InvalidOperationException("Account was not found.");
+            var plans = PaymentPlans(accountId);
+            var rule = plans.FirstOrDefault() ?? new RecurringTransferRule
+            {
+                Id = Guid.NewGuid(),
+                IsPaymentPlan = true,
+                IsUserCreated = true
+            };
+            var reconciliation = new ReconciliationOrchestrator(_transactions);
+            foreach (var extra in plans.Where(candidate => candidate.Id != rule.Id))
+            {
+                reconciliation.DropUnmatchedForRule(extra.Id);
+                _transactions.DeleteRecurringTransferRule(extra.Id);
+            }
+
+            rule.FromAccountId = fundingAccountId;
+            rule.ToAccountId = accountId;
+            rule.Amount = Math.Abs(amount);
+            rule.Frequency = frequency;
+            rule.NextOccurrence = nextDate.Date;
+            rule.EndDate = endDate.Date;
+            rule.Description = $"{account.Name} payment";
+            rule.IsActive = true;
+            rule.IsPaymentPlan = true;
+            rule.IsUserCreated = true;
+            ApplyPaymentCategory(rule);
+            rule.TargetCategoryId = rule.CategoryId;
+            rule.TargetCategory = rule.Category;
+
+            if (plans.Any(candidate => candidate.Id == rule.Id))
+            {
+                reconciliation.DropUnmatchedForRule(rule.Id);
+                _transactions.UpdateRecurringTransferRule(rule);
+            }
+            else
+            {
+                _transactions.AddRecurringTransferRule(rule);
+            }
+
+            reconciliation.MaterializeRule(rule);
+        }
+
+        public void DeletePaymentPlan(Guid accountId)
+        {
+            var reconciliation = new ReconciliationOrchestrator(_transactions);
+            foreach (var rule in PaymentPlans(accountId))
+            {
+                reconciliation.DropUnmatchedForRule(rule.Id);
+                _transactions.DeleteRecurringTransferRule(rule.Id);
+            }
+        }
+
+        private List<RecurringTransferRule> PaymentPlans(Guid accountId) =>
+            _transactions.GetRecurringTransferRules(accountId)
+                .Where(rule => rule.IsPaymentPlan && rule.ToAccountId == accountId)
+                .ToList();
 
         public IReadOnlyList<ExpenseCategory> GetCategories()
         {

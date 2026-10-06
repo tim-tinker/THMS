@@ -13,6 +13,7 @@
         public DateTime? EndDate { get; set; }
         public bool IsActive { get; set; } = true;
         public bool IsUserCreated { get; set; }
+        public bool IsPaymentPlan { get; set; }
 
         public bool IsFinalPaymentDifferent { get; set; }
         public decimal? FinalPaymentAmount { get; set; }

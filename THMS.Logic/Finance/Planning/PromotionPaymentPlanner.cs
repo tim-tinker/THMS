@@ -78,11 +78,38 @@ namespace THMS.Logic.Finance.Planning
             if (balance == 0)
                 return 0;
 
-            var effective = type == PromoType.EqualPayments
-                ? RecurrenceFrequency.Monthly
-                : frequency;
-            var periods = RemainingPeriods(asOf, deadline, effective);
+            if (type == PromoType.EqualPayments)
+                return EqualPayment(balance, asOf, deadline, frequency);
+
+            var periods = RemainingPeriods(asOf, deadline, frequency);
             return MoneyCeiling(balance / periods);
+        }
+
+        private static decimal EqualPayment(
+            decimal balance,
+            DateTime asOf,
+            DateTime deadline,
+            RecurrenceFrequency frequency)
+        {
+            var monthly = MoneyCeiling(balance / RemainingPeriods(asOf, deadline, RecurrenceFrequency.Monthly));
+            var scaled = frequency switch
+            {
+                RecurrenceFrequency.Weekly => monthly / 4m,
+                RecurrenceFrequency.BiWeekly => monthly / 2m,
+                _ => monthly
+            };
+            return frequency is RecurrenceFrequency.Weekly or RecurrenceFrequency.BiWeekly
+                ? MoneyCeiling(scaled)
+                : monthly;
+        }
+
+        public static decimal RecommendedPayment(
+            IEnumerable<PromotionalBalance> promotions,
+            DateTime asOf,
+            RecurrenceFrequency frequency)
+        {
+            ArgumentNullException.ThrowIfNull(promotions);
+            return promotions.Sum(promo => RequiredThisPayment(promo, asOf, frequency));
         }
 
         public static decimal RequiredThisPayment(PromotionalBalance promo, DateTime asOf, RecurrenceFrequency? frequency = null)

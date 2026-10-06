@@ -2,7 +2,6 @@ using System.Diagnostics;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
-using THMS.Logic.Finance.Transactions;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
@@ -85,6 +84,7 @@ namespace THMS.UI.WinForms.Controls
             };
             toolbar.Controls.Add(ActionButton("Match import", OnMatchImport));
             toolbar.Controls.Add(ActionButton("Add", OnAddBill));
+            toolbar.Controls.Add(ActionButton("Projection", OnProjection));
             _delete = ActionButton("Delete", OnDelete);
             _delete.Destructive = true;
             _delete.Enabled = false;
@@ -398,6 +398,21 @@ namespace THMS.UI.WinForms.Controls
         private void OnAddBill(object? sender, EventArgs e) =>
             ShowBillDialog(existing: null);
 
+        private void OnProjection(object? sender, EventArgs e)
+        {
+            if (_accountId is not Guid accountId)
+            {
+                MessageBox.Show(FindForm(), "Select an account first.", "Projection",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var account = _orchestrator.GetAccounts().FirstOrDefault(item => item.Id == accountId);
+            var projection = _orchestrator.GetProjection(accountId);
+            using var dialog = new BalanceProjectionDialog(account?.Name ?? "Account", projection);
+            dialog.ShowDialog(FindForm());
+        }
+
         private void OnBillDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0 || e.ColumnIndex < 0)
@@ -532,13 +547,18 @@ namespace THMS.UI.WinForms.Controls
         private readonly TextBox _description = new();
         private readonly NumericUpDown _amount = new();
         private readonly ComboBox _billCategory = new();
-        private readonly TextBox _date = new();
+        private readonly DateTimePicker _date = new();
         private readonly ComboBox _creditAccount = new();
         private readonly Label _creditCategoryLabel;
         private readonly ComboBox _creditCategory = new();
         private readonly ComboBox _frequency = new();
         private readonly ThmsButton _save = new() { Text = "Save" };
         private readonly ThmsButton _cancel = new() { Text = "Cancel" };
+
+        private readonly Guid? _billAccountId;
+        private readonly Guid? _billCategoryId;
+        private readonly Guid? _creditAccountId;
+        private readonly Guid? _creditCategoryId;
 
         public Guid BillAccountId { get; private set; }
         public string Description { get; private set; } = "";
@@ -567,8 +587,14 @@ namespace THMS.UI.WinForms.Controls
 
             var ordered = accounts.OrderBy(a => a.Name).ToList();
             var categoryList = categories.OrderBy(c => c.Name).ToList();
-            BindAccounts(_billAccount, ordered, selectedAccountId);
-            BindAccounts(_creditAccount, BlankFirst(ordered), null);
+            _billAccountId = existing?.BillAccountId is Guid billId && billId != Guid.Empty
+                ? billId
+                : selectedAccountId;
+            _billCategoryId = existing?.BillCategoryId;
+            _creditAccountId = existing?.CreditAccountId;
+            _creditCategoryId = existing?.CreditCategoryId;
+            BindAccounts(_billAccount, ordered);
+            BindAccounts(_creditAccount, BlankFirst(ordered));
             BindCategories(_billCategory, categoryList);
             BindCategories(_creditCategory, categoryList);
 
@@ -577,8 +603,8 @@ namespace THMS.UI.WinForms.Controls
             _amount.DecimalPlaces = 2;
             _amount.Minimum = -1_000_000;
             _amount.Maximum = 1_000_000;
-            _date.Width = 280;
-            _date.Text = DateTime.Today.ToString("M/d/yyyy");
+            _date.Format = DateTimePickerFormat.Short;
+            _date.Value = DateTime.Today;
             _frequency.Width = 280;
             _frequency.DropDownStyle = ComboBoxStyle.DropDownList;
             _frequency.Items.AddRange([OneTime, "Weekly", "Biweekly", "Monthly", "Quarterly", "Yearly"]);
@@ -602,9 +628,9 @@ namespace THMS.UI.WinForms.Controls
             Controls.Add(_cancel);
             AcceptButton = _save;
             CancelButton = _cancel;
-            SelectAccount(_billAccount, selectedAccountId);
             if (existing is not null)
                 ApplyDraft(existing);
+            ApplySelections();
             LayoutFields();
             _creditAccount.SelectedIndexChanged += (_, _) => ShowCreditCategory(HasCreditAccount());
         }
@@ -612,7 +638,18 @@ namespace THMS.UI.WinForms.Controls
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
+            ApplySelections();
             LayoutFields();
+            BeginInvoke(new Action(ApplySelections));
+        }
+
+        private void ApplySelections()
+        {
+            SelectAccount(_billAccount, _billAccountId);
+            SelectCategory(_billCategory, _billCategoryId);
+            SelectAccount(_creditAccount, _creditAccountId);
+            if (HasCreditAccount())
+                SelectCategory(_creditCategory, _creditCategoryId);
         }
 
         private readonly List<(Label Label, Control Editor)> _rows = [];
@@ -636,7 +673,6 @@ namespace THMS.UI.WinForms.Controls
 
         private void ApplyDraft(BillDraft draft)
         {
-            SelectAccount(_billAccount, draft.BillAccountId);
             _description.Text = draft.Description;
             var amount = draft.Amount;
             if (amount < _amount.Minimum)
@@ -644,13 +680,7 @@ namespace THMS.UI.WinForms.Controls
             if (amount > _amount.Maximum)
                 amount = _amount.Maximum;
             _amount.Value = amount;
-            SelectCategory(_billCategory, draft.BillCategoryId);
-            _date.Text = draft.Date.ToString("M/d/yyyy");
-            SelectAccount(_creditAccount, draft.CreditAccountId);
-            _creditCategory.Visible = HasCreditAccount();
-            _creditCategoryLabel.Visible = _creditCategory.Visible;
-            if (_creditCategory.Visible)
-                SelectCategory(_creditCategory, draft.CreditCategoryId);
+            _date.Value = draft.Date.Year > 1 ? draft.Date.Date : DateTime.Today;
             _frequency.SelectedItem = draft.Frequency switch
             {
                 RecurrenceFrequency.Weekly => "Weekly",
@@ -664,24 +694,47 @@ namespace THMS.UI.WinForms.Controls
 
         private static void SelectAccount(ComboBox combo, Guid? id)
         {
-            if (id is not Guid accountId || combo.DataSource is not IEnumerable<Account> accounts)
+            if (id is not Guid accountId || combo.DataSource is not IList<Account> accounts)
                 return;
-            var match = accounts.FirstOrDefault(a => a.Id == accountId);
-            if (match is not null)
-                combo.SelectedItem = match;
+
+            for (var i = 0; i < accounts.Count; i++)
+            {
+                if (accounts[i].Id != accountId)
+                    continue;
+                combo.SelectedIndex = i;
+                return;
+            }
         }
 
         private static void SelectCategory(ComboBox combo, Guid? id)
         {
-            if (combo.DataSource is not IEnumerable<ExpenseCategory> categories)
+            if (combo.DataSource is not IList<ExpenseCategory> categories || categories.Count == 0)
                 return;
-            var match = id is Guid categoryId
-                ? categories.FirstOrDefault(c => c.Id == categoryId)
-                : null;
-            match ??= categories.FirstOrDefault(c => c.Id == DefaultExpenseCategories.UncategorizedId)
-                ?? categories.FirstOrDefault();
-            if (match is not null)
-                combo.SelectedItem = match;
+
+            var index = -1;
+            if (id is Guid categoryId)
+            {
+                for (var i = 0; i < categories.Count; i++)
+                {
+                    if (categories[i].Id != categoryId)
+                        continue;
+                    index = i;
+                    break;
+                }
+            }
+
+            if (index < 0)
+            {
+                for (var i = 0; i < categories.Count; i++)
+                {
+                    if (categories[i].Id != DefaultExpenseCategories.UncategorizedId)
+                        continue;
+                    index = i;
+                    break;
+                }
+            }
+
+            combo.SelectedIndex = index >= 0 ? index : 0;
         }
 
         private void LayoutFields()
@@ -726,14 +779,12 @@ namespace THMS.UI.WinForms.Controls
         private static Label LabelAt(string text) =>
             new() { Text = text, AutoSize = true };
 
-        private static void BindAccounts(ComboBox combo, IReadOnlyList<Account> accounts, Guid? selectedId)
+        private static void BindAccounts(ComboBox combo, IReadOnlyList<Account> accounts)
         {
             combo.DropDownStyle = ComboBoxStyle.DropDownList;
             combo.DisplayMember = nameof(Account.Name);
             combo.ValueMember = nameof(Account.Id);
             combo.DataSource = accounts.ToList();
-            if (selectedId is Guid id)
-                combo.SelectedValue = id;
         }
 
         private static void BindCategories(ComboBox combo, List<ExpenseCategory> categories)
@@ -742,8 +793,6 @@ namespace THMS.UI.WinForms.Controls
             combo.DisplayMember = nameof(ExpenseCategory.Name);
             combo.ValueMember = nameof(ExpenseCategory.Id);
             combo.DataSource = categories.ToList();
-            combo.SelectedItem = categories.FirstOrDefault(c => c.Id == DefaultExpenseCategories.UncategorizedId)
-                ?? categories.FirstOrDefault();
         }
 
         private static List<Account> BlankFirst(IReadOnlyList<Account> accounts)
@@ -779,12 +828,6 @@ namespace THMS.UI.WinForms.Controls
                 return;
             }
 
-            if (!LedgerEntryDate.TryParse(_date.Text, out var date))
-            {
-                MessageBox.Show(this, "Enter a date like 9/28/2026.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
             Guid? creditAccountId = null;
             Guid? creditCategoryId = null;
             if (HasCreditAccount() && _creditAccount.SelectedItem is Account credit)
@@ -810,7 +853,7 @@ namespace THMS.UI.WinForms.Controls
             Description = _description.Text.Trim();
             Amount = _amount.Value;
             BillCategoryId = billCategory.Id;
-            Date = date;
+            Date = _date.Value.Date;
             CreditAccountId = creditAccountId;
             CreditCategoryId = creditCategoryId;
             Frequency = _frequency.SelectedItem?.ToString() switch

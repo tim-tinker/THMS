@@ -72,6 +72,10 @@ namespace THMS.UI.WinForms.Controls
             var sortOrder = gridAccounts.SortOrder;
             var posted = _transactions.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
             var unreconciled = new ReconciliationOrchestrator(_transactions).AccountIdsWithUnreconciled();
+            var paymentPlans = _transactions.GetAllRecurringTransferRules()
+                .Where(rule => rule.IsPaymentPlan && rule.IsActive)
+                .Select(rule => rule.ToAccountId)
+                .ToHashSet();
             var itemState = _accounts.GetPlaidItemSyncStates()
                 .ToDictionary(s => s.ItemId, StringComparer.Ordinal);
             var accounts = _accountOrchestrator.GetAllAccounts()
@@ -83,7 +87,8 @@ namespace THMS.UI.WinForms.Controls
                         _statements.GetForAccount(account.Id).ToList(),
                         posted.Where(tx => tx.AccountId == account.Id),
                         AccountRegisterRow.PlaidStatusOf(account, state),
-                        unreconciled.Contains(account.Id));
+                        unreconciled.Contains(account.Id),
+                        paymentPlans.Contains(account.Id));
                 })
                 .ToList();
             _suppressSelectionEvents = true;
@@ -276,6 +281,7 @@ namespace THMS.UI.WinForms.Controls
                 case CreditAccount:
                     _accountMenu.Items.Add(MenuItem("Add Charge", (_, _) => AddCharge(account)));
                     _accountMenu.Items.Add(PayMenuItem(account, latest));
+                    _accountMenu.Items.Add(MenuItem("Payment plan", (_, _) => OpenPaymentPlan(account, latest)));
                     break;
                 case LoanAccount or MortgageAccount:
                     _accountMenu.Items.Add(MenuItem("Add Interest", (_, _) => AddInterest(account)));
@@ -397,6 +403,45 @@ namespace THMS.UI.WinForms.Controls
                 return;
             RunActivity(() => _activityOrchestrator.AddTransfer(
                 account.Id, dlg.CounterpartyAccountId, dlg.Date, dlg.Amount, dlg.Description));
+        }
+
+        private void OpenPaymentPlan(Account account, AccountStatement? latest)
+        {
+            var funding = PayFromAccounts(account);
+            if (funding.Count == 0)
+            {
+                MessageBox.Show(FindForm(), "Add a bank account to pay from.", "Payment plan",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var promotions = latest is CreditCardStatement card
+                ? card.Promotions.Where(promo => promo.CurrentBalance > 0).ToList()
+                : [];
+            var existing = _billsOrchestrator.GetPaymentPlan(account.Id);
+            using var dlg = new PaymentPlanDialog(
+                account,
+                funding,
+                PromotionPaymentPlanner.StatementBalanceOf(latest),
+                promotions,
+                latest?.DueDate ?? latest?.StatementDate,
+                existing);
+            if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
+                return;
+
+            if (dlg.DeletePlan)
+            {
+                RunActivity(() => _billsOrchestrator.DeletePaymentPlan(account.Id));
+                return;
+            }
+
+            RunActivity(() => _billsOrchestrator.SavePaymentPlan(
+                account.Id,
+                dlg.FundingAccountId,
+                dlg.Amount,
+                dlg.Frequency,
+                dlg.NextDate,
+                dlg.EndDate));
         }
 
         private void PayAccount(Account account, AccountStatement? latest)

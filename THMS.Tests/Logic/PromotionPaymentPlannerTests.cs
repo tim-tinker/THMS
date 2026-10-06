@@ -20,7 +20,7 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void RequiredThisPayment_SplitsByFrequencyAndKeepsEqualPaymentsMonthly()
+        public void RequiredThisPayment_SplitsLumpSumByFrequencyAndEqualPaymentsFromTheMonthlyAmount()
         {
             var asOf = new DateTime(2026, 9, 20);
             var deadline = asOf.AddMonths(6);
@@ -40,7 +40,15 @@ namespace THMS.Tests.Logic
             Assert.That(PromotionPaymentPlanner.RequiredThisPayment(lump, asOf, RecurrenceFrequency.Weekly), Is.EqualTo(38.47m));
             Assert.That(PromotionPaymentPlanner.RequiredThisPayment(lump, asOf, RecurrenceFrequency.BiWeekly), Is.EqualTo(76.93m));
             Assert.That(PromotionPaymentPlanner.RequiredThisPayment(lump, asOf, RecurrenceFrequency.Monthly), Is.EqualTo(166.67m));
-            Assert.That(PromotionPaymentPlanner.RequiredThisPayment(equal, asOf, RecurrenceFrequency.Weekly), Is.EqualTo(166.67m));
+            Assert.That(PromotionPaymentPlanner.RequiredThisPayment(equal, asOf, RecurrenceFrequency.Monthly), Is.EqualTo(166.67m));
+            Assert.That(PromotionPaymentPlanner.RequiredThisPayment(equal, asOf, RecurrenceFrequency.BiWeekly), Is.EqualTo(83.34m));
+            Assert.That(PromotionPaymentPlanner.RequiredThisPayment(equal, asOf, RecurrenceFrequency.Weekly), Is.EqualTo(41.67m));
+            Assert.That(
+                PromotionPaymentPlanner.RecommendedPayment([lump, equal], asOf, RecurrenceFrequency.Monthly),
+                Is.EqualTo(333.34m));
+            Assert.That(
+                PromotionPaymentPlanner.RecommendedPayment([lump, equal], asOf, RecurrenceFrequency.BiWeekly),
+                Is.EqualTo(160.27m));
         }
 
         [Test]

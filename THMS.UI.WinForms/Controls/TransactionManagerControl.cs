@@ -501,12 +501,103 @@ namespace THMS.UI.WinForms.Controls
         {
             if (importedGrid is null)
                 return;
+
+            var previousIds = ImportedRowIds();
+            var topId = TopImportedRowId(previousIds);
             var rows = _reconciliationOrchestrator.GetUnreconciled(accountId);
             _importedSource.DataSource = rows;
             if (lblImported is not null)
                 lblImported.Text = rows.Count == 0
                     ? "Imported (none unreconciled)"
                     : $"Imported (unreconciled) — {rows.Count}";
+            RestoreImportedScroll(topId, previousIds, rows);
+        }
+
+        private List<Guid> ImportedRowIds()
+        {
+            var ids = new List<Guid>();
+            if (importedGrid is null)
+                return ids;
+
+            foreach (DataGridViewRow row in importedGrid.Rows)
+            {
+                if (row.DataBoundItem is ImportedTransactionView view)
+                    ids.Add(view.Id);
+            }
+
+            return ids;
+        }
+
+        private Guid? TopImportedRowId(IReadOnlyList<Guid> ids)
+        {
+            if (importedGrid is null || ids.Count == 0)
+                return null;
+
+            var index = importedGrid.FirstDisplayedScrollingRowIndex;
+            return index >= 0 && index < ids.Count ? ids[index] : null;
+        }
+
+        private void RestoreImportedScroll(
+            Guid? topId,
+            IReadOnlyList<Guid> previousIds,
+            IReadOnlyList<ImportedTransactionView> rows)
+        {
+            if (importedGrid is null || topId is not Guid anchor || rows.Count == 0)
+                return;
+
+            var index = ImportedAnchorIndex(anchor, previousIds, rows);
+            if (index < 0)
+                return;
+
+            ApplyImportedScroll(index);
+            if (importedGrid.IsHandleCreated)
+                importedGrid.BeginInvoke(() => ApplyImportedScroll(index));
+        }
+
+        private static int ImportedAnchorIndex(
+            Guid topId,
+            IReadOnlyList<Guid> previousIds,
+            IReadOnlyList<ImportedTransactionView> rows)
+        {
+            var indexById = new Dictionary<Guid, int>(rows.Count);
+            for (var i = 0; i < rows.Count; i++)
+                indexById[rows[i].Id] = i;
+
+            if (indexById.TryGetValue(topId, out var index))
+                return index;
+
+            var previousIndex = -1;
+            for (var i = 0; i < previousIds.Count; i++)
+            {
+                if (previousIds[i] == topId)
+                {
+                    previousIndex = i;
+                    break;
+                }
+            }
+
+            if (previousIndex < 0)
+                return -1;
+
+            for (var i = previousIndex + 1; i < previousIds.Count; i++)
+            {
+                if (indexById.TryGetValue(previousIds[i], out index))
+                    return index;
+            }
+
+            return -1;
+        }
+
+        private void ApplyImportedScroll(int firstDisplayed)
+        {
+            if (importedGrid is null || importedGrid.IsDisposed || importedGrid.RowCount == 0)
+                return;
+            if (!importedGrid.IsHandleCreated || importedGrid.DisplayedRowCount(includePartialRow: false) == 0)
+                return;
+
+            var index = Math.Clamp(firstDisplayed, 0, importedGrid.RowCount - 1);
+            if (importedGrid.FirstDisplayedScrollingRowIndex != index)
+                importedGrid.FirstDisplayedScrollingRowIndex = index;
         }
 
         private void OnImportedMouseDown(object? sender, MouseEventArgs e)
