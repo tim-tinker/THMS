@@ -21,12 +21,12 @@ namespace THMS.Configuration
 
             _clientId = config["Plaid:ClientId"]!;
 
-            var secretsPath = Path.Combine(AppContext.BaseDirectory, "plaid.secrets.dat");
+            var secretsPath = AppPaths.PlaidSecrets;
 
             if (!File.Exists(secretsPath))
             {
                 throw new InvalidOperationException(
-                    "Missing Plaid secrets. Please run THMS.SecretWriter to generate plaid.secrets.dat.");
+                    $"Missing Plaid secrets. Run THMS.SecretWriter to create {secretsPath}.");
             }
 
             using var fs = new FileStream(secretsPath, FileMode.Open, FileAccess.Read);

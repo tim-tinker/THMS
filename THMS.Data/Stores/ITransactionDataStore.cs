@@ -20,7 +20,10 @@ namespace THMS.Data.Stores
         IEnumerable<PostedTransaction> GetPostedTransactions(Guid accountId, DateTime start, DateTime end);
         decimal SumPostedAmountsBefore(Guid accountId, DateTime before);
         decimal SumPostedAmountsAfter(Guid accountId, DateTime after);
+        decimal SumIncomingTransferSplitAmounts(Guid accountId, DateTime? beforeExclusive = null, DateTime? afterExclusive = null);
         DateTime? GetLatestPostedTransactionDate(Guid accountId);
+        IEnumerable<PostedTransaction> GetPostedTransactionsIncomingTo(Guid accountId, DateTime start, DateTime end);
+        IEnumerable<PostedTransaction> GetUnreconciledPostedTransactions(Guid accountId);
 
 
         // ------------------------------------------------------------
@@ -37,6 +40,9 @@ namespace THMS.Data.Stores
         decimal SumPostedTransferAmountsBefore(Guid accountId, DateTime before);
         decimal SumPostedTransferAmountsAfter(Guid accountId, DateTime after);
         DateTime? GetLatestPostedTransferTransactionDate(Guid accountId);
+        IEnumerable<PostedTransferTransaction> GetPostedTransferTransactionsIncomingTo(Guid accountId, DateTime start, DateTime end);
+        IEnumerable<PostedTransferTransaction> GetUnreconciledPostedTransferTransactions(Guid accountId);
+        IReadOnlyCollection<Guid> GetAccountIdsWithUnreconciledImports();
 
 
         // ------------------------------------------------------------
@@ -70,7 +76,7 @@ namespace THMS.Data.Stores
         // ------------------------------------------------------------
         // Recurring Single Transaction Rules
         // ------------------------------------------------------------
-        void AddRecurringSingleRule(RecurringSingleTransactionRule rule);
+        void AddRecurringSingleRule(RecurringSingleTransactionRule rule, bool matchExistingPattern = true);
         void UpdateRecurringSingleRule(RecurringSingleTransactionRule rule);
         void DeleteRecurringSingleRule(Guid id);
 
@@ -81,7 +87,7 @@ namespace THMS.Data.Stores
         // ------------------------------------------------------------
         // Recurring Transfer Rules
         // ------------------------------------------------------------
-        void AddRecurringTransferRule(RecurringTransferRule rule);
+        void AddRecurringTransferRule(RecurringTransferRule rule, bool matchExistingPattern = true);
         void UpdateRecurringTransferRule(RecurringTransferRule rule);
         void DeleteRecurringTransferRule(Guid id);
 

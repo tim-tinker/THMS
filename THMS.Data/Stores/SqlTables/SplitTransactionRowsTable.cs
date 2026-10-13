@@ -24,14 +24,15 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
             EnsureColumn(conn, "FromAccountId", "TEXT");
             EnsureColumn(conn, "ToAccountId", "TEXT");
+            using var index = conn.CreateCommand();
+            index.CommandText = @"
+                CREATE INDEX IF NOT EXISTS IX_SplitTransactionRows_TransferAccount
+                    ON SplitTransactionRows (TransferAccountId, Type);";
+            index.ExecuteNonQuery();
         }
 
-        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
-        {
-            using var alter = conn.CreateCommand();
-            alter.CommandText = $"ALTER TABLE SplitTransactionRows ADD COLUMN IF NOT EXISTS {columnName} {columnDef};";
-            alter.ExecuteNonQuery();
-        }
+        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef) =>
+            SqliteSchema.EnsureColumn(conn, "SplitTransactionRows", columnName, columnDef);
 
         public void ReplaceAll(SqliteConnection conn, Guid parentId, IEnumerable<SplitTransactionRow> splits)
         {

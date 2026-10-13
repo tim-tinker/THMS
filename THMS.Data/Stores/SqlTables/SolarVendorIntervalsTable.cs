@@ -74,9 +74,11 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@End", end);
 
             using var reader = cmd.ExecuteReader();
-
+            var list = new List<SolarProductionInterval>();
             while (reader.Read())
-                yield return Read(reader);
+                list.Add(Read(reader));
+
+            return list;
         }
 
         public SolarProductionInterval? GetLatest(SqliteConnection conn)

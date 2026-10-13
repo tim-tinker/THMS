@@ -6,6 +6,7 @@ namespace THMS.UI
         private FlowLayoutPanel navigationPanel;
         private Panel dashboardHostPanel;
         private Panel statusStrip;
+        private PictureBox statusIcon;
         private Label lblPlaidStatus;
         private ProgressBar syncProgress;
 
@@ -22,9 +23,11 @@ namespace THMS.UI
 
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             navigationPanel = new FlowLayoutPanel();
             dashboardHostPanel = new Panel();
             statusStrip = new Panel();
+            statusIcon = new PictureBox();
             lblPlaidStatus = new Label();
             syncProgress = new ProgressBar();
             statusStrip.SuspendLayout();
@@ -58,6 +61,7 @@ namespace THMS.UI
             statusStrip.BackColor = Color.FromArgb(245, 245, 245);
             statusStrip.Controls.Add(lblPlaidStatus);
             statusStrip.Controls.Add(syncProgress);
+            statusStrip.Controls.Add(statusIcon);
             statusStrip.Dock = DockStyle.Bottom;
             statusStrip.Location = new Point(0, 1099);
             statusStrip.Name = "statusStrip";
@@ -65,6 +69,17 @@ namespace THMS.UI
             statusStrip.Size = new Size(2700, 48);
             statusStrip.TabIndex = 2;
             statusStrip.Paint += OnStatusStripPaint;
+            // 
+            // statusIcon
+            // 
+            statusIcon.BackColor = Color.FromArgb(245, 245, 245);
+            statusIcon.Dock = DockStyle.Left;
+            statusIcon.Margin = new Padding(0, 0, 8, 0);
+            statusIcon.Name = "statusIcon";
+            statusIcon.Size = new Size(32, 32);
+            statusIcon.SizeMode = PictureBoxSizeMode.Zoom;
+            statusIcon.TabIndex = 2;
+            statusIcon.TabStop = false;
             // 
             // lblPlaidStatus
             // 
@@ -94,6 +109,7 @@ namespace THMS.UI
             Controls.Add(dashboardHostPanel);
             Controls.Add(navigationPanel);
             Controls.Add(statusStrip);
+            Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "MainForm";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "THMS Dashboard";

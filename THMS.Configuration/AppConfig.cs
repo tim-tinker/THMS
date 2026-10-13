@@ -33,7 +33,7 @@ namespace THMS.Configuration
 
             Environment = config["App:Environment"] ?? "Development";
 
-            SQLiteDataBase = config["SQLite:DataBasePath"] ?? string.Empty;
+            SQLiteDataBase = AppPaths.DatabaseFile(config["SQLite:DataBasePath"]);
 
             PlaidClientId = config["Plaid:ClientId"]!;
             PlaidEnvironment = config["Plaid:Environment"] ?? "Sandbox";

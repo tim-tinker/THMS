@@ -160,6 +160,38 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void ImportAccounts_MapsFundingAccountAndAutoPay()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"accounts-{Guid.NewGuid():N}.csv");
+            File.WriteAllText(path, """
+                Name,Type,Number,URL,CreditLimit,APR,Principal,TermMonths,FundingAccount,AutoPay
+                WF Checking,Bank,b4,https://www.wellsfargo.com/,,,,,
+                AMEX,Credit,c1,https://www.americanexpress.com/,49000,0.1724,,,WF Checking,
+                Affirm,Loan,l1,,,0.12,1000,24,WF Checking,1
+                """);
+            try
+            {
+                var store = new InMemoryAccountDataStore();
+                var orchestrator = new AccountImportOrchestrator(store);
+                var rows = orchestrator.LoadAccountsFromFile(path);
+                orchestrator.ImportAccounts(rows);
+
+                var checking = store.GetAllAccounts().Single(account => account.Name == "WF Checking");
+                var card = store.GetAllAccounts().OfType<CreditAccount>().Single();
+                var loan = store.GetAllAccounts().OfType<LoanAccount>().Single();
+
+                Assert.That(card.AutoPay, Is.False);
+                Assert.That(card.AutoPayFromAccountId, Is.EqualTo(checking.Id));
+                Assert.That(loan.AutoPay, Is.True);
+                Assert.That(loan.AutoPayFromAccountId, Is.EqualTo(checking.Id));
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Test]
         public void LoadAccountsFromFile_ThrowsWhenMissing()
         {
             var orchestrator = new AccountImportOrchestrator(new InMemoryAccountDataStore());

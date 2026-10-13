@@ -57,6 +57,7 @@ namespace THMS.Logic.ViewModels.Finance
                 },
                 UtilityStatement utility => ObligationRow(utility) with
                 {
+                    StatementBalance = Money(utility.StatementBalance),
                     Usage = CountItems(utility.Usage),
                     Charges = CountItems(utility.Charges)
                 },

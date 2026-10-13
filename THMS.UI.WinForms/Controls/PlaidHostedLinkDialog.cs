@@ -1,5 +1,6 @@
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using THMS.Configuration;
 using THMS.External;
 using THMS.External.Plaid;
 using THMS.Logic.Orchestrators.Finance;
@@ -83,10 +84,7 @@ namespace THMS.UI.WinForms.Controls
         {
             try
             {
-                var userData = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "THMS",
-                    "WebView2");
+                var userData = AppPaths.WebView2;
                 Directory.CreateDirectory(userData);
                 var environment = await CoreWebView2Environment.CreateAsync(null, userData);
                 await _webView.EnsureCoreWebView2Async(environment);

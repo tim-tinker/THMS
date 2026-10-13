@@ -32,6 +32,7 @@ namespace THMS.Logic.Finance.Planning
             LoanStatement loan => loan.StatementBalance,
             MortgageStatement mortgage => mortgage.StatementBalance,
             CreditCardStatement card => card.StatementBalance,
+            UtilityStatement utility => utility.StatementBalance,
             _ => null
         };
 

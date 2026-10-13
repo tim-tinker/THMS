@@ -5,6 +5,7 @@ using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace THMS.UI.WinForms
 {
+    // TODO: Not used. Other forms or updaters appear to have replaced this class. Remove later once that is confirmed.
     public partial class ImporterForm : Form
     {
         private readonly ImporterViewModel _vm;

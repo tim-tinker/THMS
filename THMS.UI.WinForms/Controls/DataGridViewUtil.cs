@@ -87,12 +87,23 @@ namespace THMS.UI.WinForms.Controls
         {
             if (e.RowIndex != -1)
                 return;
+            if (e.Graphics is null || e.CellBounds.Width <= 1 || e.CellBounds.Height <= 1)
+                return;
 
-            e.Paint(e.ClipBounds, e.PaintParts);
-            var y = e.CellBounds.Bottom - 2;
-            using var pen = new Pen(HeaderRule, 2f);
-            e.Graphics.DrawLine(pen, e.CellBounds.Left, y, e.CellBounds.Right, y);
-            e.Handled = true;
+            try
+            {
+                e.Paint(e.ClipBounds, e.PaintParts);
+                var y = e.CellBounds.Bottom - 2;
+                using var pen = new Pen(HeaderRule, 2f);
+                e.Graphics.DrawLine(pen, e.CellBounds.Left, y, e.CellBounds.Right, y);
+                e.Handled = true;
+            }
+            catch (ArgumentException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
         }
     }
 }

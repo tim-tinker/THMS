@@ -26,7 +26,7 @@ namespace THMS.UI.WinForms
             InitializeComponent();
             SplitContainerUtil.MakeSplitterVisible(split);
             ledger.HostProvidesAccounts = true;
-            categoryManager.Bind(new CategoryOrchestrator());
+            categoryManager.Bind(new CategoryOrchestrator(), reload: false);
             categoryManager.CatalogChanged += (_, _) => ledger.RefreshCurrentAccount();
             ConfigureStatementGrid();
             tabsTop.RecalculateItemSize();
@@ -60,8 +60,6 @@ namespace THMS.UI.WinForms
             ledger.DataChanged += (_, _) => accountUpdater.RefreshAccounts();
             accountUpdater.SelectedAccountChanged += (_, _) => LoadSelectedAccount();
             historyBar.SelectedPeriodChanged += (_, _) => ApplyHistoryPeriod();
-            ApplyHistoryPeriod();
-            LoadSelectedAccount();
         }
 
         public void ShowAccount(Guid accountId)

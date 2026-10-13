@@ -18,9 +18,11 @@ namespace THMS.Data.Stores.SQLite
         private readonly SqliteHomeEvChargeBillingStore _billingStore = new();
         private readonly SqliteMaintenanceInvoiceStore _maintenanceStore = new();
 
-        public SQLiteVehicleDataStore(string connectionString)
+        public SQLiteVehicleDataStore(string databasePath)
         {
-            _connectionString = connectionString;
+            _connectionString = databasePath.Contains("Data Source=", StringComparison.OrdinalIgnoreCase)
+                ? databasePath
+                : $"Data Source={databasePath}";
             _iceMileageStore = new SqliteIceMileageStore(_mileageStore);
             _baseEvStore = new SqliteBaseEvChargeSessionStore(_mileageStore);
 

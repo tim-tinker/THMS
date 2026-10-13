@@ -24,7 +24,7 @@ namespace THMS.Logic.Finance.Forecast
             asOf = asOf.Date;
             var through = asOf.AddMonths(1);
             var opening = OpeningBalance(account, statements, transactions);
-            var movements = Movements(account, statements, transactions, through)
+            var movements = Movements(account, statements, transactions, asOf, through)
                 .Select(item => (item.Date, item.Description, Amount: DisplayDelta(account, item.LedgerAmount)))
                 .OrderBy(item => item.Date)
                 .ThenByDescending(item => item.Amount)
@@ -83,6 +83,7 @@ namespace THMS.Logic.Finance.Forecast
             Account account,
             IReadOnlyList<AccountStatement> statements,
             ITransactionDataStore transactions,
+            DateTime asOf,
             DateTime through)
         {
             var singles = transactions.GetAllFutureSingleTransactions().Where(item => !item.IsRealized).ToList();
@@ -125,7 +126,7 @@ namespace THMS.Logic.Finance.Forecast
             if (statement is not null
                 && statement.DueDate.Year > 1
                 && statement.DueDate.Date <= through
-                && !PaymentAlreadyCreated(statement, transactions))
+                && !PaymentAlreadyCreated(statement, transactions, asOf))
             {
                 movements.Add(new Movement(
                     statement.DueDate.Date,
@@ -136,10 +137,16 @@ namespace THMS.Logic.Finance.Forecast
             return movements;
         }
 
-        private static bool PaymentAlreadyCreated(AccountStatement statement, ITransactionDataStore transactions) =>
+        private static bool PaymentAlreadyCreated(
+            AccountStatement statement,
+            ITransactionDataStore transactions,
+            DateTime asOf) =>
             transactions.GetAllFutureTransferTransactions().Any(item =>
                 item.StatementId == statement.Id
-                || (item.Origin == ExpectedOrigin.StatementPay && item.OriginId == statement.Id));
+                || (item.Origin == ExpectedOrigin.StatementPay && item.OriginId == statement.Id))
+            || transactions.GetAllFutureSingleTransactions().Any(item =>
+                item.Origin == ExpectedOrigin.StatementPay && item.OriginId == statement.Id)
+            || PaymentPlanCoverage.Covers(transactions.GetAllRecurringTransferRules(), statement.AccountId, asOf);
 
         private static bool CoveredByExpected(UnifiedTransactionView row, IReadOnlyList<BaseTransaction> expected) =>
             expected.Any(item =>

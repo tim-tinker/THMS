@@ -7,7 +7,8 @@ public class LogicTestAssemblySetup
     [OneTimeSetUp]
     public void CreateLocalSecrets()
     {
-        var secretsPath = Path.Combine(AppContext.BaseDirectory, "plaid.secrets.dat");
+        Directory.CreateDirectory(AppPaths.Root);
+        var secretsPath = AppPaths.PlaidSecrets;
         if (File.Exists(secretsPath))
             return;
 

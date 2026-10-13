@@ -2,6 +2,7 @@ using THMS.Logic.ViewModels;
 
 namespace THMS.UI.WinForms
 {
+    // TODO: Not used. Other forms or updaters appear to have replaced this class. Remove later once that is confirmed.
     public partial class SettingsDashboardForm : BaseDashboardForm
     {
         private SettingsDashboardViewModel ViewModel { get; set; } = null!;

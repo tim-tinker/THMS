@@ -51,13 +51,13 @@ namespace THMS.Logic.Orchestrators
             return dates.Count == 0 ? null : dates.Min();
         }
 
-        public void AddSingleRule(RecurringSingleTransactionRule rule)
+        public void AddSingleRule(RecurringSingleTransactionRule rule, bool matchExistingPattern = true)
         {
             ArgumentNullException.ThrowIfNull(rule);
             if (rule.Id == Guid.Empty)
                 rule.Id = Guid.NewGuid();
             rule.IsUserCreated = true;
-            _store.AddRecurringSingleRule(rule);
+            _store.AddRecurringSingleRule(rule, matchExistingPattern);
             Rematerialize(rule.Id, rule);
         }
 
@@ -74,13 +74,13 @@ namespace THMS.Logic.Orchestrators
             _store.DeleteRecurringSingleRule(ruleId);
         }
 
-        public void AddTransferRule(RecurringTransferRule rule)
+        public void AddTransferRule(RecurringTransferRule rule, bool matchExistingPattern = true)
         {
             ArgumentNullException.ThrowIfNull(rule);
             if (rule.Id == Guid.Empty)
                 rule.Id = Guid.NewGuid();
             rule.IsUserCreated = true;
-            _store.AddRecurringTransferRule(rule);
+            _store.AddRecurringTransferRule(rule, matchExistingPattern);
             Rematerialize(rule.Id, rule);
         }
 

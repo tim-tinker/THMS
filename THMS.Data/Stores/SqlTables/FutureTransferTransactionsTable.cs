@@ -250,11 +250,7 @@ namespace THMS.Data.Stores.SqlTables
             return list;
         }
 
-        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
-        {
-            using var alter = conn.CreateCommand();
-            alter.CommandText = $"ALTER TABLE FutureTransferTransactions ADD COLUMN IF NOT EXISTS {columnName} {columnDef};";
-            alter.ExecuteNonQuery();
-        }
+        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef) =>
+            SqliteSchema.EnsureColumn(conn, "FutureTransferTransactions", columnName, columnDef);
     }
 }

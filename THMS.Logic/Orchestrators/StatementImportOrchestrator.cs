@@ -102,11 +102,25 @@ namespace THMS.Logic.Orchestrators
                 return false;
             if (AccountStatementValidator.Validate(statement).Count > 0)
                 return false;
-            if (IsDuplicate(statement, existingByAccount))
+
+            var existing = FindExisting(statement, existingByAccount);
+            if (existing is not null && !ShouldRefreshBlankUtility(existing, statement))
                 return false;
 
+            if (existing is not null)
+                statement.Id = existing.Id;
+
             _planning.SaveStatement(statement);
-            existingByAccount[statement.AccountId].Add(statement);
+            var saved = existingByAccount[statement.AccountId];
+            if (existing is null)
+                saved.Add(statement);
+            else
+            {
+                var index = saved.FindIndex(item => item.Id == existing.Id);
+                if (index >= 0)
+                    saved[index] = statement;
+            }
+
             return true;
         }
 
@@ -174,11 +188,18 @@ namespace THMS.Logic.Orchestrators
                 case CreditCardStatement card:
                     card.StatementBalance = row.StatementBalance;
                     break;
-                case UtilityStatement utility when row.AmountDue > 0:
-                    utility.Charges =
-                    [
-                        new UtilityChargeLine { Description = "Amount due", Amount = row.AmountDue }
-                    ];
+                case UtilityStatement utility:
+                    utility.StatementBalance = row.StatementBalance;
+                    if (utility.AmountDue == 0 && utility.StatementBalance > 0)
+                        utility.AmountDue = utility.StatementBalance;
+                    if (utility.AmountDue > 0)
+                    {
+                        utility.Charges =
+                        [
+                            new UtilityChargeLine { Description = "Amount due", Amount = utility.AmountDue }
+                        ];
+                    }
+
                     break;
                 case ServiceStatement service when row.AmountDue > 0:
                     service.Charges =
@@ -191,7 +212,16 @@ namespace THMS.Logic.Orchestrators
             return statement;
         }
 
-        private bool IsDuplicate(
+        private static bool ShouldRefreshBlankUtility(AccountStatement existing, AccountStatement incoming) =>
+            existing is UtilityStatement saved
+            && incoming is UtilityStatement
+            && saved.AmountDue == 0
+            && saved.StatementBalance == 0
+            && saved.Charges.Count == 0
+            && saved.Usage.Count == 0
+            && (incoming.AmountDue != 0 || incoming is UtilityStatement { StatementBalance: not 0 });
+
+        private AccountStatement? FindExisting(
             AccountStatement statement,
             Dictionary<Guid, List<AccountStatement>> existingByAccount)
         {
@@ -201,7 +231,7 @@ namespace THMS.Logic.Orchestrators
                 existingByAccount[statement.AccountId] = existing;
             }
 
-            return existing.Any(item => item.StatementDate.Date == statement.StatementDate.Date);
+            return existing.FirstOrDefault(item => item.StatementDate.Date == statement.StatementDate.Date);
         }
     }
 }

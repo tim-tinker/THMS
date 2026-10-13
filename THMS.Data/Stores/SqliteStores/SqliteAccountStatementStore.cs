@@ -119,6 +119,7 @@ namespace THMS.Data.Stores.SqliteStores
                 },
                 StatementType.Utility => new UtilityStatement
                 {
+                    StatementBalance = details.StatementBalance,
                     Usage = _usage.GetByStatement(conn, row.Id),
                     Charges = _charges.GetUtility(conn, row.Id)
                 },

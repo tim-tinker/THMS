@@ -109,6 +109,42 @@ namespace THMS.Data.Stores.SQLite
             return _store.Posted.SumAmountAfter(conn, accountId, after);
         }
 
+        public decimal SumIncomingTransferSplitAmounts(Guid accountId, DateTime? beforeExclusive = null, DateTime? afterExclusive = null)
+        {
+            using var conn = OpenConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT COALESCE(SUM(-s.Amount), 0)
+                FROM SplitTransactionRows s
+                INNER JOIN (
+                    SELECT Id, AccountId, Date FROM PostedTransactions
+                    UNION ALL
+                    SELECT Id, AccountId, Date FROM PostedTransferTransactions
+                ) p ON p.Id = s.ParentTransactionId
+                WHERE s.Type = 'Transfer'
+                  AND s.TransferAccountId = @AccountId
+                  AND p.AccountId != @AccountId
+                  AND (@Before IS NULL OR p.Date < @Before)
+                  AND (@After IS NULL OR p.Date > @After);";
+            cmd.Parameters.AddWithValue("@AccountId", accountId.ToString());
+            cmd.Parameters.AddWithValue("@Before", beforeExclusive is DateTime before ? before : DBNull.Value);
+            cmd.Parameters.AddWithValue("@After", afterExclusive is DateTime after ? after : DBNull.Value);
+            var value = cmd.ExecuteScalar();
+            return value is null or DBNull ? 0 : Convert.ToDecimal(value);
+        }
+
+        public IEnumerable<PostedTransaction> GetPostedTransactionsIncomingTo(Guid accountId, DateTime start, DateTime end)
+        {
+            using var conn = OpenConnection();
+            return AttachMany(conn, _store.Posted.GetIncomingTransferSources(conn, accountId, start, end));
+        }
+
+        public IEnumerable<PostedTransaction> GetUnreconciledPostedTransactions(Guid accountId)
+        {
+            using var conn = OpenConnection();
+            return AttachMany(conn, _store.Posted.GetUnreconciledByAccount(conn, accountId));
+        }
+
         public DateTime? GetLatestPostedTransactionDate(Guid accountId)
         {
             using var conn = OpenConnection();
@@ -176,6 +212,41 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             return _store.PostedTransfers.SumAmountAfter(conn, accountId, after);
+        }
+
+        public IEnumerable<PostedTransferTransaction> GetPostedTransferTransactionsIncomingTo(
+            Guid accountId,
+            DateTime start,
+            DateTime end)
+        {
+            using var conn = OpenConnection();
+            return AttachMany(conn, _store.PostedTransfers.GetIncomingTransferSources(conn, accountId, start, end));
+        }
+
+        public IEnumerable<PostedTransferTransaction> GetUnreconciledPostedTransferTransactions(Guid accountId)
+        {
+            using var conn = OpenConnection();
+            return AttachMany(conn, _store.PostedTransfers.GetUnreconciledByAccount(conn, accountId));
+        }
+
+        public IReadOnlyCollection<Guid> GetAccountIdsWithUnreconciledImports()
+        {
+            using var conn = OpenConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT AccountId FROM PostedTransactions WHERE ImportedStatus = @Status
+                UNION
+                SELECT AccountId FROM PostedTransferTransactions WHERE ImportedStatus = @Status;";
+            cmd.Parameters.AddWithValue("@Status", (int)ImportedStatus.Unreconciled);
+            var ids = new HashSet<Guid>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (Guid.TryParse(reader.GetString(0), out var id) && id != Guid.Empty)
+                    ids.Add(id);
+            }
+
+            return ids;
         }
 
         public DateTime? GetLatestPostedTransferTransactionDate(Guid accountId)
@@ -296,11 +367,13 @@ namespace THMS.Data.Stores.SQLite
         // Recurring Single Rules
         // ------------------------------------------------------------
 
-        public void AddRecurringSingleRule(RecurringSingleTransactionRule rule)
+        public void AddRecurringSingleRule(RecurringSingleTransactionRule rule, bool matchExistingPattern = true)
         {
             using var conn = OpenConnection();
-            var existing = _store.RecurringSingles.GetByAccount(conn, rule.AccountId)
-                .FirstOrDefault(r => RecurringRulePattern.Matches(r, rule));
+            var existing = matchExistingPattern
+                ? _store.RecurringSingles.GetByAccount(conn, rule.AccountId)
+                    .FirstOrDefault(r => RecurringRulePattern.Matches(r, rule))
+                : null;
             if (existing is not null)
             {
                 if (existing.IsUserCreated && !rule.IsUserCreated)
@@ -346,11 +419,13 @@ namespace THMS.Data.Stores.SQLite
         // Recurring Transfer Rules
         // ------------------------------------------------------------
 
-        public void AddRecurringTransferRule(RecurringTransferRule rule)
+        public void AddRecurringTransferRule(RecurringTransferRule rule, bool matchExistingPattern = true)
         {
             using var conn = OpenConnection();
-            var existing = _store.RecurringTransfers.GetByAccount(conn, rule.FromAccountId)
-                .FirstOrDefault(r => RecurringRulePattern.Matches(r, rule));
+            var existing = matchExistingPattern
+                ? _store.RecurringTransfers.GetByAccount(conn, rule.FromAccountId)
+                    .FirstOrDefault(r => RecurringRulePattern.Matches(r, rule))
+                : null;
             if (existing is not null)
             {
                 if (existing.IsUserCreated && !rule.IsUserCreated)

@@ -22,6 +22,13 @@ namespace THMS.Data.Stores.SqlTables
             EnsureColumn(conn, "ImportedStatus", "INTEGER NOT NULL DEFAULT 0");
             EnsureColumn(conn, "RecommendedExpectedId", "TEXT");
             EnsureColumn(conn, "ExternalTransactionId", "TEXT NOT NULL DEFAULT ''");
+            using var index = conn.CreateCommand();
+            index.CommandText = @"
+                CREATE INDEX IF NOT EXISTS IX_PostedTransactions_Account_Date
+                    ON PostedTransactions (AccountId, Date);
+                CREATE INDEX IF NOT EXISTS IX_PostedTransactions_Account_Status
+                    ON PostedTransactions (AccountId, ImportedStatus);";
+            index.ExecuteNonQuery();
         }
 
         public void Add(SqliteConnection conn, PostedTransaction transaction)
@@ -110,6 +117,42 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@AccountId", accountId.ToString());
             cmd.Parameters.AddWithValue("@Start", start);
             cmd.Parameters.AddWithValue("@End", end);
+            return ReadAll(cmd);
+        }
+
+        public IEnumerable<PostedTransaction> GetIncomingTransferSources(
+            SqliteConnection conn,
+            Guid accountId,
+            DateTime start,
+            DateTime end)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = SelectColumns + @"
+                FROM PostedTransactions p
+                WHERE p.AccountId != @AccountId
+                  AND p.Date >= @Start AND p.Date <= @End
+                  AND EXISTS (
+                      SELECT 1 FROM SplitTransactionRows s
+                      WHERE s.ParentTransactionId = p.Id
+                        AND s.Type = 'Transfer'
+                        AND s.TransferAccountId = @AccountId)
+                ORDER BY p.Date;";
+            cmd.Parameters.AddWithValue("@AccountId", accountId.ToString());
+            cmd.Parameters.AddWithValue("@Start", start);
+            cmd.Parameters.AddWithValue("@End", end);
+            return ReadAll(cmd);
+        }
+
+        public IEnumerable<PostedTransaction> GetUnreconciledByAccount(SqliteConnection conn, Guid accountId)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = SelectColumns + @"
+                FROM PostedTransactions
+                WHERE AccountId = @AccountId
+                  AND ImportedStatus = @Status
+                ORDER BY Date;";
+            cmd.Parameters.AddWithValue("@AccountId", accountId.ToString());
+            cmd.Parameters.AddWithValue("@Status", (int)ImportedStatus.Unreconciled);
             return ReadAll(cmd);
         }
 
@@ -215,12 +258,8 @@ namespace THMS.Data.Stores.SqlTables
                 ? (ImportedStatus)reader.GetInt32(index)
                 : ImportedStatus.Unreconciled;
 
-        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
-        {
-            using var alter = conn.CreateCommand();
-            alter.CommandText = $"ALTER TABLE PostedTransactions ADD COLUMN IF NOT EXISTS {columnName} {columnDef};";
-            alter.ExecuteNonQuery();
-        }
+        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef) =>
+            SqliteSchema.EnsureColumn(conn, "PostedTransactions", columnName, columnDef);
 
         private static IEnumerable<PostedTransaction> ReadAll(SqliteCommand cmd)
         {

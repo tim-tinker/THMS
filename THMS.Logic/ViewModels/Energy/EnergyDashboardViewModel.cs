@@ -6,6 +6,7 @@ namespace THMS.Logic.ViewModels.Energy
     public class EnergyDashboardViewModel
     {
         private EnergyAggregationService _service;
+        private readonly object _refreshGate = new();
 
         protected DateTime CurrentDate { get; private set; } = DateTime.Now;
 
@@ -40,6 +41,12 @@ namespace THMS.Logic.ViewModels.Energy
         }
 
         public void Refresh()
+        {
+            lock (_refreshGate)
+                RefreshCore();
+        }
+
+        private void RefreshCore()
         {
             Day = new EnergyPeriodViewModel(_service.GetDay(CurrentDate));
             Week = new EnergyPeriodViewModel(_service.GetWeek(CurrentDate));

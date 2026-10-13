@@ -132,13 +132,14 @@ namespace THMS.Logic.Orchestrators.Finance
                 return;
             }
 
+            if (account.AutoPayFromAccountId is Guid funding && funding != Guid.Empty && funding == account.Id)
+                throw new ArgumentException("Pay from a different account.");
+
             if (!account.AutoPay)
                 return;
 
-            if (account.AutoPayFromAccountId is not Guid funding || funding == Guid.Empty)
+            if (account.AutoPayFromAccountId is not Guid || account.AutoPayFromAccountId == Guid.Empty)
                 throw new ArgumentException("Auto-pay requires a funding account.");
-            if (funding == account.Id)
-                throw new ArgumentException("Auto-pay cannot debit the same account.");
         }
 
         // ------------------------------------------------------------

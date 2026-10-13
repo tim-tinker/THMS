@@ -44,12 +44,8 @@ namespace THMS.Data.Stores.SqlTables
             index.ExecuteNonQuery();
         }
 
-        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
-        {
-            using var alter = conn.CreateCommand();
-            alter.CommandText = $"ALTER TABLE ElectricUtilityBills ADD COLUMN IF NOT EXISTS {columnName} {columnDef};";
-            alter.ExecuteNonQuery();
-        }
+        private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef) =>
+            SqliteSchema.EnsureColumn(conn, "ElectricUtilityBills", columnName, columnDef);
 
         public void Upsert(SqliteConnection conn, ElectricUtilityBill bill)
         {

@@ -4,6 +4,7 @@ using THMS.Logic.ViewModels.Transportation;
 
 namespace THMS.UI.WinForms
 {
+    // TODO: Not used. Other forms or updaters appear to have replaced this class. Remove later once that is confirmed.
     public partial class MileageEntryForm : Form
     {
         private readonly MileageEntryViewModel _vm;

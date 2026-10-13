@@ -123,11 +123,26 @@ namespace THMS.Logic.Orchestrators.Finance
                 return;
             }
 
-            if (account is null || !account.AutoPay ||
-                account.AutoPayFromAccountId is not Guid funding || funding == Guid.Empty)
+            if (PaymentPlanCoverage.Covers(
+                    _transactions.GetAllRecurringTransferRules(),
+                    statement.AccountId,
+                    DateTime.Today))
             {
+                if (existing is not null)
+                    _transactions.DeleteFutureTransferTransaction(existing.Id);
                 return;
             }
+
+            if (account?.AutoPayFromAccountId is not Guid funding || funding == Guid.Empty)
+            {
+                if (existing is { Status: ExpectedStatus.Planned })
+                    _transactions.DeleteFutureTransferTransaction(existing.Id);
+                return;
+            }
+
+            var status = account.AutoPay ? ExpectedStatus.Scheduled : ExpectedStatus.Planned;
+            if (existing is { Status: ExpectedStatus.Scheduled } && !account.AutoPay)
+                return;
 
             if (existing is not null)
             {
@@ -135,7 +150,7 @@ namespace THMS.Logic.Orchestrators.Finance
                 existing.FromAccountId = funding;
                 existing.Amount = Math.Abs(statement.AmountDue);
                 existing.Date = statement.DueDate.Date;
-                existing.Status = ExpectedStatus.Scheduled;
+                existing.Status = status;
                 if (string.IsNullOrWhiteSpace(existing.Description))
                     existing.Description = string.IsNullOrWhiteSpace(statement.Notes) ? account.Name : statement.Notes.Trim();
                 _transactions.UpdateFutureTransferTransaction(existing);
@@ -148,7 +163,7 @@ namespace THMS.Logic.Orchestrators.Finance
                 ToAccountId = statement.AccountId,
                 Amount = Math.Abs(statement.AmountDue),
                 Date = statement.DueDate.Date,
-                Status = ExpectedStatus.Scheduled,
+                Status = status,
                 Origin = ExpectedOrigin.StatementPay,
                 OriginId = statement.Id,
                 StatementId = statement.Id,

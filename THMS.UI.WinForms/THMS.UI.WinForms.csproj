@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>THMS.UI.WinForms</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Properties\Icons\home_dollar_64px.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
 
@@ -17,6 +18,8 @@
     <None Remove="Properties\Icons\Home.png" />
     <None Remove="Properties\Icons\MoveUp.png" />
     <None Remove="Properties\Icons\Settings.png" />
+    <None Remove="Properties\Icons\home_dollar_64px.png" />
+    <None Remove="Properties\Icons\home_dollar_64px.ico" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,6 +28,8 @@
     <EmbeddedResource Include="Properties\Icons\Home.png" />
     <EmbeddedResource Include="Properties\Icons\MoveUp.png" />
     <EmbeddedResource Include="Properties\Icons\Settings.png" />
+    <EmbeddedResource Include="Properties\Icons\home_dollar_64px.png" />
+    <EmbeddedResource Include="Properties\Icons\home_dollar_64px.ico" />
   </ItemGroup>
 
   <ItemGroup>

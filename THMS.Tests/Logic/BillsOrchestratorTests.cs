@@ -382,6 +382,38 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void AddManual_ReplacesStatementDueWhenAmountAndDateDiffer()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var asOf = new DateTime(2026, 10, 5);
+            var statement = new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = new DateTime(2026, 9, 28),
+                DueDate = new DateTime(2026, 10, 20),
+                StatementBalance = 1000m,
+                AmountDue = 220m
+            };
+            statements.Save(statement);
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var payDate = statement.DueDate.AddDays(2);
+
+            orchestrator.AddManual(card.Id, checking.Id, 150m, payDate, "Card payment", statement.Id);
+
+            var rows = orchestrator.GetBills(card.Id, asOf);
+            Assert.That(rows, Has.Count.EqualTo(1));
+            Assert.That(rows[0].Status, Is.EqualTo(BillStatuses.Scheduled));
+            Assert.That(rows[0].Amount, Is.EqualTo(150m));
+            Assert.That(rows[0].DueDate, Is.EqualTo(payDate));
+            Assert.That(rows.Any(row => row.Status == BillStatuses.Due), Is.False);
+
+            var projection = orchestrator.GetProjection(card.Id, asOf);
+            Assert.That(projection.Rows.Select(row => row.Description), Is.EqualTo(new[] { "Card payment" }));
+            Assert.That(projection.Rows[0].Amount, Is.EqualTo(-150m));
+            Assert.That(projection.Rows[0].Date, Is.EqualTo(payDate));
+        }
+
+        [Test]
         public void GetBills_UsesOnlyLatestStatementPerAccount()
         {
             var (accounts, transactions, statements, checking, _) = SeedCheckingAndCard();
@@ -495,7 +527,7 @@ namespace THMS.Tests.Logic
 
             Assert.That(cardRows, Has.None.Matches<BillRow>(r => r.Notes == "Coffee"));
             Assert.That(checkingRows, Has.None.Matches<BillRow>(r => r.Notes == "Coffee"));
-            Assert.That(transactions.GetPostedTransactions(card.Id).Single().ImportedStatus, Is.EqualTo(ImportedStatus.Unmatched));
+            Assert.That(transactions.GetPostedTransactions(card.Id).Single().ImportedStatus, Is.EqualTo(ImportedStatus.Matched));
         }
 
         [Test]
@@ -706,6 +738,100 @@ namespace THMS.Tests.Logic
             orchestrator.DeletePaymentPlan(card.Id);
             Assert.That(orchestrator.GetPaymentPlan(card.Id), Is.Null);
             Assert.That(orchestrator.GetBills(checking.Id, next), Is.Empty);
+        }
+
+        [Test]
+        public void SavePaymentPlan_ReplacesStatementDueWithPlanPayments()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var asOf = new DateTime(2026, 10, 5);
+            var statement = new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = new DateTime(2026, 9, 28),
+                DueDate = new DateTime(2026, 10, 20),
+                StatementBalance = 1000m,
+                AmountDue = 220m
+            };
+            statements.Save(statement);
+            transactions.AddFutureTransferTransaction(new FutureTransferTransaction
+            {
+                FromAccountId = checking.Id,
+                ToAccountId = card.Id,
+                Amount = statement.AmountDue,
+                Date = statement.DueDate,
+                Description = "Statement due",
+                Origin = ExpectedOrigin.StatementPay,
+                OriginId = statement.Id,
+                StatementId = statement.Id,
+                Status = ExpectedStatus.Scheduled
+            });
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var next = new DateTime(2026, 10, 9);
+            var end = new DateTime(2027, 4, 9);
+
+            orchestrator.SavePaymentPlan(card.Id, checking.Id, 80m, RecurrenceFrequency.BiWeekly, next, end);
+
+            Assert.That(
+                transactions.GetAllFutureTransferTransactions().Any(item => item.Origin == ExpectedOrigin.StatementPay),
+                Is.False);
+            var cardBills = orchestrator.GetBills(card.Id, asOf);
+            Assert.That(cardBills.Any(row => row.Kind == BillKinds.Statement), Is.False);
+            Assert.That(cardBills.Single().Notes, Is.EqualTo("Card payment"));
+            Assert.That(cardBills[0].Amount, Is.EqualTo(80m));
+            Assert.That(cardBills[0].DueDate, Is.EqualTo(next));
+            var checkingBills = orchestrator.GetBills(checking.Id, asOf);
+            Assert.That(checkingBills.Single().Amount, Is.EqualTo(-80m));
+
+            var projection = orchestrator.GetProjection(card.Id, asOf);
+            Assert.That(projection.Rows, Is.Not.Empty);
+            Assert.That(projection.Rows.Select(row => row.Description), Does.Not.Contain("Statement due"));
+            Assert.That(projection.Rows.Select(row => row.Amount), Is.All.EqualTo(-80m));
+
+            statements.Save(new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = new DateTime(2026, 10, 28),
+                DueDate = new DateTime(2026, 11, 20),
+                StatementBalance = 900m,
+                AmountDue = 200m
+            });
+            Assert.That(
+                orchestrator.GetBills(card.Id, asOf).Any(row => row.Kind == BillKinds.Statement),
+                Is.False);
+        }
+
+        [Test]
+        public void GetBills_ExpiredPaymentPlanShowsStatementDue()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var asOf = new DateTime(2026, 10, 5);
+            statements.Save(new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = new DateTime(2026, 9, 28),
+                DueDate = new DateTime(2026, 10, 20),
+                StatementBalance = 1000m,
+                AmountDue = 220m
+            });
+            transactions.AddRecurringTransferRule(new RecurringTransferRule
+            {
+                FromAccountId = checking.Id,
+                ToAccountId = card.Id,
+                Description = "Card payment",
+                Amount = 80m,
+                Frequency = RecurrenceFrequency.BiWeekly,
+                NextOccurrence = new DateTime(2026, 9, 25),
+                EndDate = asOf.AddDays(-1),
+                IsActive = true,
+                IsPaymentPlan = true
+            });
+
+            var rows = new BillsOrchestrator(accounts, transactions, statements).GetBills(card.Id, asOf);
+
+            Assert.That(rows.Single().Kind, Is.EqualTo(BillKinds.Statement));
+            Assert.That(rows[0].Amount, Is.EqualTo(220m));
+            Assert.That(rows[0].Status, Is.EqualTo(BillStatuses.Due));
         }
 
         [Test]

@@ -14,7 +14,8 @@ class Program
         var sandboxProtected = SecretProtector.Protect(sandboxSecret);
         var productionProtected = SecretProtector.Protect(productionSecret);
 
-        var path = Path.Combine(AppContext.BaseDirectory, "plaid.secrets.dat");
+        Directory.CreateDirectory(AppPaths.Root);
+        var path = AppPaths.PlaidSecrets;
 
         using var fs = new FileStream(path, FileMode.Create, FileAccess.Write);
         using var bw = new BinaryWriter(fs, Encoding.UTF8);

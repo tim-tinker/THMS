@@ -242,7 +242,7 @@ namespace THMS.UI.WinForms.Controls
 
         private void UpdateAutoPayEnabled()
         {
-            cmbAutoPayFrom.Enabled = pnlAutoPay.Visible && chkAutoPay.Checked;
+            cmbAutoPayFrom.Enabled = pnlAutoPay.Visible;
         }
 
         private void ResizeFormForPanel(Panel panel)

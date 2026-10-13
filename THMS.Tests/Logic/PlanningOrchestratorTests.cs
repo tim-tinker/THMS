@@ -151,6 +151,58 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void SaveStatement_FundingAccountCreatesDueTransferOnBothAccounts()
+        {
+            var (accounts, transactions, statements, card) = SeedCardStatement();
+            var checking = new BankAccount { Name = "Checking", Institution = "X", AccountNumber = "9", WebsiteUrl = "" };
+            accounts.UpsertAccount(checking);
+            card.AutoPay = false;
+            card.AutoPayFromAccountId = checking.Id;
+            accounts.UpsertAccount(card);
+            var orchestrator = new PlanningOrchestrator(accounts, transactions, statements);
+            var statement = new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = DateTime.Today.AddDays(-5),
+                DueDate = DateTime.Today.AddDays(10),
+                AmountDue = 819.80m,
+                StatementBalance = 17672.62m
+            };
+
+            orchestrator.SaveStatement(statement);
+
+            var expected = transactions.GetAllFutureTransferTransactions().Single();
+            Assert.That(expected.Status, Is.EqualTo(ExpectedStatus.Planned));
+            Assert.That(expected.FromAccountId, Is.EqualTo(checking.Id));
+            Assert.That(expected.ToAccountId, Is.EqualTo(card.Id));
+            Assert.That(expected.Amount, Is.EqualTo(819.80m));
+            Assert.That(expected.OriginId, Is.EqualTo(statement.Id));
+
+            var bills = new BillsOrchestrator(accounts, transactions, statements);
+            var cardBill = bills.GetBills(card.Id).Single();
+            var checkingBill = bills.GetBills(checking.Id).Single();
+            Assert.That(cardBill.Status, Is.EqualTo(BillStatuses.Due));
+            Assert.That(checkingBill.Status, Is.EqualTo(BillStatuses.Due));
+            Assert.That(checkingBill.Amount, Is.EqualTo(-819.80m));
+
+            var paid = bills.AddManual(card.Id, checking.Id, 400m, DateTime.Today, "Card payment", statement.Id);
+
+            Assert.That(transactions.GetAllFutureTransferTransactions().ToList(), Has.Count.EqualTo(1));
+            Assert.That(paid.Id, Is.EqualTo(expected.Id));
+            Assert.That(paid.Status, Is.EqualTo(ExpectedStatus.Scheduled));
+            Assert.That(paid.Amount, Is.EqualTo(400m));
+            Assert.That(paid.Date, Is.EqualTo(DateTime.Today));
+            Assert.That(bills.GetBills(card.Id).Single().Status, Is.EqualTo(BillStatuses.Scheduled));
+            Assert.That(bills.GetBills(checking.Id).Single().Status, Is.EqualTo(BillStatuses.Scheduled));
+
+            orchestrator.SaveStatement(statement);
+            var kept = transactions.GetAllFutureTransferTransactions().Single();
+            Assert.That(kept.Amount, Is.EqualTo(400m));
+            Assert.That(kept.Date, Is.EqualTo(DateTime.Today));
+            Assert.That(kept.Status, Is.EqualTo(ExpectedStatus.Scheduled));
+        }
+
+        [Test]
         public void SaveStatement_WithoutAutoPayDoesNotCreateIntent()
         {
             var (accounts, transactions, statements, card) = SeedCardStatement();
@@ -166,6 +218,43 @@ namespace THMS.Tests.Logic
             });
 
             Assert.That(transactions.GetAllFutureTransferTransactions(), Is.Empty);
+        }
+
+        [Test]
+        public void SaveStatement_AutoPayLeavesPaymentPlanInPlaceOfStatementDue()
+        {
+            var (accounts, transactions, statements, card) = SeedCardStatement();
+            var checking = new BankAccount { Name = "Checking", Institution = "X", AccountNumber = "9", WebsiteUrl = "" };
+            accounts.UpsertAccount(checking);
+            card.AutoPay = true;
+            card.AutoPayFromAccountId = checking.Id;
+            accounts.UpsertAccount(card);
+            transactions.AddRecurringTransferRule(new RecurringTransferRule
+            {
+                FromAccountId = checking.Id,
+                ToAccountId = card.Id,
+                Description = "Card payment",
+                Amount = 80m,
+                Frequency = RecurrenceFrequency.BiWeekly,
+                NextOccurrence = DateTime.Today,
+                EndDate = DateTime.Today.AddMonths(6),
+                IsActive = true,
+                IsPaymentPlan = true
+            });
+            var orchestrator = new PlanningOrchestrator(accounts, transactions, statements);
+
+            orchestrator.SaveStatement(new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = DateTime.Today.AddDays(-5),
+                DueDate = DateTime.Today.AddDays(10),
+                AmountDue = 819.80m,
+                StatementBalance = 17672.62m
+            });
+
+            Assert.That(
+                transactions.GetAllFutureTransferTransactions().Any(item => item.Origin == ExpectedOrigin.StatementPay),
+                Is.False);
         }
 
         [Test]

@@ -22,6 +22,7 @@ namespace THMS.UI.WinForms.Controls
         private Guid? _selectedCategoryId;
         private string _historyPeriod = HistoryPeriodBar.Month;
         private bool _loading;
+        private int _reloadGeneration;
 
         public event EventHandler? CatalogChanged;
         public event EventHandler? CloseRequested;
@@ -54,18 +55,52 @@ namespace THMS.UI.WinForms.Controls
             tabsDetail.RecalculateItemSize();
         }
 
-        public void Bind(CategoryOrchestrator orchestrator)
+        public void Bind(CategoryOrchestrator orchestrator, bool reload = true)
         {
             ArgumentNullException.ThrowIfNull(orchestrator);
             _orchestrator = orchestrator;
-            Reload(_selectedCategoryId);
+            if (reload)
+                Reload(_selectedCategoryId);
         }
 
         public void ReloadIfClean()
         {
             if (_orchestrator is null)
                 return;
-            Reload(_selectedCategoryId);
+            var generation = Interlocked.Increment(ref _reloadGeneration);
+            var selectId = _selectedCategoryId;
+            _ = ReloadCleanAsync(generation, selectId);
+        }
+
+        private async Task ReloadCleanAsync(int generation, Guid? selectId)
+        {
+            try
+            {
+                await Task.Run(() => _budgets.RefreshAllActive());
+            }
+            catch (Exception ex)
+            {
+                if (generation == _reloadGeneration && !IsDisposed && IsHandleCreated)
+                    BeginInvoke(() => MessageBox.Show(FindForm(), ex.Message, "Categories",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                return;
+            }
+
+            if (generation != _reloadGeneration || IsDisposed)
+                return;
+            if (!IsHandleCreated)
+                return;
+            if (InvokeRequired)
+                BeginInvoke(Apply);
+            else
+                Apply();
+
+            void Apply()
+            {
+                if (generation != _reloadGeneration || IsDisposed)
+                    return;
+                Reload(selectId, refreshBudgets: false);
+            }
         }
 
         public void RefreshLayout()
@@ -512,12 +547,28 @@ namespace THMS.UI.WinForms.Controls
             if (hit.RowIndex < 0)
                 return;
 
-            gridTransactions.ClearSelection();
-            gridTransactions.Rows[hit.RowIndex].Selected = true;
-            if (hit.ColumnIndex >= 0)
-                gridTransactions.CurrentCell = gridTransactions[hit.ColumnIndex, hit.RowIndex];
+            var row = gridTransactions.Rows[hit.RowIndex];
+            var alreadyCurrent = row.Selected
+                && gridTransactions.SelectedRows.Count == 1
+                && gridTransactions.CurrentCell?.RowIndex == hit.RowIndex;
+            if (!alreadyCurrent)
+            {
+                gridTransactions.ClearSelection();
+                row.Selected = true;
+                if (hit.ColumnIndex >= 0)
+                    gridTransactions.CurrentCell = gridTransactions[hit.ColumnIndex, hit.RowIndex];
+            }
 
-            if (SelectedTransaction() is not UnifiedTransactionView view || !CanSplit(view))
+            var rowIndex = hit.RowIndex;
+            var location = e.Location;
+            gridTransactions.BeginInvoke(() => ShowTransactionMenu(rowIndex, location));
+        }
+
+        private void ShowTransactionMenu(int rowIndex, Point location)
+        {
+            if (gridTransactions.IsDisposed || rowIndex < 0 || rowIndex >= gridTransactions.RowCount)
+                return;
+            if (gridTransactions.Rows[rowIndex].DataBoundItem is not UnifiedTransactionView view || !CanSplit(view))
                 return;
 
             var menu = new ContextMenuStrip();
@@ -525,7 +576,7 @@ namespace THMS.UI.WinForms.Controls
             split.Click += (_, _) => OpenSplitEditor(view);
             menu.Items.Add(split);
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
-            menu.Show(gridTransactions, e.Location);
+            menu.Show(gridTransactions, location);
         }
 
         private void OnTransactionDoubleClick(object? sender, DataGridViewCellEventArgs e)
@@ -587,13 +638,16 @@ namespace THMS.UI.WinForms.Controls
                 ? _transactions.GetParent(view.LookupId) as PostedTransaction
                 : null;
             var suggestion = posted is null ? null : Orchestrator.Suggest(posted);
+            var splitSelected = !view.IsSplitRow && view.Category == UnifiedTransactionView.SplitCategory;
             var menu = CategoryTreeUi.CreateAssignMenu(
                 Orchestrator.GetActiveCategories(),
-                view.CategoryId ?? suggestion?.CategoryId,
-                suggestion?.CategoryId,
+                splitSelected ? null : view.CategoryId ?? suggestion?.CategoryId,
+                splitSelected ? null : suggestion?.CategoryId,
                 category => AssignTransactionCategory(view, category.Id),
                 () => CreateAndAssignCategory(view),
-                OpenCategoryManager);
+                OpenCategoryManager,
+                () => OpenSplitEditor(view),
+                splitSelected);
 
             var cell = gridTransactions.GetCellDisplayRectangle(
                 _transactionCategoryColumn.Index, rowIndex, cutOverflow: false);

@@ -129,6 +129,9 @@ namespace THMS.Logic.Orchestrators.Finance
         private TransactionReconciliation PersistAcceptedNew(Guid importedId) =>
             PersistAcceptedNew(RequireUnreconciled(importedId));
 
+        public bool CanUndoMatch(Guid importedId) =>
+            _transactions.GetReconciliationByImported(importedId) is not null;
+
         public void UndoMatch(Guid importedId)
         {
             var reconciliation = _transactions.GetReconciliationByImported(importedId)
@@ -150,24 +153,8 @@ namespace THMS.Logic.Orchestrators.Finance
             RefreshBudgets(imported);
         }
 
-        public HashSet<Guid> AccountIdsWithUnreconciled()
-        {
-            var ids = new HashSet<Guid>();
-            foreach (var posted in _transactions.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue)
-                         .Where(p => p.ImportedStatus == ImportedStatus.Unreconciled))
-            {
-                ids.Add(posted.AccountId);
-            }
-
-            foreach (var transfer in _transactions.GetPostedTransferTransactions(DateTime.MinValue, DateTime.MaxValue)
-                         .Where(p => p.ImportedStatus == ImportedStatus.Unreconciled))
-            {
-                ids.Add(transfer.AccountId);
-            }
-
-            ids.Remove(Guid.Empty);
-            return ids;
-        }
+        public HashSet<Guid> AccountIdsWithUnreconciled() =>
+            _transactions.GetAccountIdsWithUnreconciledImports().ToHashSet();
 
         private void RefreshBudgets(params PostedTransaction[] posted) =>
             new BudgetOrchestrator(_transactions).RefreshAffected(posted);
@@ -498,9 +485,8 @@ namespace THMS.Logic.Orchestrators.Finance
         }
 
         private IEnumerable<PostedTransaction> UnreconciledForAccount(Guid accountId) =>
-            _transactions.GetPostedTransactions(accountId)
-                .Concat(_transactions.GetPostedTransferTransactions(accountId))
-                .Where(p => p.ImportedStatus == ImportedStatus.Unreconciled);
+            _transactions.GetUnreconciledPostedTransactions(accountId)
+                .Concat(_transactions.GetUnreconciledPostedTransferTransactions(accountId));
 
         private IEnumerable<ExpectedChoice> UnmatchedExpected()
         {

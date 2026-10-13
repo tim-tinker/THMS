@@ -16,6 +16,7 @@ namespace THMS.UI.WinForms.Controls
         private readonly DataGridView _grid = new();
         private readonly Label _lblCash = new();
         private readonly ContextMenuStrip _menu = new();
+        private bool _suppressMenu;
         private ThmsButton _delete = null!;
         private Guid? _accountId;
         private bool _suppressCash;
@@ -219,16 +220,41 @@ namespace THMS.UI.WinForms.Controls
             if (hit.RowIndex < 0)
                 return;
 
-            _grid.ClearSelection();
-            _grid.Rows[hit.RowIndex].Selected = true;
-            var cell = _grid.Rows[hit.RowIndex].Cells.Cast<DataGridViewCell>()
-                .FirstOrDefault(c => c.Visible);
-            if (cell is not null)
+            var row = _grid.Rows[hit.RowIndex];
+            var alreadyCurrent = row.Selected
+                && _grid.SelectedRows.Count == 1
+                && _grid.CurrentCell?.RowIndex == hit.RowIndex;
+            if (!alreadyCurrent)
+            {
+                var cell = hit.ColumnIndex >= 0 && row.Cells[hit.ColumnIndex].Visible
+                    ? row.Cells[hit.ColumnIndex]
+                    : row.Cells.Cast<DataGridViewCell>().FirstOrDefault(c => c.Visible);
+                if (cell is null)
+                    return;
+
+                _grid.ClearSelection();
+                row.Selected = true;
                 _grid.CurrentCell = cell;
+            }
+
+            var location = e.Location;
+            _suppressMenu = true;
+            _grid.BeginInvoke(() =>
+            {
+                _suppressMenu = false;
+                if (!_grid.IsDisposed)
+                    _menu.Show(_grid, location);
+            });
         }
 
         private void OnMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
         {
+            if (_suppressMenu)
+            {
+                e.Cancel = true;
+                return;
+            }
+
             _menu.Items.Clear();
             if (_grid.CurrentRow?.DataBoundItem is not BillRow row || row.DestinationAccountId == Guid.Empty)
             {
@@ -697,11 +723,13 @@ namespace THMS.UI.WinForms.Controls
             if (id is not Guid accountId || combo.DataSource is not IList<Account> accounts)
                 return;
 
+            EnsureComboItems(combo);
             for (var i = 0; i < accounts.Count; i++)
             {
                 if (accounts[i].Id != accountId)
                     continue;
-                combo.SelectedIndex = i;
+                if (i < combo.Items.Count)
+                    combo.SelectedIndex = i;
                 return;
             }
         }
@@ -711,6 +739,7 @@ namespace THMS.UI.WinForms.Controls
             if (combo.DataSource is not IList<ExpenseCategory> categories || categories.Count == 0)
                 return;
 
+            EnsureComboItems(combo);
             var index = -1;
             if (id is Guid categoryId)
             {
@@ -734,7 +763,17 @@ namespace THMS.UI.WinForms.Controls
                 }
             }
 
-            combo.SelectedIndex = index >= 0 ? index : 0;
+            if (index < 0)
+                index = 0;
+            if (index < combo.Items.Count)
+                combo.SelectedIndex = index;
+        }
+
+        private static void EnsureComboItems(ComboBox combo)
+        {
+            if (combo.Items.Count > 0 || combo.DataSource is null)
+                return;
+            combo.BindingContext ??= new BindingContext();
         }
 
         private void LayoutFields()
@@ -785,6 +824,7 @@ namespace THMS.UI.WinForms.Controls
             combo.DisplayMember = nameof(Account.Name);
             combo.ValueMember = nameof(Account.Id);
             combo.DataSource = accounts.ToList();
+            EnsureComboItems(combo);
         }
 
         private static void BindCategories(ComboBox combo, List<ExpenseCategory> categories)
@@ -793,6 +833,7 @@ namespace THMS.UI.WinForms.Controls
             combo.DisplayMember = nameof(ExpenseCategory.Name);
             combo.ValueMember = nameof(ExpenseCategory.Id);
             combo.DataSource = categories.ToList();
+            EnsureComboItems(combo);
         }
 
         private static List<Account> BlankFirst(IReadOnlyList<Account> accounts)

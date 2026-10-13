@@ -227,6 +227,7 @@ namespace THMS.Tests.Logic
                     StatementDate = DateTime.Today.AddDays(-10),
                     DueDate = DateTime.Today.AddDays(12),
                     AmountDue = 80,
+                    StatementBalance = 49.84m,
                     Usage = [new() { Type = "kWh", Amount = 400, Rate = 0.20m }],
                     Charges = [new() { Description = "Energy", Amount = 80 }]
                 },
@@ -273,6 +274,7 @@ namespace THMS.Tests.Logic
             Assert.That(card.Promotions[0].DateAcquired.Date, Is.EqualTo(DateTime.Today.AddDays(-40).Date));
             Assert.That(card.Promotions[0].Type, Is.EqualTo(PromoType.LumpSum));
             var utility = (UtilityStatement)store.Get(statements[4].Id)!;
+            Assert.That(utility.StatementBalance, Is.EqualTo(49.84m));
             Assert.That(utility.Usage[0].Amount, Is.EqualTo(400m));
             Assert.That(utility.Charges[0].Amount, Is.EqualTo(80m));
             Assert.That(((ServiceStatement)store.Get(statements[5].Id)!).Charges[0].Description, Is.EqualTo("Streaming"));
@@ -708,11 +710,14 @@ namespace THMS.Tests.Logic
             {
                 StatementDate = new DateTime(2026, 8, 15),
                 DueDate = new DateTime(2026, 9, 10),
-                AmountDue = 80
+                AmountDue = 80,
+                StatementBalance = 49.84m
             });
             Assert.That(utility.Usage, Is.EqualTo(""));
             Assert.That(utility.Charges, Is.EqualTo(""));
             Assert.That(utility.Promotions, Is.EqualTo(AccountStatementListRow.NotApplicable));
+            Assert.That(utility.AmountDue, Is.EqualTo(80m.ToString("c2")));
+            Assert.That(utility.StatementBalance, Is.EqualTo(49.84m.ToString("c2")));
 
             var billed = AccountStatementListRow.From(new UtilityStatement
             {

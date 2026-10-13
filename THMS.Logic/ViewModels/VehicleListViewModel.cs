@@ -65,17 +65,21 @@ namespace THMS.Logic.ViewModels
             PeriodEnd = end;
         }
 
-        private void Load()
+        public List<VehicleListItemViewModel> Query(string period)
+        {
+            _historyPeriod = string.IsNullOrWhiteSpace(period) ? "Month" : period;
+            ApplyPeriod();
+            return _vehicleStore.GetAllVehicles().Select(CreateListItem).ToList();
+        }
+
+        public void Replace(IReadOnlyList<VehicleListItemViewModel> items)
         {
             Vehicles.Clear();
-
-            var allVehicles = _vehicleStore.GetAllVehicles();
-
-            foreach (var v in allVehicles)
-            {
-                Vehicles.Add(CreateListItem(v));
-            }
+            foreach (var item in items)
+                Vehicles.Add(item);
         }
+
+        private void Load() => Replace(Query(_historyPeriod));
 
         public void AddVehicle(VehicleBase vehicle)
         {

@@ -84,6 +84,35 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void ImportRules_KeepsIdenticalRowsInTheSameFile()
+        {
+            var path = WriteCsv("""
+                From Account,To Account,Description,Frequency,Last Occurrence,Last Amount,Date,Amount,From Category,To Category
+                WF Checking,Credit: Amazon Store Card,Payment,Bi-weekly,2026-08-31,20,2026-09-14,20,Credit Card Payment,Card Receipt
+                WF Checking,Credit: Amazon Store Card,Payment,Bi-weekly,2026-08-31,20,2026-09-14,20,Credit Card Payment,Card Receipt
+                """);
+            try
+            {
+                var (orchestrator, transactions, _) = Create();
+                var rows = orchestrator.LoadRulesFromFile(path);
+                Assert.That(orchestrator.ImportRules(rows).Count, Is.EqualTo(2));
+
+                var saved = transactions.GetAllRecurringTransferRules().ToList();
+                Assert.That(saved, Has.Count.EqualTo(2));
+                Assert.That(saved.Select(rule => rule.Id).Distinct().Count(), Is.EqualTo(2));
+                Assert.That(saved.All(rule => rule.Description == "Payment" && rule.Amount == 20m), Is.True);
+                Assert.That(saved.All(rule => rule.NextOccurrence == new DateTime(2026, 9, 14)), Is.True);
+
+                Assert.That(orchestrator.ImportRules(rows).Count, Is.EqualTo(2));
+                Assert.That(transactions.GetAllRecurringTransferRules().Count(), Is.EqualTo(2));
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Test]
         public void LoadRulesFromFile_ThrowsWhenMissing()
         {
             var (orchestrator, _, _) = Create();

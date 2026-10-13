@@ -53,6 +53,59 @@ namespace THMS.Data.Stores.InMemoryStores
         public decimal SumPostedAfter(Guid accountId, DateTime after) =>
             _posted.Where(t => t.AccountId == accountId && t.Date > after).Sum(t => t.Amount);
 
+        public decimal SumIncomingTransferSplitAmounts(Guid accountId, DateTime? beforeExclusive, DateTime? afterExclusive)
+        {
+            decimal sum = 0;
+            foreach (var transaction in _posted.Concat<PostedTransaction>(_postedTransfers))
+            {
+                if (transaction.AccountId == accountId)
+                    continue;
+                if (beforeExclusive is DateTime before && transaction.Date >= before)
+                    continue;
+                if (afterExclusive is DateTime after && transaction.Date <= after)
+                    continue;
+                sum += transaction.Splits
+                    .Where(split => SplitTransactionMath.IsTransferTo(split, accountId))
+                    .Sum(SplitTransactionMath.CounterpartAmount);
+            }
+
+            return sum;
+        }
+
+        public IEnumerable<PostedTransaction> GetPostedIncomingTo(Guid accountId, DateTime start, DateTime end) =>
+            Attach(_posted.Where(t =>
+                t.AccountId != accountId
+                && InRange(t.Date, start, end)
+                && t.Splits.Any(split => SplitTransactionMath.IsTransferTo(split, accountId)))
+                .OrderBy(t => t.Date));
+
+        public IEnumerable<PostedTransferTransaction> GetPostedTransfersIncomingTo(Guid accountId, DateTime start, DateTime end) =>
+            Attach(_postedTransfers.Where(t =>
+                t.AccountId != accountId
+                && InRange(t.Date, start, end)
+                && t.Splits.Any(split => SplitTransactionMath.IsTransferTo(split, accountId)))
+                .OrderBy(t => t.Date));
+
+        public IEnumerable<PostedTransaction> GetUnreconciledPosted(Guid accountId) =>
+            Attach(_posted.Where(t => t.AccountId == accountId && t.ImportedStatus == ImportedStatus.Unreconciled)
+                .OrderBy(t => t.Date));
+
+        public IEnumerable<PostedTransferTransaction> GetUnreconciledPostedTransfers(Guid accountId) =>
+            Attach(_postedTransfers.Where(t => t.AccountId == accountId && t.ImportedStatus == ImportedStatus.Unreconciled)
+                .OrderBy(t => t.Date));
+
+        public IReadOnlyCollection<Guid> GetAccountIdsWithUnreconciledImports()
+        {
+            var ids = new HashSet<Guid>();
+            foreach (var transaction in _posted.Concat<PostedTransaction>(_postedTransfers))
+            {
+                if (transaction.ImportedStatus == ImportedStatus.Unreconciled && transaction.AccountId != Guid.Empty)
+                    ids.Add(transaction.AccountId);
+            }
+
+            return ids;
+        }
+
         public PostedTransaction? GetLatestPosted(Guid accountId) =>
             _posted
                 .Where(t => t.AccountId == accountId)
@@ -253,9 +306,11 @@ namespace THMS.Data.Stores.InMemoryStores
         // Recurring Single Rules
         // ------------------------------------------------------------
 
-        public void AddRecurringSingle(RecurringSingleTransactionRule rule)
+        public void AddRecurringSingle(RecurringSingleTransactionRule rule, bool matchExistingPattern = true)
         {
-            var existing = _recurringSingles.FirstOrDefault(r => RecurringRulePattern.Matches(r, rule));
+            var existing = matchExistingPattern
+                ? _recurringSingles.FirstOrDefault(r => RecurringRulePattern.Matches(r, rule))
+                : null;
             if (existing is not null)
             {
                 UpsertExisting(existing, rule, r => Update(_recurringSingles, r));
@@ -287,9 +342,11 @@ namespace THMS.Data.Stores.InMemoryStores
         // Recurring Transfer Rules
         // ------------------------------------------------------------
 
-        public void AddRecurringTransfer(RecurringTransferRule rule)
+        public void AddRecurringTransfer(RecurringTransferRule rule, bool matchExistingPattern = true)
         {
-            var existing = _recurringTransfers.FirstOrDefault(r => RecurringRulePattern.Matches(r, rule));
+            var existing = matchExistingPattern
+                ? _recurringTransfers.FirstOrDefault(r => RecurringRulePattern.Matches(r, rule))
+                : null;
             if (existing is not null)
             {
                 UpsertExisting(existing, rule, r => Update(_recurringTransfers, r));

@@ -152,6 +152,7 @@ namespace THMS.Logic.ViewModels.Finance
             LoanStatement loan => loan.StatementBalance,
             MortgageStatement mortgage => mortgage.StatementBalance,
             CreditCardStatement card => card.StatementBalance,
+            UtilityStatement utility => utility.StatementBalance,
             _ => null
         };
 

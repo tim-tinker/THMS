@@ -21,6 +21,8 @@ namespace THMS.UI
         public MainForm()
         {
             InitializeComponent();
+            statusIcon.Image = LoadStatusIcon();
+            Icon = LoadWindowIcon();
             AppStatus.Bind(SetAppStatus);
         }
 
@@ -155,6 +157,23 @@ namespace THMS.UI
                     child.Cursor = Cursors.Default;
                 ClearStuckWaitCursor(child);
             }
+        }
+
+        private static Icon LoadWindowIcon()
+        {
+            const string resource = "THMS.UI.WinForms.Properties.Icons.home_dollar_64px.ico";
+            var stream = typeof(MainForm).Assembly.GetManifestResourceStream(resource)
+                ?? throw new InvalidOperationException($"Missing window icon resource {resource}.");
+            return new Icon(stream);
+        }
+
+        private static Image LoadStatusIcon()
+        {
+            const string resource = "THMS.UI.WinForms.Properties.Icons.home_dollar_64px.png";
+            using var stream = typeof(MainForm).Assembly.GetManifestResourceStream(resource)
+                ?? throw new InvalidOperationException($"Missing status icon resource {resource}.");
+            using var loaded = new Bitmap(stream);
+            return new Bitmap(loaded);
         }
 
         private void OnStatusStripPaint(object? sender, PaintEventArgs e)

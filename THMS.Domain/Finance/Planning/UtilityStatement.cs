@@ -2,6 +2,7 @@ namespace THMS.Domain.Finance.Planning
 {
     public class UtilityStatement : AccountStatement
     {
+        public decimal StatementBalance { get; set; }
         public List<UtilityUsageRecord> Usage { get; set; } = [];
         public List<UtilityChargeLine> Charges { get; set; } = [];
 

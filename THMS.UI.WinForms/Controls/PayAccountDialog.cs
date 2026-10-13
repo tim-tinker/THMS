@@ -32,7 +32,8 @@ namespace THMS.UI.WinForms.Controls
             decimal? amountDue,
             string? defaultDescription,
             IReadOnlyList<PromotionalBalance>? promotions = null,
-            DateTime? asOf = null)
+            DateTime? asOf = null,
+            Guid? fundingAccountId = null)
         {
             ArgumentNullException.ThrowIfNull(destination);
             var hasPromotions = promotions is { Count: > 0 };
@@ -128,8 +129,7 @@ namespace THMS.UI.WinForms.Controls
 
             Controls.Add(layout);
             _from.DataSource = choices;
-            if (_from.Items.Count > 0)
-                _from.SelectedIndex = 0;
+            SelectFunding(fundingAccountId);
             AcceptButton = _save;
             CancelButton = cancel;
             UpdateSaveEnabled();
@@ -138,6 +138,29 @@ namespace THMS.UI.WinForms.Controls
         private void UpdateSaveEnabled()
         {
             _save.Enabled = SelectedFunding() is not null;
+        }
+
+        private void SelectFunding(Guid? accountId)
+        {
+            if (accountId is not Guid id || id == Guid.Empty || _from.DataSource is not IList<PayFromChoice> choices)
+                return;
+
+            EnsureComboItems(_from);
+            for (var i = 0; i < choices.Count; i++)
+            {
+                if (choices[i].Id != id)
+                    continue;
+                if (i < _from.Items.Count)
+                    _from.SelectedIndex = i;
+                return;
+            }
+        }
+
+        private static void EnsureComboItems(ComboBox combo)
+        {
+            if (combo.Items.Count > 0 || combo.DataSource is null)
+                return;
+            combo.BindingContext ??= new BindingContext();
         }
 
         private PayFromChoice? SelectedFunding() =>

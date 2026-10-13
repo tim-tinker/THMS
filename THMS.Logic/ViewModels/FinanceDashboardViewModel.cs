@@ -1,5 +1,6 @@
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Aggregation;
 using THMS.Logic.Orchestrators;
@@ -29,18 +30,35 @@ namespace THMS.Logic.ViewModels.Finance
 
         public FinanceDashboardSnapshot Snapshot { get; private set; } = new();
 
+        public void Use(FinanceDashboardSnapshot snapshot) => Snapshot = snapshot;
+
         public override void Initialize() => Refresh();
 
         public void Refresh() => Refresh(DateTime.Today);
 
-        public void Refresh(DateTime asOf)
+        public void Refresh(DateTime asOf) => Snapshot = CreateSnapshot(asOf);
+
+        public FinanceDashboardSnapshot CreateAccountSnapshot(DateTime asOf)
+        {
+            var accounts = HouseholdAccounts();
+            return _composer.Compose(
+                asOf.Date,
+                accounts,
+                [],
+                [],
+                [],
+                new Dictionary<Guid, ExpenseBudgetHistory?>(),
+                [],
+                [],
+                []);
+        }
+
+        public FinanceDashboardSnapshot CreateSnapshot(DateTime asOf)
         {
             _transactions.EnsureDefaultCategories();
             _budgets.RefreshAllActive();
 
-            var accounts = _accounts.GetAllAccounts()
-                .Where(a => a is not InternalAccount)
-                .ToList();
+            var accounts = HouseholdAccounts();
             var accountIds = accounts.Select(a => a.Id).ToHashSet();
 
             var posted = new List<PostedTransaction>();
@@ -59,7 +77,7 @@ namespace THMS.Logic.ViewModels.Finance
             var categories = _transactions.GetAllCategories(includeInactive: true).ToList();
             var forecast = BuildForecast(asOf.Date, accounts);
 
-            Snapshot = _composer.Compose(
+            return _composer.Compose(
                 asOf.Date,
                 accounts,
                 posted,
@@ -70,6 +88,11 @@ namespace THMS.Logic.ViewModels.Finance
                 forecast,
                 categories);
         }
+
+        private List<Account> HouseholdAccounts() =>
+            _accounts.GetAllAccounts()
+                .Where(a => a is not InternalAccount)
+                .ToList();
 
         private List<UnifiedTransactionView> BuildForecast(DateTime from, List<Account> accounts)
         {

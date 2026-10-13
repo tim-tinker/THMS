@@ -16,6 +16,8 @@ namespace THMS.UI.WinForms.Controls
         private readonly List<Account> _accounts;
         private bool _loading;
 
+        private const string StatementFieldsTag = "statement-fields";
+
         private NumericUpDown? numEscrowBalance;
         private NumericUpDown? numStatementBalance;
         private DataGridView? gridPromotions;
@@ -115,8 +117,9 @@ namespace THMS.UI.WinForms.Controls
 
             var fieldHeight = Math.Max(LogicalToDeviceUnits(36), Font.Height + LogicalToDeviceUnits(16));
             pnlCommon.RowStyles[0].Height = fieldHeight;
-            if (txtAmountDue.Visible)
+            if (numAmountDue.Visible)
                 pnlCommon.RowStyles[1].Height = fieldHeight;
+            AlignStatementFields(fieldHeight);
         }
 
         private static void OnComboDrawItem(object? sender, DrawItemEventArgs e)
@@ -228,7 +231,7 @@ namespace THMS.UI.WinForms.Controls
             _loading = true;
             dtStatementDate.Value = DateTime.Today.AddDays(-15);
             dtDueDate.Value = DateTime.Today.AddDays(15);
-            txtAmountDue.Text = "";
+            numAmountDue.Value = 0;
 
             if (_existingStatement is null)
             {
@@ -257,9 +260,7 @@ namespace THMS.UI.WinForms.Controls
             dtDueDate.Value = SafeDate(_existingStatement.DueDate);
             txtNotes.Text = _existingStatement.Notes ?? "";
             if (!StatementAccountMatch.IsNonPayable(_existingStatement))
-            {
-                txtAmountDue.Text = _existingStatement.AmountDue.ToString("0.00");
-            }
+                SetMoney(numAmountDue, _existingStatement.AmountDue);
 
             _loading = false;
             LoadTypePanel(_existingStatement.Type);
@@ -372,6 +373,8 @@ namespace THMS.UI.WinForms.Controls
             pnlTypeSpecific.Controls.Add(panel);
             pnlTypeSpecific.ResumeLayout();
             ShowObligationFields(!StatementAccountMatch.IsNonPayable(type));
+            if (IsHandleCreated)
+                AlignStatementFields(CurrentFieldHeight());
         }
 
         private static bool UsesFixedFields(StatementType type) =>
@@ -382,7 +385,7 @@ namespace THMS.UI.WinForms.Controls
             lblDueDate.Visible = visible;
             dtDueDate.Visible = visible;
             lblAmountDue.Visible = visible;
-            txtAmountDue.Visible = visible;
+            numAmountDue.Visible = visible;
 
             var rowHeight = IsHandleCreated
                 ? Math.Max(LogicalToDeviceUnits(36), Font.Height + LogicalToDeviceUnits(16))
@@ -414,7 +417,7 @@ namespace THMS.UI.WinForms.Controls
             var layout = FieldLayout(2);
             numStatementBalance = MoneyBox();
             numEscrowBalance = MoneyBox();
-            AddField(layout, 0, "Statement Balance", numStatementBalance);
+            AddField(layout, 0, "Outstanding Principal", numStatementBalance);
             AddField(layout, 1, "Escrow Balance", numEscrowBalance);
             return layout;
         }
@@ -435,7 +438,6 @@ namespace THMS.UI.WinForms.Controls
             numStatementBalance = MoneyBox();
             AddField(fields, 0, "Statement Balance", numStatementBalance);
             fields.Dock = DockStyle.Top;
-            fields.Height = 36;
 
             gridPromotions = CreateGrid();
             gridPromotions.Columns.Add(DatePickerColumn(nameof(PromotionEditRow.DateAcquired), "Date Acquired"));
@@ -665,10 +667,7 @@ namespace THMS.UI.WinForms.Controls
                 return false;
             }
 
-            decimal amountDue = 0;
-            if (!StatementAccountMatch.IsNonPayable(type) &&
-                !TryParseMoney(txtAmountDue.Text, "Amount due", out amountDue, out error))
-                return false;
+            var amountDue = StatementAccountMatch.IsNonPayable(type) ? 0 : numAmountDue.Value;
 
             statement = type switch
             {
@@ -771,8 +770,10 @@ namespace THMS.UI.WinForms.Controls
                 list.Remove(item);
         }
 
-        private static TableLayoutPanel FieldLayout(int rows)
+        private TableLayoutPanel FieldLayout(int rows)
         {
+            var labelWidth = pnlCommon.ColumnStyles.Count > 0 ? pnlCommon.ColumnStyles[0].Width : 150F;
+            var rowHeight = CurrentFieldHeight();
             var layout = new TableLayoutPanel
             {
                 Dock = DockStyle.Top,
@@ -781,27 +782,91 @@ namespace THMS.UI.WinForms.Controls
                 GrowStyle = TableLayoutPanelGrowStyle.FixedSize,
                 ColumnCount = 2,
                 RowCount = rows,
-                Padding = new Padding(0, 4, 0, 4)
+                Padding = ScaledPadding(0, 4, 0, 4),
+                Tag = StatementFieldsTag
             };
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, labelWidth));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             for (var i = 0; i < rows; i++)
-                layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
+                layout.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
             return layout;
         }
 
-        private static void AddField(TableLayoutPanel layout, int row, string label, Control field)
+        private void AddField(TableLayoutPanel layout, int row, string label, Control field)
         {
             layout.Controls.Add(new Label
             {
                 Text = label,
                 AutoSize = false,
-                Height = 28,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Dock = DockStyle.Fill
             }, 0, row);
-            field.Dock = DockStyle.Fill;
+            field.Dock = DockStyle.None;
+            field.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
+            field.Margin = numAmountDue.Margin;
             layout.Controls.Add(field, 1, row);
+        }
+
+        private float CurrentFieldHeight()
+        {
+            if (pnlCommon.RowStyles.Count == 0)
+                return 36F;
+
+            var amountRow = numAmountDue.Visible ? pnlCommon.RowStyles[1].Height : 0F;
+            if (amountRow > 0)
+                return amountRow;
+            return pnlCommon.RowStyles[0].Height > 0 ? pnlCommon.RowStyles[0].Height : 36F;
+        }
+
+        private Padding ScaledPadding(int left, int top, int right, int bottom) =>
+            IsHandleCreated
+                ? new Padding(
+                    LogicalToDeviceUnits(left),
+                    LogicalToDeviceUnits(top),
+                    LogicalToDeviceUnits(right),
+                    LogicalToDeviceUnits(bottom))
+                : new Padding(left, top, right, bottom);
+
+        private void AlignStatementFields(float rowHeight)
+        {
+            if (rowHeight <= 0 || pnlCommon.ColumnStyles.Count == 0)
+                return;
+
+            var labelWidth = pnlCommon.ColumnStyles[0].Width;
+            foreach (var table in FindStatementFields(pnlTypeSpecific))
+            {
+                if (table.ColumnStyles.Count > 0)
+                {
+                    table.ColumnStyles[0].SizeType = SizeType.Absolute;
+                    table.ColumnStyles[0].Width = labelWidth;
+                }
+
+                for (var i = 0; i < table.RowCount && i < table.RowStyles.Count; i++)
+                {
+                    table.RowStyles[i].SizeType = SizeType.Absolute;
+                    table.RowStyles[i].Height = rowHeight;
+                }
+
+                foreach (Control control in table.Controls)
+                {
+                    if (control is not NumericUpDown)
+                        continue;
+                    control.Margin = numAmountDue.Margin;
+                    control.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
+                }
+            }
+        }
+
+        private static IEnumerable<TableLayoutPanel> FindStatementFields(Control parent)
+        {
+            foreach (Control child in parent.Controls)
+            {
+                if (child is TableLayoutPanel table && Equals(table.Tag, StatementFieldsTag))
+                    yield return table;
+
+                foreach (var nested in FindStatementFields(child))
+                    yield return nested;
+            }
         }
 
         private static Control GridToolbar(string addText, string deleteText, EventHandler add, EventHandler delete)
@@ -903,20 +968,6 @@ namespace THMS.UI.WinForms.Controls
         }
 
         private static decimal ValueOf(NumericUpDown? box) => box?.Value ?? 0;
-
-        private static bool TryParseMoney(string text, string field, out decimal value, out string error)
-        {
-            if (decimal.TryParse(text, System.Globalization.NumberStyles.Number | System.Globalization.NumberStyles.AllowCurrencySymbol,
-                    System.Globalization.CultureInfo.CurrentCulture, out value))
-            {
-                error = "";
-                return true;
-            }
-
-            value = 0;
-            error = $"{field} must be a number.";
-            return false;
-        }
 
         private static DateTime SafeDate(DateTime value) =>
             value == default ? DateTime.Today : value;

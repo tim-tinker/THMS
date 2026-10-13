@@ -38,6 +38,7 @@ namespace THMS.UI.WinForms
         private Control? _openAnchor;
         private Control? _closedByClickAnchor;
         private int _closedByClickTick;
+        private int _refreshGeneration;
 
         public FinanceDashboardForm()
         {
@@ -51,8 +52,8 @@ namespace THMS.UI.WinForms
 
             _vm = new FinanceDashboardViewModel();
             BuildLayout();
+            ShowLoadingPlaceholders();
             _initialized = true;
-            RefreshDashboard();
         }
 
         public override void RefreshDashboard()
@@ -60,8 +61,110 @@ namespace THMS.UI.WinForms
             if (_vm is null || !_initialized)
                 return;
 
-            _vm.Refresh();
-            BindSnapshot(_vm.Snapshot);
+            var generation = Interlocked.Increment(ref _refreshGeneration);
+            _ = LoadDashboardAsync(generation);
+        }
+
+        private async Task LoadDashboardAsync(int generation)
+        {
+            FinanceDashboardSnapshot cards;
+            try
+            {
+                cards = await Task.Run(() => _vm.CreateAccountSnapshot(DateTime.Today));
+            }
+            catch (Exception ex)
+            {
+                OnUi(() => ShowLoadFailure(generation, ex));
+                return;
+            }
+
+            if (!StillCurrent(generation))
+                return;
+            OnUi(() =>
+            {
+                if (StillCurrent(generation))
+                    BindAccountCards(cards);
+            });
+
+            FinanceDashboardSnapshot full;
+            try
+            {
+                full = await Task.Run(() => _vm.CreateSnapshot(DateTime.Today));
+            }
+            catch (Exception ex)
+            {
+                OnUi(() => ShowLoadFailure(generation, ex));
+                return;
+            }
+
+            if (!StillCurrent(generation))
+                return;
+            OnUi(() =>
+            {
+                if (!StillCurrent(generation))
+                    return;
+                _vm.Use(full);
+                BindSnapshot(full);
+            });
+        }
+
+        private bool StillCurrent(int generation) =>
+            !IsDisposed && generation == _refreshGeneration;
+
+        private void OnUi(Action action)
+        {
+            if (IsDisposed)
+                return;
+            if (!IsHandleCreated)
+            {
+                HandleCreated += OnCreated;
+                return;
+
+                void OnCreated(object? sender, EventArgs e)
+                {
+                    HandleCreated -= OnCreated;
+                    if (!IsDisposed)
+                        BeginInvoke(action);
+                }
+            }
+
+            if (InvokeRequired)
+                BeginInvoke(action);
+            else
+                action();
+        }
+
+        private void ShowLoadingPlaceholders()
+        {
+            _valueBank.Text = "…";
+            _valueCredit.Text = "…";
+            _valueLoans.Text = "…";
+            _valueInvest.Text = "…";
+            _valueLiquid.Text = "…";
+            _valueNet.Text = "…";
+            if (_alerts is not null)
+                _alerts.DataSource = new List<string> { "Loading…" };
+        }
+
+        private void ShowLoadFailure(int generation, Exception ex)
+        {
+            if (!StillCurrent(generation) || _alerts is null)
+                return;
+            _alerts.DataSource = new List<string> { "Could not load the dashboard.", ex.Message };
+        }
+
+        private void BindAccountCards(FinanceDashboardSnapshot snapshot)
+        {
+            _valueBank.Text = snapshot.BankBalance.ToString("c2");
+            _valueCredit.Text = snapshot.CreditOwed.ToString("c2");
+            _valueLoans.Text = snapshot.LoanPrincipal.ToString("c2");
+            _valueInvest.Text = snapshot.InvestmentCash.ToString("c2");
+            _valueLiquid.Text = snapshot.NetLiquid.ToString("c2");
+            _valueNet.Text = snapshot.NetPosition.ToString("c2");
+            _bankAccounts.Accounts = snapshot.BankAccounts;
+            _creditAccounts.Accounts = snapshot.CreditAccounts;
+            _loanAccounts.Accounts = snapshot.LoanAccounts;
+            _investmentAccounts.Accounts = snapshot.InvestmentAccounts;
         }
 
         private void BindSnapshot(FinanceDashboardSnapshot snapshot)

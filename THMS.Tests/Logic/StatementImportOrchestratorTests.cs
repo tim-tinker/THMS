@@ -93,6 +93,74 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void ImportStatements_UsesUtilityStatementBalanceWhenAmountDueIsBlank()
+        {
+            var path = WriteCsv("""
+                Account,Statement Date,Due Date,Amount Due,Statement Balance
+                Electric,2026-09-16,2026-10-01,,49.84
+                Electric,2026-03-19,2026-04-05,,-10.20
+                """);
+            try
+            {
+                var (orchestrator, _, statements, _) = Create();
+                var rows = orchestrator.LoadStatementsFromFile(path);
+                var imported = orchestrator.ImportStatements(rows);
+
+                Assert.That(imported.Count, Is.EqualTo(2));
+                var saved = statements.GetForAccount(rows[0].AccountId)
+                    .OrderBy(statement => statement.StatementDate)
+                    .Cast<UtilityStatement>()
+                    .ToList();
+                Assert.That(saved[0].StatementBalance, Is.EqualTo(-10.20m));
+                Assert.That(saved[0].AmountDue, Is.EqualTo(0m));
+                Assert.That(saved[0].Charges, Is.Empty);
+                Assert.That(saved[1].StatementBalance, Is.EqualTo(49.84m));
+                Assert.That(saved[1].AmountDue, Is.EqualTo(49.84m));
+                Assert.That(saved[1].Charges, Has.Count.EqualTo(1));
+                Assert.That(saved[1].Charges[0].Amount, Is.EqualTo(49.84m));
+
+                var again = orchestrator.ImportStatements(rows);
+                Assert.That(again.Count, Is.EqualTo(0));
+                Assert.That(statements.GetForAccount(rows[0].AccountId), Has.Count.EqualTo(2));
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Test]
+        public void ImportStatements_RefreshesUtilityImportedWithoutBalance()
+        {
+            var path = WriteCsv("""
+                Account,Statement Date,Due Date,Amount Due,Statement Balance
+                Electric,2026-09-16,2026-10-01,,49.84
+                """);
+            try
+            {
+                var (orchestrator, _, statements, _) = Create();
+                var rows = orchestrator.LoadStatementsFromFile(path);
+                statements.Save(new UtilityStatement
+                {
+                    AccountId = rows[0].AccountId,
+                    StatementDate = new DateTime(2026, 9, 16),
+                    DueDate = new DateTime(2026, 10, 1)
+                });
+
+                var imported = orchestrator.ImportStatements(rows);
+
+                Assert.That(imported.Count, Is.EqualTo(1));
+                var saved = statements.GetForAccount(rows[0].AccountId).Cast<UtilityStatement>().Single();
+                Assert.That(saved.StatementBalance, Is.EqualTo(49.84m));
+                Assert.That(saved.AmountDue, Is.EqualTo(49.84m));
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Test]
         public void ImportStatements_CreatesInvestmentStatement()
         {
             var path = WriteCsv("""

@@ -135,7 +135,7 @@ namespace THMS.UI.WinForms.Controls
                 Top = 4,
                 Text = "Auto-pay (institution debits a funding account)"
             };
-            lblAutoPayFrom = FieldLabel("Auto-pay from:", 0, 36, 160);
+            lblAutoPayFrom = FieldLabel("Pay from:", 0, 36, 160);
             cmbAutoPayFrom = new ComboBox
             {
                 Left = 180,

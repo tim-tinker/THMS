@@ -233,6 +233,7 @@ namespace THMS.UI.WinForms.Controls
 
         private void SelectFrequency(RecurrenceFrequency frequency)
         {
+            EnsureComboItems(_frequency);
             if (_frequency.Items.Cast<object>().FirstOrDefault(item =>
                     item is FrequencyChoice choice && choice.Frequency == frequency) is not FrequencyChoice match)
                 return;
@@ -293,13 +294,22 @@ namespace THMS.UI.WinForms.Controls
             if (accountId is not Guid id || _from.DataSource is not IList<PayFromChoice> choices)
                 return;
 
+            EnsureComboItems(_from);
             for (var i = 0; i < choices.Count; i++)
             {
                 if (choices[i].Id != id)
                     continue;
-                _from.SelectedIndex = i;
+                if (i < _from.Items.Count)
+                    _from.SelectedIndex = i;
                 return;
             }
+        }
+
+        private static void EnsureComboItems(ComboBox combo)
+        {
+            if (combo.Items.Count > 0 || combo.DataSource is null)
+                return;
+            combo.BindingContext ??= new BindingContext();
         }
 
         private PayFromChoice? SelectedFunding() =>

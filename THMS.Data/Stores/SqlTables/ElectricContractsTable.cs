@@ -22,9 +22,7 @@ namespace THMS.Data.Stores.SqlTables
                 );";
             cmd.ExecuteNonQuery();
 
-            using var alter = conn.CreateCommand();
-            alter.CommandText = "ALTER TABLE ElectricContracts ADD COLUMN IF NOT EXISTS Name TEXT;";
-            alter.ExecuteNonQuery();
+            SqliteSchema.EnsureColumn(conn, "ElectricContracts", "Name", "TEXT");
         }
 
         public void Upsert(SqliteConnection conn, ElectricContract contract)

@@ -79,6 +79,7 @@ namespace THMS.Data.Stores.SqlTables
                 LoanStatement loan => new(0, loan.StatementBalance),
                 MortgageStatement mortgage => new(mortgage.EscrowBalance, mortgage.StatementBalance),
                 CreditCardStatement card => new(0, card.StatementBalance),
+                UtilityStatement utility => new(0, utility.StatementBalance),
                 _ => AccountStatementDetails.Empty
             };
 

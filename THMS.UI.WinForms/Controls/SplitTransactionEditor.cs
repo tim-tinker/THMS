@@ -59,7 +59,7 @@ namespace THMS.UI.WinForms.Controls
             MinimizeBox = false;
             MaximizeBox = true;
             StartPosition = FormStartPosition.CenterParent;
-            Size = new Size(980, 420);
+            Size = new Size(1280, 480);
             MinimumSize = new Size(860, 320);
 
             _lblParent.AutoEllipsis = true;

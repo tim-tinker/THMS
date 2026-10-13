@@ -17,7 +17,7 @@ namespace THMS.UI.WinForms.Controls
         private Label lblDueDate;
         private DateTimePicker dtDueDate;
         private Label lblAmountDue;
-        private TextBox txtAmountDue;
+        private NumericUpDown numAmountDue;
         private Label lblNotes;
         private TextBox txtNotes;
         private Panel pnlTypeSpecific;
@@ -48,7 +48,7 @@ namespace THMS.UI.WinForms.Controls
             lblDueDate = new Label();
             dtDueDate = new DateTimePicker();
             lblAmountDue = new Label();
-            txtAmountDue = new TextBox();
+            numAmountDue = new NumericUpDown();
             lblNotes = new Label();
             txtNotes = new TextBox();
             pnlTypeSpecific = new Panel();
@@ -144,8 +144,8 @@ namespace THMS.UI.WinForms.Controls
             pnlCommon.Controls.Add(lblDueDate, 2, 0);
             pnlCommon.Controls.Add(dtDueDate, 3, 0);
             pnlCommon.Controls.Add(lblAmountDue, 0, 1);
-            pnlCommon.Controls.Add(txtAmountDue, 1, 1);
-            pnlCommon.SetColumnSpan(txtAmountDue, 3);
+            pnlCommon.Controls.Add(numAmountDue, 1, 1);
+            pnlCommon.SetColumnSpan(numAmountDue, 3);
             pnlCommon.Controls.Add(lblNotes, 0, 2);
             pnlCommon.Controls.Add(txtNotes, 1, 2);
             pnlCommon.SetColumnSpan(txtNotes, 3);
@@ -173,9 +173,12 @@ namespace THMS.UI.WinForms.Controls
             lblAmountDue.Name = "lblAmountDue";
             lblAmountDue.Text = "Amount Due";
             lblAmountDue.TextAlign = ContentAlignment.MiddleLeft;
-            txtAmountDue.Dock = DockStyle.Fill;
-            txtAmountDue.Margin = new Padding(0, 4, 0, 4);
-            txtAmountDue.Name = "txtAmountDue";
+            numAmountDue.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
+            numAmountDue.DecimalPlaces = 2;
+            numAmountDue.Margin = new Padding(0, 4, 0, 4);
+            numAmountDue.Maximum = 100000000;
+            numAmountDue.Name = "numAmountDue";
+            numAmountDue.ThousandsSeparator = true;
             lblNotes.AutoSize = false;
             lblNotes.Dock = DockStyle.Fill;
             lblNotes.Name = "lblNotes";

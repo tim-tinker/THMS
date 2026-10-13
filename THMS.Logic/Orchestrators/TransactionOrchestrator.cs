@@ -280,53 +280,21 @@ namespace THMS.Logic.Orchestrators
         }
 
         private IEnumerable<PostedTransaction> IncomingPostedSplitSources(Guid accountId, DateTime start, DateTime end) =>
-            _store.GetPostedTransactions(start, end)
-                .Concat(_store.GetPostedTransferTransactions(start, end))
-                .Where(t => t.AccountId != accountId && HasTransferTo(t, accountId));
+            _store.GetPostedTransactionsIncomingTo(accountId, start, end)
+                .Concat(_store.GetPostedTransferTransactionsIncomingTo(accountId, start, end));
 
         private IEnumerable<FutureSingleTransaction> IncomingFutureSplitSources(Guid accountId) =>
             _store.GetAllFutureSingleTransactions()
                 .Where(t => !t.IsRealized && t.AccountId != accountId && HasTransferTo(t, accountId));
 
-        private decimal SumIncomingTransferSplits(Guid accountId, DateTime? before)
-        {
-            var posted = _store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue)
-                .Concat(_store.GetPostedTransferTransactions(DateTime.MinValue, DateTime.MaxValue));
-            decimal sum = 0;
-            foreach (var transaction in posted)
-            {
-                if (transaction.AccountId == accountId)
-                    continue;
-                if (before is DateTime cutoff && transaction.Date >= cutoff)
-                    continue;
-                sum += IncomingTransferAmount(transaction, accountId);
-            }
+        private decimal SumIncomingTransferSplits(Guid accountId, DateTime? before) =>
+            _store.SumIncomingTransferSplitAmounts(accountId, beforeExclusive: before);
 
-            return sum;
-        }
-
-        private decimal SumIncomingTransferSplitsAfter(Guid accountId, DateTime after)
-        {
-            var posted = _store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue)
-                .Concat(_store.GetPostedTransferTransactions(DateTime.MinValue, DateTime.MaxValue));
-            decimal sum = 0;
-            foreach (var transaction in posted)
-            {
-                if (transaction.AccountId == accountId || transaction.Date <= after)
-                    continue;
-                sum += IncomingTransferAmount(transaction, accountId);
-            }
-
-            return sum;
-        }
+        private decimal SumIncomingTransferSplitsAfter(Guid accountId, DateTime after) =>
+            _store.SumIncomingTransferSplitAmounts(accountId, afterExclusive: after);
 
         private static bool HasTransferTo(BaseTransaction transaction, Guid accountId) =>
             transaction.Splits.Any(s => SplitTransactionMath.IsTransferTo(s, accountId));
-
-        private static decimal IncomingTransferAmount(BaseTransaction transaction, Guid accountId) =>
-            transaction.Splits
-                .Where(s => SplitTransactionMath.IsTransferTo(s, accountId))
-                .Sum(SplitTransactionMath.CounterpartAmount);
 
         private BaseTransaction? FindParent(Guid transactionId) =>
             (BaseTransaction?)_store.GetPostedTransaction(transactionId) ??

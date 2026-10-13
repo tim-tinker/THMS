@@ -11,7 +11,7 @@ namespace THMS.UI.WinForms
     {
         private EnergyDashboardViewModel _vm { get; set; } = null!;
         private bool _initialized;
-        private bool _loading;
+        private int _refreshGeneration;
 
         public EnergyDashboardForm()
         {
@@ -142,37 +142,48 @@ namespace THMS.UI.WinForms
             if (_initialized) return;
 
             _vm = new EnergyDashboardViewModel();
-            RefreshDashboard();
-
             _initialized = true;
         }
 
-        public override void RefreshDashboard()
+        public override void RefreshDashboard() => _ = RefreshDashboardAsync();
+
+        private async Task RefreshDashboardAsync()
         {
-            _vm.Refresh();
+            if (_vm is null)
+                return;
 
-            LoadSummaryBar();
-            LoadDayTab();
-            LoadWeekTab();
-            LoadMonthTab();
-            LoadYearTab();
-            LoadCustomTab();
-
-        }
-
-        private void OnLoadForm(object sender, EventArgs e)
-        {
-            _loading = true;
-
+            var generation = Interlocked.Increment(ref _refreshGeneration);
             try
             {
-                RefreshDashboard();
+                await Task.Run(() => _vm.Refresh());
+                if (IsDisposed || generation != _refreshGeneration)
+                    return;
+                void Apply()
+                {
+                    if (IsDisposed || generation != _refreshGeneration)
+                        return;
+                    LoadSummaryBar();
+                    LoadDayTab();
+                    LoadWeekTab();
+                    LoadMonthTab();
+                    LoadYearTab();
+                    LoadCustomTab();
+                }
+
+                if (InvokeRequired)
+                    BeginInvoke(Apply);
+                else
+                    Apply();
             }
-            finally
+            catch (Exception ex)
             {
-                _loading = false;
+                if (!IsDisposed && generation == _refreshGeneration && IsHandleCreated)
+                    BeginInvoke(() => MessageBox.Show(this, ex.Message, "Energy",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning));
             }
         }
+
+        private void OnLoadForm(object sender, EventArgs e) => RefreshDashboard();
 
         // ============================================================
         // SUMMARY BAR

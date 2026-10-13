@@ -76,6 +76,35 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void ImportRules_KeepsIdenticalRowsInTheSameFile()
+        {
+            var path = WriteCsv("""
+                Account,Description,Frequency,Last Occurrence,Last Amount,Date,Amount,Category
+                WF Checking,Donation: DSF,Monthly,2026-08-16,-25,2026-09-15,-25,Charity
+                WF Checking,Donation: DSF,Monthly,2026-08-16,-25,2026-09-15,-25,Charity
+                """);
+            try
+            {
+                var (orchestrator, transactions, _) = Create();
+                var rows = orchestrator.LoadRulesFromFile(path);
+                Assert.That(orchestrator.ImportRules(rows).Count, Is.EqualTo(2));
+
+                var saved = transactions.GetAllRecurringSingleRules().ToList();
+                Assert.That(saved, Has.Count.EqualTo(2));
+                Assert.That(saved.Select(rule => rule.Id).Distinct().Count(), Is.EqualTo(2));
+                Assert.That(saved.All(rule => rule.Description == "Donation: DSF" && rule.Amount == -25m), Is.True);
+                Assert.That(saved.All(rule => rule.NextOccurrence == new DateTime(2026, 9, 15)), Is.True);
+
+                Assert.That(orchestrator.ImportRules(rows).Count, Is.EqualTo(2));
+                Assert.That(transactions.GetAllRecurringSingleRules().Count(), Is.EqualTo(2));
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Test]
         public void LoadRulesFromFile_ThrowsWhenMissing()
         {
             var (orchestrator, _, _) = Create();

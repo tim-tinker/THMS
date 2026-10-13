@@ -61,11 +61,12 @@ namespace THMS.Logic.Orchestrators
             ArgumentNullException.ThrowIfNull(previewRows);
             var rows = previewRows as IReadOnlyList<RecurringRuleImportPreview> ?? previewRows.ToList();
             var imported = 0;
+            var claimed = new HashSet<Guid>();
             ImportProgressReporter.Report(progress, 0, rows.Count, stride: 1);
 
             for (var i = 0; i < rows.Count; i++)
             {
-                if (TryImport(rows[i]))
+                if (TryImport(rows[i], claimed))
                     imported++;
                 ImportProgressReporter.Report(progress, i + 1, rows.Count, stride: 1);
             }
@@ -73,7 +74,7 @@ namespace THMS.Logic.Orchestrators
             return ImportResult.CountOnly(imported);
         }
 
-        private bool TryImport(RecurringRuleImportPreview row)
+        private bool TryImport(RecurringRuleImportPreview row, HashSet<Guid> claimed)
         {
             var accountName = row.Account?.Trim() ?? "";
             if (string.IsNullOrWhiteSpace(accountName) || string.IsNullOrWhiteSpace(row.Description))
@@ -104,7 +105,20 @@ namespace THMS.Logic.Orchestrators
             if (!string.IsNullOrWhiteSpace(categoryName))
                 rule.ApplyCategory(_categorizer.GetOrCreate(categoryName));
 
-            _rules.AddSingleRule(rule);
+            var existing = _rules.GetSingleRules(account.Id)
+                .FirstOrDefault(candidate =>
+                    !claimed.Contains(candidate.Id) && RecurringRulePattern.Matches(candidate, rule));
+            if (existing is not null)
+            {
+                rule.Id = existing.Id;
+                rule.IsUserCreated = true;
+                claimed.Add(existing.Id);
+                _rules.UpdateSingleRule(rule);
+                return true;
+            }
+
+            _rules.AddSingleRule(rule, matchExistingPattern: false);
+            claimed.Add(rule.Id);
             return true;
         }
     }

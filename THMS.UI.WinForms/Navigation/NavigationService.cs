@@ -1,5 +1,6 @@
 namespace THMS.UI.WinForms.Navigation;
 
+// TODO: Not used. Other forms or updaters appear to have replaced this class. Remove later once that is confirmed.
 public class NavigationService
 {
     private Panel? _host;

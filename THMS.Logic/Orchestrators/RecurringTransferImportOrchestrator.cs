@@ -62,11 +62,12 @@ namespace THMS.Logic.Orchestrators
             ArgumentNullException.ThrowIfNull(previewRows);
             var rows = previewRows as IReadOnlyList<RecurringTransferImportPreview> ?? previewRows.ToList();
             var imported = 0;
+            var claimed = new HashSet<Guid>();
             ImportProgressReporter.Report(progress, 0, rows.Count, stride: 1);
 
             for (var i = 0; i < rows.Count; i++)
             {
-                if (TryImport(rows[i]))
+                if (TryImport(rows[i], claimed))
                     imported++;
                 ImportProgressReporter.Report(progress, i + 1, rows.Count, stride: 1);
             }
@@ -74,7 +75,7 @@ namespace THMS.Logic.Orchestrators
             return ImportResult.CountOnly(imported);
         }
 
-        private bool TryImport(RecurringTransferImportPreview row)
+        private bool TryImport(RecurringTransferImportPreview row, HashSet<Guid> claimed)
         {
             if (string.IsNullOrWhiteSpace(row.Description))
                 return false;
@@ -112,7 +113,20 @@ namespace THMS.Logic.Orchestrators
                 rule.TargetCategory = category.Name;
             }
 
-            _rules.AddTransferRule(rule);
+            var existing = _rules.GetTransferRules(from.Id)
+                .FirstOrDefault(candidate =>
+                    !claimed.Contains(candidate.Id) && RecurringRulePattern.Matches(candidate, rule));
+            if (existing is not null)
+            {
+                rule.Id = existing.Id;
+                rule.IsUserCreated = true;
+                claimed.Add(existing.Id);
+                _rules.UpdateTransferRule(rule);
+                return true;
+            }
+
+            _rules.AddTransferRule(rule, matchExistingPattern: false);
+            claimed.Add(rule.Id);
             return true;
         }
 

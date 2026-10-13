@@ -53,7 +53,7 @@ namespace THMS.Logic.Orchestrators.Finance
 
             var latest = PayableStatements.Latest(_statements.GetForAccount(accountId));
             if (latest is not null
-                && !IsCovered(PaymentIntentSource.Statement, latest.Id, latest.AccountId, latest.DueDate.Date))
+                && !IsCovered(PaymentIntentSource.Statement, latest.Id, latest.AccountId, latest.DueDate.Date, asOfDate))
             {
                 rows.Add(new BillRow
                 {
@@ -80,7 +80,7 @@ namespace THMS.Logic.Orchestrators.Finance
             foreach (var rule in _transactions.GetAllRecurringSingleRules()
                          .Where(r => r.IsActive && r.AccountId == accountId))
             {
-                if (IsCovered(PaymentIntentSource.RecurringSingle, rule.Id, rule.AccountId, rule.NextOccurrence.Date)
+                if (IsCovered(PaymentIntentSource.RecurringSingle, rule.Id, rule.AccountId, rule.NextOccurrence.Date, asOfDate)
                     || OccurrenceExists(rule.AccountId, rule.NextOccurrence.Date, rule.Description))
                     continue;
 
@@ -107,13 +107,13 @@ namespace THMS.Logic.Orchestrators.Finance
             {
                 if (rule.FromAccountId == rule.ToAccountId)
                     continue;
-                if (IsCovered(PaymentIntentSource.RecurringTransfer, rule.Id, rule.ToAccountId, rule.NextOccurrence.Date)
+                if (IsCovered(PaymentIntentSource.RecurringTransfer, rule.Id, rule.ToAccountId, rule.NextOccurrence.Date, asOfDate)
                     || OccurrenceExists(rule.FromAccountId, rule.NextOccurrence.Date, rule.Description)
                     || OccurrenceExists(rule.ToAccountId, rule.NextOccurrence.Date, rule.Description))
                     continue;
                 if (accountId == rule.ToAccountId
                     && latest is not null
-                    && !IsCovered(PaymentIntentSource.Statement, latest.Id, latest.AccountId, latest.DueDate.Date))
+                    && !IsCovered(PaymentIntentSource.Statement, latest.Id, latest.AccountId, latest.DueDate.Date, asOfDate))
                     continue;
 
                 var otherId = accountId == rule.FromAccountId ? rule.ToAccountId : rule.FromAccountId;
@@ -310,6 +310,7 @@ namespace THMS.Logic.Orchestrators.Finance
                 _transactions.AddRecurringTransferRule(rule);
             }
 
+            DropStatementPayExpected(accountId);
             reconciliation.MaterializeRule(rule);
         }
 
@@ -783,11 +784,25 @@ namespace THMS.Logic.Orchestrators.Finance
                     && (p.Description ?? "") == notes);
         }
 
+        private void DropStatementPayExpected(Guid accountId)
+        {
+            foreach (var expected in UnmatchedTransfers()
+                         .Where(p => p.Origin == ExpectedOrigin.StatementPay && p.ToAccountId == accountId)
+                         .ToList())
+                _transactions.DeleteFutureTransferTransaction(expected.Id);
+
+            foreach (var expected in UnmatchedSingles()
+                         .Where(p => p.Origin == ExpectedOrigin.StatementPay && p.AccountId == accountId)
+                         .ToList())
+                _transactions.DeleteFutureSingleTransaction(expected.Id);
+        }
+
         private bool IsCovered(
             PaymentIntentSource source,
             Guid sourceId,
             Guid destinationId,
-            DateTime due)
+            DateTime due,
+            DateTime asOf)
         {
             var origin = OriginOf(source);
             if (UnmatchedSingles().Any(p => p.Origin == origin && p.OriginId == sourceId)
@@ -796,6 +811,9 @@ namespace THMS.Logic.Orchestrators.Finance
 
             if (source != PaymentIntentSource.Statement)
                 return false;
+
+            if (PaymentPlanCoverage.Covers(_transactions.GetAllRecurringTransferRules(), destinationId, asOf))
+                return true;
 
             return UnmatchedTransfers().Any(p => p.ToAccountId == destinationId && p.Date.Date == due.Date)
                 || UnmatchedSingles().Any(p => p.AccountId == destinationId && p.Date.Date == due.Date);

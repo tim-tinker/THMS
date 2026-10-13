@@ -53,6 +53,15 @@ namespace THMS.Data.Stores
         public decimal SumPostedAmountsAfter(Guid accountId, DateTime after) =>
             _store.SumPostedAfter(accountId, after);
 
+        public decimal SumIncomingTransferSplitAmounts(Guid accountId, DateTime? beforeExclusive = null, DateTime? afterExclusive = null) =>
+            _store.SumIncomingTransferSplitAmounts(accountId, beforeExclusive, afterExclusive);
+
+        public IEnumerable<PostedTransaction> GetPostedTransactionsIncomingTo(Guid accountId, DateTime start, DateTime end) =>
+            _store.GetPostedIncomingTo(accountId, start, end);
+
+        public IEnumerable<PostedTransaction> GetUnreconciledPostedTransactions(Guid accountId) =>
+            _store.GetUnreconciledPosted(accountId);
+
         public DateTime? GetLatestPostedTransactionDate(Guid accountId) =>
             _store.GetLatestPosted(accountId)?.Date;
 
@@ -101,6 +110,15 @@ namespace THMS.Data.Stores
 
         public decimal SumPostedTransferAmountsAfter(Guid accountId, DateTime after) =>
             _store.SumPostedTransfersAfter(accountId, after);
+
+        public IEnumerable<PostedTransferTransaction> GetPostedTransferTransactionsIncomingTo(Guid accountId, DateTime start, DateTime end) =>
+            _store.GetPostedTransfersIncomingTo(accountId, start, end);
+
+        public IEnumerable<PostedTransferTransaction> GetUnreconciledPostedTransferTransactions(Guid accountId) =>
+            _store.GetUnreconciledPostedTransfers(accountId);
+
+        public IReadOnlyCollection<Guid> GetAccountIdsWithUnreconciledImports() =>
+            _store.GetAccountIdsWithUnreconciledImports();
 
         public DateTime? GetLatestPostedTransferTransactionDate(Guid accountId) =>
             _store.GetLatestPostedTransfer(accountId)?.Date;
@@ -165,8 +183,8 @@ namespace THMS.Data.Stores
         // Recurring Single Rules
         // ------------------------------------------------------------
 
-        public void AddRecurringSingleRule(RecurringSingleTransactionRule rule) =>
-            _store.AddRecurringSingle(rule);
+        public void AddRecurringSingleRule(RecurringSingleTransactionRule rule, bool matchExistingPattern = true) =>
+            _store.AddRecurringSingle(rule, matchExistingPattern);
 
         public void UpdateRecurringSingleRule(RecurringSingleTransactionRule rule) =>
             _store.UpdateRecurringSingle(rule);
@@ -184,8 +202,8 @@ namespace THMS.Data.Stores
         // Recurring Transfer Rules
         // ------------------------------------------------------------
 
-        public void AddRecurringTransferRule(RecurringTransferRule rule) =>
-            _store.AddRecurringTransfer(rule);
+        public void AddRecurringTransferRule(RecurringTransferRule rule, bool matchExistingPattern = true) =>
+            _store.AddRecurringTransfer(rule, matchExistingPattern);
 
         public void UpdateRecurringTransferRule(RecurringTransferRule rule) =>
             _store.UpdateRecurringTransfer(rule);

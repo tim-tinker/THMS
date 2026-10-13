@@ -43,15 +43,50 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
+        public static List<CategoryListItem> ComboItems(
+            IEnumerable<ExpenseCategory> categories,
+            bool includeSplit)
+        {
+            var all = categories.ToList();
+            var items = new List<CategoryListItem>();
+            if (includeSplit)
+                items.Add(CategoryListItem.Split);
+
+            foreach (var category in ExpenseCategoryTree.Flatten(all, includeInactive: false))
+            {
+                items.Add(new CategoryListItem(
+                    ExpenseCategoryTree.IndentedName(all, category),
+                    category.Id,
+                    CategoryListAction.None));
+            }
+
+            items.Add(CategoryListItem.NewCategory);
+            items.Add(CategoryListItem.ManageCategories);
+            return items;
+        }
+
         public static ContextMenuStrip CreateAssignMenu(
             IReadOnlyList<ExpenseCategory> categories,
             Guid? currentId,
             Guid? suggestedId,
             Action<ExpenseCategory> onAssign,
             Action onNewCategory,
-            Action onManageCategories)
+            Action onManageCategories,
+            Action? onSplit = null,
+            bool splitSelected = false)
         {
             var menu = new ContextMenuStrip();
+            if (onSplit is not null)
+            {
+                var split = new ToolStripMenuItem("Split")
+                {
+                    Checked = splitSelected
+                };
+                split.Click += (_, _) => onSplit();
+                menu.Items.Add(split);
+                menu.Items.Add(new ToolStripSeparator());
+            }
+
             foreach (var root in ExpenseCategoryTree.Roots(categories))
                 menu.Items.Add(CreateMenuItem(categories, root, currentId, suggestedId, onAssign));
 
@@ -154,6 +189,32 @@ namespace THMS.UI.WinForms.Controls
 
             return null;
         }
+    }
+
+    internal enum CategoryListAction
+    {
+        None,
+        Split,
+        NewCategory,
+        ManageCategories
+    }
+
+    internal sealed class CategoryListItem
+    {
+        public static CategoryListItem Split { get; } = new("Split", null, CategoryListAction.Split);
+        public static CategoryListItem NewCategory { get; } = new("New Category…", null, CategoryListAction.NewCategory);
+        public static CategoryListItem ManageCategories { get; } = new("Manage Categories…", null, CategoryListAction.ManageCategories);
+
+        public CategoryListItem(string label, Guid? categoryId, CategoryListAction action)
+        {
+            Label = label;
+            CategoryId = categoryId;
+            Action = action;
+        }
+
+        public string Label { get; }
+        public Guid? CategoryId { get; }
+        public CategoryListAction Action { get; }
     }
 
     internal sealed class CategoryParentOption

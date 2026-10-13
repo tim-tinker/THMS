@@ -23,7 +23,10 @@ namespace THMS.UI.WinForms.Controls
         private readonly ITransactionDataStore _transactions = new DataStoreFactory().GetTransactionStore();
         private readonly IAccountDataStore _accounts = new DataStoreFactory().GetAccountStore();
         private readonly ContextMenuStrip _accountMenu = new();
+        private bool _suppressAccountMenu;
         private bool _suppressSelectionEvents;
+        private int _accountLoadGeneration;
+        private Guid? _pendingAccountId;
         private Font? _unreconciledAccountFont;
 
         public event EventHandler? SelectedAccountChanged;
@@ -44,7 +47,6 @@ namespace THMS.UI.WinForms.Controls
             components ??= new Container();
             components.Add(_accountMenu);
             _accountMenu.Opening += OnAccountMenuOpening;
-            LoadAccounts();
         }
 
         public void RefreshAccounts() => LoadAccounts();
@@ -62,14 +64,41 @@ namespace THMS.UI.WinForms.Controls
 
         public void ImportAccountsFromFile() => OnImportAccounts(this, EventArgs.Empty);
 
-        private void LoadAccounts()
+        private void LoadAccounts() => _ = LoadAccountsAsync();
+
+        private async Task LoadAccountsAsync()
         {
-            var selectedId = GetSelectedAccount()?.Id;
-            var firstDisplayed = gridAccounts.RowCount > 0
-                ? gridAccounts.FirstDisplayedScrollingRowIndex
-                : -1;
-            var sortColumn = gridAccounts.SortedColumn?.Name;
-            var sortOrder = gridAccounts.SortOrder;
+            var generation = Interlocked.Increment(ref _accountLoadGeneration);
+            if (Visible)
+                AppStatus.Set("Loading accounts...", busy: true);
+
+            List<AccountRegisterRow> accounts;
+            try
+            {
+                accounts = await Task.Run(QueryAccountRows);
+            }
+            catch (Exception ex)
+            {
+                OnUi(() =>
+                {
+                    if (generation != _accountLoadGeneration || IsDisposed)
+                        return;
+                    if (Visible)
+                        AppStatus.Set("Could not load accounts.");
+                    MessageBox.Show(FindForm(), ex.Message, "Accounts",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                });
+                return;
+            }
+
+            if (generation != _accountLoadGeneration || IsDisposed)
+                return;
+
+            OnUi(() => ApplyAccountRows(generation, accounts));
+        }
+
+        private List<AccountRegisterRow> QueryAccountRows()
+        {
             var posted = _transactions.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
             var unreconciled = new ReconciliationOrchestrator(_transactions).AccountIdsWithUnreconciled();
             var paymentPlans = _transactions.GetAllRecurringTransferRules()
@@ -78,7 +107,7 @@ namespace THMS.UI.WinForms.Controls
                 .ToHashSet();
             var itemState = _accounts.GetPlaidItemSyncStates()
                 .ToDictionary(s => s.ItemId, StringComparer.Ordinal);
-            var accounts = _accountOrchestrator.GetAllAccounts()
+            return _accountOrchestrator.GetAllAccounts()
                 .Select(account =>
                 {
                     itemState.TryGetValue(account.ExternalLink?.ItemId ?? "", out var state);
@@ -91,6 +120,19 @@ namespace THMS.UI.WinForms.Controls
                         paymentPlans.Contains(account.Id));
                 })
                 .ToList();
+        }
+
+        private void ApplyAccountRows(int generation, List<AccountRegisterRow> accounts)
+        {
+            if (generation != _accountLoadGeneration || IsDisposed)
+                return;
+
+            var selectedId = _pendingAccountId ?? GetSelectedAccount()?.Id;
+            var firstDisplayed = gridAccounts.RowCount > 0
+                ? gridAccounts.FirstDisplayedScrollingRowIndex
+                : -1;
+            var sortColumn = gridAccounts.SortedColumn?.Name;
+            var sortOrder = gridAccounts.SortOrder;
             _suppressSelectionEvents = true;
             try
             {
@@ -121,12 +163,39 @@ namespace THMS.UI.WinForms.Controls
                 _suppressSelectionEvents = false;
             }
 
+            _pendingAccountId = null;
             UpdateActionButtons();
+            if (Visible)
+                AppStatus.Set("Ready.");
             SelectedAccountChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void OnUi(Action action)
+        {
+            if (IsDisposed)
+                return;
+            if (!IsHandleCreated)
+            {
+                HandleCreated += OnCreated;
+                return;
+
+                void OnCreated(object? sender, EventArgs e)
+                {
+                    HandleCreated -= OnCreated;
+                    if (!IsDisposed)
+                        BeginInvoke(action);
+                }
+            }
+
+            if (InvokeRequired)
+                BeginInvoke(action);
+            else
+                action();
         }
 
         public void SelectAccount(Guid? id)
         {
+            _pendingAccountId = id;
             if (id is null)
                 return;
 
@@ -247,16 +316,42 @@ namespace THMS.UI.WinForms.Controls
             if (hit.RowIndex < 0)
                 return;
 
-            gridAccounts.ClearSelection();
-            gridAccounts.Rows[hit.RowIndex].Selected = true;
-            var cell = gridAccounts.Rows[hit.RowIndex].Cells.Cast<DataGridViewCell>()
-                .FirstOrDefault(c => c.Visible);
-            if (cell is not null)
+            var row = gridAccounts.Rows[hit.RowIndex];
+            var alreadyCurrent = row.Selected
+                && gridAccounts.SelectedRows.Count == 1
+                && gridAccounts.CurrentCell?.RowIndex == hit.RowIndex;
+            if (!alreadyCurrent)
+            {
+                var cell = hit.ColumnIndex >= 0 && row.Cells[hit.ColumnIndex].Visible
+                    ? row.Cells[hit.ColumnIndex]
+                    : row.Cells.Cast<DataGridViewCell>().FirstOrDefault(c => c.Visible);
+                if (cell is null)
+                    return;
+
+                gridAccounts.ClearSelection();
+                row.Selected = true;
                 gridAccounts.CurrentCell = cell;
+            }
+
+            // Changing the current cell, or focusing the grid, closes the menu this click would have opened.
+            var location = e.Location;
+            _suppressAccountMenu = true;
+            gridAccounts.BeginInvoke(() =>
+            {
+                _suppressAccountMenu = false;
+                if (!gridAccounts.IsDisposed)
+                    _accountMenu.Show(gridAccounts, location);
+            });
         }
 
         private void OnAccountMenuOpening(object? sender, CancelEventArgs e)
         {
+            if (_suppressAccountMenu)
+            {
+                e.Cancel = true;
+                return;
+            }
+
             _accountMenu.Items.Clear();
             var account = GetSelectedAccount();
             if (account is null)
@@ -464,7 +559,8 @@ namespace THMS.UI.WinForms.Controls
                 latest is { AmountDue: > 0 } ? latest.AmountDue : null,
                 latest is null ? "Payment" : account.Name,
                 promotions,
-                latest?.DueDate ?? latest?.StatementDate);
+                latest?.DueDate ?? latest?.StatementDate,
+                account.AutoPayFromAccountId);
             if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
             RunActivity(() => _billsOrchestrator.AddManual(

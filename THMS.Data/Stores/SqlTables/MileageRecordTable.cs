@@ -19,9 +19,7 @@ namespace THMS.Data.Stores.SqlTables
             );";
             cmd.ExecuteNonQuery();
 
-            using var alter = conn.CreateCommand();
-            alter.CommandText = "ALTER TABLE MileageRecords ADD COLUMN IF NOT EXISTS VehicleName TEXT;";
-            alter.ExecuteNonQuery();
+            SqliteSchema.EnsureColumn(conn, "MileageRecords", "VehicleName", "TEXT");
         }
 
         public void Upsert(SqliteConnection conn, MileageRecordBase record, string type)

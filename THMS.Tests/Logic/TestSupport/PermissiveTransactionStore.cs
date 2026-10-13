@@ -24,6 +24,12 @@ namespace THMS.Tests.Logic.TestSupport
             _inner.SumPostedAmountsBefore(accountId, before);
         public decimal SumPostedAmountsAfter(Guid accountId, DateTime after) =>
             _inner.SumPostedAmountsAfter(accountId, after);
+        public decimal SumIncomingTransferSplitAmounts(Guid accountId, DateTime? beforeExclusive = null, DateTime? afterExclusive = null) =>
+            _inner.SumIncomingTransferSplitAmounts(accountId, beforeExclusive, afterExclusive);
+        public IEnumerable<PostedTransaction> GetPostedTransactionsIncomingTo(Guid accountId, DateTime start, DateTime end) =>
+            _inner.GetPostedTransactionsIncomingTo(accountId, start, end);
+        public IEnumerable<PostedTransaction> GetUnreconciledPostedTransactions(Guid accountId) =>
+            _inner.GetUnreconciledPostedTransactions(accountId);
         public DateTime? GetLatestPostedTransactionDate(Guid accountId) => _inner.GetLatestPostedTransactionDate(accountId);
 
         public void ReplacePostedTransaction(PostedTransaction replacement)
@@ -50,6 +56,12 @@ namespace THMS.Tests.Logic.TestSupport
             _inner.SumPostedTransferAmountsBefore(accountId, before);
         public decimal SumPostedTransferAmountsAfter(Guid accountId, DateTime after) =>
             _inner.SumPostedTransferAmountsAfter(accountId, after);
+        public IEnumerable<PostedTransferTransaction> GetPostedTransferTransactionsIncomingTo(Guid accountId, DateTime start, DateTime end) =>
+            _inner.GetPostedTransferTransactionsIncomingTo(accountId, start, end);
+        public IEnumerable<PostedTransferTransaction> GetUnreconciledPostedTransferTransactions(Guid accountId) =>
+            _inner.GetUnreconciledPostedTransferTransactions(accountId);
+        public IReadOnlyCollection<Guid> GetAccountIdsWithUnreconciledImports() =>
+            _inner.GetAccountIdsWithUnreconciledImports();
         public DateTime? GetLatestPostedTransferTransactionDate(Guid accountId) => _inner.GetLatestPostedTransferTransactionDate(accountId);
 
         public void AddFutureSingleTransaction(FutureSingleTransaction transaction) => _inner.AddFutureSingleTransaction(transaction);
@@ -70,13 +82,15 @@ namespace THMS.Tests.Logic.TestSupport
         public List<FutureTransferTransaction> GetPlannedTransfers(Guid accountId) => _inner.GetPlannedTransfers(accountId);
         public List<FutureTransferTransaction> GetAllPlannedTransfers() => _inner.GetAllPlannedTransfers();
 
-        public void AddRecurringSingleRule(RecurringSingleTransactionRule rule) => _inner.AddRecurringSingleRule(rule);
+        public void AddRecurringSingleRule(RecurringSingleTransactionRule rule, bool matchExistingPattern = true) =>
+            _inner.AddRecurringSingleRule(rule, matchExistingPattern);
         public void UpdateRecurringSingleRule(RecurringSingleTransactionRule rule) => _inner.UpdateRecurringSingleRule(rule);
         public void DeleteRecurringSingleRule(Guid id) => _inner.DeleteRecurringSingleRule(id);
         public RecurringSingleTransactionRule? GetRecurringSingleRule(Guid id) => _inner.GetRecurringSingleRule(id);
         public IEnumerable<RecurringSingleTransactionRule> GetRecurringSingleRules(Guid accountId) => _inner.GetRecurringSingleRules(accountId);
 
-        public void AddRecurringTransferRule(RecurringTransferRule rule) => _inner.AddRecurringTransferRule(rule);
+        public void AddRecurringTransferRule(RecurringTransferRule rule, bool matchExistingPattern = true) =>
+            _inner.AddRecurringTransferRule(rule, matchExistingPattern);
         public void UpdateRecurringTransferRule(RecurringTransferRule rule) => _inner.UpdateRecurringTransferRule(rule);
         public void DeleteRecurringTransferRule(Guid id) => _inner.DeleteRecurringTransferRule(id);
         public RecurringTransferRule? GetRecurringTransferRule(Guid id) => _inner.GetRecurringTransferRule(id);

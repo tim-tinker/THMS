@@ -18,6 +18,9 @@ namespace THMS.UI.WinForms.Controls
         private Label? _lblTargetCategory;
         private ComboBox? _cmbTargetCategory;
         private bool _targetCategoryShifted;
+        private bool _loadingCategories;
+        private Guid? _categoryId;
+        private Guid? _targetCategoryId;
 
         public RecurringRuleEditor()
         {
@@ -84,9 +87,10 @@ namespace THMS.UI.WinForms.Controls
             cmbFrequency.Items.AddRange(["Weekly", "Biweekly", "Monthly", "Quarterly", "Yearly"]);
             cmbFrequency.SelectedIndex = 2;
 
-            cmbCategory.DisplayMember = nameof(ExpenseCategory.Name);
-            cmbCategory.ValueMember = nameof(ExpenseCategory.Id);
-            cmbCategory.DataSource = Rules.GetCategories().ToList();
+            cmbCategory.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbCategory.DropDownWidth = Math.Max(cmbCategory.Width, 320);
+            cmbCategory.SelectionChangeCommitted += OnCategoryCommitted;
+            BindCategoryLists();
 
             dtNextOccurrence.Value = DateTime.Today;
             numAmount.Value = 0;
@@ -114,10 +118,11 @@ namespace THMS.UI.WinForms.Controls
             SelectAccount(cmbAccount, rule.AccountId);
             txtDescription.Text = rule.Description ?? "";
             numAmount.Value = ClampAmount(rule.Amount);
-            SelectCategory(cmbCategory, rule.CategoryId, rule.Category);
+            _categoryId = rule.CategoryId;
+            _pendingSplits = rule.Splits.Select(s => s.Clone()).ToList();
+            BindCategoryLists();
             cmbFrequency.SelectedItem = ToFrequencyLabel(rule.Frequency);
             dtNextOccurrence.Value = rule.NextOccurrence == default ? DateTime.Today : rule.NextOccurrence;
-            _pendingSplits = rule.Splits.Select(s => s.Clone()).ToList();
         }
 
         private void BindTransfer(RecurringTransferRule rule)
@@ -130,28 +135,13 @@ namespace THMS.UI.WinForms.Controls
             SelectAccount(cmbToAccount, rule.ToAccountId);
             txtDescription.Text = rule.Description ?? "";
             numAmount.Value = ClampAmount(rule.Amount);
-            SelectCategory(cmbCategory, rule.CategoryId, rule.Category);
-            SelectCategory(_cmbTargetCategory, rule.TargetCategoryId ?? rule.CategoryId, rule.TargetCategory ?? rule.Category);
+            _categoryId = rule.CategoryId;
+            _targetCategoryId = rule.TargetCategoryId ?? rule.CategoryId;
+            _pendingSplits = rule.Splits.Select(s => s.Clone()).ToList();
+            BindCategoryLists();
             cmbFrequency.SelectedItem = ToFrequencyLabel(rule.Frequency);
             dtNextOccurrence.Value = rule.NextOccurrence == default ? DateTime.Today : rule.NextOccurrence;
             _pendingSplits = rule.Splits.Select(s => s.Clone()).ToList();
-        }
-
-        private static void SelectCategory(ComboBox? combo, Guid? categoryId, string? name)
-        {
-            if (combo?.DataSource is not IEnumerable<ExpenseCategory> categories)
-                return;
-
-            var match = categories.FirstOrDefault(c => c.Id == categoryId)
-                ?? categories.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
-            if (match is not null)
-                combo.SelectedItem = match;
-        }
-
-        private void ApplySelectedCategory(BaseTransaction transaction)
-        {
-            if (cmbCategory.SelectedItem is ExpenseCategory category)
-                transaction.ApplyCategory(category);
         }
 
         private static void SelectAccount(ComboBox combo, Guid accountId)
@@ -225,14 +215,14 @@ namespace THMS.UI.WinForms.Controls
                 FormattingEnabled = true,
                 Location = new Point(cmbCategory.Left, cmbCategory.Top + 40),
                 Size = cmbCategory.Size,
-                DisplayMember = nameof(ExpenseCategory.Name),
-                ValueMember = nameof(ExpenseCategory.Id),
-                DataSource = Rules.GetCategories().ToList()
+                DropDownWidth = Math.Max(cmbCategory.Width, 320)
             };
+            _cmbTargetCategory.SelectionChangeCommitted += OnTargetCategoryCommitted;
             Controls.Add(_lblTargetCategory);
             Controls.Add(_cmbTargetCategory);
             _lblTargetCategory.BringToFront();
             _cmbTargetCategory.BringToFront();
+            BindCategoryLists();
         }
 
         private void ShiftForTargetCategory(bool shown)
@@ -393,8 +383,8 @@ namespace THMS.UI.WinForms.Controls
                     IsActive = true,
                     IsUserCreated = true
                 };
-                ApplySelectedCategory(transfer);
-                if (_cmbTargetCategory?.SelectedItem is ExpenseCategory target)
+                ApplyRememberedCategory(transfer, _categoryId);
+                if (CategoryById(_targetCategoryId) is ExpenseCategory target)
                 {
                     transfer.TargetCategoryId = target.Id;
                     transfer.TargetCategory = target.Name;
@@ -420,23 +410,146 @@ namespace THMS.UI.WinForms.Controls
                 IsActive = true,
                 IsUserCreated = true
             };
-            ApplySelectedCategory(single);
+            ApplyRememberedCategory(single);
             single.Splits = _pendingSplits.Select(s => s.Clone()).ToList();
             return true;
         }
 
-        private void OnEditSplits(object? sender, EventArgs e)
+        private void OnEditSplits(object? sender, EventArgs e) =>
+            EditSplits();
+
+        private void OnCategoryCommitted(object? sender, EventArgs e) =>
+            HandleCategoryChoice(cmbCategory, target: false);
+
+        private void OnTargetCategoryCommitted(object? sender, EventArgs e)
         {
+            if (_cmbTargetCategory is not null)
+                HandleCategoryChoice(_cmbTargetCategory, target: true);
+        }
+
+        private void HandleCategoryChoice(ComboBox combo, bool target)
+        {
+            if (_loadingCategories || combo.SelectedItem is not CategoryListItem item)
+                return;
+
+            switch (item.Action)
+            {
+                case CategoryListAction.Split:
+                    BeginInvoke(EditSplits);
+                    break;
+                case CategoryListAction.NewCategory:
+                    BeginInvoke(() => CreateCategory(target));
+                    break;
+                case CategoryListAction.ManageCategories:
+                    BeginInvoke(() => ManageCategories());
+                    break;
+                default:
+                    if (target)
+                        _targetCategoryId = item.CategoryId;
+                    else
+                    {
+                        _categoryId = item.CategoryId;
+                        _pendingSplits.Clear();
+                    }
+                    break;
+            }
+        }
+
+        private void EditSplits()
+        {
+            var hadSplits = _pendingSplits.Count > 0;
             using var editor = new SplitTransactionEditor(
                 txtDescription.Text.Trim(),
                 numAmount.Value,
                 _pendingSplits,
-                Rules.GetCategories().ToList(),
+                ActiveCategories(),
                 Accounts.GetAllAccounts().ToList());
             if (editor.ShowDialog(this) != DialogResult.OK)
+            {
+                if (!hadSplits)
+                    _pendingSplits.Clear();
+                BindCategoryLists();
                 return;
+            }
 
             _pendingSplits = editor.Result;
+            BindCategoryLists();
+        }
+
+        private void CreateCategory(bool target)
+        {
+            using var editor = new CategoryEditor(new CategoryOrchestrator());
+            if (editor.ShowDialog(this) != DialogResult.OK || editor.CreatedCategory is null)
+            {
+                BindCategoryLists();
+                return;
+            }
+
+            if (target)
+                _targetCategoryId = editor.CreatedCategory.Id;
+            else
+            {
+                _categoryId = editor.CreatedCategory.Id;
+                _pendingSplits.Clear();
+            }
+
+            BindCategoryLists();
+        }
+
+        private void ManageCategories()
+        {
+            using var manager = new CategoryManager(new CategoryOrchestrator());
+            manager.ShowDialog(this);
+            BindCategoryLists();
+        }
+
+        private void BindCategoryLists()
+        {
+            BindCategoryCombo(cmbCategory, includeSplit: true, _categoryId, selectSplit: _pendingSplits.Count > 0);
+            if (_cmbTargetCategory is not null)
+                BindCategoryCombo(_cmbTargetCategory, includeSplit: false, _targetCategoryId, selectSplit: false);
+        }
+
+        private void BindCategoryCombo(ComboBox combo, bool includeSplit, Guid? selectedId, bool selectSplit)
+        {
+            var categories = ActiveCategories();
+            if (selectedId is Guid id && categories.All(c => c.Id != id) && CategoryById(id) is ExpenseCategory current)
+                categories.Add(current);
+
+            var items = CategoryTreeUi.ComboItems(categories, includeSplit);
+            _loadingCategories = true;
+            combo.DisplayMember = nameof(CategoryListItem.Label);
+            combo.DataSource = items;
+            combo.DropDownWidth = Math.Max(combo.Width, 320);
+            CategoryListItem? match = selectSplit
+                ? items.FirstOrDefault(i => i.Action == CategoryListAction.Split)
+                : items.FirstOrDefault(i => i.Action == CategoryListAction.None && i.CategoryId == selectedId);
+            match ??= items.FirstOrDefault(i => i.CategoryId == DefaultExpenseCategories.UncategorizedId)
+                ?? items.FirstOrDefault(i => i.Action == CategoryListAction.None);
+            if (match is not null)
+                combo.SelectedItem = match;
+            if (!selectSplit && match is { Action: CategoryListAction.None, CategoryId: Guid chosen })
+            {
+                if (ReferenceEquals(combo, cmbCategory))
+                    _categoryId ??= chosen;
+                else if (ReferenceEquals(combo, _cmbTargetCategory))
+                    _targetCategoryId ??= chosen;
+            }
+            _loadingCategories = false;
+        }
+
+        private List<ExpenseCategory> ActiveCategories() =>
+            Rules.GetCategories().Where(c => c.IsActive).ToList();
+
+        private ExpenseCategory? CategoryById(Guid? categoryId) =>
+            categoryId is Guid id
+                ? Rules.GetCategories().FirstOrDefault(c => c.Id == id)
+                : null;
+
+        private void ApplyRememberedCategory(BaseTransaction transaction, Guid? categoryId = null)
+        {
+            if (CategoryById(categoryId ?? _categoryId) is ExpenseCategory category)
+                transaction.ApplyCategory(category);
         }
 
         private void PersistPendingSplits(Guid parentId)

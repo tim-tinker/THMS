@@ -5,12 +5,8 @@ namespace THMS.Data.Stores.SqlTables
 {
     internal static class SqliteCategoryColumns
     {
-        public static void EnsureCategoryId(SqliteConnection conn, string tableName)
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"ALTER TABLE {tableName} ADD COLUMN IF NOT EXISTS CategoryId TEXT;";
-            cmd.ExecuteNonQuery();
-        }
+        public static void EnsureCategoryId(SqliteConnection conn, string tableName) =>
+            SqliteSchema.EnsureColumn(conn, tableName, "CategoryId", "TEXT");
 
         public static object BindId(Guid? categoryId) =>
             categoryId is Guid id && id != Guid.Empty ? id.ToString() : DBNull.Value;

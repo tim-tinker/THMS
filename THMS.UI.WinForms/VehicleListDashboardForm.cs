@@ -6,6 +6,8 @@ namespace THMS.UI.WinForms
     public partial class VehicleListDashboardForm : BaseDashboardForm
     {
         private VehicleListViewModel ViewModel { get; set; } = null!;
+        private bool _suspendHistory;
+        private int _loadGeneration;
 
         protected VehicleListItemViewModel? SelectedVehicle =>
             vehicleGrid.SelectedRows.Count > 0
@@ -18,22 +20,22 @@ namespace THMS.UI.WinForms
             DataGridViewUtil.EnableDoubleBuffering(vehicleGrid);
             historyBar.SelectedPeriodChanged += (_, _) =>
             {
-                if (ViewModel is null)
+                if (ViewModel is null || _suspendHistory)
                     return;
 
-                ViewModel.HistoryPeriod = historyBar.SelectedPeriod;
+                _ = LoadVehiclesAsync();
             };
         }
 
         public override void InitializeDashboard()
         {
             ViewModel = new VehicleListViewModel();
-            ViewModel.Initialize();
+            _suspendHistory = true;
             historyBar.SelectPeriod(ViewModel.HistoryPeriod);
+            _suspendHistory = false;
             vehicleGrid.DataBindingComplete += (_, _) => HideVehicleIdColumn();
             vehicleGrid.DataSource = ViewModel.Vehicles;
             HideVehicleIdColumn();
-            RefreshDashboard();
         }
 
         private void HideVehicleIdColumn()
@@ -42,10 +44,41 @@ namespace THMS.UI.WinForms
                 column.Visible = false;
         }
 
-        public override void RefreshDashboard()
+        public override void RefreshDashboard() => _ = LoadVehiclesAsync();
+
+        private async Task LoadVehiclesAsync()
         {
-            // BindingList notifies the grid on Clear/Add; no DataSource reset needed.
-            ViewModel.Activate();
+            if (ViewModel is null)
+                return;
+
+            var generation = Interlocked.Increment(ref _loadGeneration);
+            var period = historyBar.SelectedPeriod;
+            List<VehicleListItemViewModel> items;
+            try
+            {
+                items = await Task.Run(() => ViewModel.Query(period));
+            }
+            catch (Exception ex)
+            {
+                if (!IsDisposed && generation == _loadGeneration && IsHandleCreated)
+                    BeginInvoke(() => MessageBox.Show(this, ex.Message, "Vehicles",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                return;
+            }
+
+            if (IsDisposed || generation != _loadGeneration)
+                return;
+            if (InvokeRequired)
+                BeginInvoke(Apply);
+            else
+                Apply();
+
+            void Apply()
+            {
+                if (IsDisposed || generation != _loadGeneration)
+                    return;
+                ViewModel.Replace(items);
+            }
         }
 
         private void btnAddVehicle_Click(object sender, EventArgs e)

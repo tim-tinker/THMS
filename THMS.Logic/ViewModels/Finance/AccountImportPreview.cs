@@ -12,6 +12,10 @@ namespace THMS.Logic.ViewModels.Finance
         public decimal? Apr { get; set; }
         public decimal? Principal { get; set; }
         public int? TermMonths { get; set; }
+        public bool AutoPaySpecified { get; set; }
+        public bool AutoPay { get; set; }
+        public bool FundingAccountSpecified { get; set; }
+        public string? FundingAccountName { get; set; }
         public Account Account { get; set; } = null!;
 
         public static AccountImportPreview FromAccount(Account account) =>
@@ -51,6 +55,8 @@ namespace THMS.Logic.ViewModels.Finance
             account.Name = Name ?? "";
             account.AccountNumber = AccountNumber ?? "";
             account.WebsiteUrl = WebsiteUrl ?? "";
+            if (AutoPaySpecified && account.SupportsAutoPay)
+                account.AutoPay = AutoPay;
 
             switch (account)
             {
@@ -125,6 +131,8 @@ namespace THMS.Logic.ViewModels.Finance
             account.Institution = source.Institution;
             account.BalanceAsOf = source.BalanceAsOf;
             account.ExternalLink = source.ExternalLink;
+            account.AutoPay = source.AutoPay;
+            account.AutoPayFromAccountId = source.AutoPayFromAccountId;
             return account;
         }
     }
