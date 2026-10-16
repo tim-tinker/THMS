@@ -307,6 +307,8 @@ namespace THMS.UI
 
                 var dashboard = _embeddedForms[formName];
                 dashboard.Visible = true;
+                if (navButton is not null && dashboard is RegisterForm register)
+                    register.ShowHome();
                 HighlightNavButton(navButton ?? FindNavButton(formName));
             }
             finally

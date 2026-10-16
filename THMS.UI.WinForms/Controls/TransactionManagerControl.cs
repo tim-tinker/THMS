@@ -15,10 +15,6 @@ namespace THMS.UI.WinForms.Controls
 {
     public partial class TransactionManagerControl : UserControl, IDataManagerControl
     {
-        private const string ShowAll = "All";
-        private const string ShowPosted = "Posted";
-        private const string ShowForecast = "Forecast";
-        private const string ShowRecurringRules = "Recurring Rules";
         private const string HistoryMonth = "Month";
         private const string HistoryYear = "Year";
         private const string HistoryLifetime = "Lifetime";
@@ -42,7 +38,6 @@ namespace THMS.UI.WinForms.Controls
         private Label? lblLoadStatus;
         private ProgressBar? progressLoad;
         private CancellationTokenSource? _txLoadCts;
-        private bool _filterApplied;
         private bool _ready;
         private bool _suspendAccountChange;
         private bool _suspendHistoryChange;
@@ -63,9 +58,9 @@ namespace THMS.UI.WinForms.Controls
             InitializeComponent();
             SplitContainerUtil.MakeSplitterVisible(splitContainer);
             InitializeHistory();
-            InitializeForecastPeriod();
-            InitializeShowFilter();
             LayoutForecastToolbar();
+            btnAddRule.Click += OnAddRuleClicked;
+            btnDeleteRule.Click += OnDeleteRuleClicked;
             InitializeGrids();
             HostLedgerDetail();
             _ready = true;
@@ -153,12 +148,6 @@ namespace THMS.UI.WinForms.Controls
             cmbHistory.Width = 120;
             cmbHistory.DropDownWidth = 120;
             cmbHistory.IntegralHeight = false;
-            cmbForecastPeriod.Width = 140;
-            cmbForecastPeriod.DropDownWidth = 140;
-            cmbForecastPeriod.IntegralHeight = false;
-            cmbShow.Width = 200;
-            cmbShow.DropDownWidth = 220;
-            cmbShow.IntegralHeight = false;
             btnAddRule.AutoSize = true;
             btnDeleteRule.AutoSize = true;
         }
@@ -169,24 +158,6 @@ namespace THMS.UI.WinForms.Controls
             cmbHistory.Items.AddRange([HistoryMonth, HistoryYear, HistoryLifetime]);
             cmbHistory.SelectedItem = HistoryMonth;
             cmbHistory.SelectedIndexChanged += OnHistoryChanged;
-        }
-
-        private void InitializeForecastPeriod()
-        {
-            cmbForecastPeriod.Items.Clear();
-            cmbForecastPeriod.Items.AddRange(["None", "30 days", "60 days", "90 days", "6 months", "1 year"]);
-            cmbForecastPeriod.SelectedIndex = 0;
-            cmbForecastPeriod.SelectedIndexChanged += OnForecastPeriodChanged;
-        }
-
-        private void InitializeShowFilter()
-        {
-            cmbShow.Items.Clear();
-            cmbShow.Items.AddRange([ShowAll, ShowPosted, ShowForecast, ShowRecurringRules]);
-            cmbShow.SelectedIndex = 0;
-            cmbShow.SelectedIndexChanged += OnShowFilterChanged;
-            btnAddRule.Click += OnAddRuleClicked;
-            btnDeleteRule.Click += OnDeleteRuleClicked;
         }
 
         private void InitializeGrids()
@@ -300,7 +271,7 @@ namespace THMS.UI.WinForms.Controls
             {
                 AutoSize = false,
                 Anchor = AnchorStyles.Left,
-                Size = new Size(180, cmbShow.Height),
+                Size = new Size(180, cmbHistory.Height),
                 Margin = new Padding(4, 4, 8, 4),
                 PlaceholderText = "Search"
             };
@@ -1010,28 +981,6 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
-        private void OnForecastPeriodChanged(object? sender, EventArgs e)
-        {
-            if (!_ready)
-                return;
-
-            RefreshCurrentAccount();
-        }
-
-        private void OnShowFilterChanged(object? sender, EventArgs e)
-        {
-            if (!_ready)
-                return;
-
-            _filterApplied = SelectedShowMode() == ShowPosted;
-            cmbForecastPeriod.Enabled = SelectedShowMode() is ShowAll or ShowForecast;
-            UpdateRuleActionButtons();
-            RefreshCurrentAccount();
-        }
-
-        private string SelectedShowMode() =>
-            cmbShow.SelectedItem?.ToString() ?? ShowAll;
-
         private string SelectedHistory() =>
             cmbHistory.SelectedItem?.ToString() ?? HistoryMonth;
 
@@ -1048,15 +997,13 @@ namespace THMS.UI.WinForms.Controls
 
         private async Task LoadTransactionsForAccountAsync(Guid accountId, CancellationToken token)
         {
-            var show = SelectedShowMode();
             var history = SelectedHistory();
-            var forecastEnd = GetForecastEnd();
             ShowLoadProgress($"Loading {history.ToLowerInvariant()} history...");
 
             try
             {
                 var views = await Task.Run(
-                    () => BuildTransactionViews(accountId, show, history, forecastEnd, token));
+                    () => BuildTransactionViews(accountId, history, token));
                 if (views is null || token.IsCancellationRequested || CurrentAccountId != accountId)
                     return;
 
@@ -1081,46 +1028,7 @@ namespace THMS.UI.WinForms.Controls
 
         private List<UnifiedTransactionView>? BuildTransactionViews(
             Guid accountId,
-            string show,
             string history,
-            DateTime forecastEnd,
-            CancellationToken token)
-        {
-            if (token.IsCancellationRequested)
-                return null;
-            if (show == ShowRecurringRules)
-            {
-                var rules = UnifiedTransactionViewBuilder.BuildRecurringRules(
-                    _ruleOrchestrator.GetAllSingleRules(),
-                    _ruleOrchestrator.GetTransferRules(accountId),
-                    accountId);
-                ApplyCategoryDisplayNames(rules);
-                return rules;
-            }
-
-            var chronological = BuildUnifiedTransactions(accountId, show, history, forecastEnd, token);
-            if (chronological is null || token.IsCancellationRequested)
-                return null;
-            ApplyCategoryDisplayNames(chronological);
-
-            if (show != ShowAll)
-            {
-                ClearForecastBalances(chronological);
-                return UnifiedTransactionView.OrderForDisplay(chronological).ToList();
-            }
-
-            var historyStart = BaseOrchestrator.GetStartDate(DateTime.Today, history);
-            var opening = GetStartingBalance(accountId)
-                + _txOrchestrator.SumPostedAmountsBefore(accountId, historyStart);
-            ApplyRunningBalances(chronological, opening, accountId);
-            return UnifiedTransactionView.OrderForDisplay(chronological).ToList();
-        }
-
-        private List<UnifiedTransactionView>? BuildUnifiedTransactions(
-            Guid accountId,
-            string show,
-            string history,
-            DateTime forecastEnd,
             CancellationToken token)
         {
             if (token.IsCancellationRequested)
@@ -1141,56 +1049,9 @@ namespace THMS.UI.WinForms.Controls
                 accountId,
                 txs.IncomingTransferSplitPosted,
                 incomingFutureSplitSources: []);
-
-            if (show == ShowPosted)
-                return posted;
-            if (token.IsCancellationRequested)
-                return null;
-
-            var forecast = _txOrchestrator.GenerateForecast(
-                accountId,
-                DateTime.Today,
-                forecastEnd);
-            if (token.IsCancellationRequested)
-                return null;
-
-            if (show == ShowForecast)
-                return forecast;
-
-            return UnifiedTransactionView.OrderForRunningBalance(posted.Concat(forecast)).ToList();
-        }
-
-        private DateTime GetForecastEnd()
-        {
-            return cmbForecastPeriod.SelectedItem?.ToString() switch
-            {
-                "None" => DateTime.Today,
-                "30 days" => DateTime.Today.AddDays(30),
-                "60 days" => DateTime.Today.AddDays(60),
-                "90 days" => DateTime.Today.AddDays(90),
-                "6 months" => DateTime.Today.AddMonths(6),
-                "1 year" => DateTime.Today.AddYears(1),
-                _ => DateTime.Today.AddDays(90)
-            };
-        }
-
-        private void ApplyRunningBalances(
-            IEnumerable<UnifiedTransactionView> chronological,
-            decimal startingBalance,
-            Guid accountId)
-        {
-            var credit = _accountOrchestrator.GetAccount(accountId) is CreditAccount;
-            decimal balance = startingBalance;
-            foreach (var tx in chronological)
-            {
-                balance += tx.Amount;
-                tx.ForecastBalance = credit ? -balance : balance;
-            }
-        }
-
-        private decimal GetStartingBalance(Guid accountId)
-        {
-            return PostedBalanceCalculator.GetStartingBalance(_accountOrchestrator.GetAccount(accountId));
+            ApplyCategoryDisplayNames(posted);
+            ClearForecastBalances(posted);
+            return UnifiedTransactionView.OrderForDisplay(posted).ToList();
         }
 
         private void OnAccountCellBeginEdit(object? sender, DataGridViewCellCancelEventArgs e)
@@ -1375,19 +1236,11 @@ namespace THMS.UI.WinForms.Controls
         {
             if (_suppressBalanceRecompute || LedgerRowFilterActive)
                 return;
-            if (_accountsSource.Current is not UnifiedAccountView account)
+            if (_accountsSource.Current is not UnifiedAccountView)
                 return;
 
             var unified = _transactionsSource.List.Cast<UnifiedTransactionView>().ToList();
-            if (SelectedShowMode() != ShowAll || _filterApplied || !string.IsNullOrEmpty(_transactionsSource.Filter))
-            {
-                ClearForecastBalances(unified);
-                detailGrid.Refresh();
-                return;
-            }
-
-            var chronological = UnifiedTransactionView.OrderForRunningBalance(unified).ToList();
-            ApplyRunningBalances(chronological, GetStartingBalance(account.Id), account.Id);
+            ClearForecastBalances(unified);
             detailGrid.Refresh();
         }
 
@@ -1484,9 +1337,7 @@ namespace THMS.UI.WinForms.Controls
                     (t.Description ?? "").Contains(_descriptionSearch, StringComparison.CurrentCultureIgnoreCase));
             }
 
-            var list = SelectedShowMode() == ShowAll && !LedgerRowFilterActive
-                ? rows.ToList()
-                : UnifiedTransactionView.OrderForDisplay(rows).ToList();
+            var list = UnifiedTransactionView.OrderForDisplay(rows).ToList();
 
             _suppressBalanceRecompute = true;
             try
@@ -1911,8 +1762,6 @@ namespace THMS.UI.WinForms.Controls
 
         public void FilterByType(string type)
         {
-            cmbShow.SelectedItem = ShowPosted;
-            _filterApplied = !string.IsNullOrWhiteSpace(type);
             RefreshCurrentAccount();
 
             if (string.IsNullOrWhiteSpace(type))

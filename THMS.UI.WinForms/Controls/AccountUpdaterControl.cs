@@ -26,6 +26,8 @@ namespace THMS.UI.WinForms.Controls
         private bool _suppressAccountMenu;
         private bool _suppressSelectionEvents;
         private int _accountLoadGeneration;
+        private int _appliedAccountGeneration;
+        private bool _selectFirstOnLoad;
         private Guid? _pendingAccountId;
         private Font? _unreconciledAccountFont;
 
@@ -127,7 +129,10 @@ namespace THMS.UI.WinForms.Controls
             if (generation != _accountLoadGeneration || IsDisposed)
                 return;
 
-            var selectedId = _pendingAccountId ?? GetSelectedAccount()?.Id;
+            _appliedAccountGeneration = generation;
+            var selectFirst = _selectFirstOnLoad;
+            _selectFirstOnLoad = false;
+            var selectedId = selectFirst ? null : _pendingAccountId ?? GetSelectedAccount()?.Id;
             var firstDisplayed = gridAccounts.RowCount > 0
                 ? gridAccounts.FirstDisplayedScrollingRowIndex
                 : -1;
@@ -155,7 +160,10 @@ namespace THMS.UI.WinForms.Controls
                             ? ListSortDirection.Descending
                             : ListSortDirection.Ascending);
                 }
-                SelectAccount(selectedId);
+                if (selectFirst)
+                    SelectGridRow(0);
+                else
+                    SelectAccount(selectedId);
                 RestoreScrollPosition(firstDisplayed);
             }
             finally
@@ -193,8 +201,25 @@ namespace THMS.UI.WinForms.Controls
                 action();
         }
 
+        public void SelectFirstAccount()
+        {
+            _pendingAccountId = null;
+            if (gridAccounts.Rows.Count == 0)
+            {
+                _selectFirstOnLoad = true;
+                if (_accountLoadGeneration == _appliedAccountGeneration)
+                    LoadAccounts();
+                return;
+            }
+
+            if (_accountLoadGeneration != _appliedAccountGeneration)
+                _selectFirstOnLoad = true;
+            SelectGridRow(0);
+        }
+
         public void SelectAccount(Guid? id)
         {
+            _selectFirstOnLoad = false;
             _pendingAccountId = id;
             if (id is null)
                 return;
@@ -203,11 +228,29 @@ namespace THMS.UI.WinForms.Controls
             {
                 if (row.DataBoundItem is AccountRegisterRow item && item.Id == id)
                 {
-                    row.Selected = true;
-                    if (row.Cells.Count > 0 && row.Cells[0].Visible)
-                        gridAccounts.CurrentCell = row.Cells[0];
+                    SelectGridRow(row.Index);
                     return;
                 }
+            }
+        }
+
+        private void SelectGridRow(int index)
+        {
+            if (index < 0 || index >= gridAccounts.Rows.Count)
+                return;
+
+            var row = gridAccounts.Rows[index];
+            row.Selected = true;
+            var column = gridAccounts.Columns.GetFirstColumn(DataGridViewElementStates.Visible);
+            if (column is null)
+                return;
+
+            try
+            {
+                gridAccounts.CurrentCell = row.Cells[column.Index];
+            }
+            catch (InvalidOperationException)
+            {
             }
         }
 

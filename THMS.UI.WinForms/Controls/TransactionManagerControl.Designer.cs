@@ -10,10 +10,6 @@ namespace THMS.UI.WinForms.Controls
         private System.Windows.Forms.FlowLayoutPanel forecastPanel;
         private System.Windows.Forms.Label lblHistory;
         private System.Windows.Forms.ComboBox cmbHistory;
-        private System.Windows.Forms.Label lblForecastPeriod;
-        private System.Windows.Forms.ComboBox cmbForecastPeriod;
-        private System.Windows.Forms.Label lblShow;
-        private System.Windows.Forms.ComboBox cmbShow;
         private ThmsButton btnAddRule;
         private ThmsButton btnDeleteRule;
 
@@ -53,10 +49,6 @@ namespace THMS.UI.WinForms.Controls
             forecastPanel = new FlowLayoutPanel();
             lblHistory = new Label();
             cmbHistory = new ComboBox();
-            lblForecastPeriod = new Label();
-            cmbForecastPeriod = new ComboBox();
-            lblShow = new Label();
-            cmbShow = new ComboBox();
             btnAddRule = new ThmsButton();
             btnDeleteRule = new ThmsButton();
             NameColumn = new DataGridViewTextBoxColumn();
@@ -206,10 +198,6 @@ namespace THMS.UI.WinForms.Controls
             // 
             forecastPanel.Controls.Add(lblHistory);
             forecastPanel.Controls.Add(cmbHistory);
-            forecastPanel.Controls.Add(lblForecastPeriod);
-            forecastPanel.Controls.Add(cmbForecastPeriod);
-            forecastPanel.Controls.Add(lblShow);
-            forecastPanel.Controls.Add(cmbShow);
             forecastPanel.Controls.Add(btnAddRule);
             forecastPanel.Controls.Add(btnDeleteRule);
             forecastPanel.AutoSize = true;
@@ -244,50 +232,6 @@ namespace THMS.UI.WinForms.Controls
             cmbHistory.Name = "cmbHistory";
             cmbHistory.Size = new Size(120, 38);
             cmbHistory.TabIndex = 1;
-            // 
-            // lblForecastPeriod
-            // 
-            lblForecastPeriod.Anchor = AnchorStyles.Left;
-            lblForecastPeriod.AutoSize = true;
-            lblForecastPeriod.Location = new Point(12, 12);
-            lblForecastPeriod.Margin = new Padding(4, 8, 8, 4);
-            lblForecastPeriod.Name = "lblForecastPeriod";
-            lblForecastPeriod.Size = new Size(159, 30);
-            lblForecastPeriod.TabIndex = 2;
-            lblForecastPeriod.Text = "Forecast Period:";
-            // 
-            // cmbForecastPeriod
-            // 
-            cmbForecastPeriod.Anchor = AnchorStyles.Left;
-            cmbForecastPeriod.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbForecastPeriod.DropDownWidth = 140;
-            cmbForecastPeriod.Location = new Point(183, 10);
-            cmbForecastPeriod.Margin = new Padding(4, 4, 8, 4);
-            cmbForecastPeriod.Name = "cmbForecastPeriod";
-            cmbForecastPeriod.Size = new Size(140, 38);
-            cmbForecastPeriod.TabIndex = 3;
-            // 
-            // lblShow
-            // 
-            lblShow.Anchor = AnchorStyles.Left;
-            lblShow.AutoSize = true;
-            lblShow.Location = new Point(335, 12);
-            lblShow.Margin = new Padding(4, 8, 8, 4);
-            lblShow.Name = "lblShow";
-            lblShow.Size = new Size(60, 30);
-            lblShow.TabIndex = 4;
-            lblShow.Text = "Show:";
-            // 
-            // cmbShow
-            // 
-            cmbShow.Anchor = AnchorStyles.Left;
-            cmbShow.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbShow.DropDownWidth = 220;
-            cmbShow.Location = new Point(407, 10);
-            cmbShow.Margin = new Padding(4, 4, 8, 4);
-            cmbShow.Name = "cmbShow";
-            cmbShow.Size = new Size(200, 38);
-            cmbShow.TabIndex = 5;
             // 
             // btnAddRule
             // 

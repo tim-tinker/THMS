@@ -15,8 +15,17 @@ namespace THMS.UI.WinForms
         private readonly RecurringRuleImportOrchestrator _ruleImportOrchestrator = new();
         private readonly RecurringTransferImportOrchestrator _transferImportOrchestrator = new();
         private readonly PlanningOrchestrator _planningOrchestrator = new();
+        private readonly TransactionOrchestrator _transactionOrchestrator = new();
+        private readonly CategoryOrchestrator _categoryOrchestrator = new();
         private readonly BindingSource _statementsSource = new();
         private readonly BindingSource _statementDetailsSource = new();
+        private readonly BindingSource _statementTransactionsSource = new();
+        private List<AccountStatement> _accountStatements = [];
+        private SplitContainer? _statementColumns;
+        private SplitContainer? _statementRows;
+        private bool _statementColumnsPending = true;
+        private bool _lineItemsSplitPending;
+        private bool _suspendStatementSelection;
         private int _loadedRevision = int.MinValue;
 
         private bool _accountSplitReady;
@@ -60,6 +69,15 @@ namespace THMS.UI.WinForms
             ledger.DataChanged += (_, _) => accountUpdater.RefreshAccounts();
             accountUpdater.SelectedAccountChanged += (_, _) => LoadSelectedAccount();
             historyBar.SelectedPeriodChanged += (_, _) => ApplyHistoryPeriod();
+        }
+
+        public void ShowHome()
+        {
+            tabsTop.SelectedTab = tabAccounts;
+            tabs.SelectedTab = tabStatements;
+            accountUpdater.SelectFirstAccount();
+            if (accountUpdater.SelectedAccount is not null)
+                LoadStatementsForSelectedAccount();
         }
 
         public void ShowAccount(Guid accountId)
@@ -122,12 +140,13 @@ namespace THMS.UI.WinForms
                 MoneyColumn(nameof(AccountStatementListRow.AmountDue), "Amount Due"),
                 MoneyColumn(nameof(AccountStatementListRow.StatementBalance), "Statement Balance"),
                 MoneyColumn(nameof(AccountStatementListRow.EscrowBalance), "Escrow Balance"),
-                MoneyColumn(nameof(AccountStatementListRow.Promotions), "Promotions"),
-                MoneyColumn(nameof(AccountStatementListRow.Usage), "Usage"),
-                MoneyColumn(nameof(AccountStatementListRow.Charges), "Charges"),
                 FillColumn(nameof(AccountStatementListRow.Notes), "Notes"));
             gridStatements.DataSource = _statementsSource;
-            gridStatements.SelectionChanged += (_, _) => LoadStatementDetails();
+            gridStatements.SelectionChanged += (_, _) =>
+            {
+                if (!_suspendStatementSelection)
+                    LoadStatementDetails();
+            };
             gridStatements.CellDoubleClick += OnStatementCellDoubleClick;
             HostStatementDetails();
         }
@@ -138,30 +157,13 @@ namespace THMS.UI.WinForms
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Horizontal,
-                Panel1MinSize = 80,
-                Panel2MinSize = 80,
-                SplitterDistance = 220,
+                Panel2Collapsed = true,
                 Name = "splitStatements"
             };
             pnlStatements.Controls.Remove(gridStatements);
             gridStatements.Dock = DockStyle.Fill;
             splitStatements.Panel1.Controls.Add(gridStatements);
 
-            var detailsHost = new Panel { Dock = DockStyle.Fill };
-            var detailsFont = new Font(Font.FontFamily, Font.Size + 3f, FontStyle.Bold);
-            var labelPad = LogicalToDeviceUnits(6);
-            var labelHeight = TextRenderer.MeasureText("Line items", detailsFont).Height + (labelPad * 2);
-            var lblDetails = new Label
-            {
-                AutoSize = false,
-                Dock = DockStyle.Top,
-                Font = detailsFont,
-                Height = Math.Max(LogicalToDeviceUnits(32), labelHeight),
-                Padding = new Padding(LogicalToDeviceUnits(8), labelPad, LogicalToDeviceUnits(8), labelPad),
-                Text = "Line items",
-                TextAlign = ContentAlignment.MiddleLeft,
-                UseMnemonic = false
-            };
             var gridDetails = new DataGridView
             {
                 AllowUserToAddRows = false,
@@ -188,12 +190,192 @@ namespace THMS.UI.WinForms
                 detailsColumn);
             gridDetails.DataSource = _statementDetailsSource;
             gridDetails.CellDoubleClick += OnStatementCellDoubleClick;
-            detailsHost.Controls.Add(gridDetails);
-            detailsHost.Controls.Add(lblDetails);
-            splitStatements.Panel2.Controls.Add(detailsHost);
-            pnlStatements.Controls.Add(splitStatements);
+            splitStatements.Panel2.Controls.Add(SectionHost(gridDetails, "Line items"));
+            splitStatements.SizeChanged += (_, _) => OnStatementRowsSized();
+            _statementRows = splitStatements;
+
+            var gridTransactions = new DataGridView
+            {
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToResizeRows = false,
+                AutoGenerateColumns = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
+                Dock = DockStyle.Fill,
+                MultiSelect = false,
+                Name = "gridStatementTransactions",
+                ReadOnly = true,
+                RowHeadersVisible = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            };
+            DataGridViewUtil.EnableDoubleBuffering(gridTransactions);
+            gridTransactions.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True;
+            var txDate = TextColumn(nameof(UnifiedTransactionView.Date), "Transaction Date");
+            txDate.DefaultCellStyle.Format = "d";
+            var txAmount = TextColumn(nameof(UnifiedTransactionView.Amount), "Amount");
+            txAmount.DefaultCellStyle.Format = "c2";
+            txAmount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            txAmount.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+            var txDescription = TextColumn(nameof(UnifiedTransactionView.Description), "Description");
+            txDescription.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            txDescription.MinimumWidth = 120;
+            gridTransactions.Columns.AddRange(
+                txDate,
+                txAmount,
+                TextColumn(nameof(UnifiedTransactionView.Category), "Category"),
+                txDescription);
+            gridTransactions.DataSource = _statementTransactionsSource;
+
+            var columns = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Vertical,
+                Panel2Collapsed = true,
+                Name = "splitStatementColumns"
+            };
+            columns.Panel1.Controls.Add(splitStatements);
+            columns.Panel2.Controls.Add(gridTransactions);
+            columns.SizeChanged += (_, _) => OnStatementColumnsSized();
+            _statementColumns = columns;
+
+            pnlStatements.Controls.Add(columns);
+            // Dock the button bar first so the grids fill only the space above it.
+            columns.BringToFront();
             SplitContainerUtil.MakeSplitterVisible(splitStatements);
-            splitStatements.SendToBack();
+            SplitContainerUtil.MakeSplitterVisible(columns);
+        }
+
+        private Panel SectionHost(Control body, string title)
+        {
+            var host = new Panel { Dock = DockStyle.Fill };
+            var font = new Font(Font.FontFamily, Font.Size + 3f, FontStyle.Bold);
+            var labelPad = LogicalToDeviceUnits(6);
+            var labelHeight = TextRenderer.MeasureText(title, font).Height + (labelPad * 2);
+            var label = new Label
+            {
+                AutoSize = false,
+                Dock = DockStyle.Top,
+                Font = font,
+                Height = Math.Max(LogicalToDeviceUnits(32), labelHeight),
+                Padding = new Padding(LogicalToDeviceUnits(8), labelPad, LogicalToDeviceUnits(8), labelPad),
+                Text = title,
+                TextAlign = ContentAlignment.MiddleLeft,
+                UseMnemonic = false
+            };
+            host.Controls.Add(body);
+            host.Controls.Add(label);
+            return host;
+        }
+
+        private void TryApplyStatementColumnSplit()
+        {
+            if (!_statementColumnsPending || _statementColumns is null || _statementColumns.Panel2Collapsed || !_statementColumns.IsHandleCreated)
+                return;
+
+            const int min = 220;
+            var available = _statementColumns.Width - _statementColumns.SplitterWidth;
+            if (available < min * 2)
+                return;
+
+            _statementColumns.Panel1MinSize = min;
+            _statementColumns.Panel2MinSize = min;
+            _statementColumns.SplitterDistance = available / 2;
+            _statementColumnsPending = false;
+        }
+
+        private void OnStatementColumnsSized()
+        {
+            if (_statementColumns is null)
+                return;
+
+            var show = _statementTransactionsSource.Count > 0;
+            if (_statementColumns.Panel2Collapsed == show)
+                UpdateTransactionSplit();
+            else
+                TryApplyStatementColumnSplit();
+        }
+
+        private void UpdateTransactionSplit()
+        {
+            if (_statementColumns is null || _statementColumns.IsDisposed)
+                return;
+
+            var show = _statementTransactionsSource.Count > 0;
+            if (_statementColumns.Panel2Collapsed == !show)
+                return;
+
+            try
+            {
+                if (!show)
+                {
+                    _statementColumns.Panel2Collapsed = true;
+                    return;
+                }
+
+                _statementColumns.Panel2Collapsed = false;
+                TryApplyStatementColumnSplit();
+            }
+            catch (InvalidOperationException)
+            {
+                _statementColumnsPending = true;
+            }
+        }
+
+        private void OnStatementRowsSized()
+        {
+            if (_statementRows is null)
+                return;
+
+            var show = _statementDetailsSource.Count > 0;
+            if (_statementRows.Panel2Collapsed == show)
+                UpdateLineItemsSplit();
+            else
+                TryApplyLineItemsSplitDistance();
+        }
+
+        private void UpdateLineItemsSplit()
+        {
+            if (_statementRows is null || _statementRows.IsDisposed)
+                return;
+
+            var show = _statementDetailsSource.Count > 0;
+            if (_statementRows.Panel2Collapsed == !show)
+                return;
+
+            try
+            {
+                if (!show)
+                {
+                    _lineItemsSplitPending = false;
+                    _statementRows.Panel2Collapsed = true;
+                    return;
+                }
+
+                _lineItemsSplitPending = true;
+                _statementRows.Panel2Collapsed = false;
+                TryApplyLineItemsSplitDistance();
+            }
+            catch (InvalidOperationException)
+            {
+                _lineItemsSplitPending = show;
+            }
+        }
+
+        private void TryApplyLineItemsSplitDistance()
+        {
+            if (!_lineItemsSplitPending || _statementRows is null || _statementRows.Panel2Collapsed || !_statementRows.IsHandleCreated)
+                return;
+
+            const int min = 80;
+            var available = _statementRows.Height - _statementRows.SplitterWidth;
+            if (available < min * 2)
+                return;
+
+            _statementRows.Panel1MinSize = min;
+            _statementRows.Panel2MinSize = min;
+            _statementRows.SplitterDistance = Math.Clamp((available * 2) / 3, min, available - min);
+            _lineItemsSplitPending = false;
         }
 
         private static DataGridViewTextBoxColumn TextColumn(string property, string header) =>
@@ -239,8 +421,9 @@ namespace THMS.UI.WinForms
             var account = accountUpdater.SelectedAccount;
             if (account is null)
             {
+                _accountStatements = [];
                 _statementsSource.DataSource = new List<AccountStatementListRow>();
-                _statementDetailsSource.DataSource = new List<StatementChildRow>();
+                ClearStatementSelection();
                 btnAddStatement.Enabled = false;
                 return;
             }
@@ -248,23 +431,71 @@ namespace THMS.UI.WinForms
             var canAdd = StatementAccountMatch.ForAccount(account) is not null;
             btnAddStatement.Enabled = canAdd;
 
-            var rows = _planningOrchestrator.GetStatementListRows(account.Id);
-            _statementsSource.DataSource = rows;
-
-            if (!canAdd)
+            _accountStatements = _planningOrchestrator.GetStatementStore().GetForAccount(account.Id).ToList();
+            var rows = _accountStatements
+                .OrderByDescending(s => s.StatementDate)
+                .ThenByDescending(s => s.DueDate)
+                .Select(AccountStatementListRow.From)
+                .ToList();
+            _suspendStatementSelection = true;
+            try
             {
-                _statementDetailsSource.DataSource = new List<StatementChildRow>();
+                _statementsSource.DataSource = rows;
+                if (rows.Count > 0)
+                    _statementsSource.Position = 0;
+            }
+            finally
+            {
+                _suspendStatementSelection = false;
+            }
+
+            if (!canAdd || rows.Count == 0)
+            {
+                ClearStatementSelection();
                 return;
             }
 
+            SelectFirstStatement();
+        }
+
+        private void SelectFirstStatement()
+        {
+            if (gridStatements.Rows.Count == 0)
+            {
+                ClearStatementSelection();
+                return;
+            }
+
+            var row = gridStatements.Rows[0];
+            row.Selected = true;
+            var column = gridStatements.Columns.GetFirstColumn(DataGridViewElementStates.Visible);
+            if (column is not null)
+            {
+                try
+                {
+                    gridStatements.CurrentCell = row.Cells[column.Index];
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+
             LoadStatementDetails();
+        }
+
+        private void ClearStatementSelection()
+        {
+            _statementDetailsSource.DataSource = new List<StatementChildRow>();
+            _statementTransactionsSource.DataSource = new List<UnifiedTransactionView>();
+            UpdateLineItemsSplit();
+            UpdateTransactionSplit();
         }
 
         private void LoadStatementDetails()
         {
             if (gridStatements.CurrentRow?.DataBoundItem is not AccountStatementListRow row)
             {
-                _statementDetailsSource.DataSource = new List<StatementChildRow>();
+                ClearStatementSelection();
                 return;
             }
 
@@ -272,6 +503,44 @@ namespace THMS.UI.WinForms
             _statementDetailsSource.DataSource = statement is null
                 ? new List<StatementChildRow>()
                 : StatementChildRow.From(statement);
+            _statementTransactionsSource.DataSource = statement is null
+                ? new List<UnifiedTransactionView>()
+                : StatementTransactions(statement);
+            UpdateLineItemsSplit();
+            UpdateTransactionSplit();
+        }
+
+        private List<UnifiedTransactionView> StatementTransactions(AccountStatement statement)
+        {
+            var end = statement.StatementDate.Date;
+            var previous = _accountStatements
+                .Where(item => item.Id != statement.Id && item.StatementDate.Date < end)
+                .Select(item => item.StatementDate.Date)
+                .DefaultIfEmpty(DateTime.MinValue)
+                .Max();
+            var start = previous == DateTime.MinValue ? DateTime.MinValue : previous.AddDays(1);
+            var rangeEnd = end == DateTime.MaxValue.Date ? DateTime.MaxValue : end.AddDays(1).AddTicks(-1);
+            var txs = start <= DateTime.MinValue
+                ? _transactionOrchestrator.GetTransactionsForAccount(statement.AccountId)
+                : _transactionOrchestrator.GetTransactionsForAccount(statement.AccountId, start, rangeEnd);
+            var views = UnifiedTransactionViewBuilder.Build(
+                txs.Posted,
+                txs.PostedTransfers,
+                userFutureSingles: [],
+                userFutureTransfers: [],
+                statement.AccountId,
+                txs.IncomingTransferSplitPosted,
+                incomingFutureSplitSources: []);
+            var names = _categoryOrchestrator.GetAllCategories(includeInactive: true)
+                .ToDictionary(category => category.Id, category => category.Name);
+            foreach (var view in views)
+            {
+                if (view.CategoryId is Guid id && names.TryGetValue(id, out var name))
+                    view.Category = name;
+            }
+
+            return UnifiedTransactionView.OrderForDisplay(
+                views.Where(view => view.Date.Date >= start && view.Date.Date <= end)).ToList();
         }
 
         private void AfterImport()

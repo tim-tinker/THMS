@@ -189,8 +189,8 @@ namespace THMS.UI.WinForms
             tabs.Dock = DockStyle.Fill;
             tabs.MaxTabWidth = 220;
             tabs.Name = "tabs";
-            tabs.TabPages.Add(tabLedger);
             tabs.TabPages.Add(tabStatements);
+            tabs.TabPages.Add(tabLedger);
             tabs.TabPages.Add(tabBills);
             //
             // tabBills
