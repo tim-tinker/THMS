@@ -12,16 +12,25 @@ namespace THMS.UI.WinForms.Controls
     {
         private readonly BillsOrchestrator _orchestrator;
         private readonly RecurringRuleOrchestrator _rules = new();
+        private readonly PlanningOrchestrator _planning = new();
+        private readonly TransactionOrchestrator _transactions = new();
+        private readonly AccountActivityOrchestrator _activity = new();
+        private readonly CategoryOrchestrator _categories = new();
         private readonly BindingSource _source = new();
         private readonly DataGridView _grid = new();
+        private readonly UnreconciledImportsControl _imports = new();
         private readonly Label _lblCash = new();
         private readonly ContextMenuStrip _menu = new();
+        private SplitContainer? _billsSplit;
+        private bool _importSplitPending;
         private bool _suppressMenu;
         private ThmsButton _delete = null!;
         private Guid? _accountId;
         private bool _suppressCash;
 
         public event EventHandler? DataChanged;
+
+        public event EventHandler? StatementChanged;
 
         public BillsControl()
             : this(new BillsOrchestrator())
@@ -60,6 +69,8 @@ namespace THMS.UI.WinForms.Controls
 
             UpdateCashRemaining();
             UpdateDelete();
+            _imports.ShowAccount(_accountId);
+            UpdateImportSplit();
         }
 
         private void InitializeLayout()
@@ -115,9 +126,66 @@ namespace THMS.UI.WinForms.Controls
             _grid.ContextMenuStrip = _menu;
             _menu.Opening += OnMenuOpening;
 
-            Controls.Add(_grid);
+            _imports.Dock = DockStyle.Fill;
+            _imports.Reconciled += (_, _) =>
+            {
+                Reload();
+                DataChanged?.Invoke(this, EventArgs.Empty);
+            };
+
+            var split = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Name = "splitBills",
+                Orientation = Orientation.Vertical,
+                Panel2Collapsed = true
+            };
+            SplitContainerUtil.MakeSplitterVisible(split);
+            split.Panel1.Controls.Add(_grid);
+            split.Panel2.Controls.Add(_imports);
+            split.SizeChanged += (_, _) => TryApplyImportSplit();
+            _billsSplit = split;
+
+            Controls.Add(split);
             Controls.Add(toolbar);
             Controls.Add(cashBar);
+        }
+
+        private void UpdateImportSplit()
+        {
+            if (_billsSplit is null || _billsSplit.IsDisposed)
+                return;
+
+            var show = _imports.RowCount > 0;
+            if (_billsSplit.Panel2Collapsed == !show)
+                return;
+
+            if (!show)
+            {
+                _importSplitPending = false;
+                _billsSplit.Panel2Collapsed = true;
+                return;
+            }
+
+            _importSplitPending = true;
+            _billsSplit.Panel2Collapsed = false;
+            TryApplyImportSplit();
+        }
+
+        private void TryApplyImportSplit()
+        {
+            if (!_importSplitPending || _billsSplit is null || _billsSplit.Panel2Collapsed || !_billsSplit.IsHandleCreated)
+                return;
+
+            const int min = 180;
+            var available = _billsSplit.Width - _billsSplit.SplitterWidth;
+            if (available < min * 2)
+                return;
+
+            _billsSplit.Panel1MinSize = min;
+            _billsSplit.Panel2MinSize = min;
+            _billsSplit.SplitterDistance = available / 2;
+            _importSplitPending = false;
         }
 
         private void ConfigureGrid()
@@ -261,6 +329,16 @@ namespace THMS.UI.WinForms.Controls
                 e.Cancel = true;
                 return;
             }
+
+            var edit = new ToolStripMenuItem("Edit");
+            edit.Enabled = CanEdit(row);
+            edit.Click += (_, _) => EditBill(row);
+            _menu.Items.Add(edit);
+
+            var delete = new ToolStripMenuItem("Delete");
+            delete.Enabled = CanDelete(row);
+            delete.Click += (_, _) => DeleteBill(row);
+            _menu.Items.Add(delete);
 
             var scheduled = row.Status == BillStatuses.Scheduled;
             var pay = new ToolStripMenuItem("Pay");
@@ -444,16 +522,166 @@ namespace THMS.UI.WinForms.Controls
             if (e.RowIndex < 0 || e.ColumnIndex < 0)
                 return;
             var column = _grid.Columns[e.ColumnIndex].Name;
-            if (column == nameof(BillRow.FundingAccountId))
+            if (column is nameof(BillRow.FundingAccountId) or nameof(BillRow.OtherAccountName))
                 return;
-            if (_grid.Rows[e.RowIndex].DataBoundItem is not BillRow row)
+            if (_grid.Rows[e.RowIndex].DataBoundItem is not BillRow row || !CanEdit(row))
                 return;
 
             _grid.EndEdit();
-            var draft = _orchestrator.LoadBill(row);
-            if (draft is null)
+            EditBill(row);
+        }
+
+        private void EditBill(BillRow row)
+        {
+            if (row.Kind == BillKinds.Statement || row.Source == PaymentIntentSource.Statement)
+            {
+                EditStatement(row);
                 return;
-            ShowBillDialog(draft);
+            }
+
+            if (row.Source == PaymentIntentSource.RecurringSingle && row.SourceId is Guid singleId)
+            {
+                EditSingleRule(singleId);
+                return;
+            }
+
+            if (row.Source == PaymentIntentSource.RecurringTransfer && row.SourceId is Guid transferRuleId)
+            {
+                EditTransferRule(transferRuleId);
+                return;
+            }
+
+            if (row.IntentId is Guid expectedId)
+                EditExpected(expectedId);
+        }
+
+        private static bool CanEdit(BillRow row)
+        {
+            if (row.Kind == BillKinds.Statement || row.Source == PaymentIntentSource.Statement)
+                return row.StatementId is Guid || row.SourceId is Guid;
+            if (row.Source is PaymentIntentSource.RecurringSingle or PaymentIntentSource.RecurringTransfer)
+                return row.SourceId is Guid;
+            return row.Source == PaymentIntentSource.Manual && row.IntentId is Guid;
+        }
+
+        private void EditStatement(BillRow row)
+        {
+            if ((row.StatementId ?? row.SourceId) is not Guid statementId)
+                return;
+
+            var statement = _planning.GetStatement(statementId);
+            if (statement is null)
+            {
+                MessageBox.Show(FindForm(), "The selected statement was not found.", "Edit Statement",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var account = _planning.GetAccounts().FirstOrDefault(item => item.Id == statement.AccountId);
+            using var dialog = new StatementEditorDialog(_planning, statement, account);
+            if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+                return;
+
+            Reload();
+            DataChanged?.Invoke(this, EventArgs.Empty);
+            StatementChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void EditSingleRule(Guid ruleId)
+        {
+            var rule = _rules.GetSingleRule(ruleId);
+            if (rule is null)
+            {
+                MessageBox.Show(FindForm(), "The recurring rule was not found.", "Edit",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using var editor = new RecurringRuleEditor(rule.AccountId, rule);
+            if (editor.ShowDialog(FindForm()) != DialogResult.OK)
+                return;
+
+            FinishEdit();
+        }
+
+        private void EditTransferRule(Guid ruleId)
+        {
+            var rule = _rules.GetTransferRule(ruleId);
+            if (rule is null)
+            {
+                MessageBox.Show(FindForm(), "The recurring rule was not found.", "Edit",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using var editor = new RecurringRuleEditor(rule.FromAccountId, existingTransfer: rule);
+            if (editor.ShowDialog(FindForm()) != DialogResult.OK)
+                return;
+
+            FinishEdit();
+        }
+
+        private void EditExpected(Guid expectedId)
+        {
+            var parent = _transactions.GetParent(expectedId);
+            if (parent is not (FutureSingleTransaction or FutureTransferTransaction))
+            {
+                MessageBox.Show(FindForm(), "That bill cannot be edited.", "Edit",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var categories = _categories.GetActiveCategories().ToList();
+            if (parent.CategoryId is Guid categoryId && categories.All(item => item.Id != categoryId))
+            {
+                var current = _categories.GetCategory(categoryId);
+                if (current is not null)
+                    categories.Add(current);
+            }
+
+            var hint = parent switch
+            {
+                FutureTransferTransaction => "Amount is the size of the transfer.",
+                _ => "Negative amounts leave this account. Positive amounts are deposits."
+            };
+            if (parent.HasSplits)
+                hint += " Amount and category are changed from Split Transaction.";
+
+            using var dialog = new AccountEntryDialog(
+                "Edit Transaction",
+                hint,
+                categories,
+                defaultDescription: parent.Description,
+                initialAmount: parent.Amount,
+                initialDate: parent.Date,
+                initialCategoryId: parent.CategoryId,
+                lockAmount: parent.HasSplits,
+                lockCategory: parent.HasSplits,
+                categoryIsSplit: parent.HasSplits);
+            if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+                return;
+
+            try
+            {
+                _activity.UpdateLedgerEntry(
+                    parent.Id,
+                    dialog.Date,
+                    dialog.Amount,
+                    dialog.Description,
+                    dialog.CategoryId);
+                FinishEdit();
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(FindForm(), ex.Message, "Edit Transaction",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void FinishEdit()
+        {
+            Reload();
+            DataChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private void ShowBillDialog(BillDraft? existing)
@@ -509,31 +737,55 @@ namespace THMS.UI.WinForms.Controls
             if (SelectedDeletable() is not BillRow row)
                 return;
 
+            DeleteBill(row);
+        }
+
+        private void DeleteBill(BillRow row)
+        {
+            if (!CanDelete(row))
+                return;
+
             var name = string.IsNullOrWhiteSpace(row.Notes) ? row.Kind : row.Notes;
+            var statement = row.Kind == BillKinds.Statement || row.Source == PaymentIntentSource.Statement;
+            var prompt = statement
+                ? $"Remove '{name}' from Bills? The statement stays on the account."
+                : $"Delete '{name}'?";
             if (MessageBox.Show(
                     FindForm(),
-                    $"Delete '{name}'?",
+                    prompt,
                     "Delete",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning) != DialogResult.Yes)
                 return;
 
-            if (row.Source == PaymentIntentSource.RecurringSingle && row.SourceId is Guid singleId)
-                _rules.DeleteSingleRule(singleId);
-            else if (row.Source == PaymentIntentSource.RecurringTransfer && row.SourceId is Guid transferRuleId)
-                _rules.DeleteTransferRule(transferRuleId);
-            else if (row.IntentId is Guid expectedId)
-                _orchestrator.DeleteEnteredBill(expectedId);
+            try
+            {
+                if (statement && (row.StatementId ?? row.SourceId) is Guid statementId)
+                    _orchestrator.RemoveStatementBill(statementId);
+                else if (row.Source == PaymentIntentSource.RecurringSingle && row.SourceId is Guid singleId)
+                    _rules.DeleteSingleRule(singleId);
+                else if (row.Source == PaymentIntentSource.RecurringTransfer && row.SourceId is Guid transferRuleId)
+                    _rules.DeleteTransferRule(transferRuleId);
+                else if (row.IntentId is Guid expectedId)
+                    _orchestrator.DeleteEnteredBill(expectedId);
 
-            Reload();
-            DataChanged?.Invoke(this, EventArgs.Empty);
+                Reload();
+                DataChanged?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(FindForm(), ex.Message, "Delete",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private BillRow? SelectedDeletable() =>
             _grid.CurrentRow?.DataBoundItem is BillRow row && CanDelete(row) ? row : null;
 
         private static bool CanDelete(BillRow row) =>
-            (row.Source is PaymentIntentSource.RecurringSingle or PaymentIntentSource.RecurringTransfer
+            ((row.Kind == BillKinds.Statement || row.Source == PaymentIntentSource.Statement)
+                && (row.StatementId is Guid || row.SourceId is Guid))
+            || (row.Source is PaymentIntentSource.RecurringSingle or PaymentIntentSource.RecurringTransfer
                 && row.SourceId is Guid)
             || (row.Source == PaymentIntentSource.Manual && row.IntentId is Guid);
 

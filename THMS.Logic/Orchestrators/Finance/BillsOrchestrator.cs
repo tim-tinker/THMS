@@ -53,6 +53,7 @@ namespace THMS.Logic.Orchestrators.Finance
 
             var latest = PayableStatements.Latest(_statements.GetForAccount(accountId));
             if (latest is not null
+                && !latest.BillCleared
                 && !IsCovered(PaymentIntentSource.Statement, latest.Id, latest.AccountId, latest.DueDate.Date, asOfDate))
             {
                 rows.Add(new BillRow
@@ -113,6 +114,7 @@ namespace THMS.Logic.Orchestrators.Finance
                     continue;
                 if (accountId == rule.ToAccountId
                     && latest is not null
+                    && !latest.BillCleared
                     && !IsCovered(PaymentIntentSource.Statement, latest.Id, latest.AccountId, latest.DueDate.Date, asOfDate))
                     continue;
 
@@ -333,6 +335,25 @@ namespace THMS.Logic.Orchestrators.Finance
         {
             _transactions.EnsureDefaultCategories();
             return _transactions.GetAllCategories().OrderBy(c => c.Name).ToList();
+        }
+
+        public void RemoveStatementBill(Guid statementId)
+        {
+            var statement = _statements.Get(statementId)
+                ?? throw new InvalidOperationException("Statement was not found.");
+            statement.BillCleared = true;
+            _statements.Save(statement);
+
+            foreach (var expected in UnmatchedTransfers()
+                         .Where(item => item.Origin == ExpectedOrigin.StatementPay
+                             && (item.OriginId == statementId || item.StatementId == statementId))
+                         .ToList())
+                _transactions.DeleteFutureTransferTransaction(expected.Id);
+
+            foreach (var expected in UnmatchedSingles()
+                         .Where(item => item.Origin == ExpectedOrigin.StatementPay && item.OriginId == statementId)
+                         .ToList())
+                _transactions.DeleteFutureSingleTransaction(expected.Id);
         }
 
         public void DeleteEnteredBill(Guid expectedId)

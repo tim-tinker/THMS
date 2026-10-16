@@ -63,17 +63,27 @@ namespace THMS.Logic.Orchestrators
             if (error is not null)
                 throw new InvalidOperationException(error);
 
-            var seen = _transactions.GetPostedTransactions(accountId)
-                .Concat<PostedTransaction>(_transactions.GetPostedTransferTransactions(accountId))
-                .Select(posted => Key(posted.Date, posted.Amount, posted.Description))
-                .ToHashSet();
+            var seen = new Dictionary<DuplicateKey, bool>();
+            foreach (var posted in _transactions.GetPostedTransactions(accountId)
+                         .Concat<PostedTransaction>(_transactions.GetPostedTransferTransactions(accountId)))
+            {
+                var key = Key(posted.Date, posted.Amount, posted.Description);
+                var unreconciled = posted.ImportedStatus == ImportedStatus.Unreconciled;
+                seen[key] = seen.TryGetValue(key, out var already) ? already || unreconciled : unreconciled;
+            }
 
             var rows = new List<TransactionFileImportRow>();
             foreach (var mapped in _reader.Apply(sheet, map))
             {
                 var duplicate = false;
+                var duplicateIsUnreconciled = false;
                 if (mapped.Problem is null && mapped.Date is DateTime date && mapped.Amount is decimal amount)
-                    duplicate = !seen.Add(Key(date, amount, mapped.Description));
+                {
+                    var key = Key(date, amount, mapped.Description);
+                    duplicate = seen.TryGetValue(key, out duplicateIsUnreconciled);
+                    if (!duplicate)
+                        seen[key] = false;
+                }
 
                 rows.Add(new TransactionFileImportRow
                 {
@@ -83,6 +93,7 @@ namespace THMS.Logic.Orchestrators
                     Amount = mapped.Amount,
                     Problem = mapped.Problem,
                     IsDuplicate = duplicate,
+                    DuplicateIsUnreconciled = duplicate && duplicateIsUnreconciled,
                     Import = mapped.Problem is null && !duplicate
                 });
             }

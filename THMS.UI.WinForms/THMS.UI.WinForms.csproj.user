@@ -136,6 +136,9 @@
     <Compile Update="Controls\TransactionUpdaterControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Update="Controls\UnreconciledImportsControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Update="Controls\VcrControl.cs">
       <SubType>UserControl</SubType>
     </Compile>

@@ -23,12 +23,6 @@ namespace THMS.UI.WinForms.Controls
         private readonly TransactionOrchestrator _txOrchestrator = new();
         private readonly RecurringRuleOrchestrator _ruleOrchestrator = new();
         private readonly ReconciliationOrchestrator _reconciliationOrchestrator = new();
-        private readonly BindingSource _importedSource = new();
-        private DataGridView importedGrid = null!;
-        private SplitContainer? _ledgerSplit;
-        private bool _importedSplitPending;
-        private Guid? _focusAfterReconcileAccountId;
-        private Label? lblImported;
         private readonly CategoryOrchestrator _categoryOrchestrator = new();
         private readonly AccountActivityOrchestrator _activityOrchestrator = new();
         private readonly IAccountStatementDataStore _statements = new DataStoreFactory().GetAccountStatementStore();
@@ -201,17 +195,39 @@ namespace THMS.UI.WinForms.Controls
             masterGrid.CellContentClick += OnAccountWebsiteClicked;
             masterGrid.CellFormatting += OnAccountGridCellFormatting;
 
-            detailGrid.CellDoubleClick += OnTransactionCellDoubleClick;
-            detailGrid.KeyDown += OnTransactionGridKeyDown;
-            detailGrid.CellMouseClick += OnCategoryCellMouseClick;
+            detailGrid.CellDoubleClick += (_, e) => OnTransactionDoubleClick(detailGrid, CategoryColumn, e, includeRules: true);
+            detailGrid.KeyDown += (_, e) => OnTransactionKeyDown(detailGrid, CategoryColumn, e, includeRules: true);
+            detailGrid.CellMouseClick += (_, e) => OnCategoryCellMouseClick(detailGrid, CategoryColumn, e);
             detailGrid.ColumnHeaderMouseClick += OnLedgerHeaderMouseClick;
             detailGrid.CellFormatting += OnLedgerCellFormatting;
             detailGrid.SelectionChanged += (_, _) => UpdateRuleActionButtons();
-            detailGrid.MouseDown += OnLedgerMouseDown;
-            detailGrid.AllowDrop = true;
-            detailGrid.DragEnter += OnLedgerDrag;
-            detailGrid.DragOver += OnLedgerDrag;
-            detailGrid.DragDrop += OnLedgerDragDrop;
+            detailGrid.MouseDown += (_, e) => OnTransactionMouseDown(detailGrid, e, includeRules: true);
+            AttachTransactionDrop(detailGrid, () => CurrentAccountId);
+        }
+
+        public void AttachTransactionActions(DataGridView grid, Func<Guid?> accountId)
+        {
+            ArgumentNullException.ThrowIfNull(grid);
+            ArgumentNullException.ThrowIfNull(accountId);
+            grid.MultiSelect = true;
+            grid.ReadOnly = true;
+            grid.EditMode = DataGridViewEditMode.EditProgrammatically;
+            var category = grid.Columns
+                .Cast<DataGridViewColumn>()
+                .FirstOrDefault(column => column.DataPropertyName == nameof(UnifiedTransactionView.Category));
+            grid.MouseDown += (_, e) => OnTransactionMouseDown(grid, e, includeRules: false);
+            grid.CellDoubleClick += (_, e) => OnTransactionDoubleClick(grid, category, e, includeRules: false);
+            grid.CellMouseClick += (_, e) => OnCategoryCellMouseClick(grid, category, e);
+            grid.KeyDown += (_, e) => OnTransactionKeyDown(grid, category, e, includeRules: false);
+            AttachTransactionDrop(grid, accountId);
+        }
+
+        private void AttachTransactionDrop(DataGridView grid, Func<Guid?> accountId)
+        {
+            grid.AllowDrop = true;
+            grid.DragEnter += (_, e) => OnTransactionDrag(e, accountId);
+            grid.DragOver += (_, e) => OnTransactionDrag(e, accountId);
+            grid.DragDrop += (_, e) => OnTransactionDragDrop(e, accountId);
         }
 
         private void HostLedgerDetail()
@@ -285,162 +301,10 @@ namespace THMS.UI.WinForms.Controls
 
         private Control BuildTransactionSplit(Control ledgerHeader)
         {
-            importedGrid = new DataGridView
-            {
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                AllowUserToResizeRows = false,
-                AutoGenerateColumns = false,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
-                Dock = DockStyle.Fill,
-                MultiSelect = true,
-                ReadOnly = true,
-                RowHeadersVisible = false,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                ScrollBars = ScrollBars.Both
-            };
-            DataGridViewUtil.EnableDoubleBuffering(importedGrid);
-            var importedDate = TextColumn(nameof(ImportedTransactionView.Date), "Date");
-            importedDate.DefaultCellStyle.Format = "d";
-            importedDate.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-            importedDate.Width = 100;
-            var importedAmount = CurrencyColumn(nameof(ImportedTransactionView.Amount), "Amount");
-            importedAmount.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-            importedAmount.Width = 110;
-            var importedDescription = TextColumn(nameof(ImportedTransactionView.Description), "Description");
-            importedDescription.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-            importedDescription.Width = 180;
-            var importedMatch = TextColumn(nameof(ImportedTransactionView.RecommendedMatch), "Recommended Match");
-            importedMatch.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-            importedMatch.Width = 220;
-            var importedStatus = TextColumn(nameof(ImportedTransactionView.Status), "Status");
-            importedStatus.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-            importedStatus.Width = 120;
-            importedGrid.Columns.AddRange(
-                importedDate,
-                importedAmount,
-                importedDescription,
-                importedMatch,
-                importedStatus);
-            importedGrid.DataError += (_, e) => e.ThrowException = false;
-            importedGrid.Resize += (_, _) => SizeImportedColumns();
-            importedGrid.DataSource = _importedSource;
-            importedGrid.MouseDown += OnImportedMouseDown;
-
-            lblImported = new Label
-            {
-                AutoSize = false,
-                Dock = DockStyle.Fill,
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                Padding = new Padding(8, 0, 8, 0),
-                Text = "Imported (unreconciled)",
-                TextAlign = ContentAlignment.MiddleLeft
-            };
-            var importedHeader = new Panel { Dock = DockStyle.Top };
-            importedHeader.Controls.Add(lblImported);
-            var headerHeight = ledgerHeader.GetPreferredSize(Size.Empty).Height;
-            if (headerHeight > 0)
-                importedHeader.Height = headerHeight;
-            ledgerHeader.SizeChanged += (_, _) =>
-            {
-                if (ledgerHeader.Height > 0 && importedHeader.Height != ledgerHeader.Height)
-                    importedHeader.Height = ledgerHeader.Height;
-            };
-
             var ledgerPanel = new Panel { Dock = DockStyle.Fill };
             ledgerPanel.Controls.Add(detailGrid);
             ledgerPanel.Controls.Add(ledgerHeader);
-
-            var importedPanel = new Panel { Dock = DockStyle.Fill };
-            importedPanel.Controls.Add(importedGrid);
-            importedPanel.Controls.Add(importedHeader);
-
-            var split = new SplitContainer
-            {
-                Dock = DockStyle.Fill,
-                Orientation = Orientation.Vertical,
-                Panel2Collapsed = true
-            };
-            SplitContainerUtil.MakeSplitterVisible(split);
-            split.Panel1.Controls.Add(ledgerPanel);
-            split.Panel2.Controls.Add(importedPanel);
-            split.SizeChanged += (_, _) => TryApplyImportedSplitDistance();
-            _ledgerSplit = split;
-            _importedSource.ListChanged += (_, _) => UpdateImportedSplit();
-            return split;
-        }
-
-        private void UpdateImportedSplit()
-        {
-            if (_ledgerSplit is null || _ledgerSplit.IsDisposed)
-                return;
-
-            var show = _importedSource.Count > 0;
-            if (_ledgerSplit.Panel2Collapsed == !show)
-                return;
-
-            if (!show)
-            {
-                _importedSplitPending = false;
-                _ledgerSplit.Panel2Collapsed = true;
-                return;
-            }
-
-            _importedSplitPending = true;
-            _ledgerSplit.Panel2Collapsed = false;
-            TryApplyImportedSplitDistance();
-        }
-
-        private void TryApplyImportedSplitDistance()
-        {
-            if (!_importedSplitPending || _ledgerSplit is null || _ledgerSplit.Panel2Collapsed || !_ledgerSplit.IsHandleCreated)
-                return;
-
-            const int min = 180;
-            var available = _ledgerSplit.Width - _ledgerSplit.SplitterWidth;
-            if (available < min * 2)
-                return;
-
-            _ledgerSplit.Panel1MinSize = min;
-            _ledgerSplit.Panel2MinSize = min;
-            _ledgerSplit.SplitterDistance = available / 2;
-            _importedSplitPending = false;
-            SizeImportedColumns();
-            importedGrid?.Invalidate();
-        }
-
-        private void SizeImportedColumns()
-        {
-            if (importedGrid is null || importedGrid.IsDisposed || importedGrid.Columns.Count < 5)
-                return;
-
-            const int dateWidth = 100;
-            const int amountWidth = 110;
-            const int statusWidth = 120;
-            var scrollbar = importedGrid.Controls.OfType<VScrollBar>().Any(bar => bar.Visible)
-                ? SystemInformation.VerticalScrollBarWidth
-                : 0;
-            var remaining = importedGrid.ClientSize.Width - dateWidth - amountWidth - statusWidth - scrollbar;
-            if (remaining < 200)
-                return;
-
-            var description = Math.Max(120, remaining * 5 / 11);
-            var match = Math.Max(140, remaining - description);
-            importedGrid.Columns[nameof(ImportedTransactionView.Date)].Width = dateWidth;
-            importedGrid.Columns[nameof(ImportedTransactionView.Amount)].Width = amountWidth;
-            importedGrid.Columns[nameof(ImportedTransactionView.Description)].Width = description;
-            importedGrid.Columns[nameof(ImportedTransactionView.RecommendedMatch)].Width = match;
-            importedGrid.Columns[nameof(ImportedTransactionView.Status)].Width = statusWidth;
-        }
-
-        private static DataGridViewTextBoxColumn TextColumn(string property, string header) =>
-            new() { DataPropertyName = property, HeaderText = header, Name = property };
-
-        private static DataGridViewTextBoxColumn CurrencyColumn(string property, string header)
-        {
-            var column = TextColumn(property, header);
-            column.DefaultCellStyle.Format = "c2";
-            return column;
+            return ledgerPanel;
         }
 
         private void LoadAccounts()
@@ -499,197 +363,40 @@ namespace THMS.UI.WinForms.Controls
             RefreshCurrentAccount();
         }
 
-        private void ClearImportedWaitCursor()
-        {
-            if (importedGrid is null || importedGrid.Cursor != Cursors.WaitCursor)
-                return;
-
-            importedGrid.Cursor = Cursors.Default;
-            Cursor.Current = Cursors.Default;
-        }
-
-        private void LoadImported(Guid accountId)
-        {
-            if (importedGrid is null)
-                return;
-
-            var previousIds = ImportedRowIds();
-            var topId = TopImportedRowId(previousIds);
-            var rows = _reconciliationOrchestrator.GetUnreconciled(accountId);
-            _importedSource.DataSource = rows;
-            if (lblImported is not null)
-                lblImported.Text = rows.Count == 0
-                    ? "Imported (none unreconciled)"
-                    : $"Imported (unreconciled) — {rows.Count}";
-            RestoreImportedScroll(topId, previousIds, rows);
-        }
-
-        private List<Guid> ImportedRowIds()
-        {
-            var ids = new List<Guid>();
-            if (importedGrid is null)
-                return ids;
-
-            foreach (DataGridViewRow row in importedGrid.Rows)
-            {
-                if (row.DataBoundItem is ImportedTransactionView view)
-                    ids.Add(view.Id);
-            }
-
-            return ids;
-        }
-
-        private Guid? TopImportedRowId(IReadOnlyList<Guid> ids)
-        {
-            if (importedGrid is null || ids.Count == 0)
-                return null;
-
-            var index = importedGrid.FirstDisplayedScrollingRowIndex;
-            return index >= 0 && index < ids.Count ? ids[index] : null;
-        }
-
-        private void RestoreImportedScroll(
-            Guid? topId,
-            IReadOnlyList<Guid> previousIds,
-            IReadOnlyList<ImportedTransactionView> rows)
-        {
-            if (importedGrid is null || topId is not Guid anchor || rows.Count == 0)
-                return;
-
-            var index = ImportedAnchorIndex(anchor, previousIds, rows);
-            if (index < 0)
-                return;
-
-            ApplyImportedScroll(index);
-            if (importedGrid.IsHandleCreated)
-                importedGrid.BeginInvoke(() => ApplyImportedScroll(index));
-        }
-
-        private static int ImportedAnchorIndex(
-            Guid topId,
-            IReadOnlyList<Guid> previousIds,
-            IReadOnlyList<ImportedTransactionView> rows)
-        {
-            var indexById = new Dictionary<Guid, int>(rows.Count);
-            for (var i = 0; i < rows.Count; i++)
-                indexById[rows[i].Id] = i;
-
-            if (indexById.TryGetValue(topId, out var index))
-                return index;
-
-            var previousIndex = -1;
-            for (var i = 0; i < previousIds.Count; i++)
-            {
-                if (previousIds[i] == topId)
-                {
-                    previousIndex = i;
-                    break;
-                }
-            }
-
-            if (previousIndex < 0)
-                return -1;
-
-            for (var i = previousIndex + 1; i < previousIds.Count; i++)
-            {
-                if (indexById.TryGetValue(previousIds[i], out index))
-                    return index;
-            }
-
-            return -1;
-        }
-
-        private void ApplyImportedScroll(int firstDisplayed)
-        {
-            if (importedGrid is null || importedGrid.IsDisposed || importedGrid.RowCount == 0)
-                return;
-            if (!importedGrid.IsHandleCreated || importedGrid.DisplayedRowCount(includePartialRow: false) == 0)
-                return;
-
-            var index = Math.Clamp(firstDisplayed, 0, importedGrid.RowCount - 1);
-            if (importedGrid.FirstDisplayedScrollingRowIndex != index)
-                importedGrid.FirstDisplayedScrollingRowIndex = index;
-        }
-
-        private void OnImportedMouseDown(object? sender, MouseEventArgs e)
-        {
-            if (e.Button != MouseButtons.Right || importedGrid is null)
-                return;
-            var hit = importedGrid.HitTest(e.X, e.Y);
-            if (hit.RowIndex >= 0 && !importedGrid.Rows[hit.RowIndex].Selected)
-            {
-                importedGrid.ClearSelection();
-                importedGrid.Rows[hit.RowIndex].Selected = true;
-                if (hit.ColumnIndex >= 0)
-                    importedGrid.CurrentCell = importedGrid[hit.ColumnIndex, hit.RowIndex];
-            }
-
-            var location = e.Location;
-            importedGrid.BeginInvoke(() => ShowImportedMenu(location));
-        }
-
-        private void ShowImportedMenu(Point location)
-        {
-            if (importedGrid is null || importedGrid.IsDisposed)
-                return;
-
-            var selected = SelectedImported().ToList();
-            var menu = new ContextMenuStrip();
-            var accept = new ToolStripMenuItem("Accept Match");
-            accept.Enabled = selected.Count > 0 && selected.All(r => r.RecommendedExpectedId is Guid);
-            accept.Click += (_, _) => AcceptImportedMatches(selected);
-            var change = new ToolStripMenuItem("Change Match");
-            change.Enabled = selected.Count == 1;
-            change.Click += (_, _) => ChangeImportedMatch(selected[0]);
-            var asNew = new ToolStripMenuItem("Accept as New");
-            asNew.Enabled = selected.Count > 0;
-            asNew.Click += (_, _) => AcceptImportedAsNew(selected);
-            var before = new ToolStripMenuItem("Accept all unreconciled up to last statement");
-            before.Enabled = CurrentAccountId is Guid;
-            before.Click += (_, _) => AcceptImportedUpToLastStatement();
-            menu.Items.Add(accept);
-            menu.Items.Add(change);
-            menu.Items.Add(asNew);
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(before);
-            menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
-            menu.Show(importedGrid, location);
-        }
-
-        private void OnLedgerMouseDown(object? sender, MouseEventArgs e)
+        private void OnTransactionMouseDown(DataGridView grid, MouseEventArgs e, bool includeRules)
         {
             if (e.Button != MouseButtons.Right)
                 return;
-            var hit = detailGrid.HitTest(e.X, e.Y);
+            var hit = grid.HitTest(e.X, e.Y);
             if (hit.RowIndex < 0)
                 return;
-            if (!detailGrid.Rows[hit.RowIndex].Selected)
+            if (!grid.Rows[hit.RowIndex].Selected)
             {
-                detailGrid.ClearSelection();
-                detailGrid.Rows[hit.RowIndex].Selected = true;
+                grid.ClearSelection();
+                grid.Rows[hit.RowIndex].Selected = true;
                 if (hit.ColumnIndex >= 0)
-                    detailGrid.CurrentCell = detailGrid[hit.ColumnIndex, hit.RowIndex];
+                    grid.CurrentCell = grid[hit.ColumnIndex, hit.RowIndex];
             }
 
             var rowIndex = hit.RowIndex;
             var location = e.Location;
-            detailGrid.BeginInvoke(() => ShowLedgerMenu(rowIndex, location));
+            grid.BeginInvoke(() => ShowTransactionMenu(grid, rowIndex, location, includeRules));
         }
 
-        private void ShowLedgerMenu(int rowIndex, Point location)
+        private void ShowTransactionMenu(DataGridView grid, int rowIndex, Point location, bool includeRules)
         {
-            if (detailGrid.IsDisposed || rowIndex < 0 || rowIndex >= detailGrid.RowCount)
+            if (grid.IsDisposed || rowIndex < 0 || rowIndex >= grid.RowCount)
                 return;
 
-            var selected = detailGrid.SelectedRows
+            var selected = grid.SelectedRows
                 .Cast<DataGridViewRow>()
                 .Select(r => r.DataBoundItem)
                 .OfType<UnifiedTransactionView>()
                 .ToList();
-            var current = detailGrid.Rows[rowIndex].DataBoundItem as UnifiedTransactionView;
+            var current = grid.Rows[rowIndex].DataBoundItem as UnifiedTransactionView;
 
             var menu = new ContextMenuStrip();
-            if (current is not null && TryGetRule(current, out _, out _))
+            if (includeRules && current is not null && TryGetRule(current, out _, out _))
             {
                 var edit = new ToolStripMenuItem("Edit Rule…");
                 edit.Click += (_, _) => OpenRuleEditor(current);
@@ -749,27 +456,27 @@ namespace THMS.UI.WinForms.Controls
             }
 
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
-            menu.Show(detailGrid, location);
+            menu.Show(grid, location);
         }
 
-        private void OnLedgerDrag(object? sender, DragEventArgs e)
+        private void OnTransactionDrag(DragEventArgs e, Func<Guid?> accountId)
         {
-            e.Effect = DroppedSpreadsheet(e) is not null && CurrentAccountId is Guid
+            e.Effect = DroppedSpreadsheet(e) is not null && accountId() is Guid
                 ? DragDropEffects.Copy
                 : DragDropEffects.None;
         }
 
-        private void OnLedgerDragDrop(object? sender, DragEventArgs e)
+        private void OnTransactionDragDrop(DragEventArgs e, Func<Guid?> accountId)
         {
             e.Effect = DragDropEffects.Copy;
             var path = DroppedSpreadsheet(e);
             if (path is null)
                 return;
 
-            var accountId = CurrentAccountId;
+            var id = accountId();
             // The browser stays inside its drag until this handler returns. Open the
             // modal import only after the drop has completed.
-            BeginInvoke(() => ImportDroppedFile(path, accountId));
+            BeginInvoke(() => ImportDroppedFile(path, id));
         }
 
         private void ImportDroppedFile(string path, Guid? accountId)
@@ -797,92 +504,6 @@ namespace THMS.UI.WinForms.Controls
             return spreadsheets.Count == 1 ? spreadsheets[0] : null;
         }
 
-        private IEnumerable<ImportedTransactionView> SelectedImported()
-        {
-            if (importedGrid is null)
-                yield break;
-            foreach (DataGridViewRow row in importedGrid.SelectedRows)
-            {
-                if (row.DataBoundItem is ImportedTransactionView view)
-                    yield return view;
-            }
-        }
-
-        private void AcceptImportedMatches(IReadOnlyList<ImportedTransactionView> rows) =>
-            ReconcileMany(
-                rows,
-                row => _reconciliationOrchestrator.AcceptMatch(row.Id, refreshBudgets: false),
-                "Accept Match");
-
-        private void AcceptImportedAsNew(IReadOnlyList<ImportedTransactionView> rows) =>
-            ReconcileMany(
-                rows,
-                row => _reconciliationOrchestrator.AcceptAsNew(row.Id, refreshBudgets: false),
-                "Accept as New");
-
-        private void ChangeImportedMatch(ImportedTransactionView imported)
-        {
-            if (CurrentAccountId is not Guid accountId)
-                return;
-            var choices = _reconciliationOrchestrator.GetUnmatchedExpected(accountId).ToList();
-            using var dialog = new ChangeMatchDialog(imported, choices);
-            if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
-                return;
-            try
-            {
-                if (dialog.TreatAsNew)
-                    _reconciliationOrchestrator.AcceptAsNew(imported.Id);
-                else if (dialog.SelectedExpectedId is Guid expectedId)
-                    _reconciliationOrchestrator.AcceptMatch(imported.Id, expectedId);
-                RefreshAll();
-            }
-            catch (InvalidOperationException ex)
-            {
-                MessageBox.Show(FindForm(), ex.Message, "Change Match", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-        }
-
-        private void FocusAfterImportedReconcile()
-        {
-            if (IsDisposed)
-                return;
-
-            var importedOpen = _ledgerSplit is { IsDisposed: false, Panel2Collapsed: false }
-                && importedGrid is { IsDisposed: false, RowCount: > 0 };
-            if (importedOpen)
-            {
-                FocusGrid(importedGrid, selectFirstRow: false);
-                return;
-            }
-
-            FocusGrid(detailGrid, selectFirstRow: true);
-        }
-
-        private static void FocusGrid(DataGridView grid, bool selectFirstRow)
-        {
-            if (grid.IsDisposed || !grid.IsHandleCreated || !grid.Visible)
-                return;
-
-            grid.Focus();
-            if (grid.RowCount == 0)
-                return;
-
-            var column = FirstVisibleColumnIndex(grid);
-            if (column < 0)
-                return;
-
-            if (selectFirstRow)
-            {
-                grid.ClearSelection();
-                grid.CurrentCell = grid[column, 0];
-                grid.Rows[0].Selected = true;
-                return;
-            }
-
-            if (grid.CurrentCell is null || !grid.CurrentCell.Visible)
-                grid.CurrentCell = grid[column, 0];
-        }
-
         private static int FirstVisibleColumnIndex(DataGridView grid)
         {
             foreach (DataGridViewColumn column in grid.Columns)
@@ -892,79 +513,6 @@ namespace THMS.UI.WinForms.Controls
             }
 
             return -1;
-        }
-
-        private void AcceptImportedUpToLastStatement()
-        {
-            if (CurrentAccountId is not Guid accountId)
-                return;
-            var lastStatement = _statements.GetForAccount(accountId)
-                .OrderByDescending(s => s.StatementDate)
-                .Select(s => s.StatementDate.Date)
-                .FirstOrDefault();
-            if (lastStatement == default)
-            {
-                MessageBox.Show(FindForm(),
-                    "This account has no statements. Add a statement before accepting unreconciled transactions up to the last statement date.",
-                    "Accept Unreconciled",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            using var dialog = new AcceptBeforeDateDialog(lastStatement);
-            if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
-                return;
-
-            try
-            {
-                AppStatus.Set("Reconciling transactions...", busy: true);
-                var result = _reconciliationOrchestrator.AcceptAsNewOnOrBefore(
-                    accountId, dialog.OnOrBeforeDate, AppStatus.ForImport());
-                _focusAfterReconcileAccountId = accountId;
-                RefreshAll();
-                AppStatus.Set(ImportStatusText.Reconciled(result));
-            }
-            catch (Exception ex)
-            {
-                _focusAfterReconcileAccountId = null;
-                AppStatus.Set("Reconcile failed.");
-                MessageBox.Show(FindForm(), ex.Message, "Accept Unreconciled",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        }
-
-        private void ReconcileMany(
-            IReadOnlyList<ImportedTransactionView> rows,
-            Action<ImportedTransactionView> accept,
-            string title)
-        {
-            if (rows.Count == 0)
-                return;
-
-            var bulk = rows.Count > 1;
-            try
-            {
-                if (bulk)
-                    AppStatus.Set("Reconciling transactions...", busy: true);
-                var progress = bulk ? AppStatus.ForImport() : null;
-                ImportProgressReporter.Report(progress, 0, rows.Count, activity: "Reconciling", stride: 1);
-                for (var i = 0; i < rows.Count; i++)
-                {
-                    accept(rows[i]);
-                    ImportProgressReporter.Report(progress, i + 1, rows.Count, activity: "Reconciling", stride: 1);
-                }
-
-                _reconciliationOrchestrator.RefreshBudgetsFor(rows.Select(row => row.Id));
-                RefreshAll();
-                if (bulk)
-                    AppStatus.Set(ImportStatusText.Reconciled(ImportResult.FromDates(rows.Count, rows.Select(r => r.Date))));
-            }
-            catch (InvalidOperationException ex)
-            {
-                if (bulk)
-                    AppStatus.Set("Reconcile failed.");
-                MessageBox.Show(FindForm(), ex.Message, title, MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
         }
 
         private void UndoLedgerMatches(IReadOnlyList<UnifiedTransactionView> rows)
@@ -1010,16 +558,7 @@ namespace THMS.UI.WinForms.Controls
                 ShowLoadProgress("Updating grid...");
                 _allTransactions = views;
                 ApplyLedgerRowFilter();
-                LoadImported(accountId);
                 UpdateRuleActionButtons();
-                if (_focusAfterReconcileAccountId is Guid focusAccount && focusAccount != accountId)
-                    _focusAfterReconcileAccountId = null;
-                else if (_focusAfterReconcileAccountId == accountId)
-                {
-                    _focusAfterReconcileAccountId = null;
-                    if (IsHandleCreated)
-                        BeginInvoke(FocusAfterImportedReconcile);
-                }
             }
             catch (OperationCanceledException)
             {
@@ -1244,21 +783,25 @@ namespace THMS.UI.WinForms.Controls
             detailGrid.Refresh();
         }
 
-        private void OnTransactionCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
+        private void OnTransactionDoubleClick(
+            DataGridView grid,
+            DataGridViewColumn? categoryColumn,
+            DataGridViewCellEventArgs e,
+            bool includeRules)
         {
             if (e.RowIndex < 0)
                 return;
 
-            if (IsCategoryColumn(detailGrid, CategoryColumn, e.ColumnIndex))
+            if (categoryColumn is not null && IsCategoryColumn(grid, categoryColumn, e.ColumnIndex))
             {
-                ShowCategoryMenu(detailGrid, CategoryColumn, e.RowIndex);
+                ShowCategoryMenu(grid, categoryColumn, e.RowIndex);
                 return;
             }
 
-            if (detailGrid.Rows[e.RowIndex].DataBoundItem is not UnifiedTransactionView view)
+            if (grid.Rows[e.RowIndex].DataBoundItem is not UnifiedTransactionView view)
                 return;
 
-            if (TryGetRule(view, out _, out _))
+            if (includeRules && TryGetRule(view, out _, out _))
             {
                 OpenRuleEditor(view);
                 return;
@@ -1405,17 +948,17 @@ namespace THMS.UI.WinForms.Controls
         private static string CategoryKey(UnifiedTransactionView view) =>
             ExcelColumnFilterDropDown.Normalize(view.Category);
 
-        private void OnCategoryCellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
+        private void OnCategoryCellMouseClick(DataGridView grid, DataGridViewColumn? categoryColumn, DataGridViewCellMouseEventArgs e)
         {
-            if (e.RowIndex < 0 || !IsCategoryColumn(detailGrid, CategoryColumn, e.ColumnIndex))
+            if (categoryColumn is null || e.RowIndex < 0 || !IsCategoryColumn(grid, categoryColumn, e.ColumnIndex))
                 return;
             if (e.Button != MouseButtons.Left)
                 return;
-            if (!CanEditCategory(detailGrid, e.RowIndex))
+            if (!CanEditCategory(grid, e.RowIndex))
                 return;
 
-            detailGrid.CurrentCell = detailGrid[e.ColumnIndex, e.RowIndex];
-            ShowCategoryMenu(detailGrid, CategoryColumn, e.RowIndex);
+            grid.CurrentCell = grid[e.ColumnIndex, e.RowIndex];
+            ShowCategoryMenu(grid, categoryColumn, e.RowIndex);
         }
 
         private static bool IsCategoryColumn(DataGridView grid, DataGridViewColumn categoryColumn, int columnIndex) =>
@@ -1487,14 +1030,19 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
-        private void OnTransactionGridKeyDown(object? sender, KeyEventArgs e)
+        private void OnTransactionKeyDown(
+            DataGridView grid,
+            DataGridViewColumn? categoryColumn,
+            KeyEventArgs e,
+            bool includeRules)
         {
-            if (detailGrid.CurrentCell is { RowIndex: >= 0 } cell
-                && IsCategoryColumn(detailGrid, CategoryColumn, cell.ColumnIndex)
+            if (categoryColumn is not null
+                && grid.CurrentCell is { RowIndex: >= 0 } cell
+                && IsCategoryColumn(grid, categoryColumn, cell.ColumnIndex)
                 && e.KeyCode is Keys.F2 or Keys.Enter or Keys.Space
-                && CanEditCategory(detailGrid, cell.RowIndex))
+                && CanEditCategory(grid, cell.RowIndex))
             {
-                ShowCategoryMenu(detailGrid, CategoryColumn, cell.RowIndex);
+                ShowCategoryMenu(grid, categoryColumn, cell.RowIndex);
                 e.Handled = true;
                 return;
             }
@@ -1502,16 +1050,16 @@ namespace THMS.UI.WinForms.Controls
             if (e.KeyCode != Keys.Delete)
                 return;
 
-            if (GetSelectedRuleView() is not null)
+            if (includeRules && GetSelectedRuleView() is not null)
             {
                 DeleteSelectedRule();
                 e.Handled = true;
                 return;
             }
 
-            if (detailGrid.CurrentRow?.DataBoundItem is UnifiedTransactionView view && CanEditTransaction(view))
+            if (grid.CurrentRow?.DataBoundItem is UnifiedTransactionView view && CanEditTransaction(view))
             {
-                var targets = detailGrid.SelectedRows
+                var targets = grid.SelectedRows
                     .Cast<DataGridViewRow>()
                     .Select(r => r.DataBoundItem)
                     .OfType<UnifiedTransactionView>()
@@ -1835,7 +1383,6 @@ namespace THMS.UI.WinForms.Controls
             progressLoad.Visible = false;
             lblLoadStatus.Visible = false;
             lblLoadStatus.Text = "";
-            ClearImportedWaitCursor();
         }
 
         private Guid? CurrentAccountId =>

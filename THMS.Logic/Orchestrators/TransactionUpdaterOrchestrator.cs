@@ -83,11 +83,18 @@ namespace THMS.Logic.Orchestrators
 
                 _transferDetector.DetectTransfers(recentPosted);
 
-                foreach (var t in _transferDetector.Detected)
-                    _transactionStore.AddPostedTransferTransaction(t);
+                var savedTransferIds = new HashSet<Guid>();
+                foreach (var transfer in _transferDetector.Detected)
+                {
+                    if (!savedTransferIds.Add(transfer.Id))
+                        continue;
+                    if (_transactionStore.GetPostedTransferTransaction(transfer.Id) is not null)
+                        continue;
+                    _transactionStore.AddPostedTransferTransaction(transfer);
+                }
 
-                foreach (var m in _transferDetector.Matched)
-                    _transactionStore.DeletePostedTransaction(m.Id);
+                foreach (var matchedId in _transferDetector.Matched.Select(matched => matched.Id).Distinct())
+                    _transactionStore.DeletePostedTransaction(matchedId);
 
                 result.TransfersDetected = _transferDetector.Detected.Count;
             }

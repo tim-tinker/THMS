@@ -210,6 +210,7 @@ namespace THMS.Tests.Logic
                     StatementDate = DateTime.Today.AddDays(-15),
                     DueDate = DateTime.Today.AddDays(10),
                     AmountDue = 300,
+                    BillCleared = true,
                     StatementBalance = 300,
                     Promotions = [new()
                     {
@@ -267,6 +268,7 @@ namespace THMS.Tests.Logic
             Assert.That(mortgage.StatementBalance, Is.EqualTo(200000m));
             Assert.That(mortgage.EscrowBalance, Is.EqualTo(1200m));
             var card = (CreditCardStatement)store.Get(statements[3].Id)!;
+            Assert.That(card.BillCleared, Is.True);
             Assert.That(card.Promotions, Has.Count.EqualTo(1));
             Assert.That(card.Promotions[0].Amount, Is.EqualTo(50m));
             Assert.That(card.Promotions[0].CurrentBalance, Is.EqualTo(50m));

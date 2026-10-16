@@ -9,9 +9,12 @@ namespace THMS.Logic.ViewModels.Finance
         public decimal? Amount { get; init; }
         public string? Problem { get; init; }
         public bool IsDuplicate { get; init; }
+        public bool DuplicateIsUnreconciled { get; init; }
 
         public string DateText => Date?.ToString("d") ?? "";
         public string AmountText => Amount?.ToString("C2") ?? "";
-        public string Status => Problem ?? (IsDuplicate ? "Duplicate" : "");
+        public string Status => Problem ?? (IsDuplicate
+            ? DuplicateIsUnreconciled ? "Duplicate of an unreconciled transaction" : "Duplicate"
+            : "");
     }
 }

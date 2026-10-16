@@ -10,6 +10,8 @@ namespace THMS.Domain.Finance.Planning
 
         public decimal AmountDue { get; set; }
 
+        public bool BillCleared { get; set; }
+
         public string? Notes { get; set; }
 
         public abstract StatementType Type { get; }

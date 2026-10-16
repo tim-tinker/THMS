@@ -10,35 +10,38 @@ namespace THMS.Logic.Finance.Transfer
 
         public void DetectTransfers(List<PostedTransaction> posted)
         {
-            // same-date, same-amount, opposite sign heuristic
-            var groups = posted.GroupBy(t => t.Date);
-
-            foreach (var g in groups)
+            var used = new HashSet<Guid>();
+            foreach (var day in posted.GroupBy(t => t.Date.Date))
             {
-                var positives = g.Where(t => t.Amount > 0).ToList();
-                var negatives = g.Where(t => t.Amount < 0).ToList();
+                var positives = day.Where(t => t.Amount > 0).ToList();
+                var negatives = day.Where(t => t.Amount < 0).ToList();
 
-                foreach (var p in positives)
-                    foreach (var n in negatives)
+                foreach (var positive in positives)
+                {
+                    if (!used.Add(positive.Id))
+                        continue;
+
+                    var negative = negatives.FirstOrDefault(candidate =>
+                        candidate.Amount == -positive.Amount
+                        && candidate.AccountId != positive.AccountId
+                        && used.Add(candidate.Id));
+                    if (negative is null)
                     {
-                        if (p.Amount == -n.Amount)
-                        {
-                            // add detected transactions
-                            Detected.Add(new PostedTransferTransaction(
-                                p,
-                                n.Id,
-                                TransferDirection.Incoming));
-
-                            Detected.Add(new PostedTransferTransaction(
-                                n,
-                                p.Id,
-                                TransferDirection.Outgoing));
-
-                            // add matched transactions
-                            Matched.Add(p);
-                            Matched.Add(n);
-                        }
+                        used.Remove(positive.Id);
+                        continue;
                     }
+
+                    Detected.Add(new PostedTransferTransaction(
+                        positive,
+                        negative.Id,
+                        TransferDirection.Incoming));
+                    Detected.Add(new PostedTransferTransaction(
+                        negative,
+                        positive.Id,
+                        TransferDirection.Outgoing));
+                    Matched.Add(positive);
+                    Matched.Add(negative);
+                }
             }
         }
     }

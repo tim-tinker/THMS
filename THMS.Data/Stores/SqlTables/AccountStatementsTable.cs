@@ -24,6 +24,7 @@ namespace THMS.Data.Stores.SqlTables
                     ON AccountStatements (DueDate);";
             cmd.ExecuteNonQuery();
             EnsureColumn(conn, "StatementType", "TEXT NOT NULL DEFAULT 'CreditCard'");
+            EnsureColumn(conn, "BillCleared", "INTEGER NOT NULL DEFAULT 0");
             DropColumnIfExists(conn, "MinimumPayment");
         }
 
@@ -32,16 +33,17 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO AccountStatements
-                (Id, AccountId, StatementDate, DueDate, AmountDue, Notes, StatementType)
+                (Id, AccountId, StatementDate, DueDate, AmountDue, Notes, StatementType, BillCleared)
                 VALUES
-                (@Id, @AccountId, @StatementDate, @DueDate, @AmountDue, @Notes, @StatementType)
+                (@Id, @AccountId, @StatementDate, @DueDate, @AmountDue, @Notes, @StatementType, @BillCleared)
                 ON CONFLICT(Id) DO UPDATE SET
                     AccountId = excluded.AccountId,
                     StatementDate = excluded.StatementDate,
                     DueDate = excluded.DueDate,
                     AmountDue = excluded.AmountDue,
                     Notes = excluded.Notes,
-                    StatementType = excluded.StatementType;";
+                    StatementType = excluded.StatementType,
+                    BillCleared = excluded.BillCleared;";
             cmd.Parameters.AddWithValue("@Id", statement.Id.ToString());
             cmd.Parameters.AddWithValue("@AccountId", statement.AccountId.ToString());
             cmd.Parameters.AddWithValue("@StatementDate", statement.StatementDate);
@@ -49,6 +51,7 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@AmountDue", statement.AmountDue);
             cmd.Parameters.AddWithValue("@Notes", (object?)statement.Notes ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@StatementType", statement.Type.ToString());
+            cmd.Parameters.AddWithValue("@BillCleared", statement.BillCleared ? 1 : 0);
             cmd.ExecuteNonQuery();
         }
 
@@ -92,7 +95,7 @@ namespace THMS.Data.Stores.SqlTables
         }
 
         private const string SelectColumns =
-            "SELECT Id, AccountId, StatementDate, DueDate, AmountDue, Notes, StatementType";
+            "SELECT Id, AccountId, StatementDate, DueDate, AmountDue, Notes, StatementType, BillCleared";
 
         private static List<AccountStatementRow> ReadAll(SqliteCommand cmd)
         {
@@ -112,7 +115,8 @@ namespace THMS.Data.Stores.SqlTables
                 reader.GetDateTime(3),
                 (decimal)(double)reader.GetDouble(4),
                 reader.IsDBNull(5) ? null : reader.GetString(5),
-                reader.IsDBNull(6) ? nameof(StatementType.CreditCard) : reader.GetString(6));
+                reader.IsDBNull(6) ? nameof(StatementType.CreditCard) : reader.GetString(6),
+                !reader.IsDBNull(7) && reader.GetInt64(7) != 0);
         }
 
         private static void EnsureColumn(SqliteConnection conn, string columnName, string columnDef)
@@ -164,5 +168,6 @@ namespace THMS.Data.Stores.SqlTables
         DateTime DueDate,
         decimal AmountDue,
         string? Notes,
-        string StatementType);
+        string StatementType,
+        bool BillCleared);
 }

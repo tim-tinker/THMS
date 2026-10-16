@@ -7,6 +7,7 @@ namespace THMS.UI.WinForms.Controls
     {
         private readonly BindingList<TransactionFileImportRow> _rows;
         private readonly DataGridView _grid = new();
+        private readonly ThmsButton _import = new() { Text = "Import" };
 
         public IReadOnlyList<TransactionFileImportRow> Selected { get; private set; } = [];
 
@@ -31,6 +32,7 @@ namespace THMS.UI.WinForms.Controls
             Controls.Add(buttons);
             Controls.Add(header);
             CancelButton = buttons.Controls.OfType<Button>().First(button => button.DialogResult == DialogResult.Cancel);
+            UpdateImportEnabled();
         }
 
         private Control BuildHeader()
@@ -39,6 +41,8 @@ namespace THMS.UI.WinForms.Controls
             var duplicates = _rows.Count(row => row.IsDuplicate);
             var problems = _rows.Count(row => row.Problem is not null);
             var text = $"{ready} ready to import. {duplicates} look like duplicates and are unchecked. Check a duplicate to import it anyway.";
+            if (_rows.Any(row => row.DuplicateIsUnreconciled))
+                text += " An unreconciled duplicate is already on Bills and does not appear on Statements.";
             if (problems > 0)
                 text += $" {problems} could not be read.";
 
@@ -62,10 +66,9 @@ namespace THMS.UI.WinForms.Controls
                 Padding = new Padding(16, 8, 16, 16)
             };
             var cancel = new ThmsButton { Text = "Cancel", DialogResult = DialogResult.Cancel };
-            var import = new ThmsButton { Text = "Import" };
-            import.Click += OnImport;
+            _import.Click += OnImport;
             panel.Controls.Add(cancel);
-            panel.Controls.Add(import);
+            panel.Controls.Add(_import);
             return panel;
         }
 
@@ -83,6 +86,11 @@ namespace THMS.UI.WinForms.Controls
             {
                 if (_grid.IsCurrentCellDirty)
                     _grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+            };
+            _grid.CellValueChanged += (_, e) =>
+            {
+                if (e.RowIndex >= 0)
+                    UpdateImportEnabled();
             };
             _grid.CellBeginEdit += (_, e) =>
             {
@@ -132,16 +140,16 @@ namespace THMS.UI.WinForms.Controls
                 e.CellStyle.BackColor = Color.FromArgb(255, 243, 205);
         }
 
+        private void UpdateImportEnabled() =>
+            _import.Enabled = _rows.Any(row => row.Import && row.Problem is null);
+
         private void OnImport(object? sender, EventArgs e)
         {
             _grid.EndEdit();
+            UpdateImportEnabled();
             var selected = _rows.Where(row => row.Import && row.Problem is null).ToList();
             if (selected.Count == 0)
-            {
-                MessageBox.Show(this, "Select at least one transaction to import.", Text,
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
-            }
 
             Selected = selected;
             DialogResult = DialogResult.OK;

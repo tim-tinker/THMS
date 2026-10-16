@@ -23,7 +23,6 @@ namespace THMS.UI.WinForms
         private Label lblSelectedAccount;
         private Controls.ThmsTabControl tabs;
         private TabPage tabBills;
-        private TabPage tabLedger;
         private TabPage tabStatements;
         private Controls.BillsControl billsControl;
         private Panel pnlLedger;
@@ -32,6 +31,8 @@ namespace THMS.UI.WinForms
         private DataGridView gridStatements;
         private FlowLayoutPanel pnlStatementButtons;
         private Controls.ThmsButton btnAddStatement;
+        private Label lblDescriptionSearch;
+        private TextBox txtDescriptionSearch;
         private Controls.CategoryManagerControl categoryManager;
         private Controls.HistoryPeriodBar historyBar;
 
@@ -64,7 +65,6 @@ namespace THMS.UI.WinForms
             lblSelectedAccount = new Label();
             tabs = new Controls.ThmsTabControl();
             tabBills = new TabPage();
-            tabLedger = new TabPage();
             tabStatements = new TabPage();
             billsControl = new Controls.BillsControl();
             pnlLedger = new Panel();
@@ -73,6 +73,8 @@ namespace THMS.UI.WinForms
             gridStatements = new DataGridView();
             pnlStatementButtons = new FlowLayoutPanel();
             btnAddStatement = new Controls.ThmsButton();
+            lblDescriptionSearch = new Label();
+            txtDescriptionSearch = new TextBox();
             categoryManager = new Controls.CategoryManagerControl();
             historyBar = new Controls.HistoryPeriodBar();
             ((System.ComponentModel.ISupportInitialize)split).BeginInit();
@@ -85,7 +87,6 @@ namespace THMS.UI.WinForms
             pnlAccountTabs.SuspendLayout();
             tabs.SuspendLayout();
             tabBills.SuspendLayout();
-            tabLedger.SuspendLayout();
             tabStatements.SuspendLayout();
             pnlLedger.SuspendLayout();
             pnlStatements.SuspendLayout();
@@ -190,7 +191,6 @@ namespace THMS.UI.WinForms
             tabs.MaxTabWidth = 220;
             tabs.Name = "tabs";
             tabs.TabPages.Add(tabStatements);
-            tabs.TabPages.Add(tabLedger);
             tabs.TabPages.Add(tabBills);
             //
             // tabBills
@@ -206,19 +206,11 @@ namespace THMS.UI.WinForms
             billsControl.Dock = DockStyle.Fill;
             billsControl.Name = "billsControl";
             //
-            // tabLedger
-            //
-            tabLedger.Controls.Add(pnlLedger);
-            tabLedger.Name = "tabLedger";
-            tabLedger.Padding = new Padding(4);
-            tabLedger.Text = "Ledger";
-            tabLedger.UseVisualStyleBackColor = false;
-            //
             // pnlLedger
             //
             pnlLedger.Controls.Add(ledger);
-            pnlLedger.Dock = DockStyle.Fill;
             pnlLedger.Name = "pnlLedger";
+            pnlLedger.Visible = false;
             //
             // ledger
             //
@@ -283,20 +275,40 @@ namespace THMS.UI.WinForms
             pnlStatementButtons.AutoSize = true;
             pnlStatementButtons.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             pnlStatementButtons.Controls.Add(btnAddStatement);
+            pnlStatementButtons.Controls.Add(lblDescriptionSearch);
+            pnlStatementButtons.Controls.Add(txtDescriptionSearch);
             pnlStatementButtons.Dock = DockStyle.Bottom;
             pnlStatementButtons.Name = "pnlStatementButtons";
             pnlStatementButtons.Padding = new Padding(12, 12, 12, 16);
-            pnlStatementButtons.WrapContents = true;
+            pnlStatementButtons.WrapContents = false;
             //
             // btnAddStatement
             //
+            btnAddStatement.Margin = new Padding(0, 0, 8, 0);
             btnAddStatement.Name = "btnAddStatement";
-            btnAddStatement.Text = "Add";
+            btnAddStatement.Text = "Add Statement";
             btnAddStatement.Click += OnAddStatement;
+            //
+            // lblDescriptionSearch
+            //
+            lblDescriptionSearch.AutoSize = true;
+            lblDescriptionSearch.Margin = new Padding(16, 8, 6, 0);
+            lblDescriptionSearch.Name = "lblDescriptionSearch";
+            lblDescriptionSearch.Text = "Description:";
+            lblDescriptionSearch.TextAlign = ContentAlignment.MiddleLeft;
+            //
+            // txtDescriptionSearch
+            //
+            txtDescriptionSearch.Margin = new Padding(0, 6, 0, 0);
+            txtDescriptionSearch.Name = "txtDescriptionSearch";
+            txtDescriptionSearch.PlaceholderText = "Search";
+            txtDescriptionSearch.Width = 220;
+            txtDescriptionSearch.TextChanged += OnDescriptionSearchChanged;
             //
             // RegisterForm
             //
             ClientSize = new Size(1100, 760);
+            Controls.Add(pnlLedger);
             Controls.Add(tabsTop);
             Controls.Add(historyBar);
             Controls.Add(menu);
@@ -311,7 +323,6 @@ namespace THMS.UI.WinForms
             tabCategories.ResumeLayout(false);
             tabsTop.ResumeLayout(false);
             tabBills.ResumeLayout(false);
-            tabLedger.ResumeLayout(false);
             tabStatements.ResumeLayout(false);
             tabs.ResumeLayout(false);
             pnlAccountTabs.ResumeLayout(false);

@@ -20,7 +20,12 @@ namespace THMS.UI.WinForms
         private readonly BindingSource _statementsSource = new();
         private readonly BindingSource _statementDetailsSource = new();
         private readonly BindingSource _statementTransactionsSource = new();
+        private static readonly Guid EstimateStatementId = new("f5e5714a-7e00-4e57-a7e0-000000000001");
+        private List<EstimatePeriod> _estimatePeriods = [];
+
         private List<AccountStatement> _accountStatements = [];
+        private List<UnifiedTransactionView> _accountTransactionViews = [];
+        private string _descriptionSearch = "";
         private SplitContainer? _statementColumns;
         private SplitContainer? _statementRows;
         private bool _statementColumnsPending = true;
@@ -36,7 +41,11 @@ namespace THMS.UI.WinForms
             SplitContainerUtil.MakeSplitterVisible(split);
             ledger.HostProvidesAccounts = true;
             categoryManager.Bind(new CategoryOrchestrator(), reload: false);
-            categoryManager.CatalogChanged += (_, _) => ledger.RefreshCurrentAccount();
+            categoryManager.CatalogChanged += (_, _) =>
+            {
+                ledger.RefreshCurrentAccount();
+                RefreshStatementTransactions();
+            };
             ConfigureStatementGrid();
             tabsTop.RecalculateItemSize();
             tabs.RecalculateItemSize();
@@ -58,15 +67,18 @@ namespace THMS.UI.WinForms
             {
                 if (tabs.SelectedTab == tabBills)
                     billsControl.Reload();
-                if (tabs.SelectedTab == tabLedger)
-                    ledger.SelectAccount(accountUpdater.SelectedAccount?.Id);
             };
             billsControl.DataChanged += (_, _) =>
             {
                 accountUpdater.RefreshAccounts();
                 ledger.SelectAccount(accountUpdater.SelectedAccount?.Id);
             };
-            ledger.DataChanged += (_, _) => accountUpdater.RefreshAccounts();
+            billsControl.StatementChanged += (_, _) => LoadStatementsForSelectedAccount();
+            ledger.DataChanged += (_, _) =>
+            {
+                accountUpdater.RefreshAccounts();
+                RefreshStatementTransactions();
+            };
             accountUpdater.SelectedAccountChanged += (_, _) => LoadSelectedAccount();
             historyBar.SelectedPeriodChanged += (_, _) => ApplyHistoryPeriod();
         }
@@ -83,7 +95,7 @@ namespace THMS.UI.WinForms
         public void ShowAccount(Guid accountId)
         {
             tabsTop.SelectedTab = tabAccounts;
-            tabs.SelectedTab = tabLedger;
+            tabs.SelectedTab = tabStatements;
             accountUpdater.SelectAccount(accountId);
         }
 
@@ -106,9 +118,7 @@ namespace THMS.UI.WinForms
 
         private void ApplyHistoryPeriod()
         {
-            var period = historyBar.SelectedPeriod;
-            ledger.SetGridDataSource(period);
-            categoryManager.SetHistoryPeriod(period);
+            categoryManager.SetHistoryPeriod(historyBar.SelectedPeriod);
         }
 
         protected override void OnVisibleChanged(EventArgs e)
@@ -226,12 +236,12 @@ namespace THMS.UI.WinForms
                 TextColumn(nameof(UnifiedTransactionView.Category), "Category"),
                 txDescription);
             gridTransactions.DataSource = _statementTransactionsSource;
+            ledger.AttachTransactionActions(gridTransactions, () => accountUpdater.SelectedAccount?.Id);
 
             var columns = new SplitContainer
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
-                Panel2Collapsed = true,
                 Name = "splitStatementColumns"
             };
             columns.Panel1.Controls.Add(splitStatements);
@@ -284,43 +294,7 @@ namespace THMS.UI.WinForms
             _statementColumnsPending = false;
         }
 
-        private void OnStatementColumnsSized()
-        {
-            if (_statementColumns is null)
-                return;
-
-            var show = _statementTransactionsSource.Count > 0;
-            if (_statementColumns.Panel2Collapsed == show)
-                UpdateTransactionSplit();
-            else
-                TryApplyStatementColumnSplit();
-        }
-
-        private void UpdateTransactionSplit()
-        {
-            if (_statementColumns is null || _statementColumns.IsDisposed)
-                return;
-
-            var show = _statementTransactionsSource.Count > 0;
-            if (_statementColumns.Panel2Collapsed == !show)
-                return;
-
-            try
-            {
-                if (!show)
-                {
-                    _statementColumns.Panel2Collapsed = true;
-                    return;
-                }
-
-                _statementColumns.Panel2Collapsed = false;
-                TryApplyStatementColumnSplit();
-            }
-            catch (InvalidOperationException)
-            {
-                _statementColumnsPending = true;
-            }
-        }
+        private void OnStatementColumnsSized() => TryApplyStatementColumnSplit();
 
         private void OnStatementRowsSized()
         {
@@ -416,71 +390,253 @@ namespace THMS.UI.WinForms
             _loadedRevision = FinanceDataRevision.Current;
         }
 
-        private void LoadStatementsForSelectedAccount()
+        private void OnDescriptionSearchChanged(object? sender, EventArgs e)
+        {
+            _descriptionSearch = txtDescriptionSearch.Text.Trim();
+            ApplyStatementList(SelectedStatementId());
+        }
+
+        private void LoadStatementsForSelectedAccount(bool keepSelection = true)
         {
             var account = accountUpdater.SelectedAccount;
             if (account is null)
             {
                 _accountStatements = [];
-                _statementsSource.DataSource = new List<AccountStatementListRow>();
-                ClearStatementSelection();
+                _accountTransactionViews = [];
                 btnAddStatement.Enabled = false;
+                ApplyStatementList(null);
                 return;
             }
 
-            var canAdd = StatementAccountMatch.ForAccount(account) is not null;
-            btnAddStatement.Enabled = canAdd;
-
+            btnAddStatement.Enabled = StatementAccountMatch.ForAccount(account) is not null;
             _accountStatements = _planningOrchestrator.GetStatementStore().GetForAccount(account.Id).ToList();
-            var rows = _accountStatements
-                .OrderByDescending(s => s.StatementDate)
-                .ThenByDescending(s => s.DueDate)
-                .Select(AccountStatementListRow.From)
-                .ToList();
+            ReloadStatementViews(keepSelection ? SelectedStatementId() : null);
+        }
+
+        private void RefreshStatementTransactions() => ReloadStatementViews(SelectedStatementId());
+
+        private void ReloadStatementViews(Guid? preferStatementId)
+        {
+            var account = accountUpdater.SelectedAccount;
+            if (account is null)
+            {
+                _accountTransactionViews = [];
+                ApplyStatementList(null);
+                return;
+            }
+
+            _accountTransactionViews = BuildAccountTransactionViews(account.Id);
+            ApplyStatementList(preferStatementId);
+        }
+
+        private Guid? SelectedStatementId() =>
+            gridStatements.CurrentRow?.DataBoundItem is AccountStatementListRow row ? row.Id : null;
+
+        private void ApplyStatementList(Guid? preferStatementId)
+        {
+            var ordered = ListedStatements();
+            var visible = string.IsNullOrWhiteSpace(_descriptionSearch)
+                ? ordered
+                : ordered.Where(StatementHasMatch).ToList();
+            var selectId = ChooseStatementId(ordered, visible, preferStatementId);
+
+            if (StatementGridShows(visible))
+            {
+                if (selectId is Guid id && SelectedStatementId() == id)
+                    LoadStatementDetails();
+                else if (selectId is Guid nextId)
+                    SelectStatementRow(nextId);
+                else
+                    ClearStatementSelection();
+                return;
+            }
+
+            var rows = visible.Select(ToStatementRow).ToList();
             _suspendStatementSelection = true;
             try
             {
                 _statementsSource.DataSource = rows;
-                if (rows.Count > 0)
-                    _statementsSource.Position = 0;
+                if (selectId is Guid id)
+                {
+                    var index = rows.FindIndex(row => row.Id == id);
+                    if (index >= 0)
+                        _statementsSource.Position = index;
+                }
             }
             finally
             {
                 _suspendStatementSelection = false;
             }
 
-            if (!canAdd || rows.Count == 0)
-            {
+            if (selectId is Guid statementId)
+                SelectStatementRow(statementId);
+            else
                 ClearStatementSelection();
-                return;
-            }
-
-            SelectFirstStatement();
         }
 
-        private void SelectFirstStatement()
+        private List<ListedStatement> ListedStatements()
         {
-            if (gridStatements.Rows.Count == 0)
+            var ordered = _accountStatements
+                .OrderByDescending(statement => statement.StatementDate)
+                .ThenByDescending(statement => statement.DueDate)
+                .Select(statement => new ListedStatement(statement.Id, statement))
+                .ToList();
+            RebuildEstimatePeriods();
+            foreach (var period in _estimatePeriods)
+                ordered.Insert(0, new ListedStatement(period.Id, null));
+            return ordered;
+        }
+
+        private static Guid? ChooseStatementId(
+            IReadOnlyList<ListedStatement> ordered,
+            IReadOnlyList<ListedStatement> visible,
+            Guid? preferStatementId)
+        {
+            if (visible.Count == 0)
+                return null;
+            if (preferStatementId is Guid prefer && visible.Any(statement => statement.Id == prefer))
+                return prefer;
+
+            if (preferStatementId is Guid current)
             {
-                ClearStatementSelection();
+                var index = -1;
+                for (var i = 0; i < ordered.Count; i++)
+                {
+                    if (ordered[i].Id == current)
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+
+                if (index >= 0)
+                {
+                    for (var i = index + 1; i < ordered.Count; i++)
+                    {
+                        var candidate = ordered[i];
+                        if (visible.Any(statement => statement.Id == candidate.Id))
+                            return candidate.Id;
+                    }
+                }
+            }
+
+            return visible.FirstOrDefault(statement => statement.Statement is not null)?.Id ?? visible[0].Id;
+        }
+
+        private bool StatementGridShows(IReadOnlyList<ListedStatement> visible)
+        {
+            if (gridStatements.Rows.Count != visible.Count)
+                return false;
+
+            for (var i = 0; i < visible.Count; i++)
+            {
+                if (gridStatements.Rows[i].DataBoundItem is not AccountStatementListRow row)
+                    return false;
+
+                var expected = ToStatementRow(visible[i]);
+                if (row.Id != expected.Id || row.StatementDate != expected.StatementDate || row.Notes != expected.Notes)
+                    return false;
+            }
+
+            return true;
+        }
+
+        private AccountStatementListRow ToStatementRow(ListedStatement item)
+        {
+            if (item.Statement is AccountStatement statement)
+                return AccountStatementListRow.From(statement);
+
+            var period = _estimatePeriods.First(candidate => candidate.Id == item.Id);
+            var latest = _accountStatements
+                .OrderByDescending(statement => statement.StatementDate)
+                .ThenByDescending(statement => statement.DueDate)
+                .First();
+            return new AccountStatementListRow
+            {
+                Id = period.Id,
+                Type = AccountStatementListRow.DisplayType(latest.Type),
+                StatementDate = period.End.ToString("d"),
+                Notes = "Estimate"
+            };
+        }
+
+        private void RebuildEstimatePeriods()
+        {
+            _estimatePeriods = [];
+            if (_accountStatements.Count == 0 || _accountTransactionViews.Count == 0)
+                return;
+
+            var latest = _accountStatements.Max(statement => statement.StatementDate.Date);
+            var latestTransaction = _accountTransactionViews.Max(view => view.Date.Date);
+            if (latestTransaction <= latest)
+                return;
+
+            var previousEnd = latest;
+            for (var months = 1; ; months++)
+            {
+                var end = latest.AddMonths(months);
+                if (end <= previousEnd)
+                    break;
+
+                var start = previousEnd.AddDays(1);
+                if (_accountTransactionViews.Any(view => view.Date.Date >= start && view.Date.Date <= end))
+                    _estimatePeriods.Add(new EstimatePeriod(EstimateId(end), start, end));
+
+                if (latestTransaction <= end)
+                    break;
+
+                previousEnd = end;
+            }
+        }
+
+        private static Guid EstimateId(DateTime end)
+        {
+            var bytes = EstimateStatementId.ToByteArray();
+            var day = end.Year * 372 + (end.Month - 1) * 31 + (end.Day - 1);
+            BitConverter.GetBytes(day).CopyTo(bytes, 0);
+            return new Guid(bytes);
+        }
+
+        private bool TryEstimatePeriod(Guid id, out EstimatePeriod period)
+        {
+            foreach (var candidate in _estimatePeriods)
+            {
+                if (candidate.Id != id)
+                    continue;
+
+                period = candidate;
+                return true;
+            }
+
+            period = default;
+            return false;
+        }
+
+        private void SelectStatementRow(Guid statementId)
+        {
+            for (var i = 0; i < gridStatements.Rows.Count; i++)
+            {
+                if (gridStatements.Rows[i].DataBoundItem is not AccountStatementListRow row || row.Id != statementId)
+                    continue;
+
+                gridStatements.Rows[i].Selected = true;
+                var column = gridStatements.Columns.GetFirstColumn(DataGridViewElementStates.Visible);
+                if (column is not null)
+                {
+                    try
+                    {
+                        gridStatements.CurrentCell = gridStatements.Rows[i].Cells[column.Index];
+                    }
+                    catch (InvalidOperationException)
+                    {
+                    }
+                }
+
+                LoadStatementDetails();
                 return;
             }
 
-            var row = gridStatements.Rows[0];
-            row.Selected = true;
-            var column = gridStatements.Columns.GetFirstColumn(DataGridViewElementStates.Visible);
-            if (column is not null)
-            {
-                try
-                {
-                    gridStatements.CurrentCell = row.Cells[column.Index];
-                }
-                catch (InvalidOperationException)
-                {
-                }
-            }
-
-            LoadStatementDetails();
+            ClearStatementSelection();
         }
 
         private void ClearStatementSelection()
@@ -488,7 +644,6 @@ namespace THMS.UI.WinForms
             _statementDetailsSource.DataSource = new List<StatementChildRow>();
             _statementTransactionsSource.DataSource = new List<UnifiedTransactionView>();
             UpdateLineItemsSplit();
-            UpdateTransactionSplit();
         }
 
         private void LoadStatementDetails()
@@ -496,6 +651,14 @@ namespace THMS.UI.WinForms
             if (gridStatements.CurrentRow?.DataBoundItem is not AccountStatementListRow row)
             {
                 ClearStatementSelection();
+                return;
+            }
+
+            if (TryEstimatePeriod(row.Id, out var period))
+            {
+                _statementDetailsSource.DataSource = new List<StatementChildRow>();
+                _statementTransactionsSource.DataSource = TransactionsInWindow(period.Start, period.End);
+                UpdateLineItemsSplit();
                 return;
             }
 
@@ -507,28 +670,17 @@ namespace THMS.UI.WinForms
                 ? new List<UnifiedTransactionView>()
                 : StatementTransactions(statement);
             UpdateLineItemsSplit();
-            UpdateTransactionSplit();
         }
 
-        private List<UnifiedTransactionView> StatementTransactions(AccountStatement statement)
+        private List<UnifiedTransactionView> BuildAccountTransactionViews(Guid accountId)
         {
-            var end = statement.StatementDate.Date;
-            var previous = _accountStatements
-                .Where(item => item.Id != statement.Id && item.StatementDate.Date < end)
-                .Select(item => item.StatementDate.Date)
-                .DefaultIfEmpty(DateTime.MinValue)
-                .Max();
-            var start = previous == DateTime.MinValue ? DateTime.MinValue : previous.AddDays(1);
-            var rangeEnd = end == DateTime.MaxValue.Date ? DateTime.MaxValue : end.AddDays(1).AddTicks(-1);
-            var txs = start <= DateTime.MinValue
-                ? _transactionOrchestrator.GetTransactionsForAccount(statement.AccountId)
-                : _transactionOrchestrator.GetTransactionsForAccount(statement.AccountId, start, rangeEnd);
+            var txs = _transactionOrchestrator.GetTransactionsForAccount(accountId);
             var views = UnifiedTransactionViewBuilder.Build(
                 txs.Posted,
                 txs.PostedTransfers,
                 userFutureSingles: [],
                 userFutureTransfers: [],
-                statement.AccountId,
+                accountId,
                 txs.IncomingTransferSplitPosted,
                 incomingFutureSplitSources: []);
             var names = _categoryOrchestrator.GetAllCategories(includeInactive: true)
@@ -539,9 +691,58 @@ namespace THMS.UI.WinForms
                     view.Category = name;
             }
 
-            return UnifiedTransactionView.OrderForDisplay(
-                views.Where(view => view.Date.Date >= start && view.Date.Date <= end)).ToList();
+            return views;
         }
+
+        private bool StatementHasMatch(ListedStatement item)
+        {
+            if (item.Statement is AccountStatement statement)
+            {
+                var window = StatementWindow(statement);
+                return HasTransactionInWindow(window.Start, window.End);
+            }
+
+            return TryEstimatePeriod(item.Id, out var period) && HasTransactionInWindow(period.Start, period.End);
+        }
+
+        private bool HasTransactionInWindow(DateTime start, DateTime end) =>
+            _accountTransactionViews.Any(view =>
+                view.Date.Date >= start
+                && view.Date.Date <= end
+                && DescriptionMatches(view));
+
+        private List<UnifiedTransactionView> StatementTransactions(AccountStatement statement)
+        {
+            var (start, end) = StatementWindow(statement);
+            return TransactionsInWindow(start, end);
+        }
+
+        private List<UnifiedTransactionView> TransactionsInWindow(DateTime start, DateTime end) =>
+            UnifiedTransactionView.OrderForDisplay(
+                _accountTransactionViews.Where(view =>
+                    view.Date.Date >= start
+                    && view.Date.Date <= end
+                    && DescriptionMatches(view))).ToList();
+
+        private (DateTime Start, DateTime End) StatementWindow(AccountStatement statement)
+        {
+            var end = statement.StatementDate.Date;
+            var previous = _accountStatements
+                .Where(item => item.Id != statement.Id && item.StatementDate.Date < end)
+                .Select(item => item.StatementDate.Date)
+                .DefaultIfEmpty(DateTime.MinValue)
+                .Max();
+            var start = previous == DateTime.MinValue ? DateTime.MinValue : previous.AddDays(1);
+            return (start, end);
+        }
+
+        private bool DescriptionMatches(UnifiedTransactionView view) =>
+            string.IsNullOrWhiteSpace(_descriptionSearch)
+            || (view.Description ?? "").Contains(_descriptionSearch, StringComparison.CurrentCultureIgnoreCase);
+
+        private sealed record ListedStatement(Guid Id, AccountStatement? Statement);
+
+        private readonly record struct EstimatePeriod(Guid Id, DateTime Start, DateTime End);
 
         private void AfterImport()
         {
@@ -709,7 +910,8 @@ namespace THMS.UI.WinForms
             if (e.RowIndex < 0)
                 return;
 
-            if (gridStatements.CurrentRow?.DataBoundItem is not AccountStatementListRow row)
+            if (gridStatements.CurrentRow?.DataBoundItem is not AccountStatementListRow row
+                || TryEstimatePeriod(row.Id, out _))
                 return;
 
             var statement = _planningOrchestrator.GetStatement(row.Id);
@@ -746,7 +948,7 @@ namespace THMS.UI.WinForms
                 if (dlg.ShowDialog(this) != DialogResult.OK)
                     return;
 
-                LoadStatementsForSelectedAccount();
+                LoadStatementsForSelectedAccount(keepSelection: existing is not null);
                 billsControl.Reload();
                 accountUpdater.RefreshAccounts();
             }
@@ -783,7 +985,7 @@ namespace THMS.UI.WinForms
                 }
 
                 var result = import.ImportStatements(rows, AppStatus.ForImport());
-                LoadStatementsForSelectedAccount();
+                LoadStatementsForSelectedAccount(keepSelection: false);
                 billsControl.Reload();
                 accountUpdater.RefreshAccounts();
                 AppStatus.Set(ImportStatusText.Imported(result, "statement", "statements"));

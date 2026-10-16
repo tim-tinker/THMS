@@ -523,6 +523,33 @@ namespace THMS.Tests.Logic
             Assert.That(detector.Detected, Has.Some.Matches<PostedTransferTransaction>(t => t.Direction == TransferDirection.Incoming));
             Assert.That(detector.Detected, Has.Some.Matches<PostedTransferTransaction>(t => t.Direction == TransferDirection.Outgoing));
         }
+
+        [Test]
+        public void DetectTransfers_PairsEachTransactionOnce_AndOnlyAcrossAccounts()
+        {
+            var checking = Guid.NewGuid();
+            var card = Guid.NewGuid();
+            var other = Guid.NewGuid();
+            var date = new DateTime(2026, 9, 25);
+            var sharedPositive = Guid.NewGuid();
+            var posted = new List<PostedTransaction>
+            {
+                new() { Id = sharedPositive, AccountId = card, Date = date, Amount = 200, Description = "Payment" },
+                new() { Id = Guid.NewGuid(), AccountId = checking, Date = date, Amount = -200, Description = "Transfer A" },
+                new() { Id = Guid.NewGuid(), AccountId = other, Date = date, Amount = -200, Description = "Transfer B" },
+                new() { Id = Guid.NewGuid(), AccountId = card, Date = date, Amount = -40, Description = "Same account" },
+                new() { Id = Guid.NewGuid(), AccountId = card, Date = date, Amount = 40, Description = "Same account" }
+            };
+
+            var detector = new TransferDetector();
+            detector.DetectTransfers(posted);
+
+            Assert.That(detector.Detected, Has.Count.EqualTo(2));
+            Assert.That(detector.Detected.Select(t => t.Id).Distinct().Count(), Is.EqualTo(2));
+            Assert.That(detector.Matched, Has.Count.EqualTo(2));
+            Assert.That(detector.Matched.Select(t => t.Id), Does.Contain(sharedPositive));
+            Assert.That(detector.Matched, Has.None.Matches<PostedTransaction>(t => t.Description == "Same account"));
+        }
     }
 
     [TestFixture]

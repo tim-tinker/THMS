@@ -741,6 +741,7 @@ namespace THMS.UI.WinForms.Controls
                 ? statement.StatementDate
                 : dtDueDate.Value.Date;
             statement.AmountDue = amountDue;
+            statement.BillCleared = _existingStatement?.BillCleared ?? false;
             statement.Notes = string.IsNullOrWhiteSpace(txtNotes.Text) ? null : txtNotes.Text.Trim();
             return true;
         }

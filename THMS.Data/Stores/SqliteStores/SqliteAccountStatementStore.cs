@@ -139,6 +139,7 @@ namespace THMS.Data.Stores.SqliteStores
             statement.StatementDate = row.StatementDate;
             statement.DueDate = row.DueDate;
             statement.AmountDue = row.AmountDue;
+            statement.BillCleared = row.BillCleared;
             statement.Notes = row.Notes;
             return statement;
         }
