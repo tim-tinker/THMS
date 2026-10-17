@@ -35,6 +35,12 @@ namespace THMS.Data.Stores
             FinanceDataRevision.NoteChanged();
         }
 
+        public void DeletePostedTransactionRow(Guid id)
+        {
+            _store.DeletePostedRow(id);
+            FinanceDataRevision.NoteChanged();
+        }
+
         public PostedTransaction? GetPostedTransaction(Guid id) =>
             _store.GetPosted(id);
 

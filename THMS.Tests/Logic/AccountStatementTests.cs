@@ -170,7 +170,7 @@ namespace THMS.Tests.Logic
         {
             StatementDate = DateTime.Today,
             DueDate = DateTime.Today,
-            AmountDue = 80,
+            AmountDue = 160,
             Usage = [new() { Type = "kWh", Amount = 400, Rate = 0.20m }],
             Charges = [new() { Description = "Energy", Amount = 80 }]
         };
@@ -229,7 +229,7 @@ namespace THMS.Tests.Logic
                     DueDate = DateTime.Today.AddDays(12),
                     AmountDue = 80,
                     StatementBalance = 49.84m,
-                    Usage = [new() { Type = "kWh", Amount = 400, Rate = 0.20m }],
+                    Usage = [new() { Description = "Electricity", Type = "kWh", Amount = 400, Rate = 0.102345m }],
                     Charges = [new() { Description = "Energy", Amount = 80 }]
                 },
                 new ServiceStatement
@@ -277,7 +277,9 @@ namespace THMS.Tests.Logic
             Assert.That(card.Promotions[0].Type, Is.EqualTo(PromoType.LumpSum));
             var utility = (UtilityStatement)store.Get(statements[4].Id)!;
             Assert.That(utility.StatementBalance, Is.EqualTo(49.84m));
+            Assert.That(utility.Usage[0].Description, Is.EqualTo("Electricity"));
             Assert.That(utility.Usage[0].Amount, Is.EqualTo(400m));
+            Assert.That(utility.Usage[0].Rate, Is.EqualTo(0.102345m));
             Assert.That(utility.Charges[0].Amount, Is.EqualTo(80m));
             Assert.That(((ServiceStatement)store.Get(statements[5].Id)!).Charges[0].Description, Is.EqualTo("Streaming"));
             Assert.That(((InsuranceStatement)store.Get(statements[6].Id)!).AmountDue, Is.EqualTo(110m));
@@ -736,6 +738,24 @@ namespace THMS.Tests.Logic
             Assert.That(billed.Usage, Is.EqualTo("1"));
             Assert.That(billed.Charges, Is.EqualTo("2"));
 
+            var mortgage = AccountStatementListRow.From(new MortgageStatement
+            {
+                StatementDate = new DateTime(2026, 9, 17),
+                DueDate = new DateTime(2026, 10, 12),
+                AmountDue = 25,
+                StatementBalance = 33.81m,
+                EscrowBalance = 1200,
+                Notes = "September"
+            });
+            var editedEscrow = mortgage with { EscrowBalance = 1500m.ToString("c2") };
+            Assert.That(mortgage.SameDisplayedColumns(mortgage), Is.True);
+            Assert.That(mortgage.SameDisplayedColumns(editedEscrow), Is.False);
+            Assert.That(mortgage.SameDisplayedColumns(mortgage with { AmountDue = 40m.ToString("c2") }), Is.False);
+            Assert.That(mortgage.SameDisplayedColumns(mortgage with { StatementBalance = 30m.ToString("c2") }), Is.False);
+            Assert.That(mortgage.SameDisplayedColumns(mortgage with { StatementDate = new DateTime(2026, 10, 17).ToString("d") }), Is.False);
+            Assert.That(mortgage.SameDisplayedColumns(mortgage with { DueDate = new DateTime(2026, 11, 12).ToString("d") }), Is.False);
+            Assert.That(mortgage.SameDisplayedColumns(mortgage with { Notes = "October" }), Is.False);
+
             var service = AccountStatementListRow.From(new ServiceStatement
             {
                 StatementDate = new DateTime(2026, 8, 15),
@@ -774,16 +794,76 @@ namespace THMS.Tests.Logic
 
             var utility = StatementChildRow.From(new UtilityStatement
             {
-                Usage = [new() { Type = "kWh", Amount = 400, Rate = 0.20m }],
+                Usage = [new() { Description = "Electricity", Type = "kWh", Amount = 400, Rate = 0.20m }],
                 Charges = [new() { Description = "Energy", Amount = 80 }]
             });
             Assert.That(utility, Has.Count.EqualTo(2));
             Assert.That(utility[0].Kind, Is.EqualTo("Usage"));
-            Assert.That(utility[0].Description, Is.EqualTo("kWh"));
+            Assert.That(utility[0].Description, Is.EqualTo("Electricity"));
+            Assert.That(utility[0].Amount, Is.EqualTo(80m.ToString("c2")));
+            Assert.That(utility[0].Details, Does.Contain("kWh"));
+            Assert.That(utility[0].Details, Does.Contain(0.20m.ToString("c6")));
             Assert.That(utility[1].Kind, Is.EqualTo("Charge"));
             Assert.That(utility[1].Amount, Is.EqualTo(80m.ToString("c2")));
 
             Assert.That(StatementChildRow.From(new BankStatement()), Is.Empty);
+        }
+
+        [Test]
+        public void Validator_IncludesUsageCostInTheUtilityTotal()
+        {
+            var statement = new UtilityStatement
+            {
+                StatementDate = new DateTime(2026, 10, 15),
+                DueDate = new DateTime(2026, 10, 30),
+                AmountDue = 52.35m,
+                Usage = [new() { Type = "CCF", Amount = 6m, Rate = 1.02500m }],
+                Charges =
+                [
+                    new() { Description = "Customer charge + Tax act 2022", Amount = 25.72m },
+                    new() { Description = "Gas Line Plus", Amount = 10.49m },
+                    new() { Description = "Exterior Electric Line", Amount = 9.99m }
+                ]
+            };
+
+            Assert.That(statement.Usage[0].Cost, Is.EqualTo(6.15m));
+            Assert.That(AccountStatementValidator.Validate(statement), Is.Empty);
+
+            statement.AmountDue = 46.20m;
+            Assert.That(
+                AccountStatementValidator.Validate(statement),
+                Has.Some.Contains(
+                    $"Utility usage and charges ({52.35m:c2}) must equal amount due ({46.20m:c2})."));
+        }
+
+        [Test]
+        public void NextStatementDates_UsesOneMonthAfterThePreviousStatementDate()
+        {
+            var previous = new CreditCardStatement
+            {
+                StatementDate = new DateTime(2026, 9, 16),
+                DueDate = new DateTime(2026, 10, 11)
+            };
+            var older = new CreditCardStatement
+            {
+                StatementDate = new DateTime(2026, 8, 16),
+                DueDate = new DateTime(2026, 9, 11)
+            };
+
+            var dates = NextStatementDates.Suggest([older, previous], new DateTime(2026, 10, 16));
+
+            Assert.That(dates.StatementDate, Is.EqualTo(new DateTime(2026, 10, 16)));
+            Assert.That(dates.DueDate, Is.EqualTo(new DateTime(2026, 11, 11)));
+        }
+
+        [Test]
+        public void NextStatementDates_WithoutHistory_UsesTheTodayOffsets()
+        {
+            var today = new DateTime(2026, 10, 16);
+            var dates = NextStatementDates.Suggest([], today);
+
+            Assert.That(dates.StatementDate, Is.EqualTo(today.AddDays(-15)));
+            Assert.That(dates.DueDate, Is.EqualTo(today.AddDays(15)));
         }
 
         [Test]

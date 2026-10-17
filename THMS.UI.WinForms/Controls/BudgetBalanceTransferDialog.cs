@@ -113,7 +113,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, ex.Message, "Transfer Balance", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Transfer Balance", ex);
             }
         }
 

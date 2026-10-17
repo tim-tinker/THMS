@@ -158,8 +158,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, $"Plaid Link failed.\n{ex.Message}", "Plaid Account Setup",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Plaid Account Setup", ex, "Plaid Link failed.");
                 _status.Text = "Plaid Link failed.";
             }
             finally
@@ -192,8 +191,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, $"Save mapping failed.\n{ex.Message}", "Plaid Account Setup",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Plaid Account Setup", ex, "Save mapping failed.");
                 _status.Text = "Save mapping failed.";
             }
             finally

@@ -997,6 +997,88 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void RunLedgerUpdate_RemovesPostedCopyOfAnExistingTransfer()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var txs = new InMemoryTransactionDataStore();
+            var account = new BankAccount { Name = "Savings", Institution = "Bank", AccountNumber = "1" };
+            accounts.UpsertAccount(account);
+            var sharedId = Guid.NewGuid();
+            txs.AddPostedTransaction(new PostedTransaction
+            {
+                Id = sharedId,
+                AccountId = account.Id,
+                Date = new DateTime(2026, 8, 21),
+                Amount = 1000,
+                Description = "RECURRING TRANSFER",
+                ImportedStatus = ImportedStatus.AcceptedNew
+            });
+            txs.AddPostedTransferTransaction(new PostedTransferTransaction
+            {
+                Id = sharedId,
+                AccountId = account.Id,
+                Date = new DateTime(2026, 8, 21),
+                Amount = 1000,
+                Description = "RECURRING TRANSFER",
+                ImportedStatus = ImportedStatus.AcceptedNew,
+                RelatedPostedTransactionId = Guid.NewGuid()
+            });
+
+            Assert.That(() => new TransactionUpdaterOrchestrator(accounts, txs).RunLedgerUpdate(), Throws.Nothing);
+            Assert.That(txs.GetPostedTransaction(sharedId), Is.Null);
+            Assert.That(txs.GetPostedTransferTransaction(sharedId), Is.Not.Null);
+            Assert.That(txs.GetPostedTransferTransaction(sharedId)!.Amount, Is.EqualTo(1000));
+        }
+
+        [Test]
+        public void RunLedgerUpdate_MovesDetectedTransferOutOfPosted()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var txs = new InMemoryTransactionDataStore();
+            var checking = new BankAccount { Name = "Checking", Institution = "Bank", AccountNumber = "1" };
+            var savings = new BankAccount { Name = "Savings", Institution = "Bank", AccountNumber = "2" };
+            accounts.UpsertAccount(checking);
+            accounts.UpsertAccount(savings);
+
+            var date = DateTime.Today.AddDays(-1);
+            var outgoing = new PostedTransaction
+            {
+                AccountId = checking.Id,
+                Amount = -40,
+                Date = date,
+                Description = "Out"
+            };
+            var incoming = new PostedTransaction
+            {
+                AccountId = savings.Id,
+                Amount = 40,
+                Date = date,
+                Description = "In"
+            };
+            txs.AddPostedTransaction(outgoing);
+            txs.AddPostedTransaction(incoming);
+            txs.AddPostedTransferTransaction(new PostedTransferTransaction
+            {
+                AccountId = checking.Id,
+                Amount = -1,
+                Date = date.AddDays(-10)
+            });
+            txs.AddPostedTransferTransaction(new PostedTransferTransaction
+            {
+                AccountId = savings.Id,
+                Amount = 1,
+                Date = date.AddDays(-10)
+            });
+
+            new TransactionUpdaterOrchestrator(accounts, txs).RunLedgerUpdate();
+
+            Assert.That(txs.GetPostedTransaction(outgoing.Id), Is.Null);
+            Assert.That(txs.GetPostedTransaction(incoming.Id), Is.Null);
+            Assert.That(txs.GetPostedTransferTransaction(outgoing.Id)!.RelatedPostedTransactionId, Is.EqualTo(incoming.Id));
+            Assert.That(txs.GetPostedTransferTransaction(incoming.Id)!.RelatedPostedTransactionId, Is.EqualTo(outgoing.Id));
+        }
+
+        [Test]
         public void RunLedgerUpdate_RecommendsWithoutApplyingMatches()
         {
             var accounts = new InMemoryAccountDataStore();

@@ -92,13 +92,13 @@ namespace THMS.UI.WinForms.Controls
                     break;
 
                 case LoanAccount loan:
-                    numLoanPrincipal.Value = loan.Principal;
+                    numLoanPrincipal.Value = Clamp(numLoanPrincipal, PostedBalanceCalculator.ToDisplayBalance(loan, loan.Principal));
                     numLoanRate.Value = loan.InterestRate;
                     numLoanTerm.Value = loan.TermMonths;
                     break;
 
                 case MortgageAccount mortgage:
-                    numMortPrincipal.Value = mortgage.Principal;
+                    numMortPrincipal.Value = Clamp(numMortPrincipal, PostedBalanceCalculator.ToDisplayBalance(mortgage, mortgage.Principal));
                     numMortRate.Value = mortgage.InterestRate;
                     numMortTerm.Value = mortgage.TermMonths;
                     dtMortNext.Value = PickerDate(dtMortNext, mortgage.NextPaymentDate);
@@ -142,13 +142,13 @@ namespace THMS.UI.WinForms.Controls
                     break;
 
                 case LoanAccount loan:
-                    loan.Principal = numLoanPrincipal.Value;
+                    loan.Principal = PostedBalanceCalculator.ToLedgerBalance(loan, numLoanPrincipal.Value);
                     loan.InterestRate = numLoanRate.Value;
                     loan.TermMonths = (int)numLoanTerm.Value;
                     break;
 
                 case MortgageAccount mortgage:
-                    mortgage.Principal = numMortPrincipal.Value;
+                    mortgage.Principal = PostedBalanceCalculator.ToLedgerBalance(mortgage, numMortPrincipal.Value);
                     mortgage.InterestRate = numMortRate.Value;
                     mortgage.TermMonths = (int)numMortTerm.Value;
                     mortgage.NextPaymentDate = dtMortNext.Value;

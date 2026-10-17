@@ -183,6 +183,45 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void RecommendMatches_KeepsTheTransferWhenTheSameIdIsAlsoPosted()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var account = Guid.NewGuid();
+            var sharedId = Guid.NewGuid();
+            var expected = new FutureSingleTransaction
+            {
+                AccountId = account,
+                Date = DateTime.Today,
+                Amount = -30,
+                Description = "Card payment",
+                Origin = ExpectedOrigin.Manual,
+                Status = ExpectedStatus.Planned
+            };
+            store.AddFutureSingleTransaction(expected);
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                Id = sharedId,
+                AccountId = account,
+                Date = DateTime.Today,
+                Amount = -30,
+                Description = "Card payment",
+                ImportedStatus = ImportedStatus.Unreconciled
+            });
+            store.AddPostedTransferTransaction(new PostedTransferTransaction
+            {
+                Id = sharedId,
+                AccountId = account,
+                Date = DateTime.Today,
+                Amount = -30,
+                Description = "Card payment",
+                ImportedStatus = ImportedStatus.Unreconciled
+            });
+
+            Assert.That(new ReconciliationOrchestrator(store).RecommendMatches(), Is.EqualTo(1));
+            Assert.That(store.GetPostedTransferTransaction(sharedId)!.RecommendedExpectedId, Is.EqualTo(expected.Id));
+        }
+
+        [Test]
         public void AccountIdsWithUnreconciled_IncludesAccountsThatStillHaveImports()
         {
             var store = new InMemoryTransactionDataStore();

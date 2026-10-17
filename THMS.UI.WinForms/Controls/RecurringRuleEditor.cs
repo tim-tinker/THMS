@@ -268,7 +268,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (InvalidOperationException ex)
             {
-                MessageBox.Show(this, ex.Message, "Recurring Rule", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ExceptionDialog.Show(this, "Recurring Rule", ex, icon: MessageBoxIcon.Information);
                 return;
             }
 
@@ -298,7 +298,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (InvalidOperationException ex)
             {
-                MessageBox.Show(this, ex.Message, "Recurring Rule", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ExceptionDialog.Show(this, "Recurring Rule", ex, icon: MessageBoxIcon.Information);
                 return;
             }
 

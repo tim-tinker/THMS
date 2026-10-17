@@ -201,8 +201,7 @@ namespace THMS.UI.WinForms
             catch (Exception ex)
             {
                 AppStatus.Set("Import failed.");
-                MessageBox.Show(this, $"Could not parse the file(s).\n{ex.Message}",
-                    "Import EV Charge Sessions", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Import EV Charge Sessions", ex, "Could not parse the file(s).");
             }
         }
 
@@ -257,8 +256,7 @@ namespace THMS.UI.WinForms
             catch (Exception ex)
             {
                 AppStatus.Set("Import failed.");
-                MessageBox.Show(this, $"Could not parse the file(s).\n{ex.Message}",
-                    "Import Circuit Intervals", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Import Circuit Intervals", ex, "Could not parse the file(s).");
             }
         }
 
@@ -293,8 +291,7 @@ namespace THMS.UI.WinForms
             catch (Exception ex)
             {
                 AppStatus.Set("Import failed.");
-                MessageBox.Show(this, $"Could not parse the file(s).\n{ex.Message}",
-                    "Import Solar Intervals", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Import Solar Intervals", ex, "Could not parse the file(s).");
             }
         }
 

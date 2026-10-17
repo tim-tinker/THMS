@@ -96,12 +96,15 @@ namespace THMS.Logic.Finance.Planning
             foreach (var usage in utility.Usage)
             {
                 if (usage.Amount <= 0)
-                    findings.Add($"Utility usage '{usage.Type}' must have a positive amount.");
+                {
+                    var name = string.IsNullOrWhiteSpace(usage.Description) ? usage.Type : usage.Description.Trim();
+                    findings.Add($"Utility usage '{name}' must have a positive amount.");
+                }
             }
 
-            var chargeSum = utility.Charges.Sum(c => c.Amount);
-            if (!AmountsEqual(chargeSum, utility.AmountDue))
-                findings.Add($"Utility charges ({chargeSum:c2}) must equal amount due ({utility.AmountDue:c2}).");
+            var total = utility.Usage.Sum(usage => usage.Cost) + utility.Charges.Sum(charge => charge.Amount);
+            if (!AmountsEqual(total, utility.AmountDue))
+                findings.Add($"Utility usage and charges ({total:c2}) must equal amount due ({utility.AmountDue:c2}).");
         }
 
         private static void ValidateService(ServiceStatement service, List<string> findings)

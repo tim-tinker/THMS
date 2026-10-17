@@ -178,8 +178,7 @@ namespace THMS.UI.WinForms
             catch (Exception ex)
             {
                 if (!IsDisposed && generation == _refreshGeneration && IsHandleCreated)
-                    BeginInvoke(() => MessageBox.Show(this, ex.Message, "Energy",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                    BeginInvoke(() => ExceptionDialog.Show(this, "Energy", ex));
             }
         }
 

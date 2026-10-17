@@ -1,4 +1,5 @@
 using THMS.Domain.Finance.Accounts;
+using THMS.Logic.Finance.Model;
 
 namespace THMS.Logic.ViewModels.Finance
 {
@@ -29,8 +30,8 @@ namespace THMS.Logic.ViewModels.Finance
                 Apr = AprOf(account),
                 Principal = account switch
                 {
-                    LoanAccount loan => loan.Principal,
-                    MortgageAccount mortgage => mortgage.Principal,
+                    LoanAccount loan => PostedBalanceCalculator.ToDisplayBalance(loan, loan.Principal),
+                    MortgageAccount mortgage => PostedBalanceCalculator.ToDisplayBalance(mortgage, mortgage.Principal),
                     _ => null
                 },
                 TermMonths = account switch
@@ -70,7 +71,7 @@ namespace THMS.Logic.ViewModels.Finance
                     if (Apr.HasValue)
                         loan.InterestRate = Apr.Value;
                     if (Principal.HasValue)
-                        loan.Principal = Principal.Value;
+                        loan.Principal = PostedBalanceCalculator.ToLedgerBalance(loan, Principal.Value);
                     if (TermMonths.HasValue)
                         loan.TermMonths = TermMonths.Value;
                     break;
@@ -78,7 +79,7 @@ namespace THMS.Logic.ViewModels.Finance
                     if (Apr.HasValue)
                         mortgage.InterestRate = Apr.Value;
                     if (Principal.HasValue)
-                        mortgage.Principal = Principal.Value;
+                        mortgage.Principal = PostedBalanceCalculator.ToLedgerBalance(mortgage, Principal.Value);
                     if (TermMonths.HasValue)
                         mortgage.TermMonths = TermMonths.Value;
                     break;

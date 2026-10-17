@@ -73,7 +73,7 @@ namespace THMS.Logic.Orchestrators.Finance
             foreach (var mortgage in accounts.OfType<MortgageAccount>())
             {
                 var missing = new List<string>();
-                if (mortgage.Principal <= 0)
+                if (PostedBalanceCalculator.ToDisplayBalance(mortgage, mortgage.Principal) == 0)
                     missing.Add("principal");
                 if (mortgage.InterestRate <= 0)
                     missing.Add("interest rate");
@@ -200,12 +200,14 @@ namespace THMS.Logic.Orchestrators.Finance
                         findings.Add($"Mismatched statement balance for {account.Name}: statement {card.StatementBalance:c2} vs ledger {owed:c2}");
                     break;
                 case LoanStatement loan when account is LoanAccount loanAccount:
-                    if (Math.Abs(loan.StatementBalance - loanAccount.Principal) > AccountStatementValidator.SumTolerance)
-                        findings.Add($"Mismatched statement balance for {account.Name}: statement {loan.StatementBalance:c2} vs ledger {loanAccount.Principal:c2}");
+                    var loanOwed = PostedBalanceCalculator.ToDisplayBalance(loanAccount, loanAccount.Principal);
+                    if (Math.Abs(loan.StatementBalance - loanOwed) > AccountStatementValidator.SumTolerance)
+                        findings.Add($"Mismatched statement balance for {account.Name}: statement {loan.StatementBalance:c2} vs ledger {loanOwed:c2}");
                     break;
                 case MortgageStatement mortgage when account is MortgageAccount mortgageAccount:
-                    if (Math.Abs(mortgage.StatementBalance - mortgageAccount.Principal) > AccountStatementValidator.SumTolerance)
-                        findings.Add($"Mismatched statement balance for {account.Name}: statement {mortgage.StatementBalance:c2} vs ledger {mortgageAccount.Principal:c2}");
+                    var mortgageOwed = PostedBalanceCalculator.ToDisplayBalance(mortgageAccount, mortgageAccount.Principal);
+                    if (Math.Abs(mortgage.StatementBalance - mortgageOwed) > AccountStatementValidator.SumTolerance)
+                        findings.Add($"Mismatched statement balance for {account.Name}: statement {mortgage.StatementBalance:c2} vs ledger {mortgageOwed:c2}");
                     break;
             }
         }

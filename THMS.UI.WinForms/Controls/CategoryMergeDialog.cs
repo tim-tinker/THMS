@@ -89,7 +89,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, ex.Message, "Merge Categories", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Merge Categories", ex);
             }
         }
 

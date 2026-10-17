@@ -80,6 +80,7 @@ namespace THMS.UI.WinForms
                 RefreshStatementTransactions();
             };
             accountUpdater.SelectedAccountChanged += (_, _) => LoadSelectedAccount();
+            accountUpdater.StatementsChanged += (_, _) => LoadStatementsForSelectedAccount();
             historyBar.SelectedPeriodChanged += (_, _) => ApplyHistoryPeriod();
         }
 
@@ -448,6 +449,7 @@ namespace THMS.UI.WinForms
                     SelectStatementRow(nextId);
                 else
                     ClearStatementSelection();
+                gridStatements.Refresh();
                 return;
             }
 
@@ -456,6 +458,7 @@ namespace THMS.UI.WinForms
             try
             {
                 _statementsSource.DataSource = rows;
+                _statementsSource.ResetBindings(false);
                 if (selectId is Guid id)
                 {
                     var index = rows.FindIndex(row => row.Id == id);
@@ -472,6 +475,7 @@ namespace THMS.UI.WinForms
                 SelectStatementRow(statementId);
             else
                 ClearStatementSelection();
+            gridStatements.Refresh();
         }
 
         private List<ListedStatement> ListedStatements()
@@ -534,12 +538,32 @@ namespace THMS.UI.WinForms
                     return false;
 
                 var expected = ToStatementRow(visible[i]);
-                if (row.Id != expected.Id || row.StatementDate != expected.StatementDate || row.Notes != expected.Notes)
+                if (!row.SameDisplayedColumns(expected) || !CellsShow(gridStatements.Rows[i], expected))
                     return false;
             }
 
             return true;
         }
+
+        private static bool CellsShow(DataGridViewRow gridRow, AccountStatementListRow expected) =>
+            CellShows(gridRow, nameof(AccountStatementListRow.StatementDate), expected.StatementDate)
+            && CellShows(gridRow, nameof(AccountStatementListRow.DueDate), expected.DueDate)
+            && CellShows(gridRow, nameof(AccountStatementListRow.AmountDue), expected.AmountDue)
+            && CellShows(gridRow, nameof(AccountStatementListRow.StatementBalance), expected.StatementBalance)
+            && CellShows(gridRow, nameof(AccountStatementListRow.EscrowBalance), expected.EscrowBalance)
+            && CellShows(gridRow, nameof(AccountStatementListRow.Notes), expected.Notes);
+
+        private static bool CellShows(DataGridViewRow gridRow, string column, string expected)
+        {
+            if (gridRow.DataGridView?.Columns[column] is not DataGridViewColumn found)
+                return false;
+
+            var cell = gridRow.Cells[found.Index];
+            return SameCellText(cell.Value, expected) && SameCellText(cell.FormattedValue, expected);
+        }
+
+        private static bool SameCellText(object? value, string expected) =>
+            string.Equals(value?.ToString() ?? "", expected ?? "", StringComparison.Ordinal);
 
         private AccountStatementListRow ToStatementRow(ListedStatement item)
         {
@@ -801,8 +825,7 @@ namespace THMS.UI.WinForms
             catch (Exception ex)
             {
                 AppStatus.Set("Import failed.");
-                MessageBox.Show(this, $"Could not parse the file(s).\n{ex.Message}", "Import Transactions",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Import Transactions", ex, "Could not parse the file(s).");
             }
         }
 
@@ -821,8 +844,7 @@ namespace THMS.UI.WinForms
             catch (Exception ex)
             {
                 AppStatus.Set("Plaid sync failed.");
-                MessageBox.Show(this, $"Plaid sync failed.\n{ex.Message}", "Plaid",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Plaid", ex, "Plaid sync failed.");
             }
             finally
             {
@@ -861,8 +883,7 @@ namespace THMS.UI.WinForms
             catch (Exception ex)
             {
                 AppStatus.Set("Import failed.");
-                MessageBox.Show(this, $"Could not parse the file.\n{ex.Message}", "Import Transaction Rules",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Import Transaction Rules", ex, "Could not parse the file.");
             }
         }
 
@@ -897,8 +918,7 @@ namespace THMS.UI.WinForms
             catch (Exception ex)
             {
                 AppStatus.Set("Import failed.");
-                MessageBox.Show(this, $"Could not parse the file.\n{ex.Message}", "Import Transfer Rules",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Import Transfer Rules", ex, "Could not parse the file.");
             }
         }
 
@@ -954,8 +974,7 @@ namespace THMS.UI.WinForms
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, ex.Message, existing is null ? "Add Statement" : "Edit Statement",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, existing is null ? "Add Statement" : "Edit Statement", ex);
             }
         }
 
@@ -993,8 +1012,7 @@ namespace THMS.UI.WinForms
             catch (Exception ex)
             {
                 AppStatus.Set("Import failed.");
-                MessageBox.Show(this, $"Could not parse the file.\n{ex.Message}", "Import Statements",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Import Statements", ex, "Could not parse the file.");
             }
         }
     }

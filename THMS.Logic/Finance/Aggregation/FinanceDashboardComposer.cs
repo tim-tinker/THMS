@@ -1,6 +1,7 @@
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Categories;
+using THMS.Logic.Finance.Model;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Logic.Finance.Aggregation
@@ -87,12 +88,14 @@ namespace THMS.Logic.Finance.Aggregation
                         totals.Credits.Add(Line(creditAccount, owed));
                         break;
                     case LoanAccount loan:
-                        totals.Loans += loan.Principal;
-                        totals.LoansAccounts.Add(Line(loan, loan.Principal));
+                        var loanOwed = PostedBalanceCalculator.ToDisplayBalance(loan, loan.Principal);
+                        totals.Loans += loanOwed;
+                        totals.LoansAccounts.Add(Line(loan, loanOwed));
                         break;
                     case MortgageAccount mortgage:
-                        totals.Loans += mortgage.Principal;
-                        totals.LoansAccounts.Add(Line(mortgage, mortgage.Principal));
+                        var mortgageOwed = PostedBalanceCalculator.ToDisplayBalance(mortgage, mortgage.Principal);
+                        totals.Loans += mortgageOwed;
+                        totals.LoansAccounts.Add(Line(mortgage, mortgageOwed));
                         break;
                     case InvestmentAccount invested:
                         totals.Investment += invested.CashBalance;

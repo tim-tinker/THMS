@@ -525,7 +525,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (InvalidOperationException ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Undo Match", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ExceptionDialog.Show(FindForm(), "Undo Match", ex, icon: MessageBoxIcon.Information);
             }
         }
 
@@ -1120,7 +1120,9 @@ namespace THMS.UI.WinForms.Controls
                 initialCategoryId: parent.CategoryId,
                 lockAmount: parent.HasSplits,
                 lockCategory: parent.HasSplits,
-                categoryIsSplit: parent.HasSplits);
+                categoryIsSplit: parent.HasSplits,
+                accounts: _accountOrchestrator.GetAllAccounts().ToList(),
+                existingSplits: parent.Splits);
             if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
 
@@ -1132,13 +1134,14 @@ namespace THMS.UI.WinForms.Controls
                     dialog.Amount,
                     dialog.Description,
                     dialog.CategoryId);
+                if (dialog.HasPendingSplits)
+                    ApplyChosenSplits(parent.Id, dialog.PendingSplits);
                 RefreshAll();
                 DataChanged?.Invoke(this, EventArgs.Empty);
             }
             catch (InvalidOperationException ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Edit Transaction",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ExceptionDialog.Show(FindForm(), "Edit Transaction", ex, icon: MessageBoxIcon.Information);
             }
         }
 
@@ -1164,8 +1167,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (InvalidOperationException ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Delete Transaction",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ExceptionDialog.Show(FindForm(), "Delete Transaction", ex, icon: MessageBoxIcon.Information);
             }
         }
 
@@ -1181,6 +1183,13 @@ namespace THMS.UI.WinForms.Controls
             else if (view.IsSplitRow || parent?.HasSplits == true)
                 prompt += " This removes the whole transaction, including its splits.";
             return prompt;
+        }
+
+        private void ApplyChosenSplits(Guid transactionId, IReadOnlyList<SplitTransactionRow> splits)
+        {
+            var rows = splits.Select(split => split.Clone()).ToList();
+            if (!_txOrchestrator.TryApplyAsWholeTransfer(transactionId, rows))
+                _txOrchestrator.ApplySplits(transactionId, rows);
         }
 
         private static bool CanSplit(UnifiedTransactionView view) =>
@@ -1240,8 +1249,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (InvalidOperationException ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Split Transaction",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ExceptionDialog.Show(FindForm(), "Split Transaction", ex, icon: MessageBoxIcon.Information);
             }
         }
 

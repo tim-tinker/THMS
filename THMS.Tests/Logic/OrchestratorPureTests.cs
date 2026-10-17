@@ -157,6 +157,31 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void TryGetStatementAnchor_ConvertsLoanAndMortgageStatementBalanceToLedgerSpace()
+        {
+            var loan = new LoanAccount();
+            var loanStatement = new LoanStatement
+            {
+                StatementDate = new DateTime(2026, 10, 8),
+                StatementBalance = 27796.27m
+            };
+            Assert.That(PostedBalanceCalculator.TryGetStatementAnchor(loan, loanStatement, out var loanAnchor), Is.True);
+            Assert.That(loanAnchor.LedgerBalance, Is.EqualTo(-27796.27m));
+            Assert.That(PostedBalanceCalculator.ComputeFromAnchor(loanAnchor, 953.86m), Is.EqualTo(-26842.41m));
+            Assert.That(PostedBalanceCalculator.ToDisplayBalance(loan, -26842.41m), Is.EqualTo(26842.41m));
+
+            var mortgage = new MortgageAccount();
+            var mortgageStatement = new MortgageStatement
+            {
+                StatementDate = new DateTime(2026, 10, 5),
+                StatementBalance = 37884.67m,
+                EscrowBalance = 13360.26m
+            };
+            Assert.That(PostedBalanceCalculator.TryGetStatementAnchor(mortgage, mortgageStatement, out var mortgageAnchor), Is.True);
+            Assert.That(mortgageAnchor.LedgerBalance, Is.EqualTo(-37884.67m));
+        }
+
+        [Test]
         public void TryResolveAnchor_SkipsStatementsThatDoNotMatchAccountKind()
         {
             var bank = new BankAccount();
@@ -1142,6 +1167,14 @@ namespace THMS.Tests.Logic
             var bank = new BankAccount { PostedBalance = 400 };
             Assert.That(PostedBalanceCalculator.ToDisplayBalance(bank, 400m), Is.EqualTo(400m));
             Assert.That(PostedBalanceCalculator.ToLedgerPostedDelta(bank, 25m), Is.EqualTo(25m));
+
+            var loan = new LoanAccount { Principal = -8000 };
+            Assert.That(PostedBalanceCalculator.ToDisplayBalance(loan, loan.Principal), Is.EqualTo(8000m));
+            Assert.That(PostedBalanceCalculator.ToLedgerBalance(loan, 8000m), Is.EqualTo(-8000m));
+
+            var mortgage = new MortgageAccount { Principal = -37884.67m };
+            Assert.That(PostedBalanceCalculator.ToDisplayBalance(mortgage, mortgage.Principal), Is.EqualTo(37884.67m));
+            Assert.That(PostedBalanceCalculator.ToLedgerPostedDelta(mortgage, 100m), Is.EqualTo(-100m));
         }
     }
 

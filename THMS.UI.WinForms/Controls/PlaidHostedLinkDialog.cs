@@ -101,8 +101,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, $"Plaid Link failed to open.\n{ex.Message}", Text,
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, Text, ex, "Plaid Link failed to open.");
                 AbortLink();
             }
         }
@@ -148,8 +147,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, $"Plaid Link failed.\n{ex.Message}", Text,
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, Text, ex, "Plaid Link failed.");
                 DialogResult = DialogResult.Cancel;
             }
             finally
@@ -181,8 +179,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, $"Plaid Link failed.\n{ex.Message}", Text,
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, Text, ex, "Plaid Link failed.");
                 DialogResult = DialogResult.Cancel;
             }
             finally

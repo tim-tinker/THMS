@@ -36,6 +36,9 @@ namespace THMS.Data.Stores.InMemoryStores
             DeleteSplits(id);
         }
 
+        public void DeletePostedRow(Guid id) =>
+            _posted.RemoveAll(t => t.Id == id);
+
         public PostedTransaction? GetPosted(Guid id) => Attach(_posted.FirstOrDefault(t => t.Id == id));
 
         public IEnumerable<PostedTransaction> GetPostedByAccount(Guid accountId) =>
@@ -132,7 +135,10 @@ namespace THMS.Data.Stores.InMemoryStores
                     $"Posted transaction {replacement.Id} not found.");
 
             _posted.Remove(existing);
-            _posted.Add(replacement);
+            if (replacement is PostedTransferTransaction transfer)
+                Add(_postedTransfers, transfer);
+            else
+                _posted.Add(replacement);
             PersistIncomingSplits(replacement);
         }
 

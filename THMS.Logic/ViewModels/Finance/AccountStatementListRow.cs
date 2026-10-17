@@ -19,6 +19,15 @@ namespace THMS.Logic.ViewModels.Finance
         public string Charges { get; init; } = NotApplicable;
         public string Notes { get; init; } = "";
 
+        public bool SameDisplayedColumns(AccountStatementListRow other) =>
+            Type == other.Type
+            && StatementDate == other.StatementDate
+            && DueDate == other.DueDate
+            && AmountDue == other.AmountDue
+            && StatementBalance == other.StatementBalance
+            && EscrowBalance == other.EscrowBalance
+            && Notes == other.Notes;
+
         public static AccountStatementListRow From(AccountStatement statement)
         {
             ArgumentNullException.ThrowIfNull(statement);

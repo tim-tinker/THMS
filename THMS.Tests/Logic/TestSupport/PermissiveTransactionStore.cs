@@ -15,6 +15,7 @@ namespace THMS.Tests.Logic.TestSupport
         public void AddPostedTransaction(PostedTransaction transaction) => _inner.AddPostedTransaction(transaction);
         public void UpdatePostedTransaction(PostedTransaction transaction) => _inner.UpdatePostedTransaction(transaction);
         public void DeletePostedTransaction(Guid id) => _inner.DeletePostedTransaction(id);
+        public void DeletePostedTransactionRow(Guid id) => _inner.DeletePostedTransactionRow(id);
         public PostedTransaction? GetPostedTransaction(Guid id) => _inner.GetPostedTransaction(id);
         public IEnumerable<PostedTransaction> GetPostedTransactions(Guid accountId) => _inner.GetPostedTransactions(accountId);
         public IEnumerable<PostedTransaction> GetPostedTransactions(DateTime start, DateTime end) => _inner.GetPostedTransactions(start, end);

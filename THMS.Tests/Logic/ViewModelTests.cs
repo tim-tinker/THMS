@@ -176,8 +176,8 @@ namespace THMS.Tests.Logic
                 new BankAccount { Name = "B", Institution = "I", AccountNumber = "1", PostedBalance = 10, OverdraftLimit = 2, BalanceAsOf = DateTime.Today, WebsiteUrl = "https://bank.example" },
                 new CreditAccount { Name = "C", PostedBalance = 3, CreditLimit = 4, DueDate = DateTime.Today },
                 new InvestmentAccount { Name = "Inv", CashBalance = 5 },
-                new LoanAccount { Name = "L", Principal = 7, InterestRate = 0.05m },
-                new MortgageAccount { Name = "M", Principal = 8, InterestRate = 0.04m, NextPaymentDate = DateTime.Today },
+                new LoanAccount { Name = "L", Principal = -7, InterestRate = 0.05m },
+                new MortgageAccount { Name = "M", Principal = -8, InterestRate = 0.04m, NextPaymentDate = DateTime.Today },
                 new InternalAccount { Name = "Int" },
                 new UntrackedAccount { Name = "Power", Type = AccountType.Utility },
                 new UntrackedAccount { Name = "Lawn", Type = AccountType.Service },
@@ -200,7 +200,9 @@ namespace THMS.Tests.Logic
             Assert.That(views[1].BankCreditAvailable, Is.EqualTo(7));
             Assert.That(views[2].Balance, Is.EqualTo(5));
             Assert.That(views[3].APR, Is.EqualTo(0.05m));
+            Assert.That(views[3].Balance, Is.EqualTo(7));
             Assert.That(views[4].APR, Is.EqualTo(0.04m));
+            Assert.That(views[4].Balance, Is.EqualTo(8));
             Assert.That(views[5].Balance, Is.Null);
             Assert.That(views[0].WebsiteUrl, Is.EqualTo("https://bank.example"));
             Assert.That(views[1].WebsiteUrl, Is.EqualTo(""));

@@ -148,7 +148,7 @@ namespace THMS.Ingestion.Importers.Finance
                     if (TryReadDecimal(reader, aprColumn, out var loanApr))
                         loan.InterestRate = loanApr;
                     if (TryReadDecimal(reader, principalColumn, out var principal))
-                        loan.Principal = principal;
+                        loan.Principal = -principal;
                     if (TryReadInt(reader, termColumn, out var term))
                         loan.TermMonths = term;
                     break;
@@ -157,7 +157,7 @@ namespace THMS.Ingestion.Importers.Finance
                     if (TryReadDecimal(reader, aprColumn, out var mortgageApr))
                         mortgage.InterestRate = mortgageApr;
                     if (TryReadDecimal(reader, principalColumn, out var mPrincipal))
-                        mortgage.Principal = mPrincipal;
+                        mortgage.Principal = -mPrincipal;
                     if (TryReadInt(reader, termColumn, out var mTerm))
                         mortgage.TermMonths = mTerm;
                     break;

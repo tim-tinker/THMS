@@ -81,8 +81,7 @@ namespace THMS.UI.WinForms.Controls
             catch (Exception ex)
             {
                 if (generation == _reloadGeneration && !IsDisposed && IsHandleCreated)
-                    BeginInvoke(() => MessageBox.Show(FindForm(), ex.Message, "Categories",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                    BeginInvoke(() => ExceptionDialog.Show(FindForm(), "Categories", ex));
                 return;
             }
 
@@ -527,8 +526,7 @@ namespace THMS.UI.WinForms.Controls
             catch (Exception ex)
             {
                 AppStatus.Set("Import failed.");
-                MessageBox.Show(FindForm(), $"Could not parse the file.\n{ex.Message}", "Import Categories",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(FindForm(), "Import Categories", ex, "Could not parse the file.");
             }
         }
 
@@ -723,8 +721,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (InvalidOperationException ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Split Transaction",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ExceptionDialog.Show(FindForm(), "Split Transaction", ex, icon: MessageBoxIcon.Information);
             }
         }
 

@@ -61,7 +61,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                ShowError($"Could not parse the file(s).\n{ex.Message}");
+                ShowError(ExceptionDialog.Format(ex, "Could not parse the file(s)."));
                 AppStatus.Set("Import failed.");
             }
         }
@@ -78,7 +78,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                ShowError($"Plaid sync failed.\n{ex.Message}");
+                ShowError(ExceptionDialog.Format(ex, "Plaid sync failed."));
                 AppStatus.Set("Plaid sync failed.");
             }
             finally

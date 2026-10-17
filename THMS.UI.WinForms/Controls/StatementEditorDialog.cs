@@ -15,6 +15,7 @@ namespace THMS.UI.WinForms.Controls
         private readonly Account? _lockedAccount;
         private readonly List<Account> _accounts;
         private bool _loading;
+        private Guid? _datedForAccountId;
 
         private const string StatementFieldsTag = "statement-fields";
 
@@ -71,6 +72,7 @@ namespace THMS.UI.WinForms.Controls
                 _accounts.Add(_lockedAccount);
 
             InitializeComponent();
+            cboAccount.SelectedIndexChanged += OnAccountChanged;
             WireComboDrawing();
             _loading = true;
             BindStatementTypes();
@@ -229,8 +231,6 @@ namespace THMS.UI.WinForms.Controls
         private void LoadExisting()
         {
             _loading = true;
-            dtStatementDate.Value = DateTime.Today.AddDays(-15);
-            dtDueDate.Value = DateTime.Today.AddDays(15);
             numAmountDue.Value = 0;
 
             if (_existingStatement is null)
@@ -241,6 +241,7 @@ namespace THMS.UI.WinForms.Controls
                     SelectType(lockedType);
                     BindAccounts(locked.Id);
                     _loading = false;
+                    ApplyNewStatementDates();
                     LoadTypePanel(lockedType);
                     CopyPreviousPromotions();
                     return;
@@ -249,6 +250,7 @@ namespace THMS.UI.WinForms.Controls
                 cboStatementType.SelectedIndex = -1;
                 BindAccounts();
                 _loading = false;
+                ApplyNewStatementDates();
                 pnlTypeSpecific.Controls.Clear();
                 ShowObligationFields(false);
                 return;
@@ -277,6 +279,31 @@ namespace THMS.UI.WinForms.Controls
                     return;
                 }
             }
+        }
+
+        private void OnAccountChanged(object? sender, EventArgs e)
+        {
+            if (_loading || _existingStatement is not null)
+                return;
+
+            ApplyNewStatementDates();
+            CopyPreviousPromotions();
+        }
+
+        private void ApplyNewStatementDates()
+        {
+            if (_existingStatement is not null)
+                return;
+
+            var account = SelectedAccount() ?? _lockedAccount;
+            if (account is not null && _datedForAccountId == account.Id)
+                return;
+
+            var existing = account is null ? [] : _statementStore.GetForAccount(account.Id);
+            var dates = NextStatementDates.Suggest(existing, DateTime.Today);
+            dtStatementDate.Value = SafeDate(dates.StatementDate);
+            dtDueDate.Value = SafeDate(dates.DueDate);
+            _datedForAccountId = account?.Id;
         }
 
         private void OnStatementTypeChanged(object? sender, EventArgs e)
@@ -314,7 +341,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, ex.Message, "Account", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Account", ex);
                 return;
             }
 
@@ -466,16 +493,22 @@ namespace THMS.UI.WinForms.Controls
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
 
-            gridUsage = CreateGrid();
+            var usage = CreateGrid();
+            usage.AppendRow += (_, _) => AppendUsageRow();
+            gridUsage = usage;
+            gridUsage.Columns.Add(TextColumn(nameof(UsageEditRow.Description), "Description"));
+            gridUsage.Columns.Add(AmountColumn(nameof(UsageEditRow.Amount), "Amount"));
             gridUsage.Columns.Add(ComboColumn(
                 nameof(UsageEditRow.Type),
                 "Type",
-                ["kWh", "gallons", "GB", "minutes"]));
-            gridUsage.Columns.Add(AmountColumn(nameof(UsageEditRow.Amount), "Amount"));
-            gridUsage.Columns.Add(AmountColumn(nameof(UsageEditRow.Rate), "Rate"));
+                ["kWh", "gallons", "GB", "minutes", "CCF"]));
+            gridUsage.Columns.Add(RateColumn(nameof(UsageEditRow.Rate), "Rate"));
+            gridUsage.Columns.Add(CostColumn());
             gridUsage.DataSource = _usage;
 
-            gridCharges = CreateGrid();
+            var charges = CreateGrid();
+            charges.AppendRow += (_, _) => AppendChargeRow();
+            gridCharges = charges;
             gridCharges.Columns.Add(TextColumn(nameof(ChargeEditRow.Description), "Description"));
             gridCharges.Columns.Add(AmountColumn(nameof(ChargeEditRow.Amount), "Amount"));
             gridCharges.DataSource = _charges;
@@ -498,7 +531,9 @@ namespace THMS.UI.WinForms.Controls
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            gridCharges = CreateGrid();
+            var charges = CreateGrid();
+            charges.AppendRow += (_, _) => AppendChargeRow();
+            gridCharges = charges;
             gridCharges.Columns.Add(TextColumn(nameof(ChargeEditRow.Description), "Description"));
             gridCharges.Columns.Add(AmountColumn(nameof(ChargeEditRow.Amount), "Amount"));
             gridCharges.DataSource = _charges;
@@ -544,7 +579,13 @@ namespace THMS.UI.WinForms.Controls
                     break;
                 case UtilityStatement utility:
                     foreach (var usage in utility.Usage)
-                        _usage.Add(new UsageEditRow { Type = usage.Type, Amount = usage.Amount, Rate = usage.Rate });
+                        _usage.Add(new UsageEditRow
+                        {
+                            Description = usage.Description,
+                            Type = usage.Type,
+                            Amount = usage.Amount,
+                            Rate = usage.Rate
+                        });
                     foreach (var charge in utility.Charges)
                         _charges.Add(new ChargeEditRow { Description = charge.Description, Amount = charge.Amount });
                     EnsureUsageTypes();
@@ -592,13 +633,27 @@ namespace THMS.UI.WinForms.Controls
         private void OnDeletePromotion(object? sender, EventArgs e) =>
             DeleteSelected(_promotions, gridPromotions);
 
-        private void OnAddUsage(object? sender, EventArgs e) =>
-            _usage.Add(new UsageEditRow { Type = "kWh", Amount = 0, Rate = 0 });
+        private void OnAddUsage(object? sender, EventArgs e)
+        {
+            gridUsage?.EndEdit();
+            AppendUsageRow();
+            (gridUsage as StatementEntryGrid)?.EditFirstCellOfLastRow();
+        }
 
         private void OnDeleteUsage(object? sender, EventArgs e) =>
             DeleteSelected(_usage, gridUsage);
 
-        private void OnAddCharge(object? sender, EventArgs e) =>
+        private void OnAddCharge(object? sender, EventArgs e)
+        {
+            gridCharges?.EndEdit();
+            AppendChargeRow();
+            (gridCharges as StatementEntryGrid)?.EditFirstCellOfLastRow();
+        }
+
+        private void AppendUsageRow() =>
+            _usage.Add(new UsageEditRow { Type = "kWh", Amount = 0, Rate = 0 });
+
+        private void AppendChargeRow() =>
             _charges.Add(new ChargeEditRow());
 
         private void OnDeleteCharge(object? sender, EventArgs e) =>
@@ -637,7 +692,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, ex.Message, "Statement", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Statement", ex);
                 return;
             }
 
@@ -706,9 +761,10 @@ namespace THMS.UI.WinForms.Controls
                 {
                     Usage = _usage.Select(u => new UtilityUsageRecord
                     {
+                        Description = u.Description ?? "",
                         Type = u.Type ?? "",
                         Amount = u.Amount,
-                        Rate = u.Rate
+                        Rate = decimal.Round(u.Rate, 6, MidpointRounding.AwayFromZero)
                     }).ToList(),
                     Charges = _charges.Select(c => new UtilityChargeLine
                     {
@@ -754,7 +810,7 @@ namespace THMS.UI.WinForms.Controls
             {
                 if (column is not DataGridViewComboBoxColumn combo || combo.DataPropertyName != nameof(UsageEditRow.Type))
                     continue;
-                var values = new List<string> { "kWh", "gallons", "GB", "minutes" };
+                var values = new List<string> { "kWh", "gallons", "GB", "minutes", "CCF" };
                 foreach (var row in _usage)
                 {
                     if (!string.IsNullOrWhiteSpace(row.Type) && !values.Contains(row.Type))
@@ -887,10 +943,7 @@ namespace THMS.UI.WinForms.Controls
             return toolbar;
         }
 
-        private static DataGridView CreateGrid()
-        {
-            return new StatementEntryGrid();
-        }
+        private static StatementEntryGrid CreateGrid() => new();
 
         private static DataGridViewTextBoxColumn TextColumn(string property, string header) =>
             new()
@@ -907,6 +960,21 @@ namespace THMS.UI.WinForms.Controls
             column.ValueType = typeof(decimal);
             column.DefaultCellStyle.Format = "n2";
             column.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            return column;
+        }
+
+        private static DataGridViewTextBoxColumn RateColumn(string property, string header)
+        {
+            var column = AmountColumn(property, header);
+            column.DefaultCellStyle.Format = "c6";
+            return column;
+        }
+
+        private static DataGridViewTextBoxColumn CostColumn()
+        {
+            var column = AmountColumn(nameof(UsageEditRow.Cost), "Cost");
+            column.DefaultCellStyle.Format = "c2";
+            column.ReadOnly = true;
             return column;
         }
 
@@ -949,7 +1017,8 @@ namespace THMS.UI.WinForms.Controls
                 Name = property,
                 DataSource = values.ToList(),
                 FlatStyle = FlatStyle.Flat,
-                DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton
+                DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
             };
 
         private static NumericUpDown MoneyBox(bool allowNegative = false) =>
@@ -1043,11 +1112,47 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
-        private sealed class UsageEditRow
+        private sealed class UsageEditRow : INotifyPropertyChanged
         {
+            private decimal _amount;
+            private decimal _rate;
+
+            public string Description { get; set; } = "";
             public string Type { get; set; } = "kWh";
-            public decimal Amount { get; set; }
-            public decimal Rate { get; set; }
+
+            public decimal Amount
+            {
+                get => _amount;
+                set
+                {
+                    if (_amount == value)
+                        return;
+                    _amount = value;
+                    Notify(nameof(Amount));
+                    Notify(nameof(Cost));
+                }
+            }
+
+            public decimal Rate
+            {
+                get => _rate;
+                set
+                {
+                    var rate = decimal.Round(value, 6, MidpointRounding.AwayFromZero);
+                    if (_rate == rate)
+                        return;
+                    _rate = rate;
+                    Notify(nameof(Rate));
+                    Notify(nameof(Cost));
+                }
+            }
+
+            public decimal Cost => new UtilityUsageRecord { Amount = Amount, Rate = Rate }.Cost;
+
+            public event PropertyChangedEventHandler? PropertyChanged;
+
+            private void Notify(string name) =>
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
         private sealed class ChargeEditRow

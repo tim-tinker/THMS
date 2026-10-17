@@ -13,6 +13,7 @@ namespace THMS.Data.Stores
         void UpdatePostedTransaction(PostedTransaction transaction);
         void ReplacePostedTransaction(PostedTransaction replacement);
         void DeletePostedTransaction(Guid id);
+        void DeletePostedTransactionRow(Guid id);
 
         PostedTransaction? GetPostedTransaction(Guid id);
         IEnumerable<PostedTransaction> GetPostedTransactions(Guid accountId);

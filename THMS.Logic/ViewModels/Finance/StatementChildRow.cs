@@ -29,9 +29,9 @@ namespace THMS.Logic.ViewModels.Finance
                     utility.Usage.Select(usage => new StatementChildRow
                     {
                         Kind = "Usage",
-                        Description = usage.Type,
-                        Amount = usage.Amount.ToString("N2", CultureInfo.CurrentCulture),
-                        Details = $"Rate {usage.Rate.ToString("0.####", CultureInfo.CurrentCulture)}"
+                        Description = string.IsNullOrWhiteSpace(usage.Description) ? usage.Type : usage.Description,
+                        Amount = Money(usage.Cost),
+                        Details = UsageDetails(usage)
                     })
                     .Concat(utility.Charges.Select(Charge))
                     .ToList(),
@@ -50,6 +50,14 @@ namespace THMS.Logic.ViewModels.Finance
             if (promo.Deadline.Year > 1)
                 parts.Add($"Deadline {promo.Deadline:d}");
             return string.Join("; ", parts);
+        }
+
+        private static string UsageDetails(UtilityUsageRecord usage)
+        {
+            var quantity = usage.Amount.ToString("N2", CultureInfo.CurrentCulture);
+            var rate = usage.Rate.ToString("c6", CultureInfo.CurrentCulture);
+            var type = string.IsNullOrWhiteSpace(usage.Type) ? "" : $" {usage.Type}";
+            return $"{quantity}{type} at {rate}";
         }
 
         private static StatementChildRow Charge(UtilityChargeLine charge) =>

@@ -2,6 +2,10 @@ namespace THMS.UI.WinForms.Controls
 {
     internal sealed class StatementEntryGrid : DataGridView
     {
+        private bool _tabAppendHandled;
+
+        public event EventHandler? AppendRow;
+
         public StatementEntryGrid()
         {
             Dock = DockStyle.Fill;
@@ -18,10 +22,25 @@ namespace THMS.UI.WinForms.Controls
             DataGridViewUtil.EnableDoubleBuffering(this);
         }
 
+        public void EditFirstCellOfLastRow()
+        {
+            if (IsDisposed)
+                return;
+            if (!IsHandleCreated)
+            {
+                StartEditOnFirstCell();
+                return;
+            }
+
+            BeginInvoke(StartEditOnFirstCell);
+        }
+
         protected override bool ProcessDataGridViewKey(KeyEventArgs e)
         {
             if (e.KeyCode is Keys.Tab or Keys.Enter)
                 CommitCurrentEdit();
+            if (TryAppendRowOnTab(e.KeyData))
+                return true;
             return base.ProcessDataGridViewKey(e);
         }
 
@@ -29,7 +48,76 @@ namespace THMS.UI.WinForms.Controls
         {
             if ((keyData & Keys.KeyCode) is Keys.Tab or Keys.Enter)
                 CommitCurrentEdit();
+            if (TryAppendRowOnTab(keyData))
+                return true;
             return base.ProcessDialogKey(keyData);
+        }
+
+        private bool TryAppendRowOnTab(Keys keyData)
+        {
+            if ((keyData & Keys.KeyCode) != Keys.Tab || (keyData & Keys.Shift) != 0)
+                return false;
+            if (_tabAppendHandled)
+                return true;
+            if (AppendRow is null || !IsOnLastCell())
+                return false;
+
+            _tabAppendHandled = true;
+            try
+            {
+                CommitCurrentEdit();
+                AppendRow(this, EventArgs.Empty);
+                EditFirstCellOfLastRow();
+            }
+            finally
+            {
+                if (IsHandleCreated && !IsDisposed)
+                    BeginInvoke(() => _tabAppendHandled = false);
+                else
+                    _tabAppendHandled = false;
+            }
+
+            return true;
+        }
+
+        private bool IsOnLastCell()
+        {
+            if (CurrentCell is null || Rows.Count == 0)
+                return false;
+
+            var lastColumn = -1;
+            for (var i = 0; i < Columns.Count; i++)
+            {
+                if (Columns[i].Visible)
+                    lastColumn = i;
+            }
+
+            return lastColumn >= 0
+                && CurrentCell.ColumnIndex == lastColumn
+                && CurrentCell.RowIndex == Rows.Count - 1;
+        }
+
+        private void StartEditOnFirstCell()
+        {
+            if (IsDisposed || Rows.Count == 0 || Columns.Count == 0)
+                return;
+
+            var column = -1;
+            for (var i = 0; i < Columns.Count; i++)
+            {
+                if (Columns[i].Visible)
+                {
+                    column = i;
+                    break;
+                }
+            }
+
+            if (column < 0)
+                return;
+
+            Focus();
+            CurrentCell = this[column, Rows.Count - 1];
+            BeginEdit(true);
         }
 
         private void OnCurrentCellDirtyStateChanged(object? sender, EventArgs e)

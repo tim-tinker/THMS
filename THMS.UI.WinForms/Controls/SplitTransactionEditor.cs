@@ -253,7 +253,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (InvalidOperationException ex)
             {
-                MessageBox.Show(this, ex.Message, "Split Transaction", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ExceptionDialog.Show(this, "Split Transaction", ex, icon: MessageBoxIcon.Information);
             }
         }
 

@@ -58,14 +58,14 @@ namespace THMS.Logic.ViewModels.Finance
 
                     case LoanAccount loan:
                         if (live is null && useStoredPosted)
-                            view.Balance = loan.Principal;
+                            view.Balance = PostedBalanceCalculator.ToDisplayBalance(loan, loan.Principal);
                         view.APR = PositiveRate(loan.InterestRate);
                         view.DueDate = LookupNextPayment(acct.Id, nextPaymentByAccount) ?? live?.DueDate;
                         break;
 
                     case MortgageAccount mortgage:
                         if (live is null && useStoredPosted)
-                            view.Balance = mortgage.Principal;
+                            view.Balance = PostedBalanceCalculator.ToDisplayBalance(mortgage, mortgage.Principal);
                         view.APR = PositiveRate(mortgage.InterestRate);
                         view.DueDate = LookupNextPayment(acct.Id, nextPaymentByAccount) ?? live?.DueDate;
                         break;

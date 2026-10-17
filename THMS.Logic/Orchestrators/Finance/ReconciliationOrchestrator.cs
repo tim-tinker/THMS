@@ -26,7 +26,9 @@ namespace THMS.Logic.Orchestrators.Finance
             var singles = _transactions.GetAllFutureSingleTransactions().ToList();
             var transfers = _transactions.GetAllFutureTransferTransactions().ToList();
             var imported = _transactions.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue)
-                .Concat(_transactions.GetPostedTransferTransactions(DateTime.MinValue, DateTime.MaxValue))
+                .Concat<PostedTransaction>(_transactions.GetPostedTransferTransactions(DateTime.MinValue, DateTime.MaxValue))
+                .GroupBy(p => p.Id)
+                .Select(g => (PostedTransaction?)g.OfType<PostedTransferTransaction>().FirstOrDefault() ?? g.First())
                 .ToList();
 
             foreach (var row in imported.Where(p => p.ImportedStatus == ImportedStatus.Unreconciled && p.RecommendedExpectedId is not null))

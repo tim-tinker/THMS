@@ -15,6 +15,7 @@ namespace THMS.Data.Stores.SQLite
             _connectionString = $"Data Source={databasePath}";
             using var conn = OpenConnection();
             _accountStore.InitializeSchema(conn);
+            LiabilityLedgerMigration.Apply(conn);
         }
 
         private SqliteConnection OpenConnection()

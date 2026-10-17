@@ -120,7 +120,9 @@ namespace THMS.Tests.Logic
             var loan = store.GetAllAccounts().OfType<LoanAccount>().Single();
             var mortgage = store.GetAllAccounts().OfType<MortgageAccount>().Single();
             Assert.That(loan.InterestRate, Is.EqualTo(0.0699m));
+            Assert.That(loan.Principal, Is.EqualTo(-10000m));
             Assert.That(mortgage.InterestRate, Is.EqualTo(2.875m));
+            Assert.That(mortgage.Principal, Is.EqualTo(-200000m));
         }
 
         [Test]

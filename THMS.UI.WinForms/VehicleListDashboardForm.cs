@@ -61,8 +61,7 @@ namespace THMS.UI.WinForms
             catch (Exception ex)
             {
                 if (!IsDisposed && generation == _loadGeneration && IsHandleCreated)
-                    BeginInvoke(() => MessageBox.Show(this, ex.Message, "Vehicles",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                    BeginInvoke(() => ExceptionDialog.Show(this, "Vehicles", ex));
                 return;
             }
 

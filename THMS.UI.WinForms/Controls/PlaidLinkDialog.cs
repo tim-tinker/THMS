@@ -140,8 +140,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, $"Plaid Link failed.\n{ex.Message}", "Plaid Link",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Plaid Link", ex, "Plaid Link failed.");
                 _btnContinue.Enabled = true;
             }
         }

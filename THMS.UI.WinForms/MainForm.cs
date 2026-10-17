@@ -85,8 +85,7 @@ namespace THMS.UI
             catch (Exception ex)
             {
                 SetAppStatus("Plaid sync failed.");
-                MessageBox.Show(this, $"Plaid sync failed.\n{ex.Message}", "Plaid",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Plaid", ex, "Plaid sync failed.");
             }
         }
 

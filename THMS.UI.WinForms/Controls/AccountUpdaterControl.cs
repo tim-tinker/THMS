@@ -23,7 +23,6 @@ namespace THMS.UI.WinForms.Controls
         private readonly ITransactionDataStore _transactions = new DataStoreFactory().GetTransactionStore();
         private readonly IAccountDataStore _accounts = new DataStoreFactory().GetAccountStore();
         private readonly ContextMenuStrip _accountMenu = new();
-        private bool _suppressAccountMenu;
         private bool _suppressSelectionEvents;
         private int _accountLoadGeneration;
         private int _appliedAccountGeneration;
@@ -32,6 +31,7 @@ namespace THMS.UI.WinForms.Controls
         private Font? _unreconciledAccountFont;
 
         public event EventHandler? SelectedAccountChanged;
+        public event EventHandler? StatementsChanged;
 
         public Account? SelectedAccount => GetSelectedAccount();
 
@@ -45,7 +45,7 @@ namespace THMS.UI.WinForms.Controls
             gridAccounts.CellContentClick += OnAccountNameClicked;
             gridAccounts.CellFormatting += OnAccountCellFormatting;
             gridAccounts.MouseDown += OnAccountGridMouseDown;
-            gridAccounts.ContextMenuStrip = _accountMenu;
+            gridAccounts.KeyDown += OnAccountGridKeyDown;
             components ??= new Container();
             components.Add(_accountMenu);
             _accountMenu.Opening += OnAccountMenuOpening;
@@ -87,8 +87,7 @@ namespace THMS.UI.WinForms.Controls
                         return;
                     if (Visible)
                         AppStatus.Set("Could not load accounts.");
-                    MessageBox.Show(FindForm(), ex.Message, "Accounts",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ExceptionDialog.Show(FindForm(), "Accounts", ex);
                 });
                 return;
             }
@@ -318,8 +317,7 @@ namespace THMS.UI.WinForms.Controls
             catch (Exception ex)
             {
                 AppStatus.Set("Import failed.");
-                MessageBox.Show(FindForm(), $"Could not parse the file.\n{ex.Message}", "Import Accounts",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(FindForm(), "Import Accounts", ex, "Could not parse the file.");
             }
         }
 
@@ -359,42 +357,52 @@ namespace THMS.UI.WinForms.Controls
             if (hit.RowIndex < 0)
                 return;
 
-            var row = gridAccounts.Rows[hit.RowIndex];
-            var alreadyCurrent = row.Selected
-                && gridAccounts.SelectedRows.Count == 1
-                && gridAccounts.CurrentCell?.RowIndex == hit.RowIndex;
-            if (!alreadyCurrent)
-            {
-                var cell = hit.ColumnIndex >= 0 && row.Cells[hit.ColumnIndex].Visible
-                    ? row.Cells[hit.ColumnIndex]
-                    : row.Cells.Cast<DataGridViewCell>().FirstOrDefault(c => c.Visible);
-                if (cell is null)
-                    return;
+            if (!SelectAccountRow(hit.RowIndex, hit.ColumnIndex))
+                return;
 
-                gridAccounts.ClearSelection();
-                row.Selected = true;
-                gridAccounts.CurrentCell = cell;
-            }
-
-            // Changing the current cell, or focusing the grid, closes the menu this click would have opened.
             var location = e.Location;
-            _suppressAccountMenu = true;
             gridAccounts.BeginInvoke(() =>
             {
-                _suppressAccountMenu = false;
                 if (!gridAccounts.IsDisposed)
                     _accountMenu.Show(gridAccounts, location);
             });
         }
 
+        private void OnAccountGridKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.KeyCode != Keys.Apps && (e.KeyCode != Keys.F10 || !e.Shift))
+                return;
+            if (gridAccounts.CurrentCell is not { } cell)
+                return;
+
+            var bounds = gridAccounts.GetCellDisplayRectangle(cell.ColumnIndex, cell.RowIndex, cutOverflow: false);
+            _accountMenu.Show(gridAccounts, new Point(bounds.Left, bounds.Bottom));
+            e.Handled = true;
+        }
+
+        private bool SelectAccountRow(int rowIndex, int columnIndex)
+        {
+            var row = gridAccounts.Rows[rowIndex];
+            var alreadyCurrent = row.Selected
+                && gridAccounts.SelectedRows.Count == 1
+                && gridAccounts.CurrentCell?.RowIndex == rowIndex;
+            if (alreadyCurrent)
+                return true;
+
+            var cell = columnIndex >= 0 && row.Cells[columnIndex].Visible
+                ? row.Cells[columnIndex]
+                : row.Cells.Cast<DataGridViewCell>().FirstOrDefault(c => c.Visible);
+            if (cell is null)
+                return false;
+
+            gridAccounts.ClearSelection();
+            row.Selected = true;
+            gridAccounts.CurrentCell = cell;
+            return true;
+        }
+
         private void OnAccountMenuOpening(object? sender, CancelEventArgs e)
         {
-            if (_suppressAccountMenu)
-            {
-                e.Cancel = true;
-                return;
-            }
-
             _accountMenu.Items.Clear();
             var account = GetSelectedAccount();
             if (account is null)
@@ -422,7 +430,7 @@ namespace THMS.UI.WinForms.Controls
                     _accountMenu.Items.Add(MenuItem("Payment plan", (_, _) => OpenPaymentPlan(account, latest)));
                     break;
                 case LoanAccount or MortgageAccount:
-                    _accountMenu.Items.Add(MenuItem("Add Interest", (_, _) => AddInterest(account)));
+                    _accountMenu.Items.Add(MenuItem("Add Transaction", (_, _) => AddBankTransaction(account)));
                     _accountMenu.Items.Add(PayMenuItem(account, latest));
                     break;
                 case BankAccount or InvestmentAccount or InternalAccount:
@@ -480,11 +488,11 @@ namespace THMS.UI.WinForms.Controls
                 if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
                     return;
                 LoadAccounts();
+                StatementsChanged?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, existing is null ? "Add Statement" : "Edit Statement",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(FindForm(), existing is null ? "Add Statement" : "Edit Statement", ex);
             }
         }
 
@@ -494,37 +502,26 @@ namespace THMS.UI.WinForms.Controls
                 "Add Charge",
                 "Negative amounts are purchases. Positive amounts are refunds.",
                 Categories(),
-                defaultDescription: "Charge");
+                defaultDescription: "Charge",
+                accounts: _accountOrchestrator.GetAllAccounts().ToList());
             if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
-            RunActivity(() => _activityOrchestrator.AddPosted(
-                account.Id, dlg.Date, dlg.Amount, dlg.Description, dlg.CategoryId));
-        }
-
-        private void AddInterest(Account account)
-        {
-            using var dlg = new AccountEntryDialog(
-                "Add Interest",
-                "Interest is posted now. A positive amount increases the balance owed.",
-                Categories(),
-                DefaultExpenseCategories.InterestId,
-                "Interest");
-            if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
-                return;
-            RunActivity(() => _activityOrchestrator.AddPosted(
-                account.Id, dlg.Date, dlg.Amount, dlg.Description, dlg.CategoryId));
+            RunActivity(() => SavePosted(account.Id, dlg));
         }
 
         private void AddBankTransaction(Account account)
         {
+            var hint = account is LoanAccount or MortgageAccount
+                ? "Negative amounts increase what you owe, such as interest. Positive amounts are payments."
+                : "Negative amounts leave this account. Positive amounts are deposits. The other party is not a THMS account.";
             using var dlg = new AccountEntryDialog(
                 "Add Transaction",
-                "Negative amounts leave this account. Positive amounts are deposits. The other party is not a THMS account.",
-                Categories());
+                hint,
+                Categories(),
+                accounts: _accountOrchestrator.GetAllAccounts().ToList());
             if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
-            RunActivity(() => _activityOrchestrator.AddPosted(
-                account.Id, dlg.Date, dlg.Amount, dlg.Description, dlg.CategoryId));
+            RunActivity(() => SavePosted(account.Id, dlg));
         }
 
         private void TransferFrom(Account account)
@@ -615,6 +612,19 @@ namespace THMS.UI.WinForms.Controls
                 latest?.Id));
         }
 
+        private void SavePosted(Guid accountId, AccountEntryDialog dlg)
+        {
+            var posted = _activityOrchestrator.AddPosted(
+                accountId, dlg.Date, dlg.Amount, dlg.Description, dlg.CategoryId);
+            if (!dlg.HasPendingSplits)
+                return;
+
+            var rows = dlg.PendingSplits.Select(split => split.Clone()).ToList();
+            var transactions = new TransactionOrchestrator();
+            if (!transactions.TryApplyAsWholeTransfer(posted.Id, rows))
+                transactions.ApplySplits(posted.Id, rows);
+        }
+
         private void RunActivity(Action action)
         {
             try
@@ -624,7 +634,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Accounts", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(FindForm(), "Accounts", ex);
             }
         }
 
@@ -757,7 +767,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, ex.Message, "Accounts", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Accounts", ex);
             }
         }
 
@@ -771,7 +781,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, ex.Message, "Accounts", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(this, "Accounts", ex);
             }
         }
 

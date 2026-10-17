@@ -130,10 +130,10 @@ namespace THMS.Logic.Finance.Model
                     anchor = new PostedBalanceAnchor(ToLedgerBalance(credit, card.StatementBalance), card.StatementDate);
                     return true;
                 case LoanStatement loan when account is LoanAccount:
-                    anchor = new PostedBalanceAnchor(loan.StatementBalance, loan.StatementDate);
+                    anchor = new PostedBalanceAnchor(ToLedgerBalance(account, loan.StatementBalance), loan.StatementDate);
                     return true;
                 case MortgageStatement mortgage when account is MortgageAccount:
-                    anchor = new PostedBalanceAnchor(mortgage.StatementBalance, mortgage.StatementDate);
+                    anchor = new PostedBalanceAnchor(ToLedgerBalance(account, mortgage.StatementBalance), mortgage.StatementDate);
                     return true;
                 default:
                     anchor = default;
@@ -190,16 +190,20 @@ namespace THMS.Logic.Finance.Model
         }
 
         /// <summary>
-        /// Credit balances are stored in ledger space (charges negative). Display space
-        /// is inverted so a positive value is the amount owed.
+        /// Credit, loan, and mortgage balances are stored in ledger space (amount owed is negative).
+        /// Display space is inverted so a positive value is the amount owed. Statement balances stay
+        /// in display space and are converted only when used as a ledger anchor.
         /// </summary>
         public static decimal ToDisplayBalance(Account? account, decimal ledgerBalance) =>
-            account is CreditAccount ? -ledgerBalance : ledgerBalance;
+            UsesLiabilityLedger(account) ? -ledgerBalance : ledgerBalance;
 
         public static decimal ToLedgerBalance(Account? account, decimal displayBalance) =>
-            account is CreditAccount ? -displayBalance : displayBalance;
+            UsesLiabilityLedger(account) ? -displayBalance : displayBalance;
 
         public static decimal ToLedgerPostedDelta(Account? account, decimal displayDelta) =>
-            account is CreditAccount ? -displayDelta : displayDelta;
+            UsesLiabilityLedger(account) ? -displayDelta : displayDelta;
+
+        private static bool UsesLiabilityLedger(Account? account) =>
+            account is CreditAccount or LoanAccount or MortgageAccount;
     }
 }

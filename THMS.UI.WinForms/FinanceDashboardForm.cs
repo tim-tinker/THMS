@@ -150,7 +150,9 @@ namespace THMS.UI.WinForms
         {
             if (!StillCurrent(generation) || _alerts is null)
                 return;
-            _alerts.DataSource = new List<string> { "Could not load the dashboard.", ex.Message };
+            _alerts.DataSource = ExceptionDialog.Format(ex, "Could not load the dashboard.")
+                .Split('\n')
+                .ToList();
         }
 
         private void BindAccountCards(FinanceDashboardSnapshot snapshot)

@@ -12,6 +12,7 @@ namespace THMS.Data.Stores.SqlTables
                 CREATE TABLE IF NOT EXISTS UtilityUsageRecords (
                     Id TEXT PRIMARY KEY,
                     StatementId TEXT NOT NULL,
+                    Description TEXT NOT NULL DEFAULT '',
                     Type TEXT NOT NULL,
                     Amount REAL NOT NULL,
                     Rate REAL NOT NULL,
@@ -20,6 +21,7 @@ namespace THMS.Data.Stores.SqlTables
                 CREATE INDEX IF NOT EXISTS IX_UtilityUsageRecords_StatementId
                     ON UtilityUsageRecords (StatementId);";
             cmd.ExecuteNonQuery();
+            SqliteSchema.EnsureColumn(conn, "UtilityUsageRecords", "Description", "TEXT NOT NULL DEFAULT ''");
         }
 
         public void ReplaceAll(SqliteConnection conn, Guid statementId, IEnumerable<UtilityUsageRecord> usage)
@@ -42,7 +44,7 @@ namespace THMS.Data.Stores.SqlTables
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT Type, Amount, Rate
+                SELECT Description, Type, Amount, Rate
                 FROM UtilityUsageRecords
                 WHERE StatementId = @StatementId
                 ORDER BY SortOrder, Id;";
@@ -53,9 +55,10 @@ namespace THMS.Data.Stores.SqlTables
             {
                 list.Add(new UtilityUsageRecord
                 {
-                    Type = reader.IsDBNull(0) ? "" : reader.GetString(0),
-                    Amount = (decimal)(double)reader.GetDouble(1),
-                    Rate = (decimal)(double)reader.GetDouble(2)
+                    Description = reader.IsDBNull(0) ? "" : reader.GetString(0),
+                    Type = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    Amount = (decimal)(double)reader.GetDouble(2),
+                    Rate = decimal.Round((decimal)(double)reader.GetDouble(3), 6, MidpointRounding.AwayFromZero)
                 });
             }
 
@@ -67,11 +70,12 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO UtilityUsageRecords
-                (Id, StatementId, Type, Amount, Rate, SortOrder)
+                (Id, StatementId, Description, Type, Amount, Rate, SortOrder)
                 VALUES
-                (@Id, @StatementId, @Type, @Amount, @Rate, @SortOrder);";
+                (@Id, @StatementId, @Description, @Type, @Amount, @Rate, @SortOrder);";
             cmd.Parameters.AddWithValue("@Id", Guid.NewGuid().ToString());
             cmd.Parameters.AddWithValue("@StatementId", statementId.ToString());
+            cmd.Parameters.AddWithValue("@Description", record.Description ?? "");
             cmd.Parameters.AddWithValue("@Type", record.Type);
             cmd.Parameters.AddWithValue("@Amount", record.Amount);
             cmd.Parameters.AddWithValue("@Rate", record.Rate);

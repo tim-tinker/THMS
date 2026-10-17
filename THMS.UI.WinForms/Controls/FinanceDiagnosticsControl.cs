@@ -60,7 +60,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                var message = $"{name} failed.\n{ex.Message}";
+                var message = ExceptionDialog.Format(ex, $"{name} failed.");
                 ShowError(message);
                 output.Text = message;
                 SetStatus($"{name} failed.");

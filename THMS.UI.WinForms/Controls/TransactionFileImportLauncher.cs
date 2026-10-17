@@ -53,8 +53,7 @@ namespace THMS.UI.WinForms.Controls
             catch (Exception ex)
             {
                 AppStatus.Set("Import failed.");
-                MessageBox.Show(owner, $"Could not import transactions.\n{ex.Message}", "Import Transactions",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(owner, "Import Transactions", ex, "Could not import transactions.");
             }
         }
     }

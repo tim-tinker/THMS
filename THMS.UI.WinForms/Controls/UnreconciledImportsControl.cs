@@ -141,7 +141,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (InvalidOperationException ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Change Match", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ExceptionDialog.Show(FindForm(), "Change Match", ex, icon: MessageBoxIcon.Information);
             }
         }
 
@@ -177,7 +177,7 @@ namespace THMS.UI.WinForms.Controls
             catch (Exception ex)
             {
                 AppStatus.Set("Reconcile failed.");
-                MessageBox.Show(FindForm(), ex.Message, "Accept Unreconciled", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(FindForm(), "Accept Unreconciled", ex);
             }
         }
 
@@ -211,7 +211,7 @@ namespace THMS.UI.WinForms.Controls
             {
                 if (bulk)
                     AppStatus.Set("Reconcile failed.");
-                MessageBox.Show(FindForm(), ex.Message, title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ExceptionDialog.Show(FindForm(), title, ex, icon: MessageBoxIcon.Information);
             }
         }
 

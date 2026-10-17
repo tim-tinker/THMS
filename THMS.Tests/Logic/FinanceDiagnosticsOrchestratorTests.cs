@@ -109,7 +109,7 @@ namespace THMS.Tests.Logic
                 Institution = "X",
                 AccountNumber = "3",
                 WebsiteUrl = "",
-                Principal = 1000,
+                Principal = -1000,
                 InterestRate = 0.05m,
                 TermMonths = 12,
                 NextPaymentDate = DateTime.Today.AddDays(5)

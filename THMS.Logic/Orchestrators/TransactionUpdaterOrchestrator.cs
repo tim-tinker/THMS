@@ -90,14 +90,16 @@ namespace THMS.Logic.Orchestrators
                         continue;
                     if (_transactionStore.GetPostedTransferTransaction(transfer.Id) is not null)
                         continue;
-                    _transactionStore.AddPostedTransferTransaction(transfer);
+                    if (_transactionStore.GetPostedTransaction(transfer.Id) is not null)
+                        _transactionStore.ReplacePostedTransaction(transfer);
+                    else
+                        _transactionStore.AddPostedTransferTransaction(transfer);
                 }
-
-                foreach (var matchedId in _transferDetector.Matched.Select(matched => matched.Id).Distinct())
-                    _transactionStore.DeletePostedTransaction(matchedId);
 
                 result.TransfersDetected = _transferDetector.Detected.Count;
             }
+
+            DropPostedRowsCopiedIntoTransfers();
 
             foreach (var account in accounts)
             {
@@ -162,6 +164,22 @@ namespace THMS.Logic.Orchestrators
             reconciliation.RecommendMatches();
 
             return result;
+        }
+
+        private void DropPostedRowsCopiedIntoTransfers()
+        {
+            var transferIds = _transactionStore
+                .GetPostedTransferTransactions(DateTime.MinValue, DateTime.MaxValue)
+                .Select(t => t.Id)
+                .ToHashSet();
+            if (transferIds.Count == 0)
+                return;
+
+            foreach (var posted in _transactionStore.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue))
+            {
+                if (transferIds.Contains(posted.Id))
+                    _transactionStore.DeletePostedTransactionRow(posted.Id);
+            }
         }
 
         private void RefreshPostedBalance(Account account)

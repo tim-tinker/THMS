@@ -49,7 +49,7 @@ namespace THMS.Logic.Orchestrators.Finance
             foreach (var loan in loans)
             {
                 var missing = new List<string>();
-                if (loan.Principal <= 0)
+                if (AmountOwed(loan, loan.Principal) == 0)
                     missing.Add("principal");
                 if (loan.InterestRate <= 0)
                     missing.Add("interest rate");
@@ -67,7 +67,7 @@ namespace THMS.Logic.Orchestrators.Finance
             foreach (var mortgage in mortgages)
             {
                 var missing = new List<string>();
-                if (mortgage.Principal <= 0)
+                if (AmountOwed(mortgage, mortgage.Principal) == 0)
                     missing.Add("principal");
                 if (mortgage.InterestRate <= 0)
                     missing.Add("interest rate");
@@ -124,16 +124,22 @@ namespace THMS.Logic.Orchestrators.Finance
             IReadOnlyList<PostedTransaction> posted,
             List<string> findings)
         {
-            foreach (var loan in loans.Where(l => l.Principal > 0))
+            foreach (var loan in loans)
             {
-                var remaining = RemainingPrincipal(loan.Principal, posted.Where(t => t.AccountId == loan.Id));
+                var owed = AmountOwed(loan, loan.Principal);
+                if (owed <= 0)
+                    continue;
+                var remaining = RemainingPrincipal(owed, posted.Where(t => t.AccountId == loan.Id));
                 if (remaining < 0)
                     findings.Add($"Remaining principal is negative: {loan.Name} ({remaining:c2})");
             }
 
-            foreach (var mortgage in mortgages.Where(m => m.Principal > 0))
+            foreach (var mortgage in mortgages)
             {
-                var remaining = RemainingPrincipal(mortgage.Principal, posted.Where(t => t.AccountId == mortgage.Id));
+                var owed = AmountOwed(mortgage, mortgage.Principal);
+                if (owed <= 0)
+                    continue;
+                var remaining = RemainingPrincipal(owed, posted.Where(t => t.AccountId == mortgage.Id));
                 if (remaining < 0)
                     findings.Add($"Remaining principal is negative: {mortgage.Name} ({remaining:c2})");
             }
@@ -146,9 +152,9 @@ namespace THMS.Logic.Orchestrators.Finance
         {
             var engine = new LoanAmortizationEngine();
             foreach (var loan in loans)
-                InspectSchedule(loan.Name, loan.Principal, loan.InterestRate, loan.TermMonths, engine, findings);
+                InspectSchedule(loan.Name, AmountOwed(loan, loan.Principal), loan.InterestRate, loan.TermMonths, engine, findings);
             foreach (var mortgage in mortgages)
-                InspectSchedule(mortgage.Name, mortgage.Principal, mortgage.InterestRate, mortgage.TermMonths, engine, findings);
+                InspectSchedule(mortgage.Name, AmountOwed(mortgage, mortgage.Principal), mortgage.InterestRate, mortgage.TermMonths, engine, findings);
         }
 
         private static void InspectSchedule(
@@ -195,6 +201,9 @@ namespace THMS.Logic.Orchestrators.Finance
             if (previous > 0 && current > previous * 1.5m)
                 findings.Add($"Loan interest spike detected ({previous:c2} last month vs {current:c2} this month)");
         }
+
+        private static decimal AmountOwed(Account account, decimal principal) =>
+            PostedBalanceCalculator.ToDisplayBalance(account, principal);
 
         private static decimal RemainingPrincipal(decimal originalPrincipal, IEnumerable<PostedTransaction> posted)
         {

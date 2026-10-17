@@ -19,14 +19,12 @@ namespace THMS.UI.WinForms.Controls
         private readonly BindingSource _source = new();
         private readonly DataGridView _grid = new();
         private readonly UnreconciledImportsControl _imports = new();
-        private readonly Label _lblCash = new();
         private readonly ContextMenuStrip _menu = new();
         private SplitContainer? _billsSplit;
         private bool _importSplitPending;
         private bool _suppressMenu;
         private ThmsButton _delete = null!;
         private Guid? _accountId;
-        private bool _suppressCash;
 
         public event EventHandler? DataChanged;
 
@@ -53,21 +51,11 @@ namespace THMS.UI.WinForms.Controls
 
         public void Reload()
         {
-            _suppressCash = true;
-            try
-            {
-                var rows = _accountId is Guid accountId
-                    ? _orchestrator.GetBills(accountId)
-                    : [];
-                _source.DataSource = rows;
-                RefreshFundingCombo();
-            }
-            finally
-            {
-                _suppressCash = false;
-            }
-
-            UpdateCashRemaining();
+            var rows = _accountId is Guid accountId
+                ? _orchestrator.GetBills(accountId)
+                : [];
+            _source.DataSource = rows;
+            RefreshFundingCombo();
             UpdateDelete();
             _imports.ShowAccount(_accountId);
             UpdateImportSplit();
@@ -75,17 +63,6 @@ namespace THMS.UI.WinForms.Controls
 
         private void InitializeLayout()
         {
-            var cashBar = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 40,
-                Padding = new Padding(8, 4, 8, 4)
-            };
-            _lblCash.Dock = DockStyle.Fill;
-            _lblCash.Font = new Font(Font.FontFamily, Font.Size + 2f, FontStyle.Bold);
-            _lblCash.TextAlign = ContentAlignment.MiddleLeft;
-            cashBar.Controls.Add(_lblCash);
-
             var toolbar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Bottom,
@@ -115,7 +92,6 @@ namespace THMS.UI.WinForms.Controls
             _grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             _grid.DataSource = _source;
             _grid.CurrentCellDirtyStateChanged += OnDirtyStateChanged;
-            _grid.CellValueChanged += (_, _) => UpdateCashRemaining();
             _grid.CellContentClick += OnOtherAccountClicked;
             _grid.CellFormatting += OnBillCellFormatting;
             _grid.CellBeginEdit += OnPayFromBeginEdit;
@@ -148,7 +124,6 @@ namespace THMS.UI.WinForms.Controls
 
             Controls.Add(split);
             Controls.Add(toolbar);
-            Controls.Add(cashBar);
         }
 
         private void UpdateImportSplit()
@@ -267,16 +242,6 @@ namespace THMS.UI.WinForms.Controls
         {
             if (_grid.IsCurrentCellDirty)
                 _grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
-        }
-
-        private void UpdateCashRemaining()
-        {
-            if (_suppressCash)
-                return;
-            EndEdit();
-            var remaining = _orchestrator.CashRemaining(_accountId, CurrentRows());
-            _lblCash.Text = $"{CashLabel()} remaining: {remaining:c2}";
-            _lblCash.ForeColor = remaining < 0 ? Color.Firebrick : Color.FromArgb(32, 32, 32);
         }
 
         private void OnGridMouseDown(object? sender, MouseEventArgs e)
@@ -432,8 +397,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Pay",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(FindForm(), "Pay", ex);
             }
         }
 
@@ -450,8 +414,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Unschedule",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(FindForm(), "Unschedule", ex);
             }
         }
 
@@ -494,8 +457,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Match import",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(FindForm(), "Match import", ex);
             }
         }
 
@@ -657,7 +619,9 @@ namespace THMS.UI.WinForms.Controls
                 initialCategoryId: parent.CategoryId,
                 lockAmount: parent.HasSplits,
                 lockCategory: parent.HasSplits,
-                categoryIsSplit: parent.HasSplits);
+                categoryIsSplit: parent.HasSplits,
+                accounts: new AccountOrchestrator().GetAllAccounts().ToList(),
+                existingSplits: parent.Splits);
             if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
 
@@ -669,12 +633,18 @@ namespace THMS.UI.WinForms.Controls
                     dialog.Amount,
                     dialog.Description,
                     dialog.CategoryId);
+                if (dialog.HasPendingSplits)
+                {
+                    var rows = dialog.PendingSplits.Select(split => split.Clone()).ToList();
+                    if (!_transactions.TryApplyAsWholeTransfer(parent.Id, rows))
+                        _transactions.ApplySplits(parent.Id, rows);
+                }
+
                 FinishEdit();
             }
             catch (InvalidOperationException ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Edit Transaction",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ExceptionDialog.Show(FindForm(), "Edit Transaction", ex, icon: MessageBoxIcon.Information);
             }
         }
 
@@ -727,8 +697,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Bill Details",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(FindForm(), "Bill Details", ex);
             }
         }
 
@@ -774,8 +743,7 @@ namespace THMS.UI.WinForms.Controls
             }
             catch (Exception ex)
             {
-                MessageBox.Show(FindForm(), ex.Message, "Delete",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ExceptionDialog.Show(FindForm(), "Delete", ex);
             }
         }
 
@@ -791,24 +759,6 @@ namespace THMS.UI.WinForms.Controls
 
         private void UpdateDelete() =>
             _delete.Enabled = SelectedDeletable() is not null;
-
-        private string CashLabel()
-        {
-            if (_accountId is Guid id)
-            {
-                var account = _orchestrator.GetAccounts().FirstOrDefault(a => a.Id == id);
-                if (account is BankAccount)
-                    return account.Name;
-            }
-
-            return "Bank";
-        }
-
-        private List<BillRow> CurrentRows()
-        {
-            EndEdit();
-            return _source.List.Cast<BillRow>().ToList();
-        }
 
         private void EndEdit()
         {

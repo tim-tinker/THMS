@@ -16,6 +16,7 @@ namespace THMS.Data.Stores.SQLite
             _connectionString = $"Data Source={databasePath}";
             using var conn = OpenConnection();
             _store.InitializeSchema(conn);
+            LiabilityLedgerMigration.Apply(conn);
         }
 
         private SqliteConnection OpenConnection()
@@ -70,6 +71,13 @@ namespace THMS.Data.Stores.SQLite
             using var conn = OpenConnection();
             _store.Posted.Delete(conn, id);
             _store.Splits.DeleteByParent(conn, id);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public void DeletePostedTransactionRow(Guid id)
+        {
+            using var conn = OpenConnection();
+            _store.Posted.Delete(conn, id);
             FinanceDataRevision.NoteChanged();
         }
 
