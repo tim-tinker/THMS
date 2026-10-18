@@ -237,6 +237,15 @@ namespace THMS.UI.WinForms
                 TextColumn(nameof(UnifiedTransactionView.Category), "Category"),
                 txDescription);
             gridTransactions.DataSource = _statementTransactionsSource;
+            gridTransactions.CellFormatting += (_, e) =>
+            {
+                if (e.RowIndex < 0 || e.ColumnIndex != txAmount.Index)
+                    return;
+                if (accountUpdater.SelectedAccount is not CreditAccount)
+                    return;
+                if (e.Value is decimal amount)
+                    e.Value = -amount;
+            };
             ledger.AttachTransactionActions(gridTransactions, () => accountUpdater.SelectedAccount?.Id);
 
             var columns = new SplitContainer

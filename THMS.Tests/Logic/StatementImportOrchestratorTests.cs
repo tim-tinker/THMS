@@ -79,8 +79,9 @@ namespace THMS.Tests.Logic
 
                 var utility = (UtilityStatement)statements
                     .GetForAccount(rows.Single(r => r.Account == "Electric").AccountId).Single();
-                Assert.That(utility.Charges, Has.Count.EqualTo(1));
-                Assert.That(utility.Charges[0].Amount, Is.EqualTo(87.50m));
+                Assert.That(utility.AmountDue, Is.EqualTo(87.50m));
+                Assert.That(utility.Charges, Is.Empty);
+                Assert.That(utility.Usage, Is.Empty);
 
                 var second = orchestrator.ImportStatements(rows);
                 Assert.That(second.Count, Is.EqualTo(0));
@@ -116,8 +117,8 @@ namespace THMS.Tests.Logic
                 Assert.That(saved[0].Charges, Is.Empty);
                 Assert.That(saved[1].StatementBalance, Is.EqualTo(49.84m));
                 Assert.That(saved[1].AmountDue, Is.EqualTo(49.84m));
-                Assert.That(saved[1].Charges, Has.Count.EqualTo(1));
-                Assert.That(saved[1].Charges[0].Amount, Is.EqualTo(49.84m));
+                Assert.That(saved[1].Charges, Is.Empty);
+                Assert.That(saved[1].Usage, Is.Empty);
 
                 var again = orchestrator.ImportStatements(rows);
                 Assert.That(again.Count, Is.EqualTo(0));

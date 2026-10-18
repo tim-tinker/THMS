@@ -195,6 +195,8 @@ namespace THMS.UI.WinForms.Controls
                 TextColumn(nameof(UnifiedTransactionView.TypeLabel), "Type", DataGridViewAutoSizeColumnMode.AllCells, 80),
                 descriptionColumn);
             gridTransactions.DataSource = _transactionsSource;
+            gridTransactions.MultiSelect = true;
+            gridTransactions.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             gridTransactions.CellDoubleClick += OnTransactionDoubleClick;
             gridTransactions.CellMouseClick += OnTransactionCategoryMouseClick;
             gridTransactions.MouseDown += OnTransactionGridMouseDown;
@@ -546,10 +548,7 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             var row = gridTransactions.Rows[hit.RowIndex];
-            var alreadyCurrent = row.Selected
-                && gridTransactions.SelectedRows.Count == 1
-                && gridTransactions.CurrentCell?.RowIndex == hit.RowIndex;
-            if (!alreadyCurrent)
+            if (!row.Selected)
             {
                 gridTransactions.ClearSelection();
                 row.Selected = true;
@@ -566,13 +565,51 @@ namespace THMS.UI.WinForms.Controls
         {
             if (gridTransactions.IsDisposed || rowIndex < 0 || rowIndex >= gridTransactions.RowCount)
                 return;
-            if (gridTransactions.Rows[rowIndex].DataBoundItem is not UnifiedTransactionView view || !CanSplit(view))
+            if (gridTransactions.Rows[rowIndex].DataBoundItem is not UnifiedTransactionView view)
                 return;
 
+            var selected = gridTransactions.SelectedRows
+                .Cast<DataGridViewRow>()
+                .Select(row => row.DataBoundItem)
+                .OfType<UnifiedTransactionView>()
+                .ToList();
+            if (selected.All(row => row.Id != view.Id))
+                selected.Add(view);
+            var targets = selected
+                .Where(CanAssignTransactionCategory)
+                .DistinctBy(row => (row.LookupId, row.SplitRowId))
+                .ToList();
+
             var menu = new ContextMenuStrip();
-            var split = new ToolStripMenuItem("Split Transaction");
-            split.Click += (_, _) => OpenSplitEditor(view);
-            menu.Items.Add(split);
+            if (targets.Count > 0)
+            {
+                Guid? shared = targets.Select(row => row.CategoryId).Distinct().Count() == 1
+                    ? targets[0].CategoryId
+                    : null;
+                menu.Items.Add(CategoryTreeUi.CreateSetCategoryItem(
+                    Orchestrator.GetActiveCategories(),
+                    targets.Count,
+                    shared,
+                    category => AssignTransactionCategory(targets, category.Id),
+                    () => CreateAndAssignCategory(targets),
+                    OpenCategoryManager));
+            }
+
+            if (CanSplit(view))
+            {
+                if (menu.Items.Count > 0)
+                    menu.Items.Add(new ToolStripSeparator());
+                var split = new ToolStripMenuItem("Split Transaction");
+                split.Click += (_, _) => OpenSplitEditor(view);
+                menu.Items.Add(split);
+            }
+
+            if (menu.Items.Count == 0)
+            {
+                menu.Dispose();
+                return;
+            }
+
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
             menu.Show(gridTransactions, location);
         }
@@ -596,6 +633,8 @@ namespace THMS.UI.WinForms.Controls
             if (e.RowIndex < 0 || !IsTransactionCategoryColumn(e.ColumnIndex))
                 return;
             if (e.Button != MouseButtons.Left)
+                return;
+            if ((Control.ModifierKeys & (Keys.Control | Keys.Shift)) != 0)
                 return;
             if (!CanEditTransactionCategory(e.RowIndex))
                 return;
@@ -641,8 +680,8 @@ namespace THMS.UI.WinForms.Controls
                 Orchestrator.GetActiveCategories(),
                 splitSelected ? null : view.CategoryId ?? suggestion?.CategoryId,
                 splitSelected ? null : suggestion?.CategoryId,
-                category => AssignTransactionCategory(view, category.Id),
-                () => CreateAndAssignCategory(view),
+                category => AssignTransactionCategory([view], category.Id),
+                () => CreateAndAssignCategory([view]),
                 OpenCategoryManager,
                 () => OpenSplitEditor(view),
                 splitSelected);
@@ -653,19 +692,23 @@ namespace THMS.UI.WinForms.Controls
             menu.Show(gridTransactions, new Point(cell.Left, cell.Bottom));
         }
 
-        private void AssignTransactionCategory(UnifiedTransactionView view, Guid categoryId)
+        private static bool CanAssignTransactionCategory(UnifiedTransactionView view) =>
+            view.Type is UnifiedTransactionView.PostedType or UnifiedTransactionView.PostedTransferType;
+
+        private void AssignTransactionCategory(IReadOnlyList<UnifiedTransactionView> views, Guid categoryId)
         {
-            Orchestrator.AssignToPosted(view.LookupId, categoryId, splitRowId: view.SplitRowId);
+            foreach (var view in views)
+                Orchestrator.AssignToPosted(view.LookupId, categoryId, splitRowId: view.SplitRowId);
             NoteCatalogChanged();
             Reload(_selectedCategoryId);
         }
 
-        private void CreateAndAssignCategory(UnifiedTransactionView view)
+        private void CreateAndAssignCategory(IReadOnlyList<UnifiedTransactionView> views)
         {
             using var editor = new CategoryEditor(Orchestrator);
             if (editor.ShowDialog(FindForm()) != DialogResult.OK || editor.CreatedCategory is null)
                 return;
-            AssignTransactionCategory(view, editor.CreatedCategory.Id);
+            AssignTransactionCategory(views, editor.CreatedCategory.Id);
         }
 
         private void OpenCategoryManager()

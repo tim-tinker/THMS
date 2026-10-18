@@ -58,6 +58,7 @@ namespace THMS.Logic.ViewModels.Finance
         public Guid? CreditAccountId { get; init; }
         public Guid? CreditCategoryId { get; init; }
         public RecurrenceFrequency? Frequency { get; init; }
+        public List<SplitTransactionRow> Splits { get; init; } = [];
     }
 
     public static class BillKinds

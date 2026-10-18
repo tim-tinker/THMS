@@ -100,6 +100,7 @@ namespace THMS.UI.WinForms.Controls
             VehicleColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             VehicleColumn.MinimumWidth = Math.Max(VehicleColumn.Width, 80);
             VehicleColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            DataGridViewUtil.FitDisplayedDateAndMoneyColumns(_gridSessions);
         }
 
         private void OnLoad(object sender, EventArgs e)

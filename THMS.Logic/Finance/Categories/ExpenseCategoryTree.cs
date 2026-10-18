@@ -125,8 +125,9 @@ namespace THMS.Logic.Finance.Categories
             return depth;
         }
 
+        // A ComboBox trims ordinary leading spaces, which hides the hierarchy.
         public static string IndentedName(IEnumerable<ExpenseCategory> categories, ExpenseCategory category) =>
-            new string(' ', Depth(categories, category) * 2) + category.Name;
+            new string('\u00A0', Depth(categories, category) * 2) + category.Name;
 
         public static ExpenseCategory GetOrCreate(
             IEnumerable<ExpenseCategory> existing,

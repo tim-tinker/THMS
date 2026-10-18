@@ -192,14 +192,6 @@ namespace THMS.Logic.Orchestrators
                     utility.StatementBalance = row.StatementBalance;
                     if (utility.AmountDue == 0 && utility.StatementBalance > 0)
                         utility.AmountDue = utility.StatementBalance;
-                    if (utility.AmountDue > 0)
-                    {
-                        utility.Charges =
-                        [
-                            new UtilityChargeLine { Description = "Amount due", Amount = utility.AmountDue }
-                        ];
-                    }
-
                     break;
                 case ServiceStatement service when row.AmountDue > 0:
                     service.Charges =

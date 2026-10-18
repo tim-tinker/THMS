@@ -99,7 +99,9 @@ namespace THMS.UI.WinForms.Controls
             debitCredit.Controls.Add(_credit);
             layout.Controls.Add(debitCredit, 1, 5);
 
-            var hint = Wrap("Flip sign applies to the amount column. Credits increase the ledger balance and debits decrease it.");
+            var hint = Wrap(
+                "Flip sign applies to the amount column. A positive amount increases this account's ledger balance. " +
+                "On a credit card, check Flip sign when the file lists charges as positive numbers. The card ledger then shows those charges as positive and payments as negative.");
             layout.Controls.Add(hint, 0, 6);
             layout.SetColumnSpan(hint, 2);
 

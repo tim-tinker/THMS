@@ -41,6 +41,7 @@ namespace THMS.UI.WinForms.Controls
             NameColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             NameColumn.MinimumWidth = Math.Max(NameColumn.Width, 80);
             NameColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            DataGridViewUtil.FitDisplayedDateAndMoneyColumns(_gridContracts);
         }
 
         private void OnLoad(object sender, EventArgs e)

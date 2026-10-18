@@ -12,6 +12,7 @@ namespace THMS.Data.Stores
     {
         public const string PrincipalId = "LiabilityLedgerPrincipal";
         public const string ActivityId = "LiabilityLedgerActivity";
+        public const string CreditPlaidId = "CreditCardPlaidSign";
 
         private static readonly string[] PrincipalTables = ["LoanAccounts", "MortgageAccounts"];
 
@@ -41,7 +42,8 @@ namespace THMS.Data.Stores
             ArgumentNullException.ThrowIfNull(conn);
             var flipPrincipal = TablesExist(conn, PrincipalTables) && !AlreadyApplied(conn, PrincipalId);
             var flipActivity = TablesExist(conn, ActivityTables) && !AlreadyApplied(conn, ActivityId);
-            if (!flipPrincipal && !flipActivity)
+            var flipCreditPlaid = CreditPlaidRowsNeedFlip(conn);
+            if (!flipPrincipal && !flipActivity && !flipCreditPlaid)
                 return;
 
             using var tx = conn.BeginTransaction();
@@ -60,8 +62,21 @@ namespace THMS.Data.Stores
                 MarkApplied(conn, ActivityId);
             }
 
+            if (flipCreditPlaid)
+            {
+                NegatePlaidCreditCardAmounts(conn);
+                MarkApplied(conn, CreditPlaidId);
+            }
+
             tx.Commit();
         }
+
+        /// <summary>
+        /// Plaid reports a credit-card charge as positive and a payment as negative.
+        /// The ledger stores the opposite: a charge decreases the balance, a payment increases it.
+        /// </summary>
+        public static decimal FromPlaidAmount(bool liabilityAccount, decimal amount) =>
+            liabilityAccount ? -amount : amount;
 
         private static LiabilityActivityKind Classify(string? category, string? description)
         {
@@ -156,6 +171,50 @@ namespace THMS.Data.Stores
             }
         }
 
+        private static bool CreditPlaidRowsNeedFlip(SqliteConnection conn) =>
+            TableExists(conn, "CreditAccounts")
+            && TableExists(conn, "PostedTransactions")
+            && ColumnExists(conn, "PostedTransactions", "ExternalTransactionId")
+            && !AlreadyApplied(conn, CreditPlaidId);
+
+        private static void NegatePlaidCreditCardAmounts(SqliteConnection conn)
+        {
+            Execute(conn, @"
+                UPDATE PostedTransactions
+                SET Amount = -Amount
+                WHERE IFNULL(ExternalTransactionId, '') <> ''
+                  AND AccountId IN (SELECT AccountId FROM CreditAccounts);");
+
+            if (TableExists(conn, "PostedTransferTransactions")
+                && ColumnExists(conn, "PostedTransferTransactions", "ExternalTransactionId"))
+            {
+                Execute(conn, @"
+                    UPDATE PostedTransferTransactions
+                    SET Amount = -Amount
+                    WHERE IFNULL(ExternalTransactionId, '') <> ''
+                      AND AccountId IN (SELECT AccountId FROM CreditAccounts);");
+            }
+
+            if (!TableExists(conn, "SplitTransactionRows"))
+                return;
+
+            Execute(conn, @"
+                UPDATE SplitTransactionRows
+                SET Amount = -Amount
+                WHERE ParentTransactionId IN (
+                    SELECT Id FROM PostedTransactions
+                    WHERE IFNULL(ExternalTransactionId, '') <> ''
+                      AND AccountId IN (SELECT AccountId FROM CreditAccounts)
+                );");
+        }
+
+        private static void Execute(SqliteConnection conn, string sql)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.ExecuteNonQuery();
+        }
+
         private static void NegateSplits(SqliteConnection conn, string parentId)
         {
             using var cmd = conn.CreateCommand();
@@ -171,14 +230,33 @@ namespace THMS.Data.Stores
         {
             foreach (var name in names)
             {
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = @Name;";
-                cmd.Parameters.AddWithValue("@Name", name);
-                if (cmd.ExecuteScalar() is null)
+                if (!TableExists(conn, name))
                     return false;
             }
 
             return true;
+        }
+
+        private static bool TableExists(SqliteConnection conn, string name)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = @Name;";
+            cmd.Parameters.AddWithValue("@Name", name);
+            return cmd.ExecuteScalar() is not null;
+        }
+
+        private static bool ColumnExists(SqliteConnection conn, string table, string column)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"PRAGMA table_info({table});";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
 
         private static bool AlreadyApplied(SqliteConnection conn, string id)

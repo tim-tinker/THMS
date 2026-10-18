@@ -197,7 +197,7 @@ namespace THMS.Logic.Orchestrators.Finance
                     {
                         Date = date,
                         Description = dto.Name,
-                        Amount = dto.Amount,
+                        Amount = LiabilityLedgerMigration.FromPlaidAmount(IsLiability(match), dto.Amount),
                         Account = match.Name,
                         Category = dto.Category ?? "",
                         Pending = dto.Pending,
@@ -325,7 +325,7 @@ namespace THMS.Logic.Orchestrators.Finance
                 {
                     Date = date,
                     Description = dto.Name,
-                    Amount = dto.Amount,
+                    Amount = LiabilityLedgerMigration.FromPlaidAmount(IsLiability(account), dto.Amount),
                     Account = account.Name,
                     Category = dto.Category ?? "",
                     AccountId = account.Id,
@@ -393,6 +393,9 @@ namespace THMS.Logic.Orchestrators.Finance
                 })
                 .ToList();
         }
+
+        private static bool IsLiability(Account account) =>
+            account is CreditAccount or LoanAccount or MortgageAccount;
 
         private static bool HasPlaidLink(Account account) =>
             account.ExternalLink is { } link

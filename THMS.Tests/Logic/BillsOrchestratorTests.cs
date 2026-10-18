@@ -619,6 +619,50 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void AddEnteredBill_StoresSplitAmountsForLoanAndEscrow()
+        {
+            var (accounts, transactions, statements, checking, _) = SeedCheckingAndCard();
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var due = new DateTime(2026, 10, 20);
+            var loan = Guid.NewGuid();
+            var escrow = Guid.NewGuid();
+            List<SplitTransactionRow> splits =
+            [
+                TransferSplit(-1600m, checking.Id, loan),
+                TransferSplit(-400m, checking.Id, escrow)
+            ];
+
+            orchestrator.AddEnteredBill(
+                checking.Id, "Mortgage", -2000m, DefaultExpenseCategories.UncategorizedId, due,
+                creditAccountId: null, creditCategoryId: null, frequency: null, splits);
+
+            var saved = transactions.GetFutureSingleTransactions(checking.Id).Single();
+            Assert.That(saved.Splits, Has.Count.EqualTo(2));
+            Assert.That(saved.Splits.Sum(split => split.Amount), Is.EqualTo(-2000m));
+            Assert.That(saved.Splits.Select(split => split.ToAccountId), Is.EquivalentTo(new Guid?[] { loan, escrow }));
+
+            orchestrator.AddEnteredBill(
+                checking.Id, "Mortgage recurring", -2000m, DefaultExpenseCategories.UncategorizedId, due,
+                creditAccountId: null, creditCategoryId: null, RecurrenceFrequency.Monthly, splits);
+            var rule = transactions.GetAllRecurringSingleRules().Single();
+            var planned = transactions.GetFutureSingleTransactions(checking.Id)
+                .Single(item => item.Description == "Mortgage recurring");
+            Assert.That(rule.Splits.Sum(split => split.Amount), Is.EqualTo(-2000m));
+            Assert.That(planned.Splits.Sum(split => split.Amount), Is.EqualTo(-2000m));
+        }
+
+        private static SplitTransactionRow TransferSplit(decimal amount, Guid fromAccountId, Guid toAccountId) =>
+            new()
+            {
+                Amount = amount,
+                Type = SplitType.Transfer,
+                CategoryId = DefaultExpenseCategories.PaymentId,
+                Category = DefaultExpenseCategories.Payment,
+                FromAccountId = fromAccountId,
+                ToAccountId = toAccountId
+            };
+
+        [Test]
         public void AddEnteredBill_OneTimeWithCredit_IsATransferOnTheBills()
         {
             var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
@@ -681,6 +725,146 @@ namespace THMS.Tests.Logic
             Assert.That(saved.AmountDue, Is.EqualTo(220m));
             Assert.That(statements.Get(older.Id)!.BillCleared, Is.False);
         }
+
+        [Test]
+        public void AcceptMatch_RemovesStatementBillWhenPaymentCoversAmountDue()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var asOf = new DateTime(2026, 10, 17);
+            var statement = new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = new DateTime(2026, 10, 7),
+                DueDate = new DateTime(2026, 11, 3),
+                AmountDue = 200m,
+                StatementBalance = 800m
+            };
+            statements.Save(statement);
+            var expected = StatementPayment(checking.Id, card.Id, statement, "AMEX");
+            transactions.AddFutureTransferTransaction(expected);
+            var payment = CardPayment(card.Id, new DateTime(2026, 10, 10), 250m);
+            transactions.AddPostedTransaction(payment);
+            var bills = new BillsOrchestrator(accounts, transactions, statements);
+            Assert.That(bills.GetBills(card.Id, asOf).Single().Notes, Is.EqualTo("AMEX"));
+
+            new ReconciliationOrchestrator(transactions, statements).AcceptMatch(payment.Id, expected.Id, refreshBudgets: false);
+
+            Assert.That(statements.Get(statement.Id)!.BillCleared, Is.True);
+            Assert.That(bills.GetBills(card.Id, asOf), Is.Empty);
+            Assert.That(transactions.GetPostedTransaction(payment.Id)!.Category, Is.EqualTo(DefaultExpenseCategories.Payment));
+        }
+
+        [Test]
+        public void AcceptMatch_KeepsStatementBillWhenPaymentIsLessThanAmountDue()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var asOf = new DateTime(2026, 10, 17);
+            var statement = new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = new DateTime(2026, 10, 7),
+                DueDate = new DateTime(2026, 11, 3),
+                AmountDue = 200m,
+                StatementBalance = 800m
+            };
+            statements.Save(statement);
+            var expected = StatementPayment(checking.Id, card.Id, statement, "AMEX");
+            transactions.AddFutureTransferTransaction(expected);
+            var payment = CardPayment(card.Id, new DateTime(2026, 10, 10), 50m);
+            transactions.AddPostedTransaction(payment);
+
+            new ReconciliationOrchestrator(transactions, statements).AcceptMatch(payment.Id, expected.Id, refreshBudgets: false);
+
+            var rows = new BillsOrchestrator(accounts, transactions, statements).GetBills(card.Id, asOf);
+            Assert.That(statements.Get(statement.Id)!.BillCleared, Is.False);
+            Assert.That(rows.Single().Notes, Is.EqualTo("Statement due"));
+            Assert.That(rows.Single().Amount, Is.EqualTo(200m));
+        }
+
+        [Test]
+        public void GetBills_RemovesStatementDueAlreadyMatchedByACoveringPayment()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var statement = new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = new DateTime(2026, 10, 7),
+                DueDate = new DateTime(2026, 11, 3),
+                AmountDue = 200m,
+                StatementBalance = 800m
+            };
+            statements.Save(statement);
+            var payment = CardPayment(card.Id, new DateTime(2026, 10, 10), 200m);
+            payment.ImportedStatus = ImportedStatus.Matched;
+            transactions.AddPostedTransaction(payment);
+            var expected = StatementPayment(checking.Id, card.Id, statement, "AMEX");
+            expected.IsRealized = true;
+            expected.PostedToTransactionId = payment.Id;
+            transactions.AddFutureTransferTransaction(expected);
+
+            var rows = new BillsOrchestrator(accounts, transactions, statements).GetBills(card.Id, new DateTime(2026, 10, 17));
+
+            Assert.That(rows, Is.Empty);
+            Assert.That(statements.Get(statement.Id)!.BillCleared, Is.True);
+        }
+
+        [Test]
+        public void UndoMatch_RestoresStatementBill()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var asOf = new DateTime(2026, 10, 17);
+            var statement = new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = new DateTime(2026, 10, 7),
+                DueDate = new DateTime(2026, 11, 3),
+                AmountDue = 200m,
+                StatementBalance = 800m
+            };
+            statements.Save(statement);
+            var expected = StatementPayment(checking.Id, card.Id, statement, "AMEX");
+            transactions.AddFutureTransferTransaction(expected);
+            var payment = CardPayment(card.Id, new DateTime(2026, 10, 10), 250m);
+            transactions.AddPostedTransaction(payment);
+            var reconciliation = new ReconciliationOrchestrator(transactions, statements);
+            reconciliation.AcceptMatch(payment.Id, expected.Id, refreshBudgets: false);
+
+            reconciliation.UndoMatch(payment.Id);
+
+            var rows = new BillsOrchestrator(accounts, transactions, statements).GetBills(card.Id, asOf);
+            Assert.That(statements.Get(statement.Id)!.BillCleared, Is.False);
+            Assert.That(rows.Single().Notes, Is.EqualTo("AMEX"));
+            Assert.That(rows.Single().DueDate, Is.EqualTo(statement.DueDate));
+        }
+
+        private static FutureTransferTransaction StatementPayment(
+            Guid checkingId,
+            Guid cardId,
+            CreditCardStatement statement,
+            string description) =>
+            new()
+            {
+                FromAccountId = checkingId,
+                ToAccountId = cardId,
+                Amount = statement.AmountDue,
+                Date = statement.DueDate,
+                Description = description,
+                Origin = ExpectedOrigin.StatementPay,
+                OriginId = statement.Id,
+                StatementId = statement.Id,
+                Status = ExpectedStatus.Scheduled,
+                Category = DefaultExpenseCategories.Payment,
+                CategoryId = DefaultExpenseCategories.PaymentId
+            };
+
+        private static PostedTransaction CardPayment(Guid cardId, DateTime date, decimal amount) =>
+            new()
+            {
+                AccountId = cardId,
+                Date = date,
+                Amount = amount,
+                Description = "Payment thank you"
+            };
 
         [Test]
         public void DeleteEnteredBill_RemovesOneTimeTransactionAndTransfer()

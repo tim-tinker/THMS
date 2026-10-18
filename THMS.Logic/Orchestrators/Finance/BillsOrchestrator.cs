@@ -4,6 +4,7 @@ using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Forecast;
 using THMS.Logic.Finance.Planning;
+using THMS.Logic.Finance.Transactions;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Logic.Orchestrators.Finance
@@ -51,6 +52,7 @@ namespace THMS.Logic.Orchestrators.Finance
                 rows.Add(FromExpected(item, byId, accountId, asOfDate));
 
             var latest = PayableStatements.Latest(_statements.GetForAccount(accountId));
+            ClearPaidStatementBill(latest);
             if (latest is not null
                 && !latest.BillCleared
                 && !IsCovered(PaymentIntentSource.Statement, latest.Id, latest.AccountId, latest.DueDate.Date, asOfDate))
@@ -302,7 +304,8 @@ namespace THMS.Logic.Orchestrators.Finance
             DateTime date,
             Guid? creditAccountId,
             Guid? creditCategoryId,
-            RecurrenceFrequency? frequency)
+            RecurrenceFrequency? frequency,
+            IReadOnlyList<SplitTransactionRow>? splits = null)
         {
             if (billAccountId == Guid.Empty)
                 throw new InvalidOperationException("Select an account to bill.");
@@ -318,6 +321,8 @@ namespace THMS.Logic.Orchestrators.Finance
             var billCategory = RequireCategory(billCategoryId);
             var when = date.Date;
             var notes = description.Trim();
+            var storedAmount = credit is null ? amount : Math.Abs(amount);
+            var splitRows = PrepareSplits(storedAmount, splits);
             if (credit is null)
             {
                 if (frequency is null)
@@ -330,7 +335,8 @@ namespace THMS.Logic.Orchestrators.Finance
                         Description = notes,
                         Origin = ExpectedOrigin.Manual,
                         Status = ExpectedStatus.Planned,
-                        IsUserCreated = true
+                        IsUserCreated = true,
+                        Splits = splitRows
                     };
                     single.ApplyCategory(billCategory);
                     _transactions.AddFutureSingleTransaction(single);
@@ -346,7 +352,8 @@ namespace THMS.Logic.Orchestrators.Finance
                     Frequency = frequency.Value,
                     NextOccurrence = when,
                     IsActive = true,
-                    IsUserCreated = true
+                    IsUserCreated = true,
+                    Splits = splitRows
                 };
                 rule.ApplyCategory(billCategory);
                 _transactions.AddRecurringSingleRule(rule);
@@ -362,11 +369,12 @@ namespace THMS.Logic.Orchestrators.Finance
                     FromAccountId = credit.Value,
                     ToAccountId = billAccountId,
                     Date = when,
-                    Amount = Math.Abs(amount),
+                    Amount = storedAmount,
                     Description = notes,
                     Origin = ExpectedOrigin.Manual,
                     Status = ExpectedStatus.Planned,
-                    IsUserCreated = true
+                    IsUserCreated = true,
+                    Splits = splitRows
                 };
                 ApplyTransferCategories(transfer, creditCategory, billCategory);
                 _transactions.AddFutureTransferTransaction(transfer);
@@ -379,17 +387,30 @@ namespace THMS.Logic.Orchestrators.Finance
                 FromAccountId = credit.Value,
                 ToAccountId = billAccountId,
                 Description = notes,
-                Amount = Math.Abs(amount),
+                Amount = storedAmount,
                 Frequency = frequency.Value,
                 NextOccurrence = when,
                 IsActive = true,
-                IsUserCreated = true
+                IsUserCreated = true,
+                Splits = splitRows
             };
             transferRule.ApplyCategory(creditCategory);
             transferRule.TargetCategoryId = billCategory.Id;
             transferRule.TargetCategory = billCategory.Name;
             _transactions.AddRecurringTransferRule(transferRule);
             new ReconciliationOrchestrator(_transactions).MaterializeRule(transferRule);
+        }
+
+        private static List<SplitTransactionRow> PrepareSplits(
+            decimal parentAmount,
+            IReadOnlyList<SplitTransactionRow>? splits)
+        {
+            if (splits is null || splits.Count == 0)
+                return [];
+
+            var rows = splits.Select(split => split.Clone()).ToList();
+            SplitTransactionValidator.Validate(parentAmount, rows);
+            return rows;
         }
 
         public BillDraft? LoadBill(BillRow row)
@@ -408,7 +429,8 @@ namespace THMS.Logic.Orchestrators.Finance
                     Amount = single.Amount,
                     BillCategoryId = single.CategoryId,
                     Date = single.NextOccurrence.Date,
-                    Frequency = single.Frequency
+                    Frequency = single.Frequency,
+                    Splits = single.Splits.Select(split => split.Clone()).ToList()
                 };
             }
 
@@ -427,7 +449,8 @@ namespace THMS.Logic.Orchestrators.Finance
                     BillCategoryId = transfer.TargetCategoryId ?? transfer.CategoryId,
                     CreditCategoryId = transfer.CategoryId,
                     Date = transfer.NextOccurrence.Date,
-                    Frequency = transfer.Frequency
+                    Frequency = transfer.Frequency,
+                    Splits = transfer.Splits.Select(split => split.Clone()).ToList()
                 };
             }
 
@@ -445,7 +468,8 @@ namespace THMS.Logic.Orchestrators.Finance
                     Description = futureSingle.Description ?? "",
                     Amount = futureSingle.Amount,
                     BillCategoryId = futureSingle.CategoryId,
-                    Date = futureSingle.Date.Date
+                    Date = futureSingle.Date.Date,
+                    Splits = futureSingle.Splits.Select(split => split.Clone()).ToList()
                 };
             }
 
@@ -462,7 +486,8 @@ namespace THMS.Logic.Orchestrators.Finance
                     Amount = Math.Abs(futureTransfer.Amount),
                     BillCategoryId = futureTransfer.TargetCategoryId ?? futureTransfer.CategoryId,
                     CreditCategoryId = futureTransfer.CategoryId,
-                    Date = futureTransfer.Date.Date
+                    Date = futureTransfer.Date.Date,
+                    Splits = futureTransfer.Splits.Select(split => split.Clone()).ToList()
                 };
             }
 
@@ -478,7 +503,8 @@ namespace THMS.Logic.Orchestrators.Finance
             DateTime date,
             Guid? creditAccountId,
             Guid? creditCategoryId,
-            RecurrenceFrequency? frequency)
+            RecurrenceFrequency? frequency,
+            IReadOnlyList<SplitTransactionRow>? splits = null)
         {
             ArgumentNullException.ThrowIfNull(existing);
             if (existing.Source == PaymentIntentSource.RecurringSingle && existing.RuleId is Guid singleId)
@@ -504,7 +530,8 @@ namespace THMS.Logic.Orchestrators.Finance
                 date,
                 creditAccountId,
                 creditCategoryId,
-                frequency);
+                frequency,
+                splits);
         }
 
         private ExpenseCategory RequireCategory(Guid categoryId)
@@ -639,7 +666,7 @@ namespace THMS.Logic.Orchestrators.Finance
         {
             ArgumentNullException.ThrowIfNull(row);
             var expectedId = row.IntentId ?? EnsureExpected(row, ExpectedStatus.Planned);
-            new ReconciliationOrchestrator(_transactions).AcceptMatch(importedId, expectedId);
+            new ReconciliationOrchestrator(_transactions, _statements).AcceptMatch(importedId, expectedId);
         }
 
         private Guid EnsureExpected(BillRow row, ExpectedStatus status)
@@ -701,6 +728,58 @@ namespace THMS.Logic.Orchestrators.Finance
 
         private IEnumerable<FutureSingleTransaction> UnmatchedSingles() =>
             _transactions.GetAllFutureSingleTransactions().Where(e => !e.IsRealized);
+
+        private void ClearPaidStatementBill(AccountStatement? latest)
+        {
+            if (latest is null || latest.BillCleared || !RealizedPaymentCovers(latest))
+                return;
+
+            latest.BillCleared = true;
+            _statements.Save(latest);
+        }
+
+        private bool RealizedPaymentCovers(AccountStatement statement)
+        {
+            var due = Math.Abs(statement.AmountDue);
+            if (due == 0)
+                return false;
+
+            foreach (var transfer in _transactions.GetAllFutureTransferTransactions())
+            {
+                if (!transfer.IsRealized || !PaysStatement(transfer.Origin, transfer.OriginId, transfer.StatementId, statement.Id))
+                    continue;
+                if (CoversAmountDue(PostedAmount(transfer.PostedToTransactionId), due)
+                    || CoversAmountDue(PostedAmount(transfer.PostedFromTransactionId), due))
+                    return true;
+            }
+
+            foreach (var single in _transactions.GetAllFutureSingleTransactions())
+            {
+                if (!single.IsRealized || !PaysStatement(single.Origin, single.OriginId, single.StatementId, statement.Id))
+                    continue;
+                if (CoversAmountDue(PostedAmount(single.PostedTransactionId), due))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private decimal? PostedAmount(Guid? id)
+        {
+            if (id is not Guid postedId || postedId == Guid.Empty)
+                return null;
+
+            PostedTransaction? posted = _transactions.GetPostedTransaction(postedId)
+                ?? _transactions.GetPostedTransferTransaction(postedId);
+            return posted?.Amount;
+        }
+
+        private static bool PaysStatement(ExpectedOrigin origin, Guid? originId, Guid? statementId, Guid expectedStatementId) =>
+            origin == ExpectedOrigin.StatementPay
+            && (originId == expectedStatementId || statementId == expectedStatementId);
+
+        private static bool CoversAmountDue(decimal? paid, decimal amountDue) =>
+            paid is decimal amount && Math.Abs(amount) >= amountDue;
 
         private void DropSupersededStatementExpected()
         {

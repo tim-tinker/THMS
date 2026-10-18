@@ -83,6 +83,13 @@ namespace THMS.Tests.Logic
                 Charges = [new() { Description = "Energy", Amount = 40 }]
             }), Has.Some.Contains("positive amount").And.Some.Contains("must equal amount due"));
 
+            Assert.That(AccountStatementValidator.Validate(new UtilityStatement
+            {
+                StatementDate = DateTime.Today,
+                DueDate = DateTime.Today,
+                AmountDue = 50
+            }), Is.Empty);
+
             Assert.That(AccountStatementValidator.Validate(new ServiceStatement
             {
                 StatementDate = DateTime.Today,

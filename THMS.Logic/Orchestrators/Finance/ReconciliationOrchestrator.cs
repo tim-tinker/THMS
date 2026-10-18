@@ -1,4 +1,5 @@
 using THMS.Data.Stores;
+using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Forecast;
 using THMS.Logic.ViewModels;
@@ -9,16 +10,20 @@ namespace THMS.Logic.Orchestrators.Finance
     public class ReconciliationOrchestrator
     {
         private readonly ITransactionDataStore _transactions;
+        private readonly IAccountStatementDataStore? _statements;
         private readonly MatchRecommender _recommender = new();
 
         public ReconciliationOrchestrator()
-            : this(new DataStoreFactory().GetTransactionStore())
+            : this(
+                new DataStoreFactory().GetTransactionStore(),
+                new DataStoreFactory().GetAccountStatementStore())
         {
         }
 
-        public ReconciliationOrchestrator(ITransactionDataStore transactions)
+        public ReconciliationOrchestrator(ITransactionDataStore transactions, IAccountStatementDataStore? statements = null)
         {
             _transactions = transactions;
+            _statements = statements;
         }
 
         public int RecommendMatches()
@@ -147,8 +152,10 @@ namespace THMS.Logic.Orchestrators.Finance
 
             if (reconciliation.ExpectedTransactionId is Guid expectedId)
             {
+                var expected = ResolveExpected(expectedId);
                 Unrealize(expectedId);
                 RestoreRule(expectedId, reconciliation);
+                RestoreStatementBill(expected);
             }
 
             _transactions.DeleteReconciliation(reconciliation.Id);
@@ -260,8 +267,50 @@ namespace THMS.Logic.Orchestrators.Finance
             if (origin is ExpectedOrigin.RecurringSingle or ExpectedOrigin.RecurringTransfer && originId is Guid ruleId)
                 AdvanceRule(origin, ruleId, imported.Date);
 
+            ClearStatementBillIfPaid(expected, imported.Amount);
             return reconciliation;
         }
+
+        private void ClearStatementBillIfPaid(BaseTransaction expected, decimal paidAmount)
+        {
+            if (_statements is null)
+                return;
+            var statementId = StatementIdOf(expected);
+            if (statementId is not Guid id)
+                return;
+            var statement = _statements.Get(id);
+            if (statement is null || statement.BillCleared)
+                return;
+            if (Math.Abs(paidAmount) < Math.Abs(statement.AmountDue))
+                return;
+
+            statement.BillCleared = true;
+            _statements.Save(statement);
+        }
+
+        private void RestoreStatementBill(BaseTransaction? expected)
+        {
+            if (_statements is null)
+                return;
+            var statementId = StatementIdOf(expected);
+            if (statementId is not Guid id)
+                return;
+            var statement = _statements.Get(id);
+            if (statement is null || !statement.BillCleared)
+                return;
+
+            statement.BillCleared = false;
+            _statements.Save(statement);
+        }
+
+        private static Guid? StatementIdOf(BaseTransaction? expected) => expected switch
+        {
+            FutureTransferTransaction transfer when transfer.Origin == ExpectedOrigin.StatementPay
+                => transfer.StatementId ?? transfer.OriginId,
+            FutureSingleTransaction single when single.Origin == ExpectedOrigin.StatementPay
+                => single.StatementId ?? single.OriginId,
+            _ => null
+        };
 
         private void CaptureRule(
             ExpectedOrigin origin,

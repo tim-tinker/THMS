@@ -102,6 +102,9 @@ namespace THMS.Logic.Finance.Planning
                 }
             }
 
+            if (utility.Usage.Count == 0 && utility.Charges.Count == 0)
+                return;
+
             var total = utility.Usage.Sum(usage => usage.Cost) + utility.Charges.Sum(charge => charge.Amount);
             if (!AmountsEqual(total, utility.AmountDue))
                 findings.Add($"Utility usage and charges ({total:c2}) must equal amount due ({utility.AmountDue:c2}).");

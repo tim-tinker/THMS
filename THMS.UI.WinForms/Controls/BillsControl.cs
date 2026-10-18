@@ -2,6 +2,8 @@ using System.Diagnostics;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
+using THMS.Logic.Finance.Categories;
+using THMS.Logic.Finance.Transactions;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
@@ -676,7 +678,8 @@ namespace THMS.UI.WinForms.Controls
                         dialog.Date,
                         dialog.CreditAccountId,
                         dialog.CreditCategoryId,
-                        dialog.Frequency);
+                        dialog.Frequency,
+                        dialog.Splits);
                 }
                 else
                 {
@@ -689,7 +692,8 @@ namespace THMS.UI.WinForms.Controls
                         dialog.Date,
                         dialog.CreditAccountId,
                         dialog.CreditCategoryId,
-                        dialog.Frequency);
+                        dialog.Frequency,
+                        dialog.Splits);
                 }
 
                 Reload();
@@ -783,10 +787,15 @@ namespace THMS.UI.WinForms.Controls
         private readonly ThmsButton _save = new() { Text = "Save" };
         private readonly ThmsButton _cancel = new() { Text = "Cancel" };
 
+        private readonly List<Account> _accounts;
         private readonly Guid? _billAccountId;
-        private readonly Guid? _billCategoryId;
         private readonly Guid? _creditAccountId;
         private readonly Guid? _creditCategoryId;
+        private List<ExpenseCategory> _categories;
+        private List<SplitTransactionRow> _pendingSplits;
+        private Guid? _billCategoryId;
+        private bool _showSplit;
+        private bool _loadingCategories;
 
         public Guid BillAccountId { get; private set; }
         public string Description { get; private set; } = "";
@@ -796,6 +805,7 @@ namespace THMS.UI.WinForms.Controls
         public Guid? CreditAccountId { get; private set; }
         public Guid? CreditCategoryId { get; private set; }
         public RecurrenceFrequency? Frequency { get; private set; }
+        public IReadOnlyList<SplitTransactionRow> Splits { get; private set; } = [];
 
         public AddBillDialog(
             IReadOnlyList<Account> accounts,
@@ -813,18 +823,21 @@ namespace THMS.UI.WinForms.Controls
             AutoSize = false;
             AutoScroll = false;
 
-            var ordered = accounts.OrderBy(a => a.Name).ToList();
-            var categoryList = categories.OrderBy(c => c.Name).ToList();
+            _accounts = accounts.OrderBy(a => a.Name).ToList();
+            _categories = categories.ToList();
             _billAccountId = existing?.BillAccountId is Guid billId && billId != Guid.Empty
                 ? billId
                 : selectedAccountId;
             _billCategoryId = existing?.BillCategoryId;
             _creditAccountId = existing?.CreditAccountId;
             _creditCategoryId = existing?.CreditCategoryId;
-            BindAccounts(_billAccount, ordered);
-            BindAccounts(_creditAccount, BlankFirst(ordered));
-            BindCategories(_billCategory, categoryList);
-            BindCategories(_creditCategory, categoryList);
+            _pendingSplits = existing?.Splits.Select(split => split.Clone()).ToList() ?? [];
+            _showSplit = _pendingSplits.Count > 0;
+            BindAccounts(_billAccount, _accounts);
+            BindAccounts(_creditAccount, BlankFirst(_accounts));
+            BindBillCategories();
+            BindCategories(_creditCategory, _categories, _creditCategoryId);
+            _billCategory.SelectionChangeCommitted += OnBillCategoryCommitted;
 
             _description.Width = 280;
             _amount.Width = 280;
@@ -874,7 +887,10 @@ namespace THMS.UI.WinForms.Controls
         private void ApplySelections()
         {
             SelectAccount(_billAccount, _billAccountId);
-            SelectCategory(_billCategory, _billCategoryId);
+            if (_showSplit)
+                SelectSplit(_billCategory);
+            else
+                SelectCategory(_billCategory, _billCategoryId);
             SelectAccount(_creditAccount, _creditAccountId);
             if (HasCreditAccount())
                 SelectCategory(_creditCategory, _creditCategoryId);
@@ -938,37 +954,31 @@ namespace THMS.UI.WinForms.Controls
 
         private static void SelectCategory(ComboBox combo, Guid? id)
         {
-            if (combo.DataSource is not IList<ExpenseCategory> categories || categories.Count == 0)
+            if (combo.DataSource is not IList<CategoryListItem> categories || categories.Count == 0)
                 return;
 
             EnsureComboItems(combo);
-            var index = -1;
-            if (id is Guid categoryId)
-            {
-                for (var i = 0; i < categories.Count; i++)
-                {
-                    if (categories[i].Id != categoryId)
-                        continue;
-                    index = i;
-                    break;
-                }
-            }
-
-            if (index < 0)
-            {
-                for (var i = 0; i < categories.Count; i++)
-                {
-                    if (categories[i].Id != DefaultExpenseCategories.UncategorizedId)
-                        continue;
-                    index = i;
-                    break;
-                }
-            }
-
+            var index = IndexOfCategory(categories, id);
+            if (index < 0 && id is not null)
+                index = IndexOfCategory(categories, DefaultExpenseCategories.UncategorizedId);
             if (index < 0)
                 index = 0;
             if (index < combo.Items.Count)
                 combo.SelectedIndex = index;
+        }
+
+        private static int IndexOfCategory(IList<CategoryListItem> categories, Guid? id)
+        {
+            if (id is not Guid categoryId)
+                return -1;
+
+            for (var i = 0; i < categories.Count; i++)
+            {
+                if (categories[i].CategoryId == categoryId)
+                    return i;
+            }
+
+            return -1;
         }
 
         private static void EnsureComboItems(ComboBox combo)
@@ -998,6 +1008,8 @@ namespace THMS.UI.WinForms.Controls
                 editor.Top = y;
                 editor.Width = editorWidth;
                 editor.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+                if (editor is ComboBox combo && combo.DataSource is IList<CategoryListItem>)
+                    WidenCategoryDropDown(combo);
                 y += rowHeight;
             }
 
@@ -1029,13 +1041,175 @@ namespace THMS.UI.WinForms.Controls
             EnsureComboItems(combo);
         }
 
-        private static void BindCategories(ComboBox combo, List<ExpenseCategory> categories)
+        private static void BindCategories(ComboBox combo, IReadOnlyList<ExpenseCategory> categories, Guid? selectedId)
         {
+            var active = categories.Where(category => category.IsActive).ToList();
+            var items = CategoryTreeUi.ComboItems(active, includeSplit: false)
+                .Where(item => item.Action == CategoryListAction.None)
+                .ToList();
+            if (selectedId is Guid id && items.All(item => item.CategoryId != id))
+            {
+                var extra = categories.FirstOrDefault(category => category.Id == id);
+                if (extra is not null)
+                {
+                    items.Add(new CategoryListItem(
+                        ExpenseCategoryTree.IndentedName(categories, extra),
+                        extra.Id,
+                        CategoryListAction.None));
+                }
+            }
+
             combo.DropDownStyle = ComboBoxStyle.DropDownList;
-            combo.DisplayMember = nameof(ExpenseCategory.Name);
-            combo.ValueMember = nameof(ExpenseCategory.Id);
-            combo.DataSource = categories.ToList();
+            combo.DisplayMember = nameof(CategoryListItem.Label);
+            combo.DataSource = items;
+            WidenCategoryDropDown(combo);
             EnsureComboItems(combo);
+        }
+
+        private void BindBillCategories()
+        {
+            var active = _categories.Where(category => category.IsActive).ToList();
+            var items = CategoryTreeUi.ComboItems(active, includeSplit: true);
+            if (_billCategoryId is Guid id && items.All(item => item.CategoryId != id))
+            {
+                var extra = _categories.FirstOrDefault(category => category.Id == id);
+                if (extra is not null)
+                {
+                    var choice = new CategoryListItem(
+                        ExpenseCategoryTree.IndentedName(_categories, extra),
+                        extra.Id,
+                        CategoryListAction.None);
+                    var insertAt = items.FindIndex(item => item.Action == CategoryListAction.NewCategory);
+                    if (insertAt >= 0)
+                        items.Insert(insertAt, choice);
+                    else
+                        items.Add(choice);
+                }
+            }
+
+            _loadingCategories = true;
+            _billCategory.DropDownStyle = ComboBoxStyle.DropDownList;
+            _billCategory.DisplayMember = nameof(CategoryListItem.Label);
+            _billCategory.DataSource = items;
+            WidenCategoryDropDown(_billCategory);
+            EnsureComboItems(_billCategory);
+            if (_showSplit)
+                SelectSplit(_billCategory);
+            else
+                SelectCategory(_billCategory, _billCategoryId);
+            _loadingCategories = false;
+        }
+
+        private void OnBillCategoryCommitted(object? sender, EventArgs e)
+        {
+            if (_loadingCategories || _billCategory.SelectedItem is not CategoryListItem item)
+                return;
+
+            switch (item.Action)
+            {
+                case CategoryListAction.Split:
+                    BeginInvoke(EditSplits);
+                    break;
+                case CategoryListAction.NewCategory:
+                    BeginInvoke(CreateBillCategory);
+                    break;
+                case CategoryListAction.ManageCategories:
+                    BeginInvoke(ManageBillCategories);
+                    break;
+                default:
+                    _showSplit = false;
+                    _pendingSplits = [];
+                    _billCategoryId = item.CategoryId;
+                    break;
+            }
+        }
+
+        private void EditSplits()
+        {
+            if (_amount.Value == 0)
+            {
+                MessageBox.Show(this, "Enter the amount before splitting it.", Text,
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                BindBillCategories();
+                return;
+            }
+
+            var active = _categories.Where(category => category.IsActive).ToList();
+            using var editor = new SplitTransactionEditor(
+                _description.Text.Trim(),
+                StoredAmount(),
+                _pendingSplits,
+                active,
+                _accounts);
+            if (editor.ShowDialog(this) != DialogResult.OK)
+            {
+                BindBillCategories();
+                return;
+            }
+
+            _pendingSplits = editor.Result;
+            _showSplit = _pendingSplits.Count > 0;
+            BindBillCategories();
+        }
+
+        private void CreateBillCategory()
+        {
+            using var editor = new CategoryEditor(new CategoryOrchestrator());
+            if (editor.ShowDialog(this) != DialogResult.OK || editor.CreatedCategory is null)
+            {
+                BindBillCategories();
+                return;
+            }
+
+            _showSplit = false;
+            _pendingSplits = [];
+            _billCategoryId = editor.CreatedCategory.Id;
+            ReloadCategories();
+        }
+
+        private void ManageBillCategories()
+        {
+            using var manager = new CategoryManager(new CategoryOrchestrator());
+            manager.ShowDialog(this);
+            ReloadCategories();
+        }
+
+        private void ReloadCategories()
+        {
+            var orchestrator = new CategoryOrchestrator();
+            _categories = orchestrator.GetAllCategories(includeInactive: true).ToList();
+            BindBillCategories();
+            BindCategories(_creditCategory, _categories, _creditCategoryId);
+            if (HasCreditAccount())
+                SelectCategory(_creditCategory, _creditCategoryId);
+        }
+
+        private decimal StoredAmount() =>
+            HasCreditAccount() ? Math.Abs(_amount.Value) : _amount.Value;
+
+        private static void SelectSplit(ComboBox combo)
+        {
+            if (combo.DataSource is not IList<CategoryListItem> categories)
+                return;
+
+            EnsureComboItems(combo);
+            for (var i = 0; i < categories.Count; i++)
+            {
+                if (categories[i].Action != CategoryListAction.Split)
+                    continue;
+                if (i < combo.Items.Count)
+                    combo.SelectedIndex = i;
+                return;
+            }
+        }
+
+        private static void WidenCategoryDropDown(ComboBox combo)
+        {
+            if (combo.DataSource is not IList<CategoryListItem> items || items.Count == 0)
+                return;
+
+            var longest = items.Max(item => TextRenderer.MeasureText(item.Label, combo.Font).Width);
+            combo.DropDownWidth = Math.Max(combo.Width, longest + SystemInformation.VerticalScrollBarWidth);
         }
 
         private static List<Account> BlankFirst(IReadOnlyList<Account> accounts)
@@ -1065,7 +1239,26 @@ namespace THMS.UI.WinForms.Controls
                 return;
             }
 
-            if (_billCategory.SelectedItem is not ExpenseCategory billCategory)
+            Guid billCategoryId;
+            if (_showSplit && _pendingSplits.Count > 0)
+            {
+                try
+                {
+                    SplitTransactionValidator.Validate(StoredAmount(), _pendingSplits);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                billCategoryId = _billCategoryId ?? DefaultExpenseCategories.UncategorizedId;
+            }
+            else if (_billCategory.SelectedItem is CategoryListItem { Action: CategoryListAction.None, CategoryId: Guid selectedCategoryId })
+            {
+                billCategoryId = selectedCategoryId;
+            }
+            else
             {
                 MessageBox.Show(this, "Select a bill category.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -1082,20 +1275,21 @@ namespace THMS.UI.WinForms.Controls
                     return;
                 }
 
-                if (_creditCategory.SelectedItem is not ExpenseCategory creditCategory)
+                if (_creditCategory.SelectedItem is not CategoryListItem creditCategory || creditCategory.CategoryId is not Guid selectedCreditCategoryId)
                 {
                     MessageBox.Show(this, "Select a credit category.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
                 creditAccountId = credit.Id;
-                creditCategoryId = creditCategory.Id;
+                creditCategoryId = selectedCreditCategoryId;
             }
 
             BillAccountId = bill.Id;
             Description = _description.Text.Trim();
             Amount = _amount.Value;
-            BillCategoryId = billCategory.Id;
+            BillCategoryId = billCategoryId;
+            Splits = _showSplit ? _pendingSplits.Select(split => split.Clone()).ToList() : [];
             Date = _date.Value.Date;
             CreditAccountId = creditAccountId;
             CreditCategoryId = creditCategoryId;

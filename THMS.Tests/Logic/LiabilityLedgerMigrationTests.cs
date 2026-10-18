@@ -152,6 +152,75 @@ namespace THMS.Tests.Logic
             }
         }
 
+        [Test]
+        public void Apply_NegatesPlaidCreditCardAmountsOnce()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"thms-liability-{Guid.NewGuid():N}.db");
+            try
+            {
+                var cardId = Guid.NewGuid().ToString();
+                var checkingId = Guid.NewGuid().ToString();
+                var chargeId = Guid.NewGuid().ToString();
+                var paymentId = Guid.NewGuid().ToString();
+                var fileId = Guid.NewGuid().ToString();
+                var checkingTxnId = Guid.NewGuid().ToString();
+                var splitId = Guid.NewGuid().ToString();
+                var transferId = Guid.NewGuid().ToString();
+
+                using (var conn = Open(path))
+                {
+                    Execute(conn, @"
+                        CREATE TABLE CreditAccounts (AccountId TEXT PRIMARY KEY);
+                        CREATE TABLE PostedTransactions (
+                            Id TEXT PRIMARY KEY, AccountId TEXT NOT NULL, Date TEXT NOT NULL,
+                            Description TEXT, Amount REAL NOT NULL, Category TEXT,
+                            ExternalTransactionId TEXT);
+                        CREATE TABLE PostedTransferTransactions (
+                            Id TEXT PRIMARY KEY, AccountId TEXT NOT NULL, Amount REAL NOT NULL,
+                            ExternalTransactionId TEXT);
+                        CREATE TABLE SplitTransactionRows (
+                            Id TEXT PRIMARY KEY, ParentTransactionId TEXT NOT NULL, Amount REAL NOT NULL);
+                        INSERT INTO CreditAccounts (AccountId) VALUES (@Card);
+                        INSERT INTO PostedTransactions (Id, AccountId, Date, Description, Amount, Category, ExternalTransactionId)
+                            VALUES (@Charge, @Card, '2026-10-09', 'AMAZON', 19.28, 'Restaurants', 'plaid-charge');
+                        INSERT INTO PostedTransactions (Id, AccountId, Date, Description, Amount, Category, ExternalTransactionId)
+                            VALUES (@Payment, @Card, '2026-09-25', 'ONLINE PAYMENT - THANK YOU', -1600, 'Credit Card Payment', 'plaid-payment');
+                        INSERT INTO PostedTransactions (Id, AccountId, Date, Description, Amount, Category, ExternalTransactionId)
+                            VALUES (@File, @Card, '2026-10-09', 'Interest Charge on Purchases', -278.69, 'Interest', '');
+                        INSERT INTO PostedTransactions (Id, AccountId, Date, Description, Amount, Category, ExternalTransactionId)
+                            VALUES (@CheckingTxn, @Checking, '2026-10-09', 'Market', -12.34, 'Groceries', 'plaid-checking');
+                        INSERT INTO SplitTransactionRows (Id, ParentTransactionId, Amount)
+                            VALUES (@Split, @Charge, 19.28);
+                        INSERT INTO PostedTransferTransactions (Id, AccountId, Amount, ExternalTransactionId)
+                            VALUES (@Transfer, @Card, 6.55, 'plaid-transfer');",
+                        ("@Card", cardId),
+                        ("@Checking", checkingId),
+                        ("@Charge", chargeId),
+                        ("@Payment", paymentId),
+                        ("@File", fileId),
+                        ("@CheckingTxn", checkingTxnId),
+                        ("@Split", splitId),
+                        ("@Transfer", transferId));
+
+                    LiabilityLedgerMigration.Apply(conn);
+                    LiabilityLedgerMigration.Apply(conn);
+
+                    Assert.That(Scalar(conn, "SELECT Amount FROM PostedTransactions WHERE Id = @Id", ("@Id", chargeId)), Is.EqualTo(-19.28));
+                    Assert.That(Scalar(conn, "SELECT Amount FROM PostedTransactions WHERE Id = @Id", ("@Id", paymentId)), Is.EqualTo(1600));
+                    Assert.That(Scalar(conn, "SELECT Amount FROM PostedTransactions WHERE Id = @Id", ("@Id", fileId)), Is.EqualTo(-278.69));
+                    Assert.That(Scalar(conn, "SELECT Amount FROM PostedTransactions WHERE Id = @Id", ("@Id", checkingTxnId)), Is.EqualTo(-12.34));
+                    Assert.That(Scalar(conn, "SELECT Amount FROM SplitTransactionRows WHERE Id = @Id", ("@Id", splitId)), Is.EqualTo(-19.28));
+                    Assert.That(Scalar(conn, "SELECT Amount FROM PostedTransferTransactions WHERE Id = @Id", ("@Id", transferId)), Is.EqualTo(-6.55));
+                }
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+        }
+
         private static SqliteConnection Open(string path)
         {
             var conn = new SqliteConnection($"Data Source={path}");

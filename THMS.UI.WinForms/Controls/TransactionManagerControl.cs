@@ -40,7 +40,7 @@ namespace THMS.UI.WinForms.Controls
         private bool _hostProvidesAccounts;
         private Font? _unreconciledAccountFont;
         private List<UnifiedTransactionView> _allTransactions = [];
-        private HashSet<string>? _categoryFilter;
+        private string? _categoryFilter;
         private string _descriptionSearch = "";
         private bool _suppressBalanceRecompute;
         private TextBox txtDescriptionSearch = null!;
@@ -198,6 +198,7 @@ namespace THMS.UI.WinForms.Controls
             detailGrid.CellDoubleClick += (_, e) => OnTransactionDoubleClick(detailGrid, CategoryColumn, e, includeRules: true);
             detailGrid.KeyDown += (_, e) => OnTransactionKeyDown(detailGrid, CategoryColumn, e, includeRules: true);
             detailGrid.CellMouseClick += (_, e) => OnCategoryCellMouseClick(detailGrid, CategoryColumn, e);
+            CategoryColumn.SortMode = DataGridViewColumnSortMode.NotSortable;
             detailGrid.ColumnHeaderMouseClick += OnLedgerHeaderMouseClick;
             detailGrid.CellFormatting += OnLedgerCellFormatting;
             detailGrid.SelectionChanged += (_, _) => UpdateRuleActionButtons();
@@ -219,6 +220,10 @@ namespace THMS.UI.WinForms.Controls
             grid.CellDoubleClick += (_, e) => OnTransactionDoubleClick(grid, category, e, includeRules: false);
             grid.CellMouseClick += (_, e) => OnCategoryCellMouseClick(grid, category, e);
             grid.KeyDown += (_, e) => OnTransactionKeyDown(grid, category, e, includeRules: false);
+            grid.MultiSelect = true;
+            grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            if (grid.DataSource is BindingSource source)
+                TransactionCategoryFilter.Attach(grid, source);
             AttachTransactionDrop(grid, accountId);
         }
 
@@ -418,6 +423,8 @@ namespace THMS.UI.WinForms.Controls
                     menu.Items.Add(split);
                 }
 
+                AddSetCategoryItem(menu, selected, current);
+
                 if (CanEditTransaction(current))
                 {
                     if (menu.Items.Count > 0)
@@ -457,6 +464,36 @@ namespace THMS.UI.WinForms.Controls
 
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
             menu.Show(grid, location);
+        }
+
+        private void AddSetCategoryItem(
+            ContextMenuStrip menu,
+            IReadOnlyList<UnifiedTransactionView> selected,
+            UnifiedTransactionView? current)
+        {
+            var targets = selected.ToList();
+            if (current is not null && targets.All(row => row.Id != current.Id))
+                targets.Add(current);
+            targets = targets
+                .Where(CanAssignCategory)
+                .DistinctBy(row => (row.LookupId, row.SplitRowId))
+                .ToList();
+            if (targets.Count == 0)
+                return;
+
+            if (menu.Items.Count > 0)
+                menu.Items.Add(new ToolStripSeparator());
+
+            Guid? shared = targets.Select(row => row.CategoryId).Distinct().Count() == 1
+                ? targets[0].CategoryId
+                : null;
+            menu.Items.Add(CategoryTreeUi.CreateSetCategoryItem(
+                _categoryOrchestrator.GetActiveCategories(),
+                targets.Count,
+                shared,
+                category => AssignCategory(targets, category.Id),
+                () => CreateAndAssignCategory(targets),
+                OpenCategoryManager));
         }
 
         private void OnTransactionDrag(DragEventArgs e, Func<Guid?> accountId)
@@ -557,6 +594,12 @@ namespace THMS.UI.WinForms.Controls
 
                 ShowLoadProgress("Updating grid...");
                 _allTransactions = views;
+                if (_categoryFilter is not null && views.All(row => !SameCategory(row, _categoryFilter)))
+                {
+                    _categoryFilter = null;
+                    CategoryColumn.HeaderText = "Category";
+                }
+
                 ApplyLedgerRowFilter();
                 UpdateRuleActionButtons();
             }
@@ -820,6 +863,9 @@ namespace THMS.UI.WinForms.Controls
         private bool LedgerRowFilterActive =>
             _categoryFilter is not null || !string.IsNullOrWhiteSpace(_descriptionSearch);
 
+        private bool ShowingCreditCard() =>
+            _accountsSource.Current is UnifiedAccountView { AccountType: AccountKinds.Credit };
+
         private void OnDescriptionSearchChanged(object? sender, EventArgs e)
         {
             _descriptionSearch = txtDescriptionSearch.Text.Trim();
@@ -835,7 +881,7 @@ namespace THMS.UI.WinForms.Controls
 
             var header = detailGrid.GetCellDisplayRectangle(e.ColumnIndex, -1, cutOverflow: false);
             var screen = detailGrid.RectangleToScreen(header);
-            ExcelColumnFilterDropDown.Show(
+            ExcelColumnFilterDropDown.ShowSingle(
                 this,
                 screen,
                 _allTransactions.Select(CategoryKey),
@@ -852,6 +898,14 @@ namespace THMS.UI.WinForms.Controls
         {
             if (e.RowIndex < 0 || e.ColumnIndex < 0)
                 return;
+            if (detailGrid.Columns[e.ColumnIndex] == AmountColumn
+                && ShowingCreditCard()
+                && e.Value is decimal amount)
+            {
+                e.Value = -amount;
+                return;
+            }
+
             if (detailGrid.Columns[e.ColumnIndex] != ForecastColumn)
                 return;
             if (!LedgerRowFilterActive)
@@ -873,7 +927,7 @@ namespace THMS.UI.WinForms.Controls
 
             IEnumerable<UnifiedTransactionView> rows = _allTransactions;
             if (_categoryFilter is not null)
-                rows = rows.Where(t => _categoryFilter.Contains(CategoryKey(t)));
+                rows = rows.Where(t => SameCategory(t, _categoryFilter));
             if (!string.IsNullOrWhiteSpace(_descriptionSearch))
             {
                 rows = rows.Where(t =>
@@ -948,11 +1002,16 @@ namespace THMS.UI.WinForms.Controls
         private static string CategoryKey(UnifiedTransactionView view) =>
             ExcelColumnFilterDropDown.Normalize(view.Category);
 
+        private static bool SameCategory(UnifiedTransactionView view, string category) =>
+            string.Equals(CategoryKey(view), category, StringComparison.CurrentCultureIgnoreCase);
+
         private void OnCategoryCellMouseClick(DataGridView grid, DataGridViewColumn? categoryColumn, DataGridViewCellMouseEventArgs e)
         {
             if (categoryColumn is null || e.RowIndex < 0 || !IsCategoryColumn(grid, categoryColumn, e.ColumnIndex))
                 return;
             if (e.Button != MouseButtons.Left)
+                return;
+            if ((Control.ModifierKeys & (Keys.Control | Keys.Shift)) != 0)
                 return;
             if (!CanEditCategory(grid, e.RowIndex))
                 return;
@@ -986,8 +1045,8 @@ namespace THMS.UI.WinForms.Controls
                 _categoryOrchestrator.GetActiveCategories(),
                 splitSelected ? null : view.CategoryId ?? suggestion?.CategoryId,
                 splitSelected ? null : suggestion?.CategoryId,
-                category => AssignCategory(view, category.Id),
-                () => CreateAndAssignCategory(view),
+                category => AssignCategory([view], category.Id),
+                () => CreateAndAssignCategory([view]),
                 OpenCategoryManager,
                 () => OpenSplitEditor(view),
                 splitSelected);
@@ -997,19 +1056,23 @@ namespace THMS.UI.WinForms.Controls
             menu.Show(grid, new Point(cell.Left, cell.Bottom));
         }
 
-        private void AssignCategory(UnifiedTransactionView view, Guid categoryId)
+        private static bool CanAssignCategory(UnifiedTransactionView view) =>
+            view.Type is UnifiedTransactionView.PostedType or UnifiedTransactionView.PostedTransferType;
+
+        private void AssignCategory(IReadOnlyList<UnifiedTransactionView> views, Guid categoryId)
         {
-            _categoryOrchestrator.AssignToPosted(view.LookupId, categoryId, splitRowId: view.SplitRowId);
+            foreach (var view in views)
+                _categoryOrchestrator.AssignToPosted(view.LookupId, categoryId, splitRowId: view.SplitRowId);
             RefreshAll();
         }
 
-        private void CreateAndAssignCategory(UnifiedTransactionView view)
+        private void CreateAndAssignCategory(IReadOnlyList<UnifiedTransactionView> views)
         {
             using var editor = new CategoryEditor(_categoryOrchestrator);
             if (editor.ShowDialog(FindForm()) != DialogResult.OK || editor.CreatedCategory is null)
                 return;
 
-            AssignCategory(view, editor.CreatedCategory.Id);
+            AssignCategory(views, editor.CreatedCategory.Id);
         }
 
         private void OpenCategoryManager()
@@ -1101,12 +1164,16 @@ namespace THMS.UI.WinForms.Controls
                     categories.Add(current);
             }
 
-            var hint = parent switch
-            {
-                FutureTransferTransaction => "Amount is the size of the transfer.",
-                PostedTransferTransaction => "Negative amounts leave this account. Positive amounts come in.",
-                _ => "Negative amounts leave this account. Positive amounts are deposits."
-            };
+            var showIssuerSign = parent is not FutureTransferTransaction
+                && _accountOrchestrator.GetAllAccounts().FirstOrDefault(account => account.Id == view.AccountId) is CreditAccount;
+            var hint = showIssuerSign
+                ? "A charge is a positive amount. A payment is negative."
+                : parent switch
+                {
+                    FutureTransferTransaction => "Amount is the size of the transfer.",
+                    PostedTransferTransaction => "Negative amounts leave this account. Positive amounts come in.",
+                    _ => "Negative amounts leave this account. Positive amounts are deposits."
+                };
             if (parent.HasSplits)
                 hint += " Amount and category are changed from Split Transaction.";
 
@@ -1115,7 +1182,7 @@ namespace THMS.UI.WinForms.Controls
                 hint,
                 categories,
                 defaultDescription: parent.Description,
-                initialAmount: parent.Amount,
+                initialAmount: showIssuerSign ? -parent.Amount : parent.Amount,
                 initialDate: parent.Date,
                 initialCategoryId: parent.CategoryId,
                 lockAmount: parent.HasSplits,
@@ -1131,7 +1198,7 @@ namespace THMS.UI.WinForms.Controls
                 _activityOrchestrator.UpdateLedgerEntry(
                     parent.Id,
                     dialog.Date,
-                    dialog.Amount,
+                    showIssuerSign ? -dialog.Amount : dialog.Amount,
                     dialog.Description,
                     dialog.CategoryId);
                 if (dialog.HasPendingSplits)

@@ -100,6 +100,37 @@ namespace THMS.UI.WinForms.Controls
             return menu;
         }
 
+        public static ToolStripMenuItem CreateSetCategoryItem(
+            IReadOnlyList<ExpenseCategory> categories,
+            int count,
+            Guid? currentId,
+            Action<ExpenseCategory> onAssign,
+            Action? onNewCategory,
+            Action? onManageCategories)
+        {
+            var item = new ToolStripMenuItem(count > 1 ? $"Set Category ({count})" : "Set Category");
+            foreach (var root in ExpenseCategoryTree.Roots(categories))
+                item.DropDownItems.Add(CreateMenuItem(categories, root, currentId, suggestedId: null, onAssign));
+
+            if (onNewCategory is not null || onManageCategories is not null)
+                item.DropDownItems.Add(new ToolStripSeparator());
+            if (onNewCategory is not null)
+            {
+                var create = new ToolStripMenuItem("New Category…");
+                create.Click += (_, _) => onNewCategory();
+                item.DropDownItems.Add(create);
+            }
+
+            if (onManageCategories is not null)
+            {
+                var manage = new ToolStripMenuItem("Manage Categories…");
+                manage.Click += (_, _) => onManageCategories();
+                item.DropDownItems.Add(manage);
+            }
+
+            return item;
+        }
+
         public static ToolStripMenuItem CreateMenuItem(
             IReadOnlyList<ExpenseCategory> categories,
             ExpenseCategory category,

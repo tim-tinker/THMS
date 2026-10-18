@@ -14,6 +14,8 @@ namespace THMS.UI.WinForms.Controls
         private readonly DataGridView _grid = new();
         private readonly Label _header = new();
         private Guid? _accountId;
+        private bool _sizeQueued;
+        private bool _sizingColumns;
 
         public event EventHandler? Reconciled;
 
@@ -44,7 +46,12 @@ namespace THMS.UI.WinForms.Controls
             DataGridViewUtil.EnableDoubleBuffering(_grid);
             _grid.Columns.AddRange(DateColumn(), AmountColumn(), TextColumn(nameof(ImportedTransactionView.Description), "Description"), TextColumn(nameof(ImportedTransactionView.RecommendedMatch), "Recommended Match"), TextColumn(nameof(ImportedTransactionView.Status), "Status"));
             _grid.DataError += (_, e) => e.ThrowException = false;
-            _grid.Resize += (_, _) => SizeColumns();
+            _grid.Resize += (_, _) => QueueSizeColumns();
+            _grid.ColumnWidthChanged += (_, e) =>
+            {
+                if (e.Column.Name is nameof(ImportedTransactionView.Date) or nameof(ImportedTransactionView.Amount))
+                    QueueSizeColumns();
+            };
             _grid.DataSource = _source;
             _grid.MouseDown += OnMouseDown;
 
@@ -58,6 +65,7 @@ namespace THMS.UI.WinForms.Controls
             var rows = accountId is Guid id ? _reconciliation.GetUnreconciled(id) : [];
             _source.DataSource = rows;
             _header.Text = rows.Count == 0 ? "Unreconciled" : $"Unreconciled — {rows.Count}";
+            QueueSizeColumns();
         }
 
         private void OnMouseDown(object? sender, MouseEventArgs e)
@@ -221,35 +229,67 @@ namespace THMS.UI.WinForms.Controls
             Reconciled?.Invoke(this, EventArgs.Empty);
         }
 
-        private void SizeColumns()
+        private void QueueSizeColumns()
         {
-            if (_grid.IsDisposed || _grid.Columns.Count < 5)
+            if (_sizeQueued || _grid.IsDisposed)
                 return;
 
-            const int dateWidth = 100;
-            const int amountWidth = 110;
+            _sizeQueued = true;
+            if (!_grid.IsHandleCreated)
+            {
+                _sizeQueued = false;
+                SizeColumns();
+                return;
+            }
+
+            _grid.BeginInvoke(() =>
+            {
+                _sizeQueued = false;
+                SizeColumns();
+            });
+        }
+
+        private void SizeColumns()
+        {
+            if (_sizingColumns || _grid.IsDisposed || _grid.Columns.Count < 5)
+                return;
+
+            var date = _grid.Columns[nameof(ImportedTransactionView.Date)];
+            var amount = _grid.Columns[nameof(ImportedTransactionView.Amount)];
+            var description = _grid.Columns[nameof(ImportedTransactionView.Description)];
+            var match = _grid.Columns[nameof(ImportedTransactionView.RecommendedMatch)];
+            var status = _grid.Columns[nameof(ImportedTransactionView.Status)];
+            if (date is null || amount is null || description is null || match is null || status is null)
+                return;
+
             const int statusWidth = 120;
             var scrollbar = _grid.Controls.OfType<VScrollBar>().Any(bar => bar.Visible)
                 ? SystemInformation.VerticalScrollBarWidth
                 : 0;
-            var remaining = _grid.ClientSize.Width - dateWidth - amountWidth - statusWidth - scrollbar;
+            var remaining = _grid.ClientSize.Width - date.Width - amount.Width - statusWidth - scrollbar;
             if (remaining < 200)
                 return;
 
-            var description = Math.Max(120, remaining * 5 / 11);
-            var match = Math.Max(140, remaining - description);
-            _grid.Columns[nameof(ImportedTransactionView.Date)].Width = dateWidth;
-            _grid.Columns[nameof(ImportedTransactionView.Amount)].Width = amountWidth;
-            _grid.Columns[nameof(ImportedTransactionView.Description)].Width = description;
-            _grid.Columns[nameof(ImportedTransactionView.RecommendedMatch)].Width = match;
-            _grid.Columns[nameof(ImportedTransactionView.Status)].Width = statusWidth;
+            var descriptionWidth = Math.Max(120, remaining * 5 / 11);
+            var matchWidth = Math.Max(140, remaining - descriptionWidth);
+            _sizingColumns = true;
+            try
+            {
+                description.Width = descriptionWidth;
+                match.Width = matchWidth;
+                status.Width = statusWidth;
+            }
+            finally
+            {
+                _sizingColumns = false;
+            }
         }
 
         private static DataGridViewTextBoxColumn DateColumn()
         {
             var column = TextColumn(nameof(ImportedTransactionView.Date), "Date");
             column.DefaultCellStyle.Format = "d";
-            column.Width = 100;
+            column.AutoSizeMode = DataGridViewAutoSizeColumnMode.DisplayedCells;
             return column;
         }
 
@@ -258,7 +298,7 @@ namespace THMS.UI.WinForms.Controls
             var column = TextColumn(nameof(ImportedTransactionView.Amount), "Amount");
             column.DefaultCellStyle.Format = "c2";
             column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            column.Width = 110;
+            column.AutoSizeMode = DataGridViewAutoSizeColumnMode.DisplayedCells;
             return column;
         }
 

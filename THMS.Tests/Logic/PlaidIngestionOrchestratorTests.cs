@@ -596,6 +596,50 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public async Task SyncInitial_StoresCreditCardChargesNegativeAndPaymentsPositive()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var txs = new InMemoryTransactionDataStore();
+            var card = new CreditAccount
+            {
+                Name = "AMEX",
+                Institution = "American Express",
+                AccountNumber = "06009",
+                Type = THMS.Domain.Finance.Accounts.AccountType.CreditCard,
+                WebsiteUrl = "",
+                CreditLimit = 1000,
+                ExternalLink = new ExternalAccountLink
+                {
+                    AccessToken = "tok",
+                    PlaidAccountId = "plaid-amex",
+                    ItemId = "item",
+                    InstitutionId = "ins_amex",
+                    AccountMask = "6009",
+                    InstitutionName = "American Express"
+                }
+            };
+            accounts.UpsertAccount(card);
+            var fetcher = new FakeTransactionFetcher();
+            fetcher.SyncPages.Enqueue(new TransactionSyncPage
+            {
+                Added =
+                [
+                    Tx("tx-charge", "plaid-amex", new DateTime(2026, 10, 9), "AMAZON MARKEPLACE", 19.28m),
+                    Tx("tx-payment", "plaid-amex", new DateTime(2026, 9, 25), "ONLINE PAYMENT - THANK YOU", -1600m)
+                ],
+                NextCursor = "cursor-1",
+                HasMore = false
+            });
+            var orchestrator = new PlaidTransactionOrchestrator(accounts, fetcher, txs);
+
+            await orchestrator.SyncInitialAsync("item", new DateTime(2026, 9, 1));
+
+            var posted = txs.GetPostedTransactions(card.Id).ToDictionary(row => row.ExternalTransactionId);
+            Assert.That(posted["tx-charge"].Amount, Is.EqualTo(-19.28m));
+            Assert.That(posted["tx-payment"].Amount, Is.EqualTo(1600m));
+        }
+
+        [Test]
         public async Task SyncIncremental_SkipsItemsWithoutCursor()
         {
             var (accounts, txs, _, fetcher) = Linked();

@@ -46,7 +46,24 @@ namespace THMS.UI.WinForms.Controls
             var description = Column(nameof(BalanceProjectionRow.Description), "Description", format: null);
             description.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             grid.Columns.Add(description);
-            grid.Columns.Add(MoneyColumn(nameof(BalanceProjectionRow.Balance), "Balance"));
+            var balance = MoneyColumn(nameof(BalanceProjectionRow.Balance), "Balance");
+            grid.Columns.Add(balance);
+            // Money columns are normally sized to the visible rows. The running balance
+            // grows down the list, so this column has to cover every row.
+            void FitBalance()
+            {
+                balance.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                if (!grid.IsHandleCreated)
+                    return;
+
+                var width = balance.GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, fixedHeight: true);
+                if (width > balance.MinimumWidth)
+                    balance.MinimumWidth = width;
+            }
+
+            grid.DataBindingComplete += (_, _) => FitBalance();
+            grid.HandleCreated += (_, _) => FitBalance();
+            FitBalance();
 
             var close = new ThmsButton { Text = "Close", Margin = new Padding(0, 4, 12, 12) };
             close.Click += (_, _) => Close();
