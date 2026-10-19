@@ -49,7 +49,7 @@
                 MoneyColumn("AmountDue", "Amount Due"),
                 TextColumn("Paid", "Paid"),
                 TextColumn("DueDate", "Due"),
-                TextColumn("Plan", "Plan"),
+                MoneyColumn("Plan", "Plan"),
                 TextColumn("Apr", "APR"),
                 MoneyColumn("CreditLimit", "Credit Limit"),
                 TextColumn("PlaidStatus", "Plaid"));

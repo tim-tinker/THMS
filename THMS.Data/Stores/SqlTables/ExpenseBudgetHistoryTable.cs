@@ -65,6 +65,14 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
+        public void Delete(SqliteConnection conn, Guid id)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM ExpenseBudgetHistory WHERE Id = @Id;";
+            cmd.Parameters.AddWithValue("@Id", id.ToString());
+            cmd.ExecuteNonQuery();
+        }
+
         public void DeleteByRule(SqliteConnection conn, Guid budgetRuleId)
         {
             using var cmd = conn.CreateCommand();

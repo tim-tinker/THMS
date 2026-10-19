@@ -4,6 +4,7 @@ using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
+using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Planning;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
@@ -45,6 +46,7 @@ namespace THMS.UI.WinForms.Controls
             gridAccounts.CellContentClick += OnAccountNameClicked;
             gridAccounts.CellFormatting += OnAccountCellFormatting;
             gridAccounts.MouseDown += OnAccountGridMouseDown;
+            gridAccounts.MouseUp += OnAccountGridMouseUp;
             gridAccounts.KeyDown += OnAccountGridKeyDown;
             components ??= new Container();
             components.Add(_accountMenu);
@@ -104,8 +106,8 @@ namespace THMS.UI.WinForms.Controls
             var unreconciled = new ReconciliationOrchestrator(_transactions).AccountIdsWithUnreconciled();
             var paymentPlans = _transactions.GetAllRecurringTransferRules()
                 .Where(rule => rule.IsPaymentPlan && rule.IsActive)
-                .Select(rule => rule.ToAccountId)
-                .ToHashSet();
+                .GroupBy(rule => rule.ToAccountId)
+                .ToDictionary(group => group.Key, group => group.First().Amount);
             var itemState = _accounts.GetPlaidItemSyncStates()
                 .ToDictionary(s => s.ItemId, StringComparer.Ordinal);
             return _accountOrchestrator.GetAllAccounts()
@@ -118,7 +120,7 @@ namespace THMS.UI.WinForms.Controls
                         posted.Where(tx => tx.AccountId == account.Id),
                         AccountRegisterRow.PlaidStatusOf(account, state),
                         unreconciled.Contains(account.Id),
-                        paymentPlans.Contains(account.Id));
+                        paymentPlans.TryGetValue(account.Id, out var planAmount) ? planAmount : null);
                 })
                 .ToList();
         }
@@ -239,7 +241,6 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             var row = gridAccounts.Rows[index];
-            row.Selected = true;
             var column = gridAccounts.Columns.GetFirstColumn(DataGridViewElementStates.Visible);
             if (column is null)
                 return;
@@ -357,15 +358,22 @@ namespace THMS.UI.WinForms.Controls
             if (hit.RowIndex < 0)
                 return;
 
+            SelectAccountRow(hit.RowIndex, hit.ColumnIndex);
+        }
+
+        private void OnAccountGridMouseUp(object? sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Right)
+                return;
+
+            var hit = gridAccounts.HitTest(e.X, e.Y);
+            if (hit.RowIndex < 0)
+                return;
+
             if (!SelectAccountRow(hit.RowIndex, hit.ColumnIndex))
                 return;
 
-            var location = e.Location;
-            gridAccounts.BeginInvoke(() =>
-            {
-                if (!gridAccounts.IsDisposed)
-                    _accountMenu.Show(gridAccounts, location);
-            });
+            _accountMenu.Show(gridAccounts, e.Location);
         }
 
         private void OnAccountGridKeyDown(object? sender, KeyEventArgs e)
@@ -382,22 +390,17 @@ namespace THMS.UI.WinForms.Controls
 
         private bool SelectAccountRow(int rowIndex, int columnIndex)
         {
-            var row = gridAccounts.Rows[rowIndex];
-            var alreadyCurrent = row.Selected
-                && gridAccounts.SelectedRows.Count == 1
-                && gridAccounts.CurrentCell?.RowIndex == rowIndex;
+            var alreadyCurrent = gridAccounts.CurrentCell?.RowIndex == rowIndex
+                && (columnIndex < 0 || gridAccounts.CurrentCell?.ColumnIndex == columnIndex)
+                && DataGridViewUtil.CellIsSelected(gridAccounts, rowIndex, columnIndex);
             if (alreadyCurrent)
                 return true;
 
-            var cell = columnIndex >= 0 && row.Cells[columnIndex].Visible
-                ? row.Cells[columnIndex]
-                : row.Cells.Cast<DataGridViewCell>().FirstOrDefault(c => c.Visible);
-            if (cell is null)
+            if (!DataGridViewUtil.SelectOnlyCell(gridAccounts, rowIndex, columnIndex))
                 return false;
-
-            gridAccounts.ClearSelection();
-            row.Selected = true;
-            gridAccounts.CurrentCell = cell;
+            // A current-cell change made while the right button is down does not
+            // raise SelectionChanged, so the statements and other child grids stay put.
+            OnAccountSelectionChanged();
             return true;
         }
 
@@ -500,19 +503,19 @@ namespace THMS.UI.WinForms.Controls
         {
             using var dlg = new AccountEntryDialog(
                 "Add Charge",
-                "Negative amounts are purchases. Positive amounts are refunds.",
+                "A charge is a positive amount. A refund is negative.",
                 Categories(),
                 defaultDescription: "Charge",
                 accounts: _accountOrchestrator.GetAllAccounts().ToList());
             if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
-            RunActivity(() => SavePosted(account.Id, dlg));
+            RunActivity(() => SavePosted(account, dlg));
         }
 
         private void AddBankTransaction(Account account)
         {
             var hint = account is LoanAccount or MortgageAccount
-                ? "Negative amounts increase what you owe, such as interest. Positive amounts are payments."
+                ? "A charge or interest is a positive amount. A payment is negative."
                 : "Negative amounts leave this account. Positive amounts are deposits. The other party is not a THMS account.";
             using var dlg = new AccountEntryDialog(
                 "Add Transaction",
@@ -521,7 +524,7 @@ namespace THMS.UI.WinForms.Controls
                 accounts: _accountOrchestrator.GetAllAccounts().ToList());
             if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
-            RunActivity(() => SavePosted(account.Id, dlg));
+            RunActivity(() => SavePosted(account, dlg));
         }
 
         private void TransferFrom(Account account)
@@ -612,14 +615,23 @@ namespace THMS.UI.WinForms.Controls
                 latest?.Id));
         }
 
-        private void SavePosted(Guid accountId, AccountEntryDialog dlg)
+        private void SavePosted(Account account, AccountEntryDialog dlg)
         {
             var posted = _activityOrchestrator.AddPosted(
-                accountId, dlg.Date, dlg.Amount, dlg.Description, dlg.CategoryId);
+                account.Id,
+                dlg.Date,
+                PostedBalanceCalculator.ToLedgerPostedDelta(account, dlg.Amount),
+                dlg.Description,
+                dlg.CategoryId);
             if (!dlg.HasPendingSplits)
                 return;
 
-            var rows = dlg.PendingSplits.Select(split => split.Clone()).ToList();
+            var rows = dlg.PendingSplits.Select(split =>
+            {
+                var copy = split.Clone();
+                copy.Amount = PostedBalanceCalculator.ToLedgerPostedDelta(account, copy.Amount);
+                return copy;
+            }).ToList();
             var transactions = new TransactionOrchestrator();
             if (!transactions.TryApplyAsWholeTransfer(posted.Id, rows))
                 transactions.ApplySplits(posted.Id, rows);

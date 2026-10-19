@@ -10,9 +10,7 @@ namespace THMS.UI.WinForms
         private int _loadGeneration;
 
         protected VehicleListItemViewModel? SelectedVehicle =>
-            vehicleGrid.SelectedRows.Count > 0
-                ? vehicleGrid.SelectedRows[0].DataBoundItem as VehicleListItemViewModel
-                : null;
+            vehicleGrid.CurrentRow?.DataBoundItem as VehicleListItemViewModel;
 
         public VehicleListDashboardForm()
         {

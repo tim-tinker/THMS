@@ -88,10 +88,8 @@ namespace THMS.UI.WinForms.Controls
             _grid.AutoGenerateColumns = false;
             _grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             _grid.Dock = DockStyle.Fill;
-            _grid.MultiSelect = false;
             _grid.Name = "gridBills";
             _grid.RowHeadersVisible = false;
-            _grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             _grid.DataSource = _source;
             _grid.CurrentCellDirtyStateChanged += OnDirtyStateChanged;
             _grid.CellContentClick += OnOtherAccountClicked;
@@ -255,22 +253,11 @@ namespace THMS.UI.WinForms.Controls
             if (hit.RowIndex < 0)
                 return;
 
-            var row = _grid.Rows[hit.RowIndex];
-            var alreadyCurrent = row.Selected
-                && _grid.SelectedRows.Count == 1
-                && _grid.CurrentCell?.RowIndex == hit.RowIndex;
-            if (!alreadyCurrent)
-            {
-                var cell = hit.ColumnIndex >= 0 && row.Cells[hit.ColumnIndex].Visible
-                    ? row.Cells[hit.ColumnIndex]
-                    : row.Cells.Cast<DataGridViewCell>().FirstOrDefault(c => c.Visible);
-                if (cell is null)
-                    return;
-
-                _grid.ClearSelection();
-                row.Selected = true;
-                _grid.CurrentCell = cell;
-            }
+            var alreadyCurrent = _grid.CurrentCell?.RowIndex == hit.RowIndex
+                && (hit.ColumnIndex < 0 || _grid.CurrentCell?.ColumnIndex == hit.ColumnIndex)
+                && DataGridViewUtil.CellIsSelected(_grid, hit.RowIndex, hit.ColumnIndex);
+            if (!alreadyCurrent && !DataGridViewUtil.SelectOnlyCell(_grid, hit.RowIndex, hit.ColumnIndex))
+                return;
 
             var location = e.Location;
             _suppressMenu = true;

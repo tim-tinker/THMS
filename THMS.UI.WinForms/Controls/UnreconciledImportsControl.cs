@@ -74,13 +74,9 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             var hit = _grid.HitTest(e.X, e.Y);
-            if (hit.RowIndex >= 0 && !_grid.Rows[hit.RowIndex].Selected)
-            {
-                _grid.ClearSelection();
-                _grid.Rows[hit.RowIndex].Selected = true;
-                if (hit.ColumnIndex >= 0)
-                    _grid.CurrentCell = _grid[hit.ColumnIndex, hit.RowIndex];
-            }
+            if (hit.RowIndex >= 0
+                && !DataGridViewUtil.CellIsSelected(_grid, hit.RowIndex, hit.ColumnIndex))
+                DataGridViewUtil.SelectOnlyCell(_grid, hit.RowIndex, hit.ColumnIndex);
 
             var location = e.Location;
             BeginInvoke(() => ShowMenu(location));
@@ -116,7 +112,7 @@ namespace THMS.UI.WinForms.Controls
 
         private IEnumerable<ImportedTransactionView> Selected()
         {
-            foreach (DataGridViewRow row in _grid.SelectedRows)
+            foreach (DataGridViewRow row in DataGridViewUtil.SelectedDataRows(_grid))
             {
                 if (row.DataBoundItem is ImportedTransactionView view)
                     yield return view;

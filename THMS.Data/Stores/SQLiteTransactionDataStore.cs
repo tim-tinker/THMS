@@ -606,6 +606,12 @@ namespace THMS.Data.Stores.SQLite
             _store.ExpenseBudgetHistory.Update(conn, history);
         }
 
+        public void DeleteExpenseBudgetHistory(Guid historyId)
+        {
+            using var conn = OpenConnection();
+            _store.ExpenseBudgetHistory.Delete(conn, historyId);
+        }
+
         public ExpenseBudgetHistory? GetExpenseBudgetHistoryById(Guid historyId)
         {
             using var conn = OpenConnection();

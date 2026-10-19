@@ -47,6 +47,8 @@ namespace THMS.Logic.Finance.Aggregation
                     HistoryId = h.Id,
                     BudgetRuleId = h.BudgetRuleId,
                     Period = $"{h.PeriodStart:d} – {h.PeriodEnd:d}",
+                    PeriodStart = h.PeriodStart.Date,
+                    PeriodEnd = h.PeriodEnd.Date,
                     Starting = h.StartingBalance,
                     BudgetAmount = h.BudgetAmount,
                     Actual = h.ActualExpenses,
@@ -56,6 +58,47 @@ namespace THMS.Logic.Finance.Aggregation
                     IsClosed = h.IsClosed
                 })
                 .ToList();
+
+        public static List<CategoryBudgetPeriodRow> AppendHistoryPeriod(
+            List<CategoryBudgetPeriodRow> periods,
+            IEnumerable<DateTime> transactionDates)
+        {
+            var dates = transactionDates.Select(d => d.Date).ToList();
+            var firstStart = periods
+                .Where(p => !p.IsHistory && p.PeriodStart is DateTime)
+                .Select(p => p.PeriodStart!.Value.Date)
+                .DefaultIfEmpty(DateTime.MaxValue)
+                .Min();
+
+            CategoryBudgetPeriodRow history;
+            if (firstStart == DateTime.MaxValue)
+            {
+                history = dates.Count == 0
+                    ? HistoryRow(null, null, "History")
+                    : HistoryRow(dates.Min(), dates.Max(), $"{dates.Min():d} – {dates.Max():d}");
+            }
+            else
+            {
+                var end = firstStart == DateTime.MinValue ? firstStart : firstStart.AddDays(-1);
+                var earlier = dates.Where(d => d < firstStart).ToList();
+                history = earlier.Count == 0
+                    ? HistoryRow(null, end, "History")
+                    : HistoryRow(earlier.Min(), end, $"{earlier.Min():d} – {end:d}");
+            }
+
+            periods.Add(history);
+            return periods;
+        }
+
+        private static CategoryBudgetPeriodRow HistoryRow(DateTime? start, DateTime? end, string period) =>
+            new()
+            {
+                IsHistory = true,
+                PeriodStart = start,
+                PeriodEnd = end,
+                Period = period,
+                Status = "History"
+            };
 
         public static Dictionary<Guid, ExpenseBudgetRule> AssignBudgets(
             IReadOnlyList<ExpenseCategory> categories,

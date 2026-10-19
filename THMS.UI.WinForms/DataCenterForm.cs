@@ -71,21 +71,10 @@ namespace THMS.UI.WinForms
 
         private void OnTabSelected(object? sender, EventArgs e)
         {
-            ConfigureHistoryForCurrentTab();
             if (IsHandleCreated)
                 BeginInvoke(ApplyHistoryToCurrentTab);
             else
                 ApplyHistoryToCurrentTab();
-        }
-
-        private void ConfigureHistoryForCurrentTab()
-        {
-            if (tabs.SelectedTab?.Text == TabElectricContracts)
-                historyBar.SetAllowedPeriods([HistoryPeriodBar.Year, HistoryPeriodBar.Lifetime], HistoryPeriodBar.Year);
-            else
-                historyBar.SetAllowedPeriods(
-                    [HistoryPeriodBar.Month, HistoryPeriodBar.Year, HistoryPeriodBar.Lifetime],
-                    HistoryPeriodBar.Month);
         }
 
         private bool EnsureCurrentTabControl(string period)
@@ -303,7 +292,6 @@ namespace THMS.UI.WinForms
 
         private void ApplyHistoryToCurrentTab()
         {
-            ConfigureHistoryForCurrentTab();
             var period = historyBar.SelectedPeriod;
             var created = EnsureCurrentTabControl(period);
             var page = tabs.SelectedTab;

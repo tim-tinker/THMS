@@ -110,6 +110,7 @@ namespace THMS.Data.Stores
         // ------------------------------------------------------------
         void AddExpenseBudgetHistory(ExpenseBudgetHistory history);
         void UpdateExpenseBudgetHistory(ExpenseBudgetHistory history);
+        void DeleteExpenseBudgetHistory(Guid historyId);
         ExpenseBudgetHistory? GetExpenseBudgetHistoryById(Guid historyId);
         IEnumerable<ExpenseBudgetHistory> GetExpenseBudgetHistory(Guid budgetRuleId);
         ExpenseBudgetHistory? GetActiveBudgetHistory(Guid budgetRuleId);

@@ -15,6 +15,7 @@ namespace THMS.UI.WinForms.Controls
         public static readonly Color LinkActiveFore = Color.FromArgb(0, 0, 180);
 
         private static readonly ConditionalWeakTable<DataGridView, object> DateMoneySizingHooked = new();
+        private static readonly ConditionalWeakTable<DataGridView, object> SelectionSummaryHooked = new();
 
         private static readonly HashSet<string> DateProperties = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -39,8 +40,59 @@ namespace THMS.UI.WinForms.Controls
                 ?.SetValue(grid, true);
             ApplyHeaderStyle(grid);
             ApplySelectionStyle(grid);
+            grid.SelectionMode = DataGridViewSelectionMode.CellSelect;
+            grid.MultiSelect = true;
             HookDisplayedDateAndMoneyColumns(grid);
             HookStableDisplayedRow(grid);
+            HookSelectionSummary(grid);
+        }
+
+        public static IEnumerable<DataGridViewRow> SelectedDataRows(DataGridView grid)
+        {
+            ArgumentNullException.ThrowIfNull(grid);
+            var seen = new HashSet<int>();
+            foreach (DataGridViewCell cell in grid.SelectedCells)
+            {
+                if (cell.RowIndex < 0 || cell.OwningRow is not { IsNewRow: false } row)
+                    continue;
+                if (seen.Add(row.Index))
+                    yield return row;
+            }
+        }
+
+        public static bool CellIsSelected(DataGridView grid, int rowIndex, int columnIndex)
+        {
+            ArgumentNullException.ThrowIfNull(grid);
+            if (rowIndex < 0 || rowIndex >= grid.RowCount)
+                return false;
+            if (columnIndex >= 0 && columnIndex < grid.ColumnCount)
+                return grid[columnIndex, rowIndex].Selected;
+            return grid.Rows[rowIndex].Selected;
+        }
+
+        public static bool SelectOnlyCell(DataGridView grid, int rowIndex, int columnIndex)
+        {
+            ArgumentNullException.ThrowIfNull(grid);
+            if (rowIndex < 0 || rowIndex >= grid.RowCount)
+                return false;
+
+            var cell = columnIndex >= 0 && columnIndex < grid.ColumnCount && grid[columnIndex, rowIndex].Visible
+                ? grid[columnIndex, rowIndex]
+                : grid.Rows[rowIndex].Cells.Cast<DataGridViewCell>().FirstOrDefault(candidate => candidate.Visible);
+            if (cell is null)
+                return false;
+
+            grid.ClearSelection();
+            try
+            {
+                grid.CurrentCell = cell;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         public static void FitDisplayedDateAndMoneyColumns(DataGridView grid)
@@ -90,6 +142,64 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             DisplayedRowAnchors.Add(grid, new DisplayedRowAnchor(grid));
+        }
+
+        private static void HookSelectionSummary(DataGridView grid)
+        {
+            if (!SelectionSummaryHooked.TryAdd(grid, grid))
+                return;
+
+            grid.SelectionChanged += (_, _) =>
+            {
+                if (grid.IsDisposed || (!grid.Focused && !grid.ContainsFocus))
+                    return;
+                GridSelectionSummary.Publish(grid);
+            };
+            grid.Leave += (_, _) =>
+            {
+                if (grid.IsDisposed)
+                    return;
+                var form = grid.FindForm();
+                if (form is null || form.IsDisposed || !form.IsHandleCreated)
+                {
+                    GridSelectionSummary.Publish(null);
+                    return;
+                }
+
+                try
+                {
+                    form.BeginInvoke(() =>
+                    {
+                        if (form.IsDisposed)
+                            return;
+                        var focused = FocusedGrid(form);
+                        if (focused is null)
+                            GridSelectionSummary.Publish(null);
+                        else if (!ReferenceEquals(focused, grid))
+                            GridSelectionSummary.Publish(focused);
+                    });
+                }
+                catch (InvalidOperationException)
+                {
+                    GridSelectionSummary.Publish(null);
+                }
+            };
+        }
+
+        private static DataGridView? FocusedGrid(ContainerControl root)
+        {
+            Control? current = root;
+            while (current is ContainerControl container)
+            {
+                var active = container.ActiveControl;
+                if (active is null || ReferenceEquals(active, current))
+                    break;
+                if (active is DataGridView grid)
+                    return grid;
+                current = active;
+            }
+
+            return null;
         }
 
         private static void HookDisplayedDateAndMoneyColumns(DataGridView grid)

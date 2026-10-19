@@ -115,6 +115,9 @@
     <Compile Update="Controls\StatementEntryGrid.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Update="Controls\StatementValidationDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Controls\ThmsButton.cs">
       <SubType>Component</SubType>
     </Compile>
@@ -143,9 +146,6 @@
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="DataCenterForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="DataManagerForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="ElectricContractDataEntryForm.cs">

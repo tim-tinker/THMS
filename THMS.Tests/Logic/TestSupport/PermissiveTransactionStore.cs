@@ -105,6 +105,7 @@ namespace THMS.Tests.Logic.TestSupport
 
         public void AddExpenseBudgetHistory(ExpenseBudgetHistory history) => _inner.AddExpenseBudgetHistory(history);
         public void UpdateExpenseBudgetHistory(ExpenseBudgetHistory history) => _inner.UpdateExpenseBudgetHistory(history);
+        public void DeleteExpenseBudgetHistory(Guid historyId) => _inner.DeleteExpenseBudgetHistory(historyId);
         public ExpenseBudgetHistory? GetExpenseBudgetHistoryById(Guid historyId) => _inner.GetExpenseBudgetHistoryById(historyId);
         public IEnumerable<ExpenseBudgetHistory> GetExpenseBudgetHistory(Guid budgetRuleId) => _inner.GetExpenseBudgetHistory(budgetRuleId);
         public ExpenseBudgetHistory? GetActiveBudgetHistory(Guid budgetRuleId) => _inner.GetActiveBudgetHistory(budgetRuleId);

@@ -86,6 +86,7 @@ namespace THMS.UI.WinForms.Controls
             SizeDialogInputs();
             FitToWorkingArea();
             ShowObligationFields(SelectedType() is StatementType type && !StatementAccountMatch.IsNonPayable(type));
+            BeginInvoke(FitPromotionDateColumns);
         }
 
         private void WireComboDrawing()
@@ -472,6 +473,9 @@ namespace THMS.UI.WinForms.Controls
             gridPromotions.Columns.Add(AmountColumn(nameof(PromotionEditRow.CurrentBalance), "Current Balance"));
             gridPromotions.Columns.Add(DatePickerColumn(nameof(PromotionEditRow.Deadline), "Deadline"));
             gridPromotions.Columns.Add(PromoTypeColumn());
+            gridPromotions.HandleCreated += (_, _) => QueueFitPromotionDateColumns();
+            gridPromotions.DataBindingComplete += (_, _) => QueueFitPromotionDateColumns();
+            gridPromotions.RowsAdded += (_, _) => QueueFitPromotionDateColumns();
             gridPromotions.DataSource = _promotions;
 
             layout.Controls.Add(fields, 0, 0);
@@ -984,8 +988,36 @@ namespace THMS.UI.WinForms.Controls
                 DataPropertyName = property,
                 HeaderText = header,
                 Name = property,
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells,
+                DefaultCellStyle = { Format = "d" }
             };
+
+        private void QueueFitPromotionDateColumns()
+        {
+            if (gridPromotions is not { IsHandleCreated: true, IsDisposed: false } grid)
+                return;
+
+            grid.BeginInvoke(FitPromotionDateColumns);
+        }
+
+        private void FitPromotionDateColumns()
+        {
+            if (gridPromotions is not { IsHandleCreated: true, IsDisposed: false } grid)
+                return;
+
+            foreach (DataGridViewColumn column in grid.Columns)
+            {
+                if (column is not CalendarColumn || column.Index < 0)
+                    continue;
+
+                // Visible-row sizing runs before the grid is on screen and keeps the header width.
+                column.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                grid.AutoResizeColumn(column.Index, DataGridViewAutoSizeColumnMode.AllCells);
+                var width = column.GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, fixedHeight: true);
+                if (width > column.MinimumWidth)
+                    column.MinimumWidth = width;
+            }
+        }
 
         private static DataGridViewComboBoxColumn PromoTypeColumn()
         {

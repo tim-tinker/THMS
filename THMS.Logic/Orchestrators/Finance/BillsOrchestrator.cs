@@ -653,7 +653,35 @@ namespace THMS.Logic.Orchestrators.Finance
             };
             ApplyPaymentCategory(transfer);
             _transactions.AddFutureTransferTransaction(transfer);
+            AdvancePaymentPlan(destinationAccountId, payDate);
             return transfer;
+        }
+
+        private void AdvancePaymentPlan(Guid accountId, DateTime payDate)
+        {
+            var plan = PaymentPlans(accountId).FirstOrDefault(rule => rule.IsActive);
+            if (plan is null)
+                return;
+            if (NextDateIsPastHalfInterval(plan.NextOccurrence, payDate, plan.Frequency))
+                return;
+
+            plan.LastOccurrence = payDate.Date;
+            plan.NextOccurrence = plan.NextOccurrence.Date.AddFrequency(plan.Frequency);
+            if (plan.EndDate is DateTime end && plan.NextOccurrence.Date > end.Date)
+                plan.IsActive = false;
+
+            var reconciliation = new ReconciliationOrchestrator(_transactions);
+            reconciliation.DropUnmatchedForRule(plan.Id);
+            _transactions.UpdateRecurringTransferRule(plan);
+            if (plan.IsActive)
+                reconciliation.MaterializeRule(plan);
+        }
+
+        private static bool NextDateIsPastHalfInterval(DateTime nextDate, DateTime payDate, RecurrenceFrequency frequency)
+        {
+            var paid = payDate.Date;
+            var interval = paid.AddFrequency(frequency) - paid;
+            return nextDate.Date > paid.Add(new TimeSpan(interval.Ticks / 2));
         }
 
         public int MatchScheduled() =>

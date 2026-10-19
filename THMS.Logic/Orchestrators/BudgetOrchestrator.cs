@@ -42,26 +42,16 @@ namespace THMS.Logic.Orchestrators
                 throw new ArgumentException("At least one category is required.");
 
             _store.AddExpenseBudgetRule(rule);
-            RefreshRule(rule);
+            if (rule.IsActive)
+                RebuildFromPeriodStart(rule);
         }
 
         public void UpdateRule(ExpenseBudgetRule rule)
         {
             ArgumentNullException.ThrowIfNull(rule);
             _store.UpdateExpenseBudgetRule(rule);
-            if (!rule.IsActive)
-                return;
-
-            var period = _store.GetActiveBudgetHistory(rule.Id);
-            if (period is not null && !period.IsClosed)
-            {
-                period.BudgetAmount = Math.Abs(rule.DefaultBudgetAmount);
-                AlignOpenPeriod(rule, period);
-                RefreshPeriod(rule, period);
-                return;
-            }
-
-            RefreshRule(rule);
+            if (rule.IsActive)
+                RebuildFromPeriodStart(rule);
         }
 
         public void DeleteRule(Guid ruleId) =>
@@ -203,21 +193,97 @@ namespace THMS.Logic.Orchestrators
 
         private void RefreshRule(ExpenseBudgetRule rule)
         {
-            var period = EnsureActivePeriod(rule);
-            if (period is not null && !period.IsClosed)
-                RefreshPeriod(rule, period);
+            var open = EnsureActivePeriod(rule);
+            if (open is not null && !open.IsClosed)
+                RefreshPeriod(rule, open);
         }
 
-        private static void AlignOpenPeriod(ExpenseBudgetRule rule, ExpenseBudgetHistory period)
+        private void RebuildFromPeriodStart(ExpenseBudgetRule rule)
         {
-            var today = DateTime.Today;
-            var anchor = today < period.PeriodStart.Date ? period.PeriodStart.Date : today;
-            var window = BudgetPeriodCalculator.PeriodContaining(anchor, rule);
-            if (period.PeriodStart.Date == window.Start && period.PeriodEnd.Date == window.End)
+            var existing = _store.GetExpenseBudgetHistory(rule.Id)
+                .OrderBy(h => h.PeriodStart)
+                .ThenBy(h => h.PeriodEnd)
+                .ToList();
+            var anchor = rule.PeriodStart?.Date
+                ?? existing.FirstOrDefault()?.PeriodStart.Date
+                ?? DateTime.Today;
+            var windows = PeriodsFrom(rule, anchor);
+            if (windows.Count == 0)
                 return;
 
-            period.PeriodStart = window.Start;
-            period.PeriodEnd = window.End;
+            var seriesStart = windows[0].Start.Date;
+            foreach (var period in existing.Where(h => h.PeriodEnd.Date >= seriesStart))
+                _store.DeleteExpenseBudgetHistory(period.Id);
+
+            var previous = existing.LastOrDefault(h => h.PeriodEnd.Date < seriesStart);
+            var posted = _store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
+            var catalog = _store.GetAllCategories(includeInactive: true).ToList();
+            var created = new List<ExpenseBudgetHistory>();
+
+            for (var i = 0; i < windows.Count; i++)
+            {
+                var contiguous = previous is not null &&
+                    previous.PeriodEnd.Date.AddDays(1) == windows[i].Start.Date;
+                var history = CreatePeriod(rule, windows[i], contiguous ? previous : null);
+                history.ActualExpenses = _detector.ComputeActualExpenses(
+                    posted,
+                    rule.IncludedCategoryIds,
+                    history.PeriodStart,
+                    history.PeriodEnd,
+                    catalog);
+                history.IsClosed = i < windows.Count - 1;
+                history.RecalculateRemaining();
+                _store.UpdateExpenseBudgetHistory(history);
+                created.Add(history);
+                previous = history;
+            }
+
+            if (created.Count == 0)
+                return;
+
+            var periods = _store.GetExpenseBudgetHistory(rule.Id)
+                .Select(h => created.FirstOrDefault(c => c.Id == h.Id) ?? h)
+                .ToList();
+            var recommended = _detector.ComputeRecommendedAmount(
+                periods,
+                rule.BudgetFrequency,
+                posted,
+                rule.IncludedCategoryIds,
+                catalog,
+                rule.PeriodStart);
+            foreach (var history in created)
+            {
+                history.RecommendedAmount = recommended;
+                history.RecalculateRemaining();
+                _store.UpdateExpenseBudgetHistory(history);
+            }
+        }
+
+        private static List<(DateTime Start, DateTime End)> PeriodsFrom(ExpenseBudgetRule rule, DateTime anchor)
+        {
+            var windows = new List<(DateTime Start, DateTime End)>();
+            var window = BudgetPeriodCalculator.PeriodContaining(anchor, rule);
+            var today = DateTime.Today;
+            if (window.Start.Date > today)
+            {
+                windows.Add(window);
+                return windows;
+            }
+
+            while (windows.Count < 10000)
+            {
+                windows.Add(window);
+                if (window.End.Date >= today)
+                    break;
+
+                var next = BudgetPeriodCalculator.NextPeriod(window.End, rule);
+                if (next.Start.Date <= window.Start.Date)
+                    break;
+
+                window = next;
+            }
+
+            return windows;
         }
 
         private ExpenseBudgetHistory? EnsureActivePeriod(ExpenseBudgetRule rule)
@@ -275,6 +341,15 @@ namespace THMS.Logic.Orchestrators
         {
             var posted = _store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
             var catalog = _store.GetAllCategories(includeInactive: true).ToList();
+            RefreshPeriod(rule, history, posted, catalog);
+        }
+
+        private void RefreshPeriod(
+            ExpenseBudgetRule rule,
+            ExpenseBudgetHistory history,
+            IReadOnlyList<PostedTransaction> posted,
+            IReadOnlyList<ExpenseCategory> catalog)
+        {
             history.ActualExpenses = _detector.ComputeActualExpenses(
                 posted,
                 rule.IncludedCategoryIds,

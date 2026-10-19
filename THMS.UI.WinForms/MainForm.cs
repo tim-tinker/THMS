@@ -24,6 +24,27 @@ namespace THMS.UI
             statusIcon.Image = LoadStatusIcon();
             Icon = LoadWindowIcon();
             AppStatus.Bind(SetAppStatus);
+            GridSelectionSummary.Bind(SetSelectionStatus);
+            syncProgress.BringToFront();
+        }
+
+        private void SetSelectionStatus(string? summary)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(() => SetSelectionStatus(summary));
+                return;
+            }
+
+            var text = summary ?? "";
+            lblSelection.Text = text;
+            lblSelection.Visible = text.Length > 0;
+            if (text.Length == 0)
+                return;
+
+            lblSelection.Width = TextRenderer.MeasureText(text, lblSelection.Font).Width
+                + lblSelection.Padding.Horizontal
+                + 8;
         }
 
         public void LoadModules()
@@ -35,7 +56,6 @@ namespace THMS.UI
 
             AddSectionLabel("Data Management");
             AddEmbeddedForm("Register", new RegisterForm());
-            AddEmbeddedForm("Data Manager", new DataManagerForm());
             AddEmbeddedForm("Energy", new DataCenterForm());
         }
 

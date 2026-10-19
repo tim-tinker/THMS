@@ -1,6 +1,5 @@
 ﻿using THMS.Data.Stores;
 using THMS.Domain.Finance;
-using THMS.Domain.Transportation;
 
 namespace THMS.Logic.Orchestrators
 {
@@ -29,20 +28,29 @@ namespace THMS.Logic.Orchestrators
             _financeStore.UpsertElectricContract(contract);
         }
 
-        // ---------------------------------------------------------
-        // GET SESSIONS (period-based)
-        // ---------------------------------------------------------
+        // Lists contracts whose start–end range covers the selected calendar period.
         public IEnumerable<ElectricContract> GetElectricContracts(string period)
         {
-            var latest = _financeStore.GetLatestElectricContract();
-            if (latest is null)
-                return Array.Empty<ElectricContract>();
-
-            var end = latest.EndDate;
-            var start = GetStartDate(end, period);
-
+            var (start, end) = CoverageRange(period);
             return _financeStore.GetElectricContracts(start, end)
                 .OrderByDescending(c => c.StartDate);
+        }
+
+        private static (DateTime Start, DateTime End) CoverageRange(string period)
+        {
+            var today = DateTime.Today;
+            return period switch
+            {
+                "Year" => (new DateTime(today.Year, 1, 1), new DateTime(today.Year, 12, 31)),
+                "Lifetime" => (DateTime.MinValue, DateTime.MaxValue),
+                _ => CalendarMonth(today)
+            };
+        }
+
+        private static (DateTime Start, DateTime End) CalendarMonth(DateTime day)
+        {
+            var start = new DateTime(day.Year, day.Month, 1);
+            return (start, start.AddMonths(1).AddDays(-1));
         }
 
     }

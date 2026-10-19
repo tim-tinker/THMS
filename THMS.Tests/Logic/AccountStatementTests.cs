@@ -707,6 +707,26 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void AccountRegisterRow_ShowsPaymentPlanAmount()
+        {
+            var planned = AccountRegisterRow.From(
+                new CreditAccount { Name = "Card" },
+                [],
+                [],
+                paymentPlanAmount: 180m);
+            var none = AccountRegisterRow.From(new BankAccount { Name = "Checking" }, latestStatement: null);
+
+            Assert.That(planned.Plan, Is.EqualTo(180m.ToString("c2")));
+            Assert.That(none.Plan, Is.EqualTo(""));
+            Assert.That(AccountRegisterRow.Compare(none, planned, nameof(AccountRegisterRow.Plan), descending: false), Is.GreaterThan(0));
+            Assert.That(AccountRegisterRow.Compare(
+                AccountRegisterRow.From(new CreditAccount { Name = "Low" }, [], [], paymentPlanAmount: 50m),
+                planned,
+                nameof(AccountRegisterRow.Plan),
+                descending: false), Is.LessThan(0));
+        }
+
+        [Test]
         public void AccountStatementListRow_EmptyApplicableCollectionsAreBlank()
         {
             var card = AccountStatementListRow.From(new CreditCardStatement

@@ -34,12 +34,14 @@ namespace THMS.Data.Stores.SqlTables
                 SolarWh = excluded.SolarWh,
                 BatteryWh = excluded.BatteryWh,
                 GridWh = excluded.GridWh,
+                IsPartial = excluded.IsPartial;
             ";
             cmd.Parameters.AddWithValue("$timestamp", result.Timestamp.ToString("o"));
-            cmd.Parameters.AddWithValue("$evChargeWh", result.TotalWh * 1000);
-            cmd.Parameters.AddWithValue("$solarWh", result.SolarWh * 1000);
-            cmd.Parameters.AddWithValue("$batteryWh", result.BatteryWh * 1000);
-            cmd.Parameters.AddWithValue("$gridWh", result.GridWh * 1000);
+            cmd.Parameters.AddWithValue("$evChargeWh", result.TotalWh);
+            cmd.Parameters.AddWithValue("$solarWh", result.SolarWh);
+            cmd.Parameters.AddWithValue("$batteryWh", result.BatteryWh);
+            cmd.Parameters.AddWithValue("$gridWh", result.GridWh);
+            cmd.Parameters.AddWithValue("$isPartial", 0);
             cmd.ExecuteNonQuery();
         }
 

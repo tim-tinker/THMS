@@ -53,8 +53,53 @@ namespace THMS.Tests.Logic
                 EndDate = new DateTime(2026, 12, 31)
             });
 
-            Assert.That(orchestrator.GetElectricContracts("Year").Count(), Is.GreaterThan(0));
-            Assert.That(orchestrator.GetElectricContracts("Lifetime").Count(), Is.GreaterThan(0));
+            Assert.That(orchestrator.GetElectricContracts("Lifetime").Count(), Is.EqualTo(3));
+        }
+
+        [Test]
+        public void GetElectricContracts_ListsContractsCoveringTheCalendarPeriod()
+        {
+            var store = new InMemoryFinanceDataStore();
+            var orchestrator = new ElectricContractOrchestrator(store);
+            var today = DateTime.Today;
+            var monthStart = new DateTime(today.Year, today.Month, 1);
+            var handover = new DateTime(today.Year, today.Month, Math.Min(12, DateTime.DaysInMonth(today.Year, today.Month)));
+
+            orchestrator.Save(new ElectricContract
+            {
+                Name = "Ended this month",
+                StartDate = monthStart.AddMonths(-6),
+                EndDate = handover
+            });
+            orchestrator.Save(new ElectricContract
+            {
+                Name = "Started this month",
+                StartDate = handover,
+                EndDate = handover.AddYears(1)
+            });
+            orchestrator.Save(new ElectricContract
+            {
+                Name = "Ended last month",
+                StartDate = monthStart.AddYears(-1),
+                EndDate = monthStart.AddDays(-1)
+            });
+            orchestrator.Save(new ElectricContract
+            {
+                Name = "Next year",
+                StartDate = new DateTime(today.Year + 1, 1, 1),
+                EndDate = new DateTime(today.Year + 1, 12, 31)
+            });
+
+            Assert.That(orchestrator.GetElectricContracts("Month").Select(c => c.Name),
+                Is.EquivalentTo(new[] { "Ended this month", "Started this month" }));
+
+            var thisYear = new List<string> { "Ended this month", "Started this month" };
+            if (monthStart.AddDays(-1).Year == today.Year)
+                thisYear.Add("Ended last month");
+            Assert.That(orchestrator.GetElectricContracts("Year").Select(c => c.Name),
+                Is.EquivalentTo(thisYear));
+            Assert.That(orchestrator.GetElectricContracts("Lifetime").Select(c => c.Name),
+                Is.EquivalentTo(new[] { "Ended this month", "Started this month", "Ended last month", "Next year" }));
         }
     }
 
@@ -1360,17 +1405,290 @@ namespace THMS.Tests.Logic
             rule.BudgetFrequency = BudgetFrequency.Biweekly;
             orchestrator.UpdateRule(rule);
 
+            var history = store.GetExpenseBudgetHistory(rule.Id).OrderBy(h => h.PeriodStart).ToList();
+            Assert.That(store.GetExpenseBudgetHistoryById(before.Id), Is.Null);
+            Assert.That(history.Count(h => !h.IsClosed), Is.EqualTo(1));
+            var open = history.Single(h => !h.IsClosed);
             var biweek = BudgetPeriodCalculator.PeriodContaining(DateTime.Today, BudgetFrequency.Biweekly);
-            var after = orchestrator.GetActivePeriod(rule.Id)!;
-            Assert.That(after.Id, Is.EqualTo(before.Id));
-            Assert.That(after.PeriodStart, Is.EqualTo(biweek.Start));
-            Assert.That(after.PeriodEnd, Is.EqualTo(biweek.End));
-            Assert.That(after.ActualExpenses, Is.EqualTo(biweek.Start <= month.Start ? 55m : 15m));
-            Assert.That(store.GetExpenseBudgetHistory(rule.Id).Count(h => !h.IsClosed), Is.EqualTo(1));
+            Assert.That(open.PeriodStart, Is.EqualTo(biweek.Start));
+            Assert.That(open.PeriodEnd, Is.EqualTo(biweek.End));
+            var openActual = 0m;
+            if (month.Start >= open.PeriodStart && month.Start <= open.PeriodEnd)
+                openActual += 40m;
+            if (DateTime.Today >= open.PeriodStart && DateTime.Today <= open.PeriodEnd)
+                openActual += 15m;
+            Assert.That(open.ActualExpenses, Is.EqualTo(openActual));
+            Assert.That(history.All(h => h.BudgetAmount == 100m), Is.True);
+            Assert.That(history.First().PeriodEnd, Is.GreaterThanOrEqualTo(month.Start));
         }
 
         [Test]
-        public void UpdateRule_SameFrequency_DoesNotMoveRolledForwardPeriod()
+        public void UpdateRule_RebuildsFromPeriodStartAndLeavesEarlierPeriods()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var anchor = DateTime.Today.AddDays(-40).Date;
+            var accountId = Guid.NewGuid();
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = anchor.AddDays(1),
+                Amount = -25,
+                CategoryId = DefaultExpenseCategories.GroceriesId
+            });
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = DateTime.Today,
+                Amount = -8,
+                CategoryId = DefaultExpenseCategories.RestaurantsId
+            });
+
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Food",
+                IncludedCategoryIds = [DefaultExpenseCategories.GroceriesId],
+                BudgetFrequency = BudgetFrequency.Biweekly,
+                PeriodStart = anchor,
+                DefaultBudgetAmount = 100,
+                IsActive = true
+            });
+
+            var rule = orchestrator.GetRules().Single();
+            var before = store.GetExpenseBudgetHistory(rule.Id).OrderBy(h => h.PeriodStart).ToList();
+            Assert.That(before.First().PeriodStart, Is.EqualTo(anchor));
+            Assert.That(before.First().ActualExpenses, Is.EqualTo(25m));
+            Assert.That(before.Last().IsClosed, Is.False);
+            Assert.That(before.Last().PeriodEnd, Is.GreaterThanOrEqualTo(DateTime.Today));
+            Assert.That(before.Take(before.Count - 1).All(h => h.IsClosed), Is.True);
+            Assert.That(before.Sum(h => h.ActualExpenses), Is.EqualTo(25m));
+
+            var cutoff = DateTime.Today.AddDays(-10).Date;
+            var kept = before.Where(h => h.PeriodEnd.Date < cutoff).ToList();
+            Assert.That(kept, Is.Not.Empty);
+
+            rule.PeriodStart = cutoff;
+            rule.DefaultBudgetAmount = 80;
+            rule.IncludedCategoryIds =
+            [
+                DefaultExpenseCategories.GroceriesId,
+                DefaultExpenseCategories.RestaurantsId
+            ];
+            orchestrator.UpdateRule(rule);
+
+            foreach (var original in kept)
+            {
+                var unchanged = store.GetExpenseBudgetHistoryById(original.Id)!;
+                Assert.That(unchanged.BudgetAmount, Is.EqualTo(original.BudgetAmount));
+                Assert.That(unchanged.ActualExpenses, Is.EqualTo(original.ActualExpenses));
+                Assert.That(unchanged.PeriodStart, Is.EqualTo(original.PeriodStart));
+                Assert.That(unchanged.PeriodEnd, Is.EqualTo(original.PeriodEnd));
+            }
+
+            foreach (var replaced in before.Where(h => h.PeriodEnd.Date >= cutoff))
+                Assert.That(store.GetExpenseBudgetHistoryById(replaced.Id), Is.Null);
+
+            var rebuilt = store.GetExpenseBudgetHistory(rule.Id)
+                .Where(h => h.PeriodStart.Date >= cutoff)
+                .OrderBy(h => h.PeriodStart)
+                .ToList();
+            Assert.That(rebuilt.First().PeriodStart, Is.EqualTo(cutoff));
+            Assert.That(rebuilt.All(h => h.BudgetAmount == 80m), Is.True);
+            Assert.That(rebuilt.Count(h => !h.IsClosed), Is.EqualTo(1));
+            Assert.That(rebuilt.Last().IsClosed, Is.False);
+            Assert.That(rebuilt.Last().PeriodEnd, Is.GreaterThanOrEqualTo(DateTime.Today));
+            Assert.That(rebuilt.Last().ActualExpenses, Is.EqualTo(8m));
+            Assert.That(rebuilt.Take(rebuilt.Count - 1).All(h => h.IsClosed), Is.True);
+        }
+
+        [Test]
+        public void UpdateRule_CarriesEndingBalanceIntoTheFirstRebuiltPeriod()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var anchor = DateTime.Today.AddDays(-20).Date;
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = Guid.NewGuid(),
+                BudgetName = "Food",
+                IncludedCategoryIds = [DefaultExpenseCategories.GroceriesId],
+                BudgetFrequency = BudgetFrequency.Biweekly,
+                PeriodStart = anchor,
+                DefaultBudgetAmount = 100,
+                IsActive = true
+            });
+
+            var rule = orchestrator.GetRules().Single();
+            var historical = new ExpenseBudgetHistory
+            {
+                Id = Guid.NewGuid(),
+                BudgetRuleId = rule.Id,
+                PeriodStart = anchor.AddDays(-14),
+                PeriodEnd = anchor.AddDays(-1),
+                StartingBalance = 0,
+                BudgetAmount = 40,
+                ActualExpenses = 10,
+                IsClosed = true
+            };
+            historical.RecalculateRemaining();
+            store.AddExpenseBudgetHistory(historical);
+
+            rule.DefaultBudgetAmount = 80;
+            orchestrator.UpdateRule(rule);
+
+            var kept = store.GetExpenseBudgetHistoryById(historical.Id)!;
+            Assert.That(kept.ActualExpenses, Is.EqualTo(10m));
+            Assert.That(kept.BudgetAmount, Is.EqualTo(40m));
+            var first = store.GetExpenseBudgetHistory(rule.Id)
+                .OrderBy(h => h.PeriodStart)
+                .First(h => h.PeriodStart.Date == anchor);
+            Assert.That(first.StartingBalance, Is.EqualTo(30m));
+            Assert.That(first.BudgetAmount, Is.EqualTo(80m));
+        }
+
+        [Test]
+        public void UpdateRule_FrequencyChange_RecreatesFromThePeriodContainingPeriodStart()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var anchor = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(-2).AddDays(10);
+            var monthStart = new DateTime(anchor.Year, anchor.Month, 1);
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = Guid.NewGuid(),
+                BudgetName = "Food",
+                IncludedCategoryIds = [DefaultExpenseCategories.GroceriesId],
+                BudgetFrequency = BudgetFrequency.Biweekly,
+                PeriodStart = anchor,
+                DefaultBudgetAmount = 100,
+                IsActive = true
+            });
+
+            var rule = orchestrator.GetRules().Single();
+            var historical = new ExpenseBudgetHistory
+            {
+                Id = Guid.NewGuid(),
+                BudgetRuleId = rule.Id,
+                PeriodStart = monthStart.AddDays(-14),
+                PeriodEnd = monthStart.AddDays(-1),
+                StartingBalance = 0,
+                BudgetAmount = 40,
+                ActualExpenses = 10,
+                IsClosed = true
+            };
+            historical.RecalculateRemaining();
+            store.AddExpenseBudgetHistory(historical);
+
+            rule.BudgetFrequency = BudgetFrequency.Monthly;
+            orchestrator.UpdateRule(rule);
+
+            Assert.That(store.GetExpenseBudgetHistoryById(historical.Id)!.BudgetAmount, Is.EqualTo(40m));
+            var rebuilt = store.GetExpenseBudgetHistory(rule.Id)
+                .Where(h => h.Id != historical.Id)
+                .OrderBy(h => h.PeriodStart)
+                .ToList();
+            Assert.That(rebuilt.First().PeriodStart, Is.EqualTo(monthStart));
+            Assert.That(rebuilt.First().PeriodEnd, Is.EqualTo(monthStart.AddMonths(1).AddDays(-1)));
+            Assert.That(rebuilt.First().StartingBalance, Is.EqualTo(30m));
+            Assert.That(rebuilt.Last().IsClosed, Is.False);
+            Assert.That(rebuilt.Last().PeriodStart, Is.LessThanOrEqualTo(DateTime.Today));
+            Assert.That(rebuilt.Last().PeriodEnd, Is.GreaterThanOrEqualTo(DateTime.Today));
+            Assert.That(rebuilt.Take(rebuilt.Count - 1).All(h => h.IsClosed), Is.True);
+        }
+
+        [Test]
+        public void UpdateRule_AnnualPeriodStartIncludesTheYearThatContainsIt()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var anchor = new DateTime(DateTime.Today.Year - 1, 6, 15);
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = Guid.NewGuid(),
+                BudgetName = "Travel",
+                IncludedCategoryIds = [DefaultExpenseCategories.GroceriesId],
+                BudgetFrequency = BudgetFrequency.Annual,
+                PeriodStart = anchor,
+                DefaultBudgetAmount = 1000,
+                IsActive = true
+            });
+
+            var periods = store.GetExpenseBudgetHistory(orchestrator.GetRules().Single().Id)
+                .OrderBy(h => h.PeriodStart)
+                .ToList();
+            Assert.That(periods.First().PeriodStart, Is.EqualTo(new DateTime(anchor.Year, 1, 1)));
+            Assert.That(periods.First().PeriodEnd, Is.EqualTo(new DateTime(anchor.Year, 12, 31)));
+            Assert.That(periods.Last().PeriodStart, Is.EqualTo(new DateTime(DateTime.Today.Year, 1, 1)));
+            Assert.That(periods.Last().IsClosed, Is.False);
+            Assert.That(periods.Take(periods.Count - 1).All(h => h.IsClosed), Is.True);
+            Assert.That(periods, Has.Count.EqualTo(DateTime.Today.Year - anchor.Year + 1));
+        }
+
+        [Test]
+        public void RefreshAllActive_LeavesPeriodsBeforePeriodStart()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var anchor = DateTime.Today.AddDays(-20).Date;
+            var accountId = Guid.NewGuid();
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Food",
+                IncludedCategoryIds = [DefaultExpenseCategories.GroceriesId],
+                BudgetFrequency = BudgetFrequency.Biweekly,
+                PeriodStart = anchor,
+                DefaultBudgetAmount = 100,
+                IsActive = true
+            });
+
+            var rule = orchestrator.GetRules().Single();
+            var historical = new ExpenseBudgetHistory
+            {
+                Id = Guid.NewGuid(),
+                BudgetRuleId = rule.Id,
+                PeriodStart = anchor.AddDays(-14),
+                PeriodEnd = anchor.AddDays(-1),
+                StartingBalance = 0,
+                BudgetAmount = 40,
+                ActualExpenses = 10,
+                IsClosed = true
+            };
+            historical.RecalculateRemaining();
+            store.AddExpenseBudgetHistory(historical);
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = anchor.AddDays(-3),
+                Amount = -50,
+                CategoryId = DefaultExpenseCategories.GroceriesId
+            });
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = anchor.AddDays(2),
+                Amount = -7,
+                CategoryId = DefaultExpenseCategories.GroceriesId
+            });
+
+            var closedActual = store.GetExpenseBudgetHistory(rule.Id)
+                .OrderBy(h => h.PeriodStart)
+                .First(h => h.PeriodStart.Date == anchor)
+                .ActualExpenses;
+
+            orchestrator.RefreshAllActive();
+
+            Assert.That(store.GetExpenseBudgetHistoryById(historical.Id)!.ActualExpenses, Is.EqualTo(10m));
+            var first = store.GetExpenseBudgetHistory(rule.Id)
+                .OrderBy(h => h.PeriodStart)
+                .First(h => h.PeriodStart.Date == anchor);
+            Assert.That(first.IsClosed, Is.True);
+            Assert.That(first.ActualExpenses, Is.EqualTo(closedActual));
+        }
+
+        [Test]
+        public void UpdateRule_RebuildsThroughThePeriodContainingToday()
         {
             var store = new InMemoryTransactionDataStore();
             var orchestrator = new BudgetOrchestrator(store);
@@ -1385,14 +1703,17 @@ namespace THMS.Tests.Logic
             });
 
             var rule = orchestrator.GetRules().Single();
-            var created = orchestrator.RollForward(rule.Id);
+            var rolled = orchestrator.RollForward(rule.Id);
             rule.BudgetName = "Home utilities";
             orchestrator.UpdateRule(rule);
 
+            var current = BudgetPeriodCalculator.PeriodContaining(DateTime.Today, BudgetFrequency.Monthly);
             var active = orchestrator.GetActivePeriod(rule.Id)!;
-            Assert.That(active.Id, Is.EqualTo(created.Id));
-            Assert.That(active.PeriodStart, Is.EqualTo(created.PeriodStart));
-            Assert.That(active.PeriodEnd, Is.EqualTo(created.PeriodEnd));
+            Assert.That(store.GetExpenseBudgetHistoryById(rolled.Id), Is.Null);
+            Assert.That(active.PeriodStart, Is.EqualTo(current.Start));
+            Assert.That(active.PeriodEnd, Is.EqualTo(current.End));
+            Assert.That(active.IsClosed, Is.False);
+            Assert.That(store.GetExpenseBudgetHistory(rule.Id).Count(h => !h.IsClosed), Is.EqualTo(1));
         }
 
         [Test]
@@ -1726,6 +2047,98 @@ namespace THMS.Tests.Logic
             Assert.That(next.StartingBalance, Is.EqualTo(60m));
             Assert.That(next.BudgetAmount, Is.EqualTo(100m));
             Assert.That(next.Remaining, Is.EqualTo(next.StartingBalance + next.BudgetAmount - next.ActualExpenses));
+        }
+
+        [Test]
+        public void RefreshAffected_LeavesClosedPeriodActual()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = DateTime.Today,
+                Amount = -40,
+                CategoryId = DefaultExpenseCategories.ElectricId
+            });
+
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Utilities",
+                IncludedCategoryIds = [DefaultExpenseCategories.ElectricId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = 100,
+                IsActive = true
+            });
+
+            var ruleId = orchestrator.GetRules().Single().Id;
+            var closed = orchestrator.GetActivePeriod(ruleId)!;
+            orchestrator.RollForward(ruleId);
+
+            var late = new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = closed.PeriodStart.AddDays(1),
+                Amount = -25,
+                CategoryId = DefaultExpenseCategories.ElectricId
+            };
+            store.AddPostedTransaction(late);
+            orchestrator.RefreshAffected([late]);
+
+            var updatedClosed = store.GetExpenseBudgetHistoryById(closed.Id)!;
+            Assert.That(updatedClosed.ActualExpenses, Is.EqualTo(40m));
+            Assert.That(updatedClosed.Remaining, Is.EqualTo(60m));
+            Assert.That(updatedClosed.EndingBalance, Is.EqualTo(60m));
+
+            var updatedOpen = orchestrator.GetActivePeriod(ruleId)!;
+            Assert.That(updatedOpen.StartingBalance, Is.EqualTo(60m));
+            Assert.That(updatedOpen.Remaining, Is.EqualTo(160m));
+        }
+
+        [Test]
+        public void RefreshAffected_LeavesManuallySetStartingBalance()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var accountId = Guid.NewGuid();
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = DateTime.Today,
+                Amount = -40,
+                CategoryId = DefaultExpenseCategories.ElectricId
+            });
+
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Utilities",
+                IncludedCategoryIds = [DefaultExpenseCategories.ElectricId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = 100,
+                IsActive = true
+            });
+
+            var ruleId = orchestrator.GetRules().Single().Id;
+            var closed = orchestrator.GetActivePeriod(ruleId)!;
+            var open = orchestrator.RollForward(ruleId);
+            orchestrator.SetStartingBalance(open.Id, 10);
+
+            store.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = closed.PeriodStart.AddDays(1),
+                Amount = -25,
+                CategoryId = DefaultExpenseCategories.ElectricId
+            });
+            orchestrator.RefreshAllActive();
+
+            Assert.That(store.GetExpenseBudgetHistoryById(closed.Id)!.ActualExpenses, Is.EqualTo(40m));
+            var updatedOpen = orchestrator.GetActivePeriod(ruleId)!;
+            Assert.That(updatedOpen.StartingBalance, Is.EqualTo(10m));
+            Assert.That(updatedOpen.Remaining, Is.EqualTo(110m));
         }
 
         [Test]

@@ -777,7 +777,63 @@ namespace THMS.Tests.Logic
 
             Assert.That(rows, Has.Count.EqualTo(2));
             Assert.That(rows[0].Status, Is.EqualTo("Open"));
+            Assert.That(rows[0].PeriodStart, Is.EqualTo(new DateTime(2026, 9, 1)));
+            Assert.That(rows[0].PeriodEnd, Is.EqualTo(new DateTime(2026, 9, 30)));
             Assert.That(rows[1].Status, Is.EqualTo("Closed"));
+        }
+
+        [Test]
+        public void AppendHistoryPeriod_CoversTransactionsBeforeTheFirstPeriod()
+        {
+            var periods = CategoryBudgetComposer.BuildPeriods(
+            [
+                new ExpenseBudgetHistory
+                {
+                    PeriodStart = new DateTime(2026, 9, 1),
+                    PeriodEnd = new DateTime(2026, 9, 30)
+                },
+                new ExpenseBudgetHistory
+                {
+                    PeriodStart = new DateTime(2026, 8, 1),
+                    PeriodEnd = new DateTime(2026, 8, 31)
+                }
+            ]);
+
+            var rows = CategoryBudgetComposer.AppendHistoryPeriod(
+                periods,
+                [
+                    new DateTime(2026, 5, 3),
+                    new DateTime(2026, 7, 20),
+                    new DateTime(2026, 8, 1),
+                    new DateTime(2026, 9, 15)
+                ]);
+
+            Assert.That(rows, Has.Count.EqualTo(3));
+            var history = rows[^1];
+            Assert.That(history.IsHistory, Is.True);
+            Assert.That(history.Status, Is.EqualTo("History"));
+            Assert.That(history.PeriodStart, Is.EqualTo(new DateTime(2026, 5, 3)));
+            Assert.That(history.PeriodEnd, Is.EqualTo(new DateTime(2026, 7, 31)));
+            Assert.That(history.Starting, Is.Null);
+            Assert.That(history.Contains(new DateTime(2026, 5, 3)), Is.True);
+            Assert.That(history.Contains(new DateTime(2026, 7, 31)), Is.True);
+            Assert.That(history.Contains(new DateTime(2026, 8, 1)), Is.False);
+            Assert.That(rows[0].Contains(new DateTime(2026, 9, 15)), Is.True);
+            Assert.That(rows[0].Contains(new DateTime(2026, 7, 20)), Is.False);
+        }
+
+        [Test]
+        public void AppendHistoryPeriod_WithoutDefinedPeriods_CoversEveryTransaction()
+        {
+            var rows = CategoryBudgetComposer.AppendHistoryPeriod(
+                [],
+                [new DateTime(2024, 2, 1), new DateTime(2026, 10, 18)]);
+
+            var history = rows.Single();
+            Assert.That(history.IsHistory, Is.True);
+            Assert.That(history.PeriodStart, Is.EqualTo(new DateTime(2024, 2, 1)));
+            Assert.That(history.PeriodEnd, Is.EqualTo(new DateTime(2026, 10, 18)));
+            Assert.That(history.Contains(new DateTime(2025, 1, 1)), Is.True);
         }
     }
 

@@ -55,7 +55,6 @@ namespace THMS.UI.WinForms.Controls
             BindCategoryTree(selected);
 
             dtPeriodStart.Value = DateTime.Today;
-            dtPeriodStart.Checked = false;
 
             if (_existing is null)
             {
@@ -67,7 +66,6 @@ namespace THMS.UI.WinForms.Controls
                 btnSave.Visible = false;
                 btnDelete.Visible = false;
                 AcceptButton = btnAdd;
-                UpdatePeriodStartVisibility();
                 return;
             }
 
@@ -75,44 +73,68 @@ namespace THMS.UI.WinForms.Controls
             numAmount.Value = Clamp(_existing.DefaultBudgetAmount);
             chkActive.Checked = _existing.IsActive;
             cmbFrequency.SelectedItem = ToLabel(_existing.BudgetFrequency);
-            if (_existing.PeriodStart is DateTime start)
-            {
-                dtPeriodStart.Value = start.Date;
-                dtPeriodStart.Checked = true;
-            }
+            dtPeriodStart.Value = _existing.PeriodStart?.Date
+                ?? Orchestrator.GetHistory(_existing.Id)
+                    .OrderBy(h => h.PeriodStart)
+                    .Select(h => (DateTime?)h.PeriodStart.Date)
+                    .FirstOrDefault()
+                ?? DateTime.Today;
             Text = "Edit Budget";
             btnAdd.Visible = false;
             btnSave.Visible = true;
             btnDelete.Visible = true;
-            btnSave.Location = new Point(12, 12);
-            btnDelete.Location = new Point(110, 12);
             AcceptButton = btnSave;
-            UpdatePeriodStartVisibility();
         }
 
-        private void OnFrequencyChanged(object? sender, EventArgs e) =>
-            UpdatePeriodStartVisibility();
-
-        private void UpdatePeriodStartVisibility()
+        protected override void OnLoad(EventArgs e)
         {
-            var cycle = UsesCycleStart(ParseFrequency(cmbFrequency.SelectedItem?.ToString()));
-            lblPeriodStart.Enabled = cycle;
-            dtPeriodStart.Enabled = cycle;
-            if (!cycle)
-                dtPeriodStart.Checked = false;
+            base.OnLoad(e);
+            FitCategoryList();
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            BeginInvoke(() =>
+            {
+                if (IsDisposed)
+                    return;
+
+                CategoryTreeUi.ScrollFirstCheckedToTop(treeCategories);
+            });
+        }
+
+        protected override bool ProcessDialogKey(Keys keyData)
+        {
+            if (keyData == Keys.Escape)
+            {
+                DialogResult = DialogResult.Cancel;
+                return true;
+            }
+
+            return base.ProcessDialogKey(keyData);
+        }
+
+        private void FitCategoryList()
+        {
+            const int visibleRows = 6;
+            var itemHeight = treeCategories.ItemHeight;
+            if (itemHeight < 1 || treeCategories.ClientSize.Height < itemHeight)
+                return;
+
+            var chrome = treeCategories.Height - treeCategories.ClientSize.Height;
+            var height = (itemHeight * visibleRows) + Math.Max(0, chrome);
+            var delta = height - treeCategories.Height;
+            if (delta == 0)
+                return;
+
+            treeCategories.Height = height;
+            ClientSize = new Size(ClientSize.Width, ClientSize.Height + delta);
         }
 
         private void BindCategoryTree(HashSet<Guid> selected)
         {
             CategoryTreeUi.Fill(treeCategories, Orchestrator.GetCategories(), selected);
-        }
-
-        private void OnManageCategories(object? sender, EventArgs e)
-        {
-            var selected = CheckedCategoryIds().ToHashSet();
-            using var manager = new CategoryManager(new CategoryOrchestrator());
-            manager.ShowDialog(this);
-            BindCategoryTree(selected);
         }
 
         private void OnAdd(object? sender, EventArgs e)
@@ -149,13 +171,6 @@ namespace THMS.UI.WinForms.Controls
             Close();
         }
 
-        private void OnClose(object? sender, EventArgs e)
-        {
-            if (DialogResult == DialogResult.None)
-                DialogResult = DialogResult.Cancel;
-            Close();
-        }
-
         private bool TryBuild(out ExpenseBudgetRule rule, bool newId)
         {
             rule = null!;
@@ -180,9 +195,7 @@ namespace THMS.UI.WinForms.Controls
                 IncludedCategoryIds = categories,
                 BudgetFrequency = frequency,
                 DefaultBudgetAmount = numAmount.Value,
-                PeriodStart = UsesCycleStart(frequency) && dtPeriodStart.Checked
-                    ? dtPeriodStart.Value.Date
-                    : null,
+                PeriodStart = dtPeriodStart.Value.Date,
                 IsActive = chkActive.Checked
             };
             return true;
@@ -208,9 +221,6 @@ namespace THMS.UI.WinForms.Controls
             BudgetFrequency.Annual => "Annual",
             _ => "Monthly"
         };
-
-        private static bool UsesCycleStart(BudgetFrequency frequency) =>
-            frequency is BudgetFrequency.Weekly or BudgetFrequency.Biweekly;
 
         private static decimal Clamp(decimal value)
         {

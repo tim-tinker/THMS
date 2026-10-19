@@ -961,6 +961,106 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void AddManual_AdvancesPaymentPlanByItsFrequency()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var next = new DateTime(2026, 10, 18);
+            var end = new DateTime(2027, 4, 18);
+            statements.Save(new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = next.AddDays(-20),
+                DueDate = next.AddDays(5),
+                StatementBalance = 900m,
+                AmountDue = 180m
+            });
+            var statementId = statements.GetForAccount(card.Id).Single().Id;
+            orchestrator.SavePaymentPlan(card.Id, checking.Id, 180m, RecurrenceFrequency.BiWeekly, next, end);
+
+            orchestrator.AddManual(card.Id, checking.Id, 180m, next, "Card payment", statementId);
+
+            var plan = orchestrator.GetPaymentPlan(card.Id);
+            Assert.That(plan!.NextOccurrence.Date, Is.EqualTo(next.AddDays(14)));
+            Assert.That(plan.LastOccurrence, Is.EqualTo(next));
+            Assert.That(plan.IsActive, Is.True);
+
+            var planned = transactions.GetAllFutureTransferTransactions()
+                .Single(item => item.Origin == ExpectedOrigin.RecurringTransfer);
+            var paid = transactions.GetAllFutureTransferTransactions()
+                .Single(item => item.Origin == ExpectedOrigin.StatementPay);
+            Assert.That(planned.Date, Is.EqualTo(next.AddDays(14)));
+            Assert.That(paid.Date, Is.EqualTo(next));
+
+            var checkingBills = orchestrator.GetBills(checking.Id, next);
+            Assert.That(checkingBills.Select(row => row.DueDate), Is.EquivalentTo(new[] { next, next.AddDays(14) }));
+            Assert.That(checkingBills.Select(row => row.Amount), Is.All.EqualTo(-180m));
+            var cardBills = orchestrator.GetBills(card.Id, next);
+            Assert.That(cardBills.Select(row => row.DueDate), Is.EquivalentTo(new[] { next, next.AddDays(14) }));
+            Assert.That(cardBills.Select(row => row.Amount), Is.All.EqualTo(180m));
+
+            orchestrator.AddManual(card.Id, checking.Id, 200m, next, "Card payment", statementId);
+            Assert.That(orchestrator.GetPaymentPlan(card.Id)!.NextOccurrence.Date, Is.EqualTo(next.AddDays(14)));
+        }
+
+        [Test]
+        public void AddManual_LeavesPaymentPlanWhenNextDateIsMoreThanHalfAnIntervalAfterThePayment()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var paidOn = new DateTime(2026, 10, 18);
+            var next = paidOn.AddDays(8);
+            var end = new DateTime(2027, 4, 18);
+            orchestrator.SavePaymentPlan(card.Id, checking.Id, 180m, RecurrenceFrequency.BiWeekly, next, end);
+
+            orchestrator.AddManual(card.Id, checking.Id, 180m, paidOn, "Card payment");
+
+            var plan = orchestrator.GetPaymentPlan(card.Id);
+            Assert.That(plan!.NextOccurrence.Date, Is.EqualTo(next));
+            Assert.That(plan.LastOccurrence, Is.Null);
+            var planned = transactions.GetAllFutureTransferTransactions()
+                .Single(item => item.Origin == ExpectedOrigin.RecurringTransfer);
+            Assert.That(planned.Date, Is.EqualTo(next));
+            Assert.That(orchestrator.GetBills(checking.Id, paidOn).Select(row => row.DueDate), Is.EquivalentTo(new[] { paidOn, next }));
+            Assert.That(orchestrator.GetBills(card.Id, paidOn).Select(row => row.DueDate), Is.EquivalentTo(new[] { paidOn, next }));
+        }
+
+        [Test]
+        public void AddManual_AdvancesPaymentPlanWhenNextDateIsHalfAnIntervalAfterThePayment()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var paidOn = new DateTime(2026, 10, 18);
+            var next = paidOn.AddDays(7);
+            var end = new DateTime(2027, 4, 18);
+            orchestrator.SavePaymentPlan(card.Id, checking.Id, 180m, RecurrenceFrequency.BiWeekly, next, end);
+
+            orchestrator.AddManual(card.Id, checking.Id, 180m, paidOn, "Card payment");
+
+            Assert.That(orchestrator.GetPaymentPlan(card.Id)!.NextOccurrence.Date, Is.EqualTo(next.AddDays(14)));
+        }
+
+        [Test]
+        public void AddManual_StopsPaymentPlanWhenTheNextDatePassesTheEnd()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var next = new DateTime(2026, 10, 18);
+            orchestrator.SavePaymentPlan(card.Id, checking.Id, 180m, RecurrenceFrequency.BiWeekly, next, next);
+
+            orchestrator.AddManual(card.Id, checking.Id, 180m, next, "Card payment");
+
+            var plan = orchestrator.GetPaymentPlan(card.Id);
+            Assert.That(plan!.IsActive, Is.False);
+            Assert.That(plan.NextOccurrence.Date, Is.EqualTo(next.AddDays(14)));
+            Assert.That(
+                transactions.GetAllFutureTransferTransactions().Any(item => item.Origin == ExpectedOrigin.RecurringTransfer),
+                Is.False);
+            Assert.That(orchestrator.GetBills(checking.Id, next).Select(row => row.DueDate), Is.EqualTo(new[] { next }));
+            Assert.That(orchestrator.GetBills(card.Id, next).Select(row => row.DueDate), Is.EqualTo(new[] { next }));
+        }
+
+        [Test]
         public void SavePaymentPlan_ReplacesStatementDueWithPlanPayments()
         {
             var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();

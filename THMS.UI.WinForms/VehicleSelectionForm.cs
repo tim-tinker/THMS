@@ -21,13 +21,13 @@ namespace THMS.UI.WinForms
 
         private void OnClickOk(object sender, EventArgs e)
         {
-            if (gridVehicles.SelectedRows.Count == 0)
+            if (gridVehicles.CurrentRow?.DataBoundItem is not VehicleBase vehicle)
             {
                 MessageBox.Show("Please select a vehicle.");
                 return;
             }
 
-            SelectedVehicle = gridVehicles.SelectedRows[0].DataBoundItem as VehicleBase;
+            SelectedVehicle = vehicle;
 
             DialogResult = DialogResult.OK;
             Close();

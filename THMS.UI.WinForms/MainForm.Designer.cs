@@ -8,6 +8,7 @@ namespace THMS.UI
         private Panel statusStrip;
         private PictureBox statusIcon;
         private Label lblPlaidStatus;
+        private Label lblSelection;
         private ProgressBar syncProgress;
 
         protected override void Dispose(bool disposing)
@@ -29,6 +30,7 @@ namespace THMS.UI
             statusStrip = new Panel();
             statusIcon = new PictureBox();
             lblPlaidStatus = new Label();
+            lblSelection = new Label();
             syncProgress = new ProgressBar();
             statusStrip.SuspendLayout();
             SuspendLayout();
@@ -60,6 +62,7 @@ namespace THMS.UI
             // 
             statusStrip.BackColor = Color.FromArgb(245, 245, 245);
             statusStrip.Controls.Add(lblPlaidStatus);
+            statusStrip.Controls.Add(lblSelection);
             statusStrip.Controls.Add(syncProgress);
             statusStrip.Controls.Add(statusIcon);
             statusStrip.Dock = DockStyle.Bottom;
@@ -91,6 +94,15 @@ namespace THMS.UI
             lblPlaidStatus.TabIndex = 0;
             lblPlaidStatus.Text = "Ready.";
             lblPlaidStatus.TextAlign = ContentAlignment.MiddleLeft;
+            // 
+            // lblSelection
+            //
+            lblSelection.Dock = DockStyle.Right;
+            lblSelection.Font = new Font("Segoe UI", 10F);
+            lblSelection.Name = "lblSelection";
+            lblSelection.Padding = new Padding(16, 0, 12, 0);
+            lblSelection.TextAlign = ContentAlignment.MiddleRight;
+            lblSelection.Visible = false;
             // 
             // syncProgress
             // 

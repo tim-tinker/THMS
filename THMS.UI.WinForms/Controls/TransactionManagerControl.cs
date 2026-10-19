@@ -162,8 +162,6 @@ namespace THMS.UI.WinForms.Controls
             detailGrid.AutoGenerateColumns = false;
             detailGrid.ReadOnly = true;
             detailGrid.EditMode = DataGridViewEditMode.EditProgrammatically;
-            detailGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            detailGrid.MultiSelect = true;
             CategoryColumn.ReadOnly = true;
             CategoryColumn.SortMode = DataGridViewColumnSortMode.NotSortable;
             ForecastColumn.Visible = false;
@@ -220,8 +218,6 @@ namespace THMS.UI.WinForms.Controls
             grid.CellDoubleClick += (_, e) => OnTransactionDoubleClick(grid, category, e, includeRules: false);
             grid.CellMouseClick += (_, e) => OnCategoryCellMouseClick(grid, category, e);
             grid.KeyDown += (_, e) => OnTransactionKeyDown(grid, category, e, includeRules: false);
-            grid.MultiSelect = true;
-            grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             if (grid.DataSource is BindingSource source)
                 TransactionCategoryFilter.Attach(grid, source);
             AttachTransactionDrop(grid, accountId);
@@ -375,13 +371,9 @@ namespace THMS.UI.WinForms.Controls
             var hit = grid.HitTest(e.X, e.Y);
             if (hit.RowIndex < 0)
                 return;
-            if (!grid.Rows[hit.RowIndex].Selected)
-            {
-                grid.ClearSelection();
-                grid.Rows[hit.RowIndex].Selected = true;
-                if (hit.ColumnIndex >= 0)
-                    grid.CurrentCell = grid[hit.ColumnIndex, hit.RowIndex];
-            }
+            if (!DataGridViewUtil.CellIsSelected(grid, hit.RowIndex, hit.ColumnIndex)
+                && !DataGridViewUtil.SelectOnlyCell(grid, hit.RowIndex, hit.ColumnIndex))
+                return;
 
             var rowIndex = hit.RowIndex;
             var location = e.Location;
@@ -393,8 +385,7 @@ namespace THMS.UI.WinForms.Controls
             if (grid.IsDisposed || rowIndex < 0 || rowIndex >= grid.RowCount)
                 return;
 
-            var selected = grid.SelectedRows
-                .Cast<DataGridViewRow>()
+            var selected = DataGridViewUtil.SelectedDataRows(grid)
                 .Select(r => r.DataBoundItem)
                 .OfType<UnifiedTransactionView>()
                 .ToList();
@@ -863,8 +854,9 @@ namespace THMS.UI.WinForms.Controls
         private bool LedgerRowFilterActive =>
             _categoryFilter is not null || !string.IsNullOrWhiteSpace(_descriptionSearch);
 
-        private bool ShowingCreditCard() =>
-            _accountsSource.Current is UnifiedAccountView { AccountType: AccountKinds.Credit };
+        private bool ShowingIssuerSign() =>
+            _accountsSource.Current is UnifiedAccountView view
+            && view.AccountType is AccountKinds.Credit or AccountKinds.Loan or AccountKinds.Mortgage;
 
         private void OnDescriptionSearchChanged(object? sender, EventArgs e)
         {
@@ -899,7 +891,7 @@ namespace THMS.UI.WinForms.Controls
             if (e.RowIndex < 0 || e.ColumnIndex < 0)
                 return;
             if (detailGrid.Columns[e.ColumnIndex] == AmountColumn
-                && ShowingCreditCard()
+                && ShowingIssuerSign()
                 && e.Value is decimal amount)
             {
                 e.Value = -amount;
@@ -972,7 +964,6 @@ namespace THMS.UI.WinForms.Controls
                         detailGrid.CurrentCell = detailGrid[column, i];
                     }
 
-                    detailGrid.Rows[i].Selected = true;
                     break;
                 }
             }
@@ -1122,8 +1113,7 @@ namespace THMS.UI.WinForms.Controls
 
             if (grid.CurrentRow?.DataBoundItem is UnifiedTransactionView view && CanEditTransaction(view))
             {
-                var targets = grid.SelectedRows
-                    .Cast<DataGridViewRow>()
+                var targets = DataGridViewUtil.SelectedDataRows(grid)
                     .Select(r => r.DataBoundItem)
                     .OfType<UnifiedTransactionView>()
                     .Append(view)
@@ -1164,8 +1154,9 @@ namespace THMS.UI.WinForms.Controls
                     categories.Add(current);
             }
 
+            var account = _accountOrchestrator.GetAllAccounts().FirstOrDefault(item => item.Id == view.AccountId);
             var showIssuerSign = parent is not FutureTransferTransaction
-                && _accountOrchestrator.GetAllAccounts().FirstOrDefault(account => account.Id == view.AccountId) is CreditAccount;
+                && account is CreditAccount or LoanAccount or MortgageAccount;
             var hint = showIssuerSign
                 ? "A charge is a positive amount. A payment is negative."
                 : parent switch
@@ -1182,7 +1173,9 @@ namespace THMS.UI.WinForms.Controls
                 hint,
                 categories,
                 defaultDescription: parent.Description,
-                initialAmount: showIssuerSign ? -parent.Amount : parent.Amount,
+                initialAmount: showIssuerSign
+                    ? PostedBalanceCalculator.ToDisplayBalance(account, parent.Amount)
+                    : parent.Amount,
                 initialDate: parent.Date,
                 initialCategoryId: parent.CategoryId,
                 lockAmount: parent.HasSplits,
@@ -1198,7 +1191,9 @@ namespace THMS.UI.WinForms.Controls
                 _activityOrchestrator.UpdateLedgerEntry(
                     parent.Id,
                     dialog.Date,
-                    showIssuerSign ? -dialog.Amount : dialog.Amount,
+                    showIssuerSign
+                        ? PostedBalanceCalculator.ToLedgerPostedDelta(account, dialog.Amount)
+                        : dialog.Amount,
                     dialog.Description,
                     dialog.CategoryId);
                 if (dialog.HasPendingSplits)

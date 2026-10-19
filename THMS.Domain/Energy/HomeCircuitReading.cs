@@ -2,7 +2,7 @@
 {
     public class HomeCircuitReading
     {
-        public Guid Id { get; set; }
+        public Guid Id { get; set; } = Guid.NewGuid();
         public DateTime Timestamp { get; set; }
         public decimal KiloWattHours { get; set; }
     }

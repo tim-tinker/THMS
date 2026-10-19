@@ -1,6 +1,8 @@
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
+using THMS.Logic.Finance.Model;
+using THMS.Logic.Finance.Planning;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
@@ -20,6 +22,8 @@ namespace THMS.UI.WinForms
         private readonly BindingSource _statementsSource = new();
         private readonly BindingSource _statementDetailsSource = new();
         private readonly BindingSource _statementTransactionsSource = new();
+        private readonly ContextMenuStrip _statementMenu = new();
+        private bool _suppressStatementMenu;
         private static readonly Guid EstimateStatementId = new("f5e5714a-7e00-4e57-a7e0-000000000001");
         private List<EstimatePeriod> _estimatePeriods = [];
 
@@ -159,6 +163,9 @@ namespace THMS.UI.WinForms
                     LoadStatementDetails();
             };
             gridStatements.CellDoubleClick += OnStatementCellDoubleClick;
+            gridStatements.MouseDown += OnStatementGridMouseDown;
+            gridStatements.ContextMenuStrip = _statementMenu;
+            _statementMenu.Opening += OnStatementMenuOpening;
             HostStatementDetails();
         }
 
@@ -241,10 +248,8 @@ namespace THMS.UI.WinForms
             {
                 if (e.RowIndex < 0 || e.ColumnIndex != txAmount.Index)
                     return;
-                if (accountUpdater.SelectedAccount is not CreditAccount)
-                    return;
                 if (e.Value is decimal amount)
-                    e.Value = -amount;
+                    e.Value = PostedBalanceCalculator.ToDisplayBalance(accountUpdater.SelectedAccount, amount);
             };
             ledger.AttachTransactionActions(gridTransactions, () => accountUpdater.SelectedAccount?.Id);
 
@@ -652,7 +657,6 @@ namespace THMS.UI.WinForms
                 if (gridStatements.Rows[i].DataBoundItem is not AccountStatementListRow row || row.Id != statementId)
                     continue;
 
-                gridStatements.Rows[i].Selected = true;
                 var column = gridStatements.Columns.GetFirstColumn(DataGridViewElementStates.Visible);
                 if (column is not null)
                 {
@@ -933,6 +937,99 @@ namespace THMS.UI.WinForms
 
         private void OnAddStatement(object? sender, EventArgs e) =>
             OpenStatementEditor(existing: null, accountUpdater.SelectedAccount);
+
+        private void OnStatementGridMouseDown(object? sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Right)
+                return;
+
+            var hit = gridStatements.HitTest(e.X, e.Y);
+            if (hit.RowIndex < 0)
+                return;
+
+            var alreadyCurrent = gridStatements.CurrentCell?.RowIndex == hit.RowIndex
+                && (hit.ColumnIndex < 0 || gridStatements.CurrentCell?.ColumnIndex == hit.ColumnIndex)
+                && DataGridViewUtil.CellIsSelected(gridStatements, hit.RowIndex, hit.ColumnIndex);
+            if (!alreadyCurrent)
+            {
+                if (!DataGridViewUtil.SelectOnlyCell(gridStatements, hit.RowIndex, hit.ColumnIndex))
+                    return;
+
+                // A current-cell change made while the right button is down does not
+                // raise SelectionChanged, so the line items and transactions stay put.
+                LoadStatementDetails();
+            }
+
+            var location = e.Location;
+            _suppressStatementMenu = true;
+            gridStatements.BeginInvoke(() =>
+            {
+                _suppressStatementMenu = false;
+                if (!gridStatements.IsDisposed)
+                    _statementMenu.Show(gridStatements, location);
+            });
+        }
+
+        private void OnStatementMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
+        {
+            _statementMenu.Items.Clear();
+            if (_suppressStatementMenu || !TryValidatableStatement(out var statement, out var previous))
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            var validate = new ToolStripMenuItem("Validate");
+            validate.Click += (_, _) => ShowStatementValidation(statement, previous);
+            _statementMenu.Items.Add(validate);
+        }
+
+        private bool TryValidatableStatement(out AccountStatement statement, out AccountStatement previous)
+        {
+            statement = null!;
+            previous = null!;
+            if (gridStatements.CurrentRow?.DataBoundItem is not AccountStatementListRow row
+                || TryEstimatePeriod(row.Id, out _))
+                return false;
+
+            var current = _accountStatements.FirstOrDefault(item => item.Id == row.Id);
+            if (current is null or UtilityStatement)
+                return false;
+
+            var older = OlderStatement(current);
+            if (older is null)
+                return false;
+
+            statement = current;
+            previous = older;
+            return true;
+        }
+
+        private AccountStatement? OlderStatement(AccountStatement statement)
+        {
+            var end = statement.StatementDate.Date;
+            return _accountStatements
+                .Where(item => item.Id != statement.Id && item.StatementDate.Date < end)
+                .OrderByDescending(item => item.StatementDate)
+                .ThenByDescending(item => item.DueDate)
+                .ThenByDescending(item => item.Id)
+                .FirstOrDefault();
+        }
+
+        private void ShowStatementValidation(AccountStatement statement, AccountStatement previous)
+        {
+            var account = accountUpdater.SelectedAccount;
+            if (account is null)
+                return;
+
+            var (start, end) = StatementWindow(statement);
+            var transactions = _accountTransactionViews
+                .Where(view => view.Date.Date >= start && view.Date.Date <= end)
+                .ToList();
+            var validation = StatementBalanceValidation.Build(account, statement, previous, transactions);
+            using var dialog = new StatementValidationDialog(account.Name, validation);
+            dialog.ShowDialog(this);
+        }
 
         private void OnStatementCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {

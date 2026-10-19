@@ -32,6 +32,16 @@ namespace THMS.UI.WinForms.Controls
             tree.EndUpdate();
         }
 
+        public static void ScrollFirstCheckedToTop(TreeView tree)
+        {
+            var node = FirstChecked(tree.Nodes);
+            if (node is null)
+                return;
+
+            node.EnsureVisible();
+            tree.TopNode = node;
+        }
+
         public static IEnumerable<Guid> CheckedIds(TreeNodeCollection nodes)
         {
             foreach (TreeNode node in nodes)
@@ -205,6 +215,21 @@ namespace THMS.UI.WinForms.Controls
             foreach (var child in ExpenseCategoryTree.Children(categories, category.Id, includeInactive))
                 node.Nodes.Add(CreateNode(categories, child, checkedIds, includeInactive));
             return node;
+        }
+
+        private static TreeNode? FirstChecked(TreeNodeCollection nodes)
+        {
+            foreach (TreeNode node in nodes)
+            {
+                if (node.Checked)
+                    return node;
+
+                var child = FirstChecked(node.Nodes);
+                if (child is not null)
+                    return child;
+            }
+
+            return null;
         }
 
         private static TreeNode? Find(TreeNodeCollection nodes, Guid id)

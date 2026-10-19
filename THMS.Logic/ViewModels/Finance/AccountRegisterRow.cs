@@ -31,6 +31,7 @@ namespace THMS.Logic.ViewModels.Finance
         public decimal? CreditLimitValue { get; init; }
         public string PlaidStatus { get; init; } = "";
         public string Plan { get; init; } = "";
+        public decimal? PlanValue { get; init; }
         public bool HasUnreconciled { get; init; }
 
         public static AccountRegisterRow From(Account account, AccountStatement? latestStatement) =>
@@ -42,7 +43,7 @@ namespace THMS.Logic.ViewModels.Finance
             IEnumerable<PostedTransaction> posted,
             string? plaidStatus = null,
             bool hasUnreconciled = false,
-            bool hasPaymentPlan = false)
+            decimal? paymentPlanAmount = null)
         {
             ArgumentNullException.ThrowIfNull(account);
             ArgumentNullException.ThrowIfNull(statements);
@@ -84,7 +85,8 @@ namespace THMS.Logic.ViewModels.Finance
                 CreditLimit = creditLimit is decimal limit ? limit.ToString("c2") : "",
                 CreditLimitValue = creditLimit,
                 PlaidStatus = plaidStatus ?? PlaidStatusOf(account, itemState: null),
-                Plan = hasPaymentPlan ? "Yes" : "",
+                Plan = paymentPlanAmount is decimal amount ? amount.ToString("c2") : "",
+                PlanValue = paymentPlanAmount,
                 HasUnreconciled = hasUnreconciled
                     || posted.Any(tx => tx.ImportedStatus == ImportedStatus.Unreconciled)
             };
@@ -114,7 +116,7 @@ namespace THMS.Logic.ViewModels.Finance
                 nameof(Apr) => CompareNullable(x.AprValue, y.AprValue, descending),
                 nameof(CreditLimit) => CompareNullable(x.CreditLimitValue, y.CreditLimitValue, descending),
                 nameof(PlaidStatus) => CompareText(x.PlaidStatus, y.PlaidStatus, descending),
-                nameof(Plan) => CompareText(x.Plan, y.Plan, descending),
+                nameof(Plan) => CompareNullable(x.PlanValue, y.PlanValue, descending),
                 _ => CompareText(x.Name, y.Name, descending)
             };
 

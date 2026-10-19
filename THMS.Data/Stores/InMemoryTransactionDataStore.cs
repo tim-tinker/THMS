@@ -248,6 +248,9 @@ namespace THMS.Data.Stores
         public void UpdateExpenseBudgetHistory(ExpenseBudgetHistory history) =>
             _store.UpdateExpenseBudgetHistory(history);
 
+        public void DeleteExpenseBudgetHistory(Guid historyId) =>
+            _store.DeleteExpenseBudgetHistory(historyId);
+
         public ExpenseBudgetHistory? GetExpenseBudgetHistoryById(Guid historyId) =>
             _store.GetExpenseBudgetHistoryById(historyId);
 

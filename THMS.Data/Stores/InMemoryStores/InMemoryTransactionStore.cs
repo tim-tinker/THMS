@@ -402,6 +402,8 @@ namespace THMS.Data.Stores.InMemoryStores
 
         public void AddExpenseBudgetHistory(ExpenseBudgetHistory history) => Add(_expenseBudgetHistory, history);
         public void UpdateExpenseBudgetHistory(ExpenseBudgetHistory history) => Update(_expenseBudgetHistory, history);
+        public void DeleteExpenseBudgetHistory(Guid id) =>
+            _expenseBudgetHistory.RemoveAll(h => h.Id == id);
 
         public ExpenseBudgetHistory? GetExpenseBudgetHistoryById(Guid id) =>
             _expenseBudgetHistory.FirstOrDefault(h => h.Id == id);

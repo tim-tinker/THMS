@@ -65,22 +65,17 @@ namespace THMS.UI.WinForms.Controls
             grid.HandleCreated += (_, _) => FitBalance();
             FitBalance();
 
-            var close = new ThmsButton { Text = "Close", Margin = new Padding(0, 4, 12, 12) };
-            close.Click += (_, _) => Close();
-            var buttons = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Bottom,
-                FlowDirection = FlowDirection.RightToLeft,
-                AutoSize = true,
-                Padding = new Padding(12, 8, 0, 4)
-            };
-            buttons.Controls.Add(close);
-
             Controls.Add(grid);
-            Controls.Add(buttons);
             Controls.Add(header);
-            AcceptButton = close;
-            CancelButton = close;
+            KeyPreview = true;
+            KeyDown += (_, e) =>
+            {
+                if (e.KeyCode != Keys.Escape)
+                    return;
+                Close();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+            };
         }
 
         private static DataGridViewTextBoxColumn Column(string property, string header, string? format)
