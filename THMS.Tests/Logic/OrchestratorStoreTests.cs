@@ -1843,6 +1843,50 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void AnnualRecommendation_IgnoresTheOpenYearAndStampsEveryPeriod()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new BudgetOrchestrator(store);
+            var thisYear = DateTime.Today.Year;
+            var years = new[] { (thisYear - 2, -1000m), (thisYear - 1, -2000m), (thisYear, -50m) };
+            foreach (var (year, amount) in years)
+            {
+                store.AddPostedTransaction(new PostedTransaction
+                {
+                    AccountId = Guid.NewGuid(),
+                    Date = new DateTime(year, 6, 15),
+                    Amount = amount,
+                    Category = DefaultExpenseCategories.Groceries,
+                    CategoryId = DefaultExpenseCategories.GroceriesId
+                });
+            }
+
+            orchestrator.AddRule(new ExpenseBudgetRule
+            {
+                BudgetName = "Food",
+                IncludedCategoryIds = [DefaultExpenseCategories.GroceriesId],
+                BudgetFrequency = BudgetFrequency.Annual,
+                PeriodStart = new DateTime(thisYear - 2, 1, 1),
+                DefaultBudgetAmount = 14000,
+                IsActive = true
+            });
+
+            var ruleId = orchestrator.GetRules().Single().Id;
+            var history = orchestrator.GetHistory(ruleId);
+            var open = history.Single(period => !period.IsClosed);
+            Assert.That(open.ActualExpenses, Is.EqualTo(50m));
+            Assert.That(history.Select(period => period.RecommendedAmount), Is.All.EqualTo(5000m / 3m));
+
+            var closed = history.First(period => period.IsClosed);
+            closed.RecommendedAmount = 1;
+            store.UpdateExpenseBudgetHistory(closed);
+            orchestrator.RefreshAllActive();
+
+            history = orchestrator.GetHistory(ruleId);
+            Assert.That(history.Select(period => period.RecommendedAmount), Is.All.EqualTo(5000m / 3m));
+        }
+
+        [Test]
         public void RefreshAccount_RecommendedIncludesForecast_NotPostedActuals()
         {
             var store = new InMemoryTransactionDataStore();

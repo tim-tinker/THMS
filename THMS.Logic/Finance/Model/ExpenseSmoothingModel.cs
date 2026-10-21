@@ -103,6 +103,7 @@ namespace THMS.Logic.Finance.Model
 
         // ------------------------------------------------------------
         // 5. Hybrid Seasonal + Trend (HST)
+        // Budget recommendations use BudgetRecommendation instead.
         // ------------------------------------------------------------
         private decimal Hybrid(
             List<MonthlyExpenseTotal> totals,

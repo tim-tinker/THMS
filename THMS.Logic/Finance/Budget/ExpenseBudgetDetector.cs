@@ -1,15 +1,10 @@
 ﻿using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Categories;
-using THMS.Logic.Finance.Model;
 
 namespace THMS.Logic.Finance.Budget
 {
     public class ExpenseBudgetDetector
     {
-        public const ExpenseSmoothingMode SmoothingMode = ExpenseSmoothingMode.Hybrid;
-
-        private readonly ExpenseSmoothingModel _smoothing = new();
-
         public decimal ComputeActualExpenses(
             IEnumerable<PostedTransaction> posted,
             IEnumerable<Guid> includedCategoryIds,
@@ -75,7 +70,8 @@ namespace THMS.Logic.Finance.Budget
             IEnumerable<PostedTransaction>? posted = null,
             IEnumerable<Guid>? includedCategoryIds = null,
             IEnumerable<ExpenseCategory>? categories = null,
-            DateTime? cycleStart = null)
+            DateTime? cycleStart = null,
+            DateTime? asOf = null)
         {
             var samples = history
                 .Select(h => (Start: h.PeriodStart.Date, End: h.PeriodEnd.Date, Actual: h.ActualExpenses))
@@ -109,60 +105,10 @@ namespace THMS.Logic.Finance.Budget
             var persistedStarts = history.Select(h => h.PeriodStart.Date).ToHashSet();
             samples = samples
                 .Where(s => s.Actual > 0 || persistedStarts.Contains(s.Start))
-                .OrderBy(s => s.Start)
                 .ToList();
 
-            if (samples.Count == 0)
-                return 0;
-
-            var totals = ToSmoothingSeries(samples, frequency);
-            return Math.Max(0, _smoothing.ComputeSmoothedAverage(totals, SmoothingMode, PeriodsToAverage(frequency)));
+            return BudgetRecommendation.Compute(samples, frequency, cycleStart, asOf);
         }
-
-        private static List<MonthlyExpenseTotal> ToSmoothingSeries(
-            List<(DateTime Start, DateTime End, decimal Actual)> samples,
-            BudgetFrequency frequency)
-        {
-            if (frequency is BudgetFrequency.Weekly or BudgetFrequency.Biweekly)
-            {
-                return samples
-                    .Select((sample, index) => new MonthlyExpenseTotal
-                    {
-                        Year = sample.Start.Year,
-                        Month = (index % 12) + 1,
-                        Amount = sample.Actual
-                    })
-                    .ToList();
-            }
-
-            return samples
-                .GroupBy(s => new { s.Start.Year, Month = BucketMonth(s.Start, frequency) })
-                .Select(g => new MonthlyExpenseTotal
-                {
-                    Year = g.Key.Year,
-                    Month = g.Key.Month,
-                    Amount = g.Sum(x => x.Actual)
-                })
-                .OrderBy(t => t.Year)
-                .ThenBy(t => t.Month)
-                .ToList();
-        }
-
-        private static int BucketMonth(DateTime start, BudgetFrequency frequency) => frequency switch
-        {
-            BudgetFrequency.Quarterly => ((start.Month - 1) / 3) * 3 + 1,
-            BudgetFrequency.Annual => 1,
-            _ => start.Month
-        };
-
-        private static int PeriodsToAverage(BudgetFrequency frequency) => frequency switch
-        {
-            BudgetFrequency.Weekly => 52,
-            BudgetFrequency.Biweekly => 26,
-            BudgetFrequency.Quarterly => 12,
-            BudgetFrequency.Annual => 5,
-            _ => 36
-        };
 
         private static HashSet<Guid> Expand(
             IEnumerable<Guid> includedCategoryIds,

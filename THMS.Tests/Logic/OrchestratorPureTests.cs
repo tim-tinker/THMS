@@ -746,10 +746,10 @@ namespace THMS.Tests.Logic
                 BudgetFrequency.Monthly,
                 posted,
                 [DefaultExpenseCategories.UtilityId],
-                DefaultExpenseCategories.All);
+                DefaultExpenseCategories.All,
+                asOf: new DateTime(2026, 3, 1));
 
-            Assert.That(amount, Is.GreaterThan(0));
-            Assert.That(amount, Is.LessThanOrEqualTo(40m));
+            Assert.That(amount, Is.EqualTo(80m / 3m));
         }
 
         [Test]
@@ -789,11 +789,177 @@ namespace THMS.Tests.Logic
 
             var recommended = new ExpenseBudgetDetector().ComputeRecommendedAmount(
                 history,
-                BudgetFrequency.Monthly);
+                BudgetFrequency.Monthly,
+                asOf: new DateTime(2026, 3, 1));
 
-            Assert.That(recommended, Is.GreaterThan(0));
-            Assert.That(recommended, Is.Not.EqualTo(40m + 20m));
+            Assert.That(recommended, Is.EqualTo(80m / 3m));
         }
+
+        [Test]
+        public void ComputeRecommendedAmount_AnnualUsesFiveClosedYearsAndIgnoresTheOpenYear()
+        {
+            var history = new List<ExpenseBudgetHistory>
+            {
+                Year(2018, 15001.99m),
+                Year(2019, 17378.38m),
+                Year(2020, 14651.83m),
+                Year(2021, 17061.37m),
+                Year(2022, 18394.46m),
+                Year(2023, 18932.95m),
+                Year(2024, 19980.30m),
+                Year(2025, 16878.60m),
+                Year(2026, 12817.57m)
+            };
+
+            var recommended = new ExpenseBudgetDetector().ComputeRecommendedAmount(
+                history,
+                BudgetFrequency.Annual,
+                asOf: new DateTime(2026, 10, 21));
+
+            Assert.That(recommended, Is.EqualTo(274963.34m / 15m));
+        }
+
+        [TestCase(BudgetFrequency.Weekly)]
+        [TestCase(BudgetFrequency.Biweekly)]
+        public void Compute_LevelWindowIsTheLast13ClosedPeriods(BudgetFrequency frequency)
+        {
+            var length = frequency == BudgetFrequency.Weekly ? 7 : 14;
+            var start = new DateTime(2026, 1, 5);
+            var periods = new List<(DateTime Start, DateTime End, decimal Actual)>();
+            var cursor = start;
+            for (var amount = 1; amount <= 21; amount++)
+            {
+                var end = cursor.AddDays(length - 1);
+                periods.Add((cursor, end, amount == 21 ? 9999m : amount));
+                cursor = end.AddDays(1);
+            }
+
+            var recommended = BudgetRecommendation.Compute(
+                periods,
+                frequency,
+                cycleStart: start,
+                asOf: periods[^1].Start.AddDays(1));
+
+            Assert.That(recommended, Is.EqualTo(16m));
+        }
+
+        [Test]
+        public void Compute_MonthlySeasonalIndexScalesTheRecentLevel()
+        {
+            var periods = new List<(DateTime Start, DateTime End, decimal Actual)>();
+            for (var year = 2024; year <= 2026; year++)
+            {
+                for (var month = 1; month <= 12; month++)
+                {
+                    if (year == 2026 && month == 12)
+                        continue;
+                    var start = new DateTime(year, month, 1);
+                    periods.Add((start, start.AddMonths(1).AddDays(-1), month == 12 ? 200m : 100m));
+                }
+            }
+
+            periods.Add((new DateTime(2026, 12, 1), new DateTime(2026, 12, 31), 1m));
+
+            var recommended = BudgetRecommendation.Compute(
+                periods,
+                BudgetFrequency.Monthly,
+                asOf: new DateTime(2026, 12, 15));
+
+            Assert.That(recommended, Is.EqualTo(200m).Within(0.01m));
+        }
+
+        [Test]
+        public void Compute_MonthlyLevelFollowsTheLast12ClosedMonths()
+        {
+            var periods = new List<(DateTime Start, DateTime End, decimal Actual)>();
+            for (var year = 2023; year <= 2025; year++)
+            {
+                for (var month = 1; month <= 12; month++)
+                {
+                    var start = new DateTime(year, month, 1);
+                    periods.Add((start, start.AddMonths(1).AddDays(-1), year == 2025 ? 200m : 100m));
+                }
+            }
+
+            periods.Add((new DateTime(2026, 1, 1), new DateTime(2026, 1, 31), 9999m));
+
+            var recommended = BudgetRecommendation.Compute(
+                periods,
+                BudgetFrequency.Monthly,
+                asOf: new DateTime(2026, 1, 15));
+
+            Assert.That(recommended, Is.EqualTo(200m));
+        }
+
+        [Test]
+        public void Compute_SingleObservationDoesNotSetASeasonalIndex()
+        {
+            var periods = new List<(DateTime Start, DateTime End, decimal Actual)>();
+            for (var month = 1; month <= 12; month++)
+            {
+                var start = new DateTime(2025, month, 1);
+                periods.Add((start, start.AddMonths(1).AddDays(-1), month == 12 ? 500m : 100m));
+            }
+
+            periods.Add((new DateTime(2026, 1, 1), new DateTime(2026, 1, 31), 9000m));
+
+            var recommended = BudgetRecommendation.Compute(
+                periods,
+                BudgetFrequency.Monthly,
+                asOf: new DateTime(2026, 1, 15));
+
+            Assert.That(recommended, Is.EqualTo(12600m / 78m));
+        }
+
+        [Test]
+        public void Compute_QuarterlySeasonalIndexUsesTheOpenQuarter()
+        {
+            var periods = new List<(DateTime Start, DateTime End, decimal Actual)>();
+            for (var year = 2023; year <= 2026; year++)
+            {
+                for (var quarter = 0; quarter < 4; quarter++)
+                {
+                    if (year == 2026 && quarter > 0)
+                        continue;
+                    var start = new DateTime(year, quarter * 3 + 1, 1);
+                    var amount = quarter == 0 ? 400m : 100m;
+                    if (year == 2026)
+                        amount = 1m;
+                    periods.Add((start, start.AddMonths(3).AddDays(-1), amount));
+                }
+            }
+
+            var recommended = BudgetRecommendation.Compute(
+                periods,
+                BudgetFrequency.Quarterly,
+                asOf: new DateTime(2026, 2, 15));
+
+            Assert.That(recommended, Is.EqualTo(400m).Within(0.01m));
+        }
+
+        [Test]
+        public void Compute_NoClosedPeriod_ReturnsZero()
+        {
+            var open = new[]
+            {
+                (new DateTime(2026, 10, 1), new DateTime(2026, 10, 31), 500m)
+            };
+
+            var recommended = BudgetRecommendation.Compute(
+                open,
+                BudgetFrequency.Monthly,
+                asOf: new DateTime(2026, 10, 21));
+
+            Assert.That(recommended, Is.EqualTo(0m));
+        }
+
+        private static ExpenseBudgetHistory Year(int year, decimal actual) => new()
+        {
+            PeriodStart = new DateTime(year, 1, 1),
+            PeriodEnd = new DateTime(year, 12, 31),
+            ActualExpenses = actual,
+            IsClosed = true
+        };
     }
 
     [TestFixture]
@@ -862,6 +1028,30 @@ namespace THMS.Tests.Logic
             Assert.That(current.End, Is.EqualTo(new DateTime(2026, 10, 8)));
             Assert.That(next.Start, Is.EqualTo(new DateTime(2026, 10, 9)));
             Assert.That(next.End, Is.EqualTo(new DateTime(2026, 10, 22)));
+        }
+
+        [Test]
+        public void PeriodSlot_WeeklyMatchesTheSameWeekNextYear()
+        {
+            var cycle = new DateTime(2026, 1, 5);
+            var slot = BudgetPeriodCalculator.PeriodSlot(new DateTime(2026, 3, 2), BudgetFrequency.Weekly, cycle);
+            var nextYear = BudgetPeriodCalculator.PeriodSlot(new DateTime(2027, 3, 1), BudgetFrequency.Weekly, cycle);
+            var followingWeek = BudgetPeriodCalculator.PeriodSlot(new DateTime(2026, 3, 9), BudgetFrequency.Weekly, cycle);
+
+            Assert.That(nextYear, Is.EqualTo(slot));
+            Assert.That(followingWeek, Is.Not.EqualTo(slot));
+        }
+
+        [Test]
+        public void PeriodSlot_BiweeklyRepeatsEvery26PayPeriods()
+        {
+            var payday = new DateTime(2026, 9, 25);
+            var slot = BudgetPeriodCalculator.PeriodSlot(payday, BudgetFrequency.Biweekly, payday);
+            var sameSlot = BudgetPeriodCalculator.PeriodSlot(payday.AddDays(14 * 26), BudgetFrequency.Biweekly, payday);
+            var nextSlot = BudgetPeriodCalculator.PeriodSlot(payday.AddDays(14), BudgetFrequency.Biweekly, payday);
+
+            Assert.That(sameSlot, Is.EqualTo(slot));
+            Assert.That(nextSlot, Is.Not.EqualTo(slot));
         }
     }
 

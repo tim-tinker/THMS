@@ -360,15 +360,18 @@ namespace THMS.Logic.Orchestrators
             var periods = _store.GetExpenseBudgetHistory(rule.Id)
                 .Select(h => h.Id == history.Id ? history : h)
                 .ToList();
-            history.RecommendedAmount = _detector.ComputeRecommendedAmount(
+            var recommended = _detector.ComputeRecommendedAmount(
                 periods,
                 rule.BudgetFrequency,
                 posted,
                 rule.IncludedCategoryIds,
                 catalog,
                 rule.PeriodStart);
+            foreach (var period in periods)
+                period.RecommendedAmount = recommended;
             history.RecalculateRemaining();
-            _store.UpdateExpenseBudgetHistory(history);
+            foreach (var period in periods)
+                _store.UpdateExpenseBudgetHistory(period);
         }
     }
 }

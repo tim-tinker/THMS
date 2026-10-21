@@ -101,7 +101,7 @@ namespace THMS.Data.Stores.SqlTables
         {
             EnsureDefaults(conn);
             var known = GetAll(conn, includeInactive: true).ToList();
-            var byName = known.ToDictionary(c => c.Name, c => c, StringComparer.OrdinalIgnoreCase);
+            var byName = IndexByName(known);
 
             foreach (var name in DistinctCategoryNames(conn))
             {
@@ -120,7 +120,7 @@ namespace THMS.Data.Stores.SqlTables
             }
 
             known = GetAll(conn, includeInactive: true).ToList();
-            byName = known.ToDictionary(c => c.Name, c => c, StringComparer.OrdinalIgnoreCase);
+            byName = IndexByName(known);
 
             string IdFor(string? raw)
             {
@@ -203,6 +203,18 @@ namespace THMS.Data.Stores.SqlTables
             }
         }
 
+        private static Dictionary<string, ExpenseCategory> IndexByName(IEnumerable<ExpenseCategory> categories) =>
+            categories
+                .GroupBy(category => category.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group
+                        .OrderByDescending(category => category.IsActive)
+                        .ThenBy(category => category.DisplayOrder)
+                        .ThenBy(category => category.Id)
+                        .First(),
+                    StringComparer.OrdinalIgnoreCase);
+
         private static IEnumerable<string> DistinctCategoryNames(SqliteConnection conn)
         {
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -256,7 +268,7 @@ namespace THMS.Data.Stores.SqlTables
                 insert.ExecuteNonQuery();
             }
 
-            var byName = GetAllStatic(conn).ToDictionary(c => c.Name, c => c, StringComparer.OrdinalIgnoreCase);
+            var byName = IndexByName(GetAllStatic(conn));
             foreach (var row in rows.Where(r => !string.IsNullOrWhiteSpace(r.Parent)))
             {
                 if (!byName.TryGetValue(row.Parent!, out var parent))

@@ -70,6 +70,59 @@ namespace THMS.Tests.Logic
             }
         }
 
+        [Test]
+        public void MigrateLegacyCategoryStrings_KeepsGoingWhenCategoryNamesRepeat()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"thms-categories-{Guid.NewGuid():N}.db");
+            var keptId = Guid.NewGuid();
+            var duplicateId = Guid.NewGuid();
+            var postedId = Guid.NewGuid();
+            try
+            {
+                _ = new SQLiteTransactionDataStore(path);
+                using (var conn = new SqliteConnection($"Data Source={path}"))
+                {
+                    conn.Open();
+                    using var insert = conn.CreateCommand();
+                    insert.CommandText = @"
+                        INSERT INTO ExpenseCategories (Id, Name, ParentCategoryId, IsActive, DisplayOrder)
+                        VALUES
+                            (@Kept, 'Solar Payment', NULL, 1, 100),
+                            (@Duplicate, 'solar payment', NULL, 1, 200);
+                        INSERT INTO PostedTransactions (Id, AccountId, Date, Description, Amount, Category, CategoryId)
+                        VALUES (@Posted, @Account, '2026-06-15', 'Lease', -40, 'Solar Payment', NULL);";
+                    insert.Parameters.AddWithValue("@Kept", keptId.ToString());
+                    insert.Parameters.AddWithValue("@Duplicate", duplicateId.ToString());
+                    insert.Parameters.AddWithValue("@Posted", postedId.ToString());
+                    insert.Parameters.AddWithValue("@Account", Guid.NewGuid().ToString());
+                    insert.ExecuteNonQuery();
+                }
+
+                var store = new SQLiteTransactionDataStore(path);
+                var solar = store.GetAllCategories(includeInactive: true)
+                    .Where(category => string.Equals(category.Name, "Solar Payment", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                Assert.That(solar.Select(category => category.Id), Is.EquivalentTo(new[] { keptId, duplicateId }));
+
+                using var check = new SqliteConnection($"Data Source={path}");
+                check.Open();
+                using var read = check.CreateCommand();
+                read.CommandText = "SELECT CategoryId FROM PostedTransactions WHERE Id = @Id;";
+                read.Parameters.AddWithValue("@Id", postedId.ToString());
+                Assert.That(read.ExecuteScalar()?.ToString(), Is.EqualTo(keptId.ToString()));
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                foreach (var suffix in new[] { "", "-wal", "-shm" })
+                {
+                    var file = path + suffix;
+                    if (File.Exists(file))
+                        File.Delete(file);
+                }
+            }
+        }
+
         private static void CreateAll(string path)
         {
             _ = new SQLiteTransactionDataStore(path);

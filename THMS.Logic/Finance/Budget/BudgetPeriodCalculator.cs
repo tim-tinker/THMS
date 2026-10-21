@@ -50,6 +50,19 @@ namespace THMS.Logic.Finance.Budget
             }
         }
 
+        public static int PeriodSlot(DateTime date, BudgetFrequency frequency, DateTime? cycleStart = null)
+        {
+            var (start, _) = PeriodContaining(date, frequency, cycleStart);
+            return frequency switch
+            {
+                BudgetFrequency.Weekly => WeekOfCycle(start, cycleStart),
+                BudgetFrequency.Biweekly => BiweekOfCycle(start, cycleStart),
+                BudgetFrequency.Monthly => start.Month,
+                BudgetFrequency.Quarterly => ((start.Month - 1) / 3) + 1,
+                _ => 0
+            };
+        }
+
         private static (DateTime Start, DateTime End) MonthContaining(DateTime date)
         {
             var start = new DateTime(date.Year, date.Month, 1);
@@ -76,6 +89,24 @@ namespace THMS.Logic.Finance.Budget
             var block = (int)Math.Floor(days / 14d);
             var start = epoch.AddDays(block * 14);
             return (start, start.AddDays(13));
+        }
+
+        private static int WeekOfCycle(DateTime weekStart, DateTime? cycleStart)
+        {
+            var weekStartsOn = cycleStart?.DayOfWeek ?? DayOfWeek.Monday;
+            var first = StartOfWeek(new DateTime(weekStart.Year, 1, 1), weekStartsOn);
+            if (weekStart.Date < first)
+                first = StartOfWeek(new DateTime(weekStart.Year - 1, 1, 1), weekStartsOn);
+            return (weekStart.Date - first).Days / 7;
+        }
+
+        private static int BiweekOfCycle(DateTime biweekStart, DateTime? cycleStart)
+        {
+            var epoch = cycleStart?.Date ?? StartOfWeek(new DateTime(2024, 1, 1), DayOfWeek.Monday);
+            var days = (biweekStart.Date - epoch).Days;
+            var block = days >= 0 ? days / 14 : -((-days + 13) / 14);
+            var slot = block % 26;
+            return slot < 0 ? slot + 26 : slot;
         }
 
         private static DateTime StartOfWeek(DateTime date, DayOfWeek weekStart)
