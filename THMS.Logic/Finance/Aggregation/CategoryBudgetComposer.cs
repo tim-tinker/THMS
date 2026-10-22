@@ -32,7 +32,8 @@ namespace THMS.Logic.Finance.Aggregation
                     PeriodStart = period?.PeriodStart.Date,
                     PeriodEnd = period?.PeriodEnd.Date,
                     Recommended = period?.RecommendedAmount,
-                    Status = StatusOf(rule, period, today)
+                    Status = StatusOf(rule, period, today, category, catalog),
+                    Role = CategoryRoleResolver.Resolve(category.Id, catalog).ToString()
                 });
             }
 
@@ -142,13 +143,18 @@ namespace THMS.Logic.Finance.Aggregation
         private static string StatusOf(
             ExpenseBudgetRule? rule,
             ExpenseBudgetHistory? period,
-            DateTime today)
+            DateTime today,
+            ExpenseCategory category,
+            IReadOnlyList<ExpenseCategory> catalog)
         {
             if (rule is null)
                 return "";
             if (!rule.IsActive)
                 return "Inactive";
-            return period is null ? "" : FinanceDashboardComposer.BudgetStatus(period, today, rule.BudgetFrequency);
+            var role = CategoryRoleResolver.Resolve(category.Id, catalog);
+            return period is null
+                ? ""
+                : FinanceDashboardComposer.BudgetStatus(period, today, rule.BudgetFrequency, role);
         }
     }
 }

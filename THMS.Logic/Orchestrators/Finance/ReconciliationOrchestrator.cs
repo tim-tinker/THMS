@@ -11,19 +11,25 @@ namespace THMS.Logic.Orchestrators.Finance
     {
         private readonly ITransactionDataStore _transactions;
         private readonly IAccountStatementDataStore? _statements;
+        private readonly IAccountDataStore? _accounts;
         private readonly MatchRecommender _recommender = new();
 
         public ReconciliationOrchestrator()
             : this(
                 new DataStoreFactory().GetTransactionStore(),
-                new DataStoreFactory().GetAccountStatementStore())
+                new DataStoreFactory().GetAccountStatementStore(),
+                new DataStoreFactory().GetAccountStore())
         {
         }
 
-        public ReconciliationOrchestrator(ITransactionDataStore transactions, IAccountStatementDataStore? statements = null)
+        public ReconciliationOrchestrator(
+            ITransactionDataStore transactions,
+            IAccountStatementDataStore? statements = null,
+            IAccountDataStore? accounts = null)
         {
             _transactions = transactions;
             _statements = statements;
+            _accounts = accounts;
         }
 
         public int RecommendMatches()
@@ -166,7 +172,7 @@ namespace THMS.Logic.Orchestrators.Finance
             _transactions.GetAccountIdsWithUnreconciledImports().ToHashSet();
 
         private void RefreshBudgets(params PostedTransaction[] posted) =>
-            new BudgetOrchestrator(_transactions).RefreshAffected(posted);
+            new BudgetOrchestrator(_transactions, _accounts).RefreshAffected(posted);
 
         public void MaterializePlannedFromRules()
         {

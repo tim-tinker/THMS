@@ -12,16 +12,23 @@ namespace THMS.Logic.Orchestrators
     public class TransactionOrchestrator
     {
         private readonly ITransactionDataStore _store;
+        private readonly IAccountDataStore? _accounts;
         private readonly ForecastGenerator _forecastGenerator = new();
 
         public TransactionOrchestrator()
-            : this(new DataStoreFactory().GetTransactionStore())
+            : this(new DataStoreFactory().GetTransactionStore(), new DataStoreFactory().GetAccountStore())
         {
         }
 
         public TransactionOrchestrator(ITransactionDataStore store)
+            : this(store, accounts: null)
+        {
+        }
+
+        public TransactionOrchestrator(ITransactionDataStore store, IAccountDataStore? accounts)
         {
             _store = store;
+            _accounts = accounts;
         }
 
         public AccountTransactions GetTransactionsForAccount(Guid accountId)
@@ -406,7 +413,7 @@ namespace THMS.Logic.Orchestrators
         }
 
         private void RefreshBudgets(BaseTransaction parent) =>
-            new BudgetOrchestrator(_store).RefreshAllActive();
+            new BudgetOrchestrator(_store, _accounts).RefreshAllActive();
     }
 
     public class AccountTransactions

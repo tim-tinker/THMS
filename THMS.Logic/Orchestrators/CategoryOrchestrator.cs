@@ -14,16 +14,25 @@ namespace THMS.Logic.Orchestrators
         public CategoryOrchestrator()
             : this(
                 new DataStoreFactory().GetCategoryStore(),
-                new DataStoreFactory().GetTransactionStore())
+                new DataStoreFactory().GetTransactionStore(),
+                new DataStoreFactory().GetAccountStore())
         {
         }
 
         public CategoryOrchestrator(ICategoryDataStore categories, ITransactionDataStore transactions)
+            : this(categories, transactions, accounts: null)
+        {
+        }
+
+        public CategoryOrchestrator(
+            ICategoryDataStore categories,
+            ITransactionDataStore transactions,
+            IAccountDataStore? accounts)
         {
             _categories = categories;
             _transactions = transactions;
             _categorizer = new Categorizer(categories);
-            _budgets = new BudgetOrchestrator(transactions);
+            _budgets = new BudgetOrchestrator(transactions, accounts);
         }
 
         public IReadOnlyList<ExpenseCategory> GetActiveCategories()
@@ -53,7 +62,7 @@ namespace THMS.Logic.Orchestrators
         public CategorySuggestion Suggest(PostedTransaction transaction) =>
             _categorizer.Suggest(transaction);
 
-        public ExpenseCategory CreateCategory(string name, Guid? parentCategoryId = null)
+        public ExpenseCategory CreateCategory(string name, Guid? parentCategoryId = null, CategoryRole? role = null)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Category name is required.");
@@ -65,7 +74,8 @@ namespace THMS.Logic.Orchestrators
                 Name = name.Trim(),
                 ParentCategoryId = parentCategoryId,
                 IsActive = true,
-                DisplayOrder = 200
+                DisplayOrder = 200,
+                Role = role
             };
             _categories.AddCategory(created);
             return created;
@@ -89,6 +99,21 @@ namespace THMS.Logic.Orchestrators
                 throw new InvalidOperationException("The Uncategorized category cannot be deactivated.");
 
             _categories.DeactivateCategory(categoryId);
+        }
+
+        public void DeleteCategory(Guid categoryId)
+        {
+            if (categoryId == DefaultExpenseCategories.UncategorizedId)
+                throw new InvalidOperationException("The Uncategorized category cannot be deleted.");
+
+            _categories.EnsureDefaultCategories();
+            _ = _categories.GetCategory(categoryId)
+                ?? throw new InvalidOperationException($"Category {categoryId} was not found.");
+            _ = _categories.GetCategory(DefaultExpenseCategories.UncategorizedId)
+                ?? throw new InvalidOperationException("The Uncategorized category was not found.");
+
+            _categories.RemoveCategory(categoryId, DefaultExpenseCategories.UncategorizedId);
+            _budgets.RefreshAllActive();
         }
 
         public void MergeCategories(Guid keepCategoryId, Guid retireCategoryId)

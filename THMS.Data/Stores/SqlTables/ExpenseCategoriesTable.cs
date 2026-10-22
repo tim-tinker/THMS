@@ -20,6 +20,7 @@ namespace THMS.Data.Stores.SqlTables
                 cmd.ExecuteNonQuery();
             }
 
+            SqliteSchema.EnsureColumn(conn, "ExpenseCategories", "Role", "TEXT");
             MigrateFromTransactionCategories(conn);
             EnsureDefaults(conn);
         }
@@ -28,8 +29,8 @@ namespace THMS.Data.Stores.SqlTables
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO ExpenseCategories (Id, Name, ParentCategoryId, IsActive, DisplayOrder)
-                VALUES (@Id, @Name, @ParentCategoryId, @IsActive, @DisplayOrder);";
+                INSERT INTO ExpenseCategories (Id, Name, ParentCategoryId, IsActive, DisplayOrder, Role)
+                VALUES (@Id, @Name, @ParentCategoryId, @IsActive, @DisplayOrder, @Role);";
             Bind(cmd, category);
             cmd.ExecuteNonQuery();
         }
@@ -42,7 +43,8 @@ namespace THMS.Data.Stores.SqlTables
                     Name = @Name,
                     ParentCategoryId = @ParentCategoryId,
                     IsActive = @IsActive,
-                    DisplayOrder = @DisplayOrder
+                    DisplayOrder = @DisplayOrder,
+                    Role = @Role
                 WHERE Id = @Id;";
             Bind(cmd, category);
             cmd.ExecuteNonQuery();
@@ -52,6 +54,14 @@ namespace THMS.Data.Stores.SqlTables
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "UPDATE ExpenseCategories SET IsActive = 0 WHERE Id = @Id;";
+            cmd.Parameters.AddWithValue("@Id", id.ToString());
+            cmd.ExecuteNonQuery();
+        }
+
+        public void Delete(SqliteConnection conn, Guid id)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM ExpenseCategories WHERE Id = @Id;";
             cmd.Parameters.AddWithValue("@Id", id.ToString());
             cmd.ExecuteNonQuery();
         }
@@ -298,7 +308,7 @@ namespace THMS.Data.Stores.SqlTables
         }
 
         private const string SelectColumns =
-            "SELECT Id, Name, ParentCategoryId, IsActive, DisplayOrder";
+            "SELECT Id, Name, ParentCategoryId, IsActive, DisplayOrder, Role";
 
         private static void Bind(SqliteCommand cmd, ExpenseCategory category)
         {
@@ -307,6 +317,7 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@ParentCategoryId", SqliteCategoryColumns.BindId(category.ParentCategoryId));
             cmd.Parameters.AddWithValue("@IsActive", category.IsActive ? 1 : 0);
             cmd.Parameters.AddWithValue("@DisplayOrder", category.DisplayOrder);
+            cmd.Parameters.AddWithValue("@Role", category.Role is CategoryRole role ? role.ToString() : DBNull.Value);
         }
 
         private static ExpenseCategory Read(SqliteDataReader reader)
@@ -317,8 +328,17 @@ namespace THMS.Data.Stores.SqlTables
                 Name = reader.GetString(1),
                 ParentCategoryId = SqliteCategoryColumns.ReadId(reader, 2),
                 IsActive = reader.GetInt32(3) == 1,
-                DisplayOrder = reader.GetInt32(4)
+                DisplayOrder = reader.GetInt32(4),
+                Role = ReadRole(reader, 5)
             };
+        }
+
+        private static CategoryRole? ReadRole(SqliteDataReader reader, int ordinal)
+        {
+            if (reader.IsDBNull(ordinal))
+                return null;
+            var text = reader.GetString(ordinal);
+            return Enum.TryParse<CategoryRole>(text, out var role) ? role : null;
         }
 
         private static IEnumerable<ExpenseCategory> ReadAll(SqliteCommand cmd)

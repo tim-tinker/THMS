@@ -209,7 +209,7 @@ namespace THMS.Logic.Orchestrators.Finance
                 IsPaymentPlan = true,
                 IsUserCreated = true
             };
-            var reconciliation = new ReconciliationOrchestrator(_transactions);
+            var reconciliation = new ReconciliationOrchestrator(_transactions, _statements, _accounts);
             foreach (var extra in plans.Where(candidate => candidate.Id != rule.Id))
             {
                 reconciliation.DropUnmatchedForRule(extra.Id);
@@ -246,7 +246,7 @@ namespace THMS.Logic.Orchestrators.Finance
 
         public void DeletePaymentPlan(Guid accountId)
         {
-            var reconciliation = new ReconciliationOrchestrator(_transactions);
+            var reconciliation = new ReconciliationOrchestrator(_transactions, _statements, _accounts);
             foreach (var rule in PaymentPlans(accountId))
             {
                 reconciliation.DropUnmatchedForRule(rule.Id);
@@ -357,7 +357,7 @@ namespace THMS.Logic.Orchestrators.Finance
                 };
                 rule.ApplyCategory(billCategory);
                 _transactions.AddRecurringSingleRule(rule);
-                new ReconciliationOrchestrator(_transactions).MaterializeRule(rule);
+                new ReconciliationOrchestrator(_transactions, _statements, _accounts).MaterializeRule(rule);
                 return;
             }
 
@@ -398,7 +398,7 @@ namespace THMS.Logic.Orchestrators.Finance
             transferRule.TargetCategoryId = billCategory.Id;
             transferRule.TargetCategory = billCategory.Name;
             _transactions.AddRecurringTransferRule(transferRule);
-            new ReconciliationOrchestrator(_transactions).MaterializeRule(transferRule);
+            new ReconciliationOrchestrator(_transactions, _statements, _accounts).MaterializeRule(transferRule);
         }
 
         private static List<SplitTransactionRow> PrepareSplits(
@@ -509,12 +509,12 @@ namespace THMS.Logic.Orchestrators.Finance
             ArgumentNullException.ThrowIfNull(existing);
             if (existing.Source == PaymentIntentSource.RecurringSingle && existing.RuleId is Guid singleId)
             {
-                new ReconciliationOrchestrator(_transactions).DropUnmatchedForRule(singleId);
+                new ReconciliationOrchestrator(_transactions, _statements, _accounts).DropUnmatchedForRule(singleId);
                 _transactions.DeleteRecurringSingleRule(singleId);
             }
             else if (existing.Source == PaymentIntentSource.RecurringTransfer && existing.RuleId is Guid transferId)
             {
-                new ReconciliationOrchestrator(_transactions).DropUnmatchedForRule(transferId);
+                new ReconciliationOrchestrator(_transactions, _statements, _accounts).DropUnmatchedForRule(transferId);
                 _transactions.DeleteRecurringTransferRule(transferId);
             }
             else if (existing.ExpectedId is Guid expectedId)
@@ -670,7 +670,7 @@ namespace THMS.Logic.Orchestrators.Finance
             if (plan.EndDate is DateTime end && plan.NextOccurrence.Date > end.Date)
                 plan.IsActive = false;
 
-            var reconciliation = new ReconciliationOrchestrator(_transactions);
+            var reconciliation = new ReconciliationOrchestrator(_transactions, _statements, _accounts);
             reconciliation.DropUnmatchedForRule(plan.Id);
             _transactions.UpdateRecurringTransferRule(plan);
             if (plan.IsActive)
@@ -685,16 +685,16 @@ namespace THMS.Logic.Orchestrators.Finance
         }
 
         public int MatchScheduled() =>
-            new ReconciliationOrchestrator(_transactions).RecommendMatches();
+            new ReconciliationOrchestrator(_transactions, _statements, _accounts).RecommendMatches();
 
         public List<ImportedTransactionView> GetUnreconciledImports(Guid accountId) =>
-            new ReconciliationOrchestrator(_transactions).GetUnreconciled(accountId);
+            new ReconciliationOrchestrator(_transactions, _statements, _accounts).GetUnreconciled(accountId);
 
         public void MatchToImported(BillRow row, Guid importedId)
         {
             ArgumentNullException.ThrowIfNull(row);
             var expectedId = row.IntentId ?? EnsureExpected(row, ExpectedStatus.Planned);
-            new ReconciliationOrchestrator(_transactions, _statements).AcceptMatch(importedId, expectedId);
+            new ReconciliationOrchestrator(_transactions, _statements, _accounts).AcceptMatch(importedId, expectedId);
         }
 
         private Guid EnsureExpected(BillRow row, ExpectedStatus status)

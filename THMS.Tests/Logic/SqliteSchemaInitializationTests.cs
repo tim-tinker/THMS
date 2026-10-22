@@ -123,6 +123,45 @@ namespace THMS.Tests.Logic
             }
         }
 
+        [Test]
+        public void DeleteCategory_OnSqliteMovesTransactionsToUncategorized()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"thms-delete-category-{Guid.NewGuid():N}.db");
+            try
+            {
+                var store = new SQLiteTransactionDataStore(path);
+                var orchestrator = new CategoryOrchestrator(store, store);
+                var solar = orchestrator.CreateCategory("Solar Payment");
+                var posted = new PostedTransaction
+                {
+                    AccountId = Guid.NewGuid(),
+                    Date = new DateTime(2026, 6, 15),
+                    Description = "Solar lease",
+                    Amount = -40,
+                    CategoryId = solar.Id,
+                    Category = solar.Name
+                };
+                store.AddPostedTransaction(posted);
+
+                orchestrator.DeleteCategory(solar.Id);
+
+                var updated = store.GetPostedTransaction(posted.Id);
+                Assert.That(store.GetCategory(solar.Id), Is.Null);
+                Assert.That(updated!.CategoryId, Is.EqualTo(DefaultExpenseCategories.UncategorizedId));
+                Assert.That(updated.Category, Is.EqualTo(DefaultExpenseCategories.Uncategorized));
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                foreach (var suffix in new[] { "", "-wal", "-shm" })
+                {
+                    var file = path + suffix;
+                    if (File.Exists(file))
+                        File.Delete(file);
+                }
+            }
+        }
+
         private static void CreateAll(string path)
         {
             _ = new SQLiteTransactionDataStore(path);

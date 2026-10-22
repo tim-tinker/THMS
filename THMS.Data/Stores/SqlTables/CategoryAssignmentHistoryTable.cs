@@ -75,6 +75,14 @@ namespace THMS.Data.Stores.SqlTables
             delete.ExecuteNonQuery();
         }
 
+        public void DeleteForCategory(SqliteConnection conn, Guid categoryId)
+        {
+            using var delete = conn.CreateCommand();
+            delete.CommandText = "DELETE FROM CategoryAssignmentHistory WHERE CategoryId = @Id;";
+            delete.Parameters.AddWithValue("@Id", categoryId.ToString());
+            delete.ExecuteNonQuery();
+        }
+
         public int CountByCategory(SqliteConnection conn, Guid categoryId)
         {
             using var cmd = conn.CreateCommand();

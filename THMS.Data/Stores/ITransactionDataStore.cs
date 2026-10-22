@@ -126,6 +126,7 @@ namespace THMS.Data.Stores
         void DeleteCategory(Guid categoryId);
         void DeactivateCategory(Guid categoryId);
         void MergeCategories(Guid keepCategoryId, Guid retireCategoryId);
+        void RemoveCategory(Guid categoryId, Guid replacementCategoryId);
         ExpenseCategory? GetCategory(Guid categoryId);
         IEnumerable<ExpenseCategory> GetAllCategories(bool includeInactive = false);
         IEnumerable<ExpenseCategory> GetChildCategories(Guid parentCategoryId);

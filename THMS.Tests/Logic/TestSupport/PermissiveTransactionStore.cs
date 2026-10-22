@@ -119,6 +119,8 @@ namespace THMS.Tests.Logic.TestSupport
         public void DeactivateCategory(Guid categoryId) => _inner.DeactivateCategory(categoryId);
         public void MergeCategories(Guid keepCategoryId, Guid retireCategoryId) =>
             _inner.MergeCategories(keepCategoryId, retireCategoryId);
+        public void RemoveCategory(Guid categoryId, Guid replacementCategoryId) =>
+            _inner.RemoveCategory(categoryId, replacementCategoryId);
         public ExpenseCategory? GetCategory(Guid categoryId) => _inner.GetCategory(categoryId);
         public IEnumerable<ExpenseCategory> GetAllCategories(bool includeInactive = false) => _inner.GetAllCategories(includeInactive);
         public IEnumerable<ExpenseCategory> GetChildCategories(Guid parentCategoryId) => _inner.GetChildCategories(parentCategoryId);

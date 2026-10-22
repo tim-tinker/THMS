@@ -57,6 +57,7 @@ namespace THMS.UI.WinForms.Controls
             cmbParent.DisplayMember = nameof(CategoryParentOption.Name);
             cmbParent.ValueMember = nameof(CategoryParentOption.Id);
             cmbParent.DataSource = items;
+            cmbParent.SelectedIndexChanged += (_, _) => BindRole();
 
             if (_existing is null)
             {
@@ -71,6 +72,7 @@ namespace THMS.UI.WinForms.Controls
                         cmbParent.SelectedItem = match;
                 }
 
+                BindRole();
                 return;
             }
 
@@ -83,7 +85,33 @@ namespace THMS.UI.WinForms.Controls
             btnDeactivate.Enabled = _existing.IsActive && _existing.Id != DefaultExpenseCategories.UncategorizedId;
             var selectedParent = items.FirstOrDefault(i => i.Id == _existing.ParentCategoryId);
             cmbParent.SelectedItem = selectedParent ?? items[0];
+            BindRole();
         }
+
+        private void BindRole()
+        {
+            var hasParent = (cmbParent.SelectedItem as CategoryParentOption)?.Id is Guid;
+            var options = new List<RoleChoice>();
+            if (hasParent)
+                options.Add(new RoleChoice(null, "Inherit from parent"));
+            options.Add(new RoleChoice(CategoryRole.Expense, "Expense"));
+            options.Add(new RoleChoice(CategoryRole.Income, "Income"));
+            options.Add(new RoleChoice(CategoryRole.Transfer, "Transfer"));
+            options.Add(new RoleChoice(CategoryRole.Investment, "Investment"));
+
+            var selected = _existing?.Role;
+            if (cmbRole.SelectedItem is RoleChoice current && options.Any(option => option.Role == current.Role))
+                selected = current.Role;
+            if (!hasParent && selected is null)
+                selected = CategoryRole.Expense;
+
+            cmbRole.DisplayMember = nameof(RoleChoice.Label);
+            cmbRole.DataSource = options;
+            cmbRole.SelectedItem = options.FirstOrDefault(option => option.Role == selected) ?? options[0];
+        }
+
+        private CategoryRole? SelectedRole() =>
+            (cmbRole.SelectedItem as RoleChoice)?.Role;
 
         private void OnSave(object? sender, EventArgs e)
         {
@@ -96,15 +124,17 @@ namespace THMS.UI.WinForms.Controls
             try
             {
                 var parentId = (cmbParent.SelectedItem as CategoryParentOption)?.Id;
+                var role = SelectedRole();
                 if (_existing is null)
                 {
-                    CreatedCategory = Orchestrator.CreateCategory(txtName.Text.Trim(), parentId);
+                    CreatedCategory = Orchestrator.CreateCategory(txtName.Text.Trim(), parentId, role);
                 }
                 else
                 {
                     _existing.Name = txtName.Text.Trim();
                     _existing.ParentCategoryId = parentId;
                     _existing.IsActive = chkActive.Checked;
+                    _existing.Role = role;
                     CreatedCategory = Orchestrator.UpdateCategory(_existing);
                 }
 
@@ -146,6 +176,12 @@ namespace THMS.UI.WinForms.Controls
         {
             DialogResult = DialogResult.Cancel;
             Close();
+        }
+
+        private sealed class RoleChoice(CategoryRole? role, string label)
+        {
+            public CategoryRole? Role { get; } = role;
+            public string Label { get; } = label;
         }
     }
 }

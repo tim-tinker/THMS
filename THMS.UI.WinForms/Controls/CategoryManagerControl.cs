@@ -69,6 +69,7 @@ namespace THMS.UI.WinForms.Controls
                 return;
             var generation = Interlocked.Increment(ref _reloadGeneration);
             var selectId = _selectedCategoryId;
+            Reload(selectId, refreshBudgets: false);
             _ = ReloadCleanAsync(generation, selectId);
         }
 
@@ -158,6 +159,7 @@ namespace THMS.UI.WinForms.Controls
             DataGridViewUtil.EnableDoubleBuffering(gridPeriods);
             gridCategories.Columns.AddRange(
                 TextColumn(nameof(CategoryBudgetRow.Name), "Category", DataGridViewAutoSizeColumnMode.Fill, 180),
+                TextColumn(nameof(CategoryBudgetRow.Role), "Role", DataGridViewAutoSizeColumnMode.AllCells, 90),
                 TextColumn(nameof(CategoryBudgetRow.Active), "Active", DataGridViewAutoSizeColumnMode.AllCells, 70),
                 CurrencyColumn(nameof(CategoryBudgetRow.Remaining), "Remaining"),
                 DateColumn(nameof(CategoryBudgetRow.PeriodStart), "Start"),
@@ -168,6 +170,7 @@ namespace THMS.UI.WinForms.Controls
             gridCategories.SelectionChanged += (_, _) => OnCategorySelectionChanged();
             gridCategories.CellDoubleClick += OnCategoryDoubleClick;
             gridCategories.CellFormatting += OnCategoryCellFormatting;
+            gridCategories.MouseDown += OnCategoryGridMouseDown;
 
             gridPeriods.Columns.AddRange(
                 TextColumn(nameof(CategoryBudgetPeriodRow.Period), "Period", DataGridViewAutoSizeColumnMode.AllCells, 160),
@@ -275,6 +278,100 @@ namespace THMS.UI.WinForms.Controls
 
         private CategoryBudgetRow? SelectedCategory() =>
             gridCategories.CurrentRow?.DataBoundItem as CategoryBudgetRow;
+
+        private void OnCategoryGridMouseDown(object? sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Right)
+                return;
+
+            var hit = gridCategories.HitTest(e.X, e.Y);
+            if (hit.RowIndex < 0)
+                return;
+
+            if (!DataGridViewUtil.CellIsSelected(gridCategories, hit.RowIndex, hit.ColumnIndex)
+                && !DataGridViewUtil.SelectOnlyCell(gridCategories, hit.RowIndex, hit.ColumnIndex))
+                return;
+
+            var rowIndex = hit.RowIndex;
+            var location = e.Location;
+            gridCategories.BeginInvoke(() => ShowCategoryMenu(rowIndex, location));
+        }
+
+        private void ShowCategoryMenu(int rowIndex, Point location)
+        {
+            if (gridCategories.IsDisposed || rowIndex < 0 || rowIndex >= gridCategories.RowCount)
+                return;
+            if (gridCategories.Rows[rowIndex].DataBoundItem is not CategoryBudgetRow row)
+                return;
+            if (row.CategoryId == DefaultExpenseCategories.UncategorizedId)
+                return;
+
+            var menu = new ContextMenuStrip();
+            var delete = new ToolStripMenuItem("Delete");
+            delete.Click += (_, _) => DeleteSelectedCategory(row);
+            menu.Items.Add(delete);
+            menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
+            menu.Show(gridCategories, location);
+        }
+
+        private void DeleteSelectedCategory(CategoryBudgetRow row)
+        {
+            if (row.CategoryId == DefaultExpenseCategories.UncategorizedId)
+                return;
+
+            var category = Orchestrator.GetCategory(row.CategoryId);
+            if (category is null)
+                return;
+
+            var usage = Orchestrator.GetUsage(category.Id);
+            var childCount = Orchestrator.GetAllCategories()
+                .Count(candidate => candidate.ParentCategoryId == category.Id);
+            var notes = new List<string>();
+            if (usage.TransactionCount > 0)
+            {
+                notes.Add(usage.TransactionCount == 1
+                    ? "1 transaction uses it and will be changed to Uncategorized."
+                    : $"{usage.TransactionCount} transactions use it and will be changed to Uncategorized.");
+            }
+
+            if (usage.RecurringRuleCount > 0)
+            {
+                notes.Add(usage.RecurringRuleCount == 1
+                    ? "1 recurring rule uses it and will be changed to Uncategorized."
+                    : $"{usage.RecurringRuleCount} recurring rules use it and will be changed to Uncategorized.");
+            }
+
+            if (childCount > 0)
+            {
+                notes.Add(childCount == 1
+                    ? "Its child category will move up one level."
+                    : "Its child categories will move up one level.");
+            }
+
+            var message = notes.Count == 0
+                ? $"Delete '{category.Name}'?"
+                : $"Delete '{category.Name}'? {string.Join(" ", notes)}";
+            if (MessageBox.Show(
+                    FindForm(),
+                    message,
+                    "Delete Category",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            try
+            {
+                var parentId = category.ParentCategoryId;
+                Orchestrator.DeleteCategory(category.Id);
+                NoteCatalogChanged();
+                _selectedCategoryId = parentId;
+                Reload(parentId);
+            }
+            catch (Exception ex)
+            {
+                ExceptionDialog.Show(FindForm(), "Delete Category", ex);
+            }
+        }
 
         private CategoryBudgetPeriodRow? SelectedPeriod() =>
             gridPeriods.CurrentRow?.DataBoundItem as CategoryBudgetPeriodRow;
@@ -843,6 +940,9 @@ namespace THMS.UI.WinForms.Controls
             }
 
             if (gridCategories.Columns[e.ColumnIndex].DataPropertyName != nameof(CategoryBudgetRow.Remaining))
+                return;
+            if (gridCategories.Rows[e.RowIndex].DataBoundItem is CategoryBudgetRow row &&
+                row.Role != CategoryRole.Expense.ToString())
                 return;
             if (e.Value is decimal remaining && remaining < 0)
                 DataGridViewUtil.SetContentForeColor(e.CellStyle, Color.Firebrick);

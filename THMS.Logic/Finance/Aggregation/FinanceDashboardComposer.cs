@@ -1,5 +1,6 @@
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
+using THMS.Logic.Finance.Budget;
 using THMS.Logic.Finance.Categories;
 using THMS.Logic.Finance.Model;
 using THMS.Logic.ViewModels.Finance;
@@ -23,24 +24,51 @@ namespace THMS.Logic.Finance.Aggregation
             IReadOnlyDictionary<Guid, ExpenseBudgetHistory?> activePeriods,
             IReadOnlyList<RecurringSingleTransactionRule> recurringSingles,
             IReadOnlyList<UnifiedTransactionView> forecast,
-            IReadOnlyList<ExpenseCategory> categories)
+            IReadOnlyList<ExpenseCategory> categories,
+            IReadOnlyList<CashContribution>? activity = null)
         {
             var today = asOf.Date;
             var names = accounts.ToDictionary(a => a.Id, a => a.Name);
-            var budgetedIds = BudgetedCategoryIds(budgetRules.Where(r => r.IsActive), categories);
             var monthStart = new DateTime(today.Year, today.Month, 1);
-            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
-            var monthPosted = posted.Where(t => t.Date.Date >= monthStart && t.Date.Date <= monthEnd).ToList();
+            activity ??= CategoryCashFlow.Read(
+                posted,
+                postedTransfers,
+                categories,
+                accounts.GroupBy(a => a.Id).ToDictionary(g => g.Key, g => g.First()));
+            var balance = BudgetBalance.Compute(
+                today,
+                budgetRules,
+                activePeriods,
+                categories,
+                activity);
 
             var totals = SumAccounts(accounts);
-            var budgets = BuildBudgets(today, budgetRules, activePeriods);
+            var budgets = BuildBudgets(today, budgetRules, activePeriods, categories);
             var payments = BuildPayments(today, accounts, recurringSingles, names);
             var uncategorized = posted.Count(IsUncategorized);
             var mismatch = posted.Count(t => t.HasSplits && !SplitTransactionMath.AmountsMatch(t.Amount, t.Splits));
             var interestSpike = HasInterestSpike(today, posted);
             var alerts = BuildAlerts(accounts, budgets, payments, today, uncategorized, mismatch, interestSpike);
-            var slices = BuildCategorySlices(monthPosted, budgetedIds, categories);
-            var trend = BuildMonthlyTrend(today, posted, budgetedIds);
+            var slices = BuildCategorySlices(activity, monthStart, categories);
+            var trend = BuildMonthlyTrend(today, activity);
+            var chartStart = monthStart.AddMonths(-11);
+            var rows = activity
+                .Where(line => line.Date.Date >= chartStart)
+                .Select(line => new FinanceDashboardActivityRow
+            {
+                Month = new DateTime(line.Date.Year, line.Date.Month, 1),
+                Date = line.Date,
+                Description = line.Description,
+                Account = line.AccountName,
+                CategoryId = line.CategoryId,
+                Category = line.CategoryName,
+                Role = line.Role.ToString(),
+                Amount = line.Amount,
+                Effect = line.Effect,
+                Spending = line.Spending,
+                Income = line.Income,
+                SetAside = line.SetAside
+            }).ToList();
             var recent = BuildRecent(posted, postedTransfers);
             var upcoming = forecast
                 .OrderBy(t => t.Date)
@@ -65,6 +93,8 @@ namespace THMS.Logic.Finance.Aggregation
                 Alerts = alerts,
                 CategorySlices = slices,
                 MonthlyTrend = trend,
+                Activity = rows,
+                Balance = balance,
                 RecentPosted = recent,
                 UpcomingForecast = upcoming,
                 UncategorizedCount = uncategorized
@@ -148,7 +178,8 @@ namespace THMS.Logic.Finance.Aggregation
         private static List<FinanceDashboardBudgetRow> BuildBudgets(
             DateTime today,
             IReadOnlyList<ExpenseBudgetRule> budgetRules,
-            IReadOnlyDictionary<Guid, ExpenseBudgetHistory?> activePeriods)
+            IReadOnlyDictionary<Guid, ExpenseBudgetHistory?> activePeriods,
+            IReadOnlyList<ExpenseCategory> categories)
         {
             var rows = new List<FinanceDashboardBudgetRow>();
             foreach (var rule in budgetRules.Where(r => r.IsActive).OrderBy(r => r.BudgetName))
@@ -156,6 +187,7 @@ namespace THMS.Logic.Finance.Aggregation
                 if (!activePeriods.TryGetValue(rule.Id, out var period) || period is null)
                     continue;
 
+                var role = BudgetBalance.UniformRole(rule, categories) ?? CategoryRole.Expense;
                 rows.Add(new FinanceDashboardBudgetRow
                 {
                     RuleId = rule.Id,
@@ -164,7 +196,8 @@ namespace THMS.Logic.Finance.Aggregation
                     PeriodStart = period.PeriodStart.Date,
                     PeriodEnd = period.PeriodEnd.Date,
                     Recommended = period.RecommendedAmount,
-                    Status = BudgetStatus(period, today, rule.BudgetFrequency)
+                    Status = BudgetStatus(period, today, rule.BudgetFrequency, role),
+                    Role = role
                 });
             }
 
@@ -174,10 +207,11 @@ namespace THMS.Logic.Finance.Aggregation
         public static string BudgetStatus(
             ExpenseBudgetHistory period,
             DateTime today,
-            BudgetFrequency frequency)
+            BudgetFrequency frequency,
+            CategoryRole role = CategoryRole.Expense)
         {
             var parts = new List<string>();
-            if (period.Remaining < 0)
+            if (period.Remaining < 0 && role == CategoryRole.Expense)
                 parts.Add("Overspent");
             var daysLeft = (period.PeriodEnd.Date - today.Date).TotalDays;
             if (daysLeft >= 0 && daysLeft <= frequency.SoonDays())
@@ -247,7 +281,7 @@ namespace THMS.Logic.Finance.Aggregation
         {
             var alerts = new List<string>();
 
-            foreach (var budget in budgets.Where(b => b.Remaining < 0))
+            foreach (var budget in budgets.Where(b => b.Role == CategoryRole.Expense && b.Remaining < 0))
                 alerts.Add($"Overspent: {budget.BudgetName} ({budget.Remaining:c2})");
 
             foreach (var credit in accounts.OfType<CreditAccount>())
@@ -277,20 +311,26 @@ namespace THMS.Logic.Finance.Aggregation
         }
 
         private static List<FinanceDashboardCategorySlice> BuildCategorySlices(
-            IReadOnlyList<PostedTransaction> monthPosted,
-            HashSet<Guid> budgetedIds,
+            IReadOnlyList<CashContribution> activity,
+            DateTime monthStart,
             IReadOnlyList<ExpenseCategory> categories)
         {
+            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
             var names = categories.ToDictionary(c => c.Id, c => c.Name);
             var totals = new Dictionary<Guid, decimal>();
-            foreach (var transaction in monthPosted)
-                ApplyNet(totals, transaction, budgetedIds);
+            foreach (var line in activity.Where(line => line.Date.Date >= monthStart && line.Date.Date <= monthEnd))
+            {
+                if (line.Spending == 0)
+                    continue;
+                totals[line.CategoryId] = totals.GetValueOrDefault(line.CategoryId) + line.Spending;
+            }
 
             var slices = totals
-                .Select(pair => new { pair.Key, Value = Math.Max(0, pair.Value) })
+                .Select(pair => new { pair.Key, Value = pair.Value })
                 .Where(pair => pair.Value > 0)
                 .Select(pair => new FinanceDashboardCategorySlice
                 {
+                    CategoryId = pair.Key,
                     Name = names.GetValueOrDefault(pair.Key, DefaultExpenseCategories.Uncategorized),
                     Amount = pair.Value
                 })
@@ -301,18 +341,20 @@ namespace THMS.Logic.Finance.Aggregation
                 return slices;
 
             var top = slices.Take(PieSliceLimit - 1).ToList();
+            var folded = slices.Skip(PieSliceLimit - 1).ToList();
             top.Add(new FinanceDashboardCategorySlice
             {
                 Name = "Other",
-                Amount = slices.Skip(PieSliceLimit - 1).Sum(s => s.Amount)
+                IsOther = true,
+                Amount = folded.Sum(s => s.Amount),
+                Folded = folded
             });
             return top;
         }
 
         private static List<FinanceDashboardMonthlyPoint> BuildMonthlyTrend(
             DateTime today,
-            IReadOnlyList<PostedTransaction> posted,
-            HashSet<Guid> budgetedIds)
+            IReadOnlyList<CashContribution> activity)
         {
             var start = new DateTime(today.Year, today.Month, 1).AddMonths(-11);
             var points = new List<FinanceDashboardMonthlyPoint>();
@@ -320,17 +362,13 @@ namespace THMS.Logic.Finance.Aggregation
             {
                 var month = start.AddMonths(i);
                 var monthEnd = month.AddMonths(1).AddDays(-1);
-                decimal spending = 0;
-                decimal income = 0;
-                foreach (var transaction in posted.Where(t => t.Date.Date >= month && t.Date.Date <= monthEnd))
-                    ApplyTrend(ref spending, ref income, transaction, budgetedIds);
-
+                var monthLines = activity.Where(line => line.Date.Date >= month && line.Date.Date <= monthEnd).ToList();
                 points.Add(new FinanceDashboardMonthlyPoint
                 {
                     Month = month,
                     Label = month.ToString("MMM yyyy"),
-                    Spending = Math.Max(0, spending),
-                    Income = income
+                    Spending = monthLines.Sum(line => line.Spending),
+                    Income = monthLines.Sum(line => line.Income)
                 });
             }
 
@@ -343,74 +381,6 @@ namespace THMS.Logic.Finance.Aggregation
         {
             var views = UnifiedTransactionViewBuilder.Build(posted, postedTransfers.Where(t => t.Amount < 0));
             return UnifiedTransactionView.OrderForDisplay(views).Take(RecentCount).ToList();
-        }
-
-        private static void ApplyNet(
-            Dictionary<Guid, decimal> totals,
-            PostedTransaction transaction,
-            HashSet<Guid> budgetedIds)
-        {
-            if (transaction.HasSplits)
-            {
-                foreach (var split in transaction.Splits)
-                {
-                    if (!SplitTransactionMath.AffectsBudget(split.Type))
-                        continue;
-                    ApplyNetAmount(totals, split.Amount, ResolveCategoryId(split.CategoryId), budgetedIds);
-                }
-
-                return;
-            }
-
-            ApplyNetAmount(totals, transaction.Amount, ResolveCategoryId(transaction), budgetedIds);
-        }
-
-        private static void ApplyNetAmount(
-            Dictionary<Guid, decimal> totals,
-            decimal amount,
-            Guid categoryId,
-            HashSet<Guid> budgetedIds)
-        {
-            if (amount < 0)
-                totals[categoryId] = totals.GetValueOrDefault(categoryId) + -amount;
-            else if (amount > 0 && budgetedIds.Contains(categoryId))
-                totals[categoryId] = totals.GetValueOrDefault(categoryId) - amount;
-        }
-
-        private static void ApplyTrend(
-            ref decimal spending,
-            ref decimal income,
-            PostedTransaction transaction,
-            HashSet<Guid> budgetedIds)
-        {
-            if (transaction.HasSplits)
-            {
-                foreach (var split in transaction.Splits)
-                {
-                    if (!SplitTransactionMath.AffectsBudget(split.Type))
-                        continue;
-                    ApplyTrendAmount(ref spending, ref income, split.Amount, ResolveCategoryId(split.CategoryId), budgetedIds);
-                }
-
-                return;
-            }
-
-            ApplyTrendAmount(ref spending, ref income, transaction.Amount, ResolveCategoryId(transaction), budgetedIds);
-        }
-
-        private static void ApplyTrendAmount(
-            ref decimal spending,
-            ref decimal income,
-            decimal amount,
-            Guid categoryId,
-            HashSet<Guid> budgetedIds)
-        {
-            if (amount < 0)
-                spending += -amount;
-            else if (amount > 0 && budgetedIds.Contains(categoryId))
-                spending -= amount;
-            else if (amount > 0)
-                income += amount;
         }
 
         private static bool HasInterestSpike(DateTime today, IReadOnlyList<PostedTransaction> posted)
@@ -434,14 +404,6 @@ namespace THMS.Logic.Finance.Aggregation
             return previous > 0 && current > previous * 1.5m;
         }
 
-        private static HashSet<Guid> BudgetedCategoryIds(
-            IEnumerable<ExpenseBudgetRule> rules,
-            IReadOnlyList<ExpenseCategory> categories)
-        {
-            var selected = rules.SelectMany(r => r.IncludedCategoryIds).Where(id => id != Guid.Empty);
-            return ExpenseCategoryTree.ExpandWithDescendants(selected, categories);
-        }
-
         public static bool IsUncategorized(PostedTransaction transaction)
         {
             if (transaction.HasSplits)
@@ -453,13 +415,5 @@ namespace THMS.Logic.Finance.Aggregation
 
             return SplitTransactionMath.IsUncategorized(transaction.CategoryId, transaction.Category);
         }
-
-        private static Guid ResolveCategoryId(PostedTransaction transaction) =>
-            ResolveCategoryId(transaction.CategoryId);
-
-        private static Guid ResolveCategoryId(Guid? categoryId) =>
-            categoryId is Guid id && id != Guid.Empty
-                ? id
-                : DefaultExpenseCategories.UncategorizedId;
     }
 }

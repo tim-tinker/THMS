@@ -508,6 +508,44 @@ namespace THMS.Data.Stores.InMemoryStores
             Update(_categories, retire);
         }
 
+        public void RemoveCategory(Guid categoryId, Guid replacementCategoryId)
+        {
+            if (categoryId == replacementCategoryId)
+                throw new InvalidOperationException("A category cannot be replaced by itself.");
+            if (categoryId == DefaultExpenseCategories.UncategorizedId)
+                throw new InvalidOperationException("The Uncategorized category cannot be deleted.");
+
+            var category = GetCategory(categoryId)
+                ?? throw new InvalidOperationException($"Category {categoryId} was not found.");
+            var replacement = GetCategory(replacementCategoryId)
+                ?? throw new InvalidOperationException($"Category {replacementCategoryId} was not found.");
+
+            foreach (var child in _categories.Where(c => c.ParentCategoryId == category.Id).ToList())
+            {
+                child.ParentCategoryId = category.ParentCategoryId;
+                Update(_categories, child);
+            }
+
+            Retarget(_posted, replacement, category.Id);
+            Retarget(_postedTransfers, replacement, category.Id);
+            Retarget(_futureSingles, replacement, category.Id);
+            Retarget(_futureTransfers, replacement, category.Id);
+            Retarget(_recurringSingles, replacement, category.Id);
+            Retarget(_recurringTransfers, replacement, category.Id);
+            RetargetSplits(replacement, category.Id);
+
+            foreach (var rule in _expenseBudgetRules.Where(r => r.IncludedCategoryIds.Contains(category.Id)).ToList())
+            {
+                rule.IncludedCategoryIds = rule.IncludedCategoryIds
+                    .Where(id => id != category.Id)
+                    .Distinct()
+                    .ToList();
+            }
+
+            _assignments.RemoveAll(a => a.CategoryId == category.Id);
+            _categories.RemoveAll(c => c.Id == category.Id);
+        }
+
         public ExpenseCategory? GetCategory(Guid id) => _categories.FirstOrDefault(c => c.Id == id);
 
         public IEnumerable<ExpenseCategory> GetAllCategories(bool includeInactive = false) =>

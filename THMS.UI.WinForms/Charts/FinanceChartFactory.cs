@@ -17,8 +17,8 @@ namespace THMS.UI.WinForms.Charts
             var income = CreateSeries("Income", SeriesChartType.Column, Color.SeaGreen);
             for (var i = 0; i < points.Count; i++)
             {
-                AddIndexedPoint(spending, i, points[i].Spending, points[i].Label);
-                AddIndexedPoint(income, i, points[i].Income, points[i].Label);
+                AddIndexedPoint(spending, i, points[i].Spending, points[i].Label, points[i].Month);
+                AddIndexedPoint(income, i, points[i].Income, points[i].Label, points[i].Month);
             }
 
             chart.Series.Add(spending);
@@ -50,8 +50,10 @@ namespace THMS.UI.WinForms.Charts
                 foreach (var slice in slices)
                 {
                     var index = series.Points.AddY((double)slice.Amount);
-                    series.Points[index].LegendText = slice.Name;
-                    series.Points[index].Label = slice.Name;
+                    var text = $"{slice.Name} ({slice.Amount:C0})";
+                    series.Points[index].LegendText = text;
+                    series.Points[index].Label = text;
+                    series.Points[index].Tag = slice;
                 }
             }
 
@@ -87,10 +89,11 @@ namespace THMS.UI.WinForms.Charts
             };
         }
 
-        private static void AddIndexedPoint(Series series, int xIndex, decimal y, string axisLabel)
+        private static void AddIndexedPoint(Series series, int xIndex, decimal y, string axisLabel, DateTime month)
         {
             var pointIndex = series.Points.AddXY(xIndex, (double)y);
             series.Points[pointIndex].AxisLabel = axisLabel;
+            series.Points[pointIndex].Tag = month;
         }
     }
 }

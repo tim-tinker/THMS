@@ -2460,6 +2460,88 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void DeleteCategory_RemovesAnUnusedCategoryAndBlocksUncategorized()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new CategoryOrchestrator(store, store);
+            var created = orchestrator.CreateCategory("Solar Payment");
+
+            orchestrator.DeleteCategory(created.Id);
+
+            Assert.That(store.GetCategory(created.Id), Is.Null);
+            Assert.That(
+                () => orchestrator.DeleteCategory(DefaultExpenseCategories.UncategorizedId),
+                Throws.InvalidOperationException);
+        }
+
+        [Test]
+        public void DeleteCategory_MovesUsersToUncategorizedAndReparentsChildren()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new CategoryOrchestrator(store, store);
+            var loan = orchestrator.CreateCategory("Loan");
+            var solar = orchestrator.CreateCategory("Solar Payment", loan.Id);
+            var child = orchestrator.CreateCategory("Lease", solar.Id);
+            var accountId = Guid.NewGuid();
+            var posted = new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = new DateTime(2026, 6, 15),
+                Description = "Solar lease",
+                Amount = -40,
+                CategoryId = solar.Id,
+                Category = solar.Name
+            };
+            store.AddPostedTransaction(posted);
+            store.SaveSplits(posted.Id,
+            [
+                new SplitTransactionRow
+                {
+                    Amount = -40,
+                    CategoryId = solar.Id,
+                    Category = solar.Name,
+                    Type = SplitType.Expense
+                }
+            ]);
+            store.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = accountId,
+                Description = "Solar lease",
+                Amount = -40,
+                CategoryId = solar.Id,
+                Category = solar.Name,
+                NextOccurrence = new DateTime(2026, 7, 15)
+            });
+            store.UpsertAssignment("solar lease", solar.Id);
+            new BudgetOrchestrator(store).AddRule(new ExpenseBudgetRule
+            {
+                AccountId = accountId,
+                BudgetName = "Solar",
+                IncludedCategoryIds = [solar.Id, DefaultExpenseCategories.ElectricId],
+                BudgetFrequency = BudgetFrequency.Monthly,
+                DefaultBudgetAmount = 50,
+                IsActive = true
+            });
+
+            orchestrator.DeleteCategory(solar.Id);
+
+            var updated = store.GetPostedTransaction(posted.Id);
+            Assert.That(updated!.CategoryId, Is.EqualTo(DefaultExpenseCategories.UncategorizedId));
+            Assert.That(updated.Category, Is.EqualTo(DefaultExpenseCategories.Uncategorized));
+            Assert.That(updated.Splits.Single().CategoryId, Is.EqualTo(DefaultExpenseCategories.UncategorizedId));
+            Assert.That(updated.Splits.Single().Category, Is.EqualTo(DefaultExpenseCategories.Uncategorized));
+            Assert.That(
+                store.GetRecurringSingleRules(accountId).Single().CategoryId,
+                Is.EqualTo(DefaultExpenseCategories.UncategorizedId));
+            Assert.That(store.GetCategory(solar.Id), Is.Null);
+            Assert.That(store.GetCategory(child.Id)!.ParentCategoryId, Is.EqualTo(loan.Id));
+            Assert.That(store.GetAssignment("solar lease"), Is.Null);
+            Assert.That(
+                store.GetAllExpenseBudgetRules().Single().IncludedCategoryIds,
+                Is.EquivalentTo(new[] { DefaultExpenseCategories.ElectricId }));
+        }
+
+        [Test]
         public void UpdateCategory_RejectsCyclicParent()
         {
             var store = new InMemoryTransactionDataStore();

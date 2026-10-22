@@ -8,16 +8,29 @@ namespace THMS.Logic.Orchestrators.Finance
     {
         private readonly ITransactionDataStore _transactions;
         private readonly ICategoryDataStore _categories;
+        private readonly IAccountDataStore? _accounts;
 
         public AccountActivityOrchestrator()
-            : this(new DataStoreFactory().GetTransactionStore(), new DataStoreFactory().GetCategoryStore())
+            : this(
+                new DataStoreFactory().GetTransactionStore(),
+                new DataStoreFactory().GetCategoryStore(),
+                new DataStoreFactory().GetAccountStore())
         {
         }
 
         public AccountActivityOrchestrator(ITransactionDataStore transactions, ICategoryDataStore categories)
+            : this(transactions, categories, accounts: null)
+        {
+        }
+
+        public AccountActivityOrchestrator(
+            ITransactionDataStore transactions,
+            ICategoryDataStore categories,
+            IAccountDataStore? accounts)
         {
             _transactions = transactions;
             _categories = categories;
+            _accounts = accounts;
         }
 
         public PostedTransaction AddPosted(
@@ -88,7 +101,7 @@ namespace THMS.Logic.Orchestrators.Finance
             {
                 ReleaseMatch(posted.Id);
                 _transactions.DeletePostedTransaction(posted.Id);
-                new BudgetOrchestrator(_transactions).RefreshAffected([posted]);
+                new BudgetOrchestrator(_transactions, _accounts).RefreshAffected([posted]);
                 return;
             }
 
@@ -159,7 +172,7 @@ namespace THMS.Logic.Orchestrators.Finance
                 }
             }
 
-            new BudgetOrchestrator(_transactions).RefreshAffected(affected);
+            new BudgetOrchestrator(_transactions, _accounts).RefreshAffected(affected);
         }
 
         private void ReleaseMatch(Guid importedId)
@@ -184,7 +197,7 @@ namespace THMS.Logic.Orchestrators.Finance
             if (!posted.HasSplits)
                 ApplyCategory(posted, categoryId);
             _transactions.UpdatePostedTransaction(posted);
-            new BudgetOrchestrator(_transactions).RefreshAffected([posted]);
+            new BudgetOrchestrator(_transactions, _accounts).RefreshAffected([posted]);
         }
 
         private void UpdatePostedTransfer(
@@ -204,7 +217,7 @@ namespace THMS.Logic.Orchestrators.Finance
                 ApplyCategory(transfer, categoryId);
             _transactions.UpdatePostedTransferTransaction(transfer);
             SyncTransferCounterpart(transfer, previousAmount);
-            new BudgetOrchestrator(_transactions).RefreshAffected([transfer]);
+            new BudgetOrchestrator(_transactions, _accounts).RefreshAffected([transfer]);
         }
 
         private void SyncTransferCounterpart(PostedTransferTransaction transfer, decimal previousAmount)

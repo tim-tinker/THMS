@@ -727,6 +727,53 @@ namespace THMS.Data.Stores.SQLite
             tx.Commit();
         }
 
+        public void RemoveCategory(Guid categoryId, Guid replacementCategoryId)
+        {
+            if (categoryId == replacementCategoryId)
+                throw new InvalidOperationException("A category cannot be replaced by itself.");
+            if (categoryId == DefaultExpenseCategories.UncategorizedId)
+                throw new InvalidOperationException("The Uncategorized category cannot be deleted.");
+
+            using var conn = OpenConnection();
+            using var tx = conn.BeginTransaction();
+
+            var category = _store.Categories.GetById(conn, categoryId)
+                ?? throw new InvalidOperationException($"Category {categoryId} was not found.");
+            var replacement = _store.Categories.GetById(conn, replacementCategoryId)
+                ?? throw new InvalidOperationException($"Category {replacementCategoryId} was not found.");
+
+            foreach (var child in _store.Categories.GetAll(conn, includeInactive: true)
+                         .Where(c => c.ParentCategoryId == category.Id))
+            {
+                child.ParentCategoryId = category.ParentCategoryId;
+                _store.Categories.Update(conn, child);
+            }
+
+            SqliteCategoryColumns.Retarget(conn, "PostedTransactions", category.Id, replacement.Id, replacement.Name);
+            SqliteCategoryColumns.Retarget(conn, "PostedTransferTransactions", category.Id, replacement.Id, replacement.Name);
+            SqliteCategoryColumns.Retarget(conn, "FutureSingleTransactions", category.Id, replacement.Id, replacement.Name);
+            SqliteCategoryColumns.Retarget(conn, "FutureTransferTransactions", category.Id, replacement.Id, replacement.Name);
+            SqliteCategoryColumns.Retarget(conn, "RecurringSingleTransactionRules", category.Id, replacement.Id, replacement.Name);
+            SqliteCategoryColumns.Retarget(conn, "RecurringTransferRules", category.Id, replacement.Id, replacement.Name);
+            SqliteCategoryColumns.Retarget(conn, "SplitTransactionRows", category.Id, replacement.Id, replacement.Name);
+
+            foreach (var rule in _store.ExpenseBudgetRules.GetAll(conn))
+            {
+                if (!rule.IncludedCategoryIds.Contains(category.Id))
+                    continue;
+
+                rule.IncludedCategoryIds = rule.IncludedCategoryIds
+                    .Where(id => id != category.Id)
+                    .Distinct()
+                    .ToList();
+                _store.ExpenseBudgetRules.Update(conn, rule);
+            }
+
+            _store.Assignments.DeleteForCategory(conn, category.Id);
+            _store.Categories.Delete(conn, category.Id);
+            tx.Commit();
+        }
+
         public ExpenseCategory? GetCategory(Guid categoryId)
         {
             using var conn = OpenConnection();

@@ -1,3 +1,6 @@
+using THMS.Domain.Finance.Transactions;
+using THMS.Logic.Finance.Budget;
+
 namespace THMS.Logic.ViewModels.Finance
 {
     public class FinanceDashboardSnapshot
@@ -19,6 +22,8 @@ namespace THMS.Logic.ViewModels.Finance
         public List<string> Alerts { get; init; } = [];
         public List<FinanceDashboardCategorySlice> CategorySlices { get; init; } = [];
         public List<FinanceDashboardMonthlyPoint> MonthlyTrend { get; init; } = [];
+        public List<FinanceDashboardActivityRow> Activity { get; init; } = [];
+        public BudgetBalanceResult Balance { get; init; } = new();
         public List<UnifiedTransactionView> RecentPosted { get; init; } = [];
         public List<UnifiedTransactionView> UpcomingForecast { get; init; } = [];
         public int UncategorizedCount { get; init; }
@@ -40,6 +45,7 @@ namespace THMS.Logic.ViewModels.Finance
         public DateTime PeriodEnd { get; init; }
         public decimal Recommended { get; init; }
         public string Status { get; init; } = "";
+        public CategoryRole Role { get; init; }
     }
 
     public class FinanceDashboardPaymentRow
@@ -52,8 +58,27 @@ namespace THMS.Logic.ViewModels.Finance
 
     public class FinanceDashboardCategorySlice
     {
+        public Guid CategoryId { get; init; }
         public string Name { get; init; } = "";
         public decimal Amount { get; init; }
+        public bool IsOther { get; init; }
+        public List<FinanceDashboardCategorySlice> Folded { get; init; } = [];
+    }
+
+    public class FinanceDashboardActivityRow
+    {
+        public DateTime Month { get; init; }
+        public DateTime Date { get; init; }
+        public string Description { get; init; } = "";
+        public string Account { get; init; } = "";
+        public Guid CategoryId { get; init; }
+        public string Category { get; init; } = "";
+        public string Role { get; init; } = "";
+        public decimal Amount { get; init; }
+        public string Effect { get; init; } = "";
+        public decimal Spending { get; init; }
+        public decimal Income { get; init; }
+        public decimal SetAside { get; init; }
     }
 
     public class FinanceDashboardMonthlyPoint

@@ -11,6 +11,7 @@ namespace THMS.Logic.ViewModels.Finance
         public DateTime? PeriodEnd { get; init; }
         public decimal? Recommended { get; init; }
         public string Status { get; init; } = "";
+        public string Role { get; init; } = "";
         public bool HasBudget => BudgetRuleId is Guid id && id != Guid.Empty;
     }
 

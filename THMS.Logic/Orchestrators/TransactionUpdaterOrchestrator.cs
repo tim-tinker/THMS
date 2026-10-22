@@ -47,7 +47,7 @@ namespace THMS.Logic.Orchestrators
             _accountStore = accountStore;
             _transactionStore = transactionStore;
             _statements = statements;
-            _budgetOrchestrator = new BudgetOrchestrator(transactionStore);
+            _budgetOrchestrator = new BudgetOrchestrator(transactionStore, accountStore);
         }
 
         public UpdaterResult RunLedgerUpdate()
@@ -159,7 +159,7 @@ namespace THMS.Logic.Orchestrators
 
             _budgetOrchestrator.RefreshAllActive();
 
-            var reconciliation = new ReconciliationOrchestrator(_transactionStore);
+            var reconciliation = new ReconciliationOrchestrator(_transactionStore, accounts: _accountStore);
             reconciliation.MaterializePlannedFromRules();
             reconciliation.RecommendMatches();
 

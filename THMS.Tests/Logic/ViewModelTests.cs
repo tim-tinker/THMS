@@ -599,15 +599,27 @@ namespace THMS.Tests.Logic
                 new Dictionary<Guid, ExpenseBudgetHistory?> { [ruleId] = period },
                 [],
                 [],
-                DefaultExpenseCategories.All.ToList());
+                DefaultExpenseCategories.All.Select(category => new ExpenseCategory
+                {
+                    Id = category.Id,
+                    Name = category.Name,
+                    ParentCategoryId = category.ParentCategoryId,
+                    IsActive = category.IsActive,
+                    DisplayOrder = category.DisplayOrder,
+                    Role = category.Id == DefaultExpenseCategories.PaymentId ? CategoryRole.Income : null
+                }).ToList());
 
+            var september = snapshot.MonthlyTrend.Single(p => p.Month == new DateTime(2026, 9, 1));
+            var septemberRows = snapshot.Activity.Where(row => row.Month == september.Month).ToList();
             Assert.That(snapshot.BankAccounts.Single().Name, Is.EqualTo("Checking"));
             Assert.That(snapshot.BankAccounts.Single().Balance, Is.EqualTo(50m));
             Assert.That(snapshot.BankBalance, Is.EqualTo(snapshot.BankAccounts.Sum(a => a.Balance)));
             Assert.That(snapshot.Budgets.Single().Status, Is.EqualTo("Overspent, Ends soon"));
             Assert.That(snapshot.CategorySlices.Single(s => s.Name == DefaultExpenseCategories.Groceries).Amount, Is.EqualTo(40m));
-            Assert.That(snapshot.MonthlyTrend.Single(p => p.Month == new DateTime(2026, 9, 1)).Spending, Is.EqualTo(40m));
-            Assert.That(snapshot.MonthlyTrend.Single(p => p.Month == new DateTime(2026, 9, 1)).Income, Is.EqualTo(2000m));
+            Assert.That(september.Spending, Is.EqualTo(40m));
+            Assert.That(september.Income, Is.EqualTo(2000m));
+            Assert.That(septemberRows.Sum(row => row.Spending), Is.EqualTo(september.Spending));
+            Assert.That(septemberRows.Sum(row => row.Income), Is.EqualTo(september.Income));
             Assert.That(snapshot.Alerts.Any(a => a.StartsWith("Overspent: Groceries")), Is.True);
             Assert.That(snapshot.Budgets.Single().PeriodStart, Is.EqualTo(new DateTime(2026, 9, 1)));
             Assert.That(snapshot.Budgets.Single().PeriodEnd, Is.EqualTo(new DateTime(2026, 9, 10)));

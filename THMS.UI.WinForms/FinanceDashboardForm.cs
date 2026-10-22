@@ -1,4 +1,5 @@
 using System.Windows.Forms.DataVisualization.Charting;
+using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.ViewModels.Finance;
 using THMS.UI.WinForms.Charts;
@@ -30,6 +31,14 @@ namespace THMS.UI.WinForms
         private ListBox _alerts = null!;
         private Panel _trendHost = null!;
         private Panel _pieHost = null!;
+        private readonly Label _balance = new()
+        {
+            Dock = DockStyle.Top,
+            Height = 48,
+            Padding = new Padding(4, 6, 4, 0),
+            Text = "Plan net …"
+        };
+        private FinanceDashboardSnapshot _snapshot = new();
         private BindingSource _budgetsSource = new();
         private BindingSource _paymentsSource = new();
         private BindingSource _recentSource = new();
@@ -189,8 +198,16 @@ namespace THMS.UI.WinForms
             _alerts.DataSource = null;
             _alerts.DataSource = snapshot.Alerts.Count == 0 ? new List<string> { "No alerts." } : snapshot.Alerts.ToList();
 
-            ReplaceChart(_trendHost, FinanceChartFactory.CreateSpendIncomeChart(snapshot.MonthlyTrend));
-            ReplaceChart(_pieHost, FinanceChartFactory.CreateCategoryPie(snapshot.CategorySlices));
+            _snapshot = snapshot;
+            _balance.Text = snapshot.Balance.Summary;
+            _balance.Height = snapshot.Balance.MixedRoleBudgets.Count == 0 ? 36 : 56;
+
+            var trend = FinanceChartFactory.CreateSpendIncomeChart(snapshot.MonthlyTrend);
+            trend.MouseClick += OnTrendClick;
+            ReplaceChart(_trendHost, trend);
+            var pie = FinanceChartFactory.CreateCategoryPie(snapshot.CategorySlices);
+            pie.MouseClick += OnPieClick;
+            ReplaceChart(_pieHost, pie);
         }
 
         private void BuildLayout()
@@ -311,7 +328,10 @@ namespace THMS.UI.WinForms
             piePage.Controls.Add(_pieHost);
             tabs.TabPages.Add(trendPage);
             tabs.TabPages.Add(piePage);
-            return tabs;
+            var host = new Panel { Dock = DockStyle.Fill };
+            host.Controls.Add(tabs);
+            host.Controls.Add(_balance);
+            return host;
         }
 
         private Control BuildActivity()
@@ -359,8 +379,35 @@ namespace THMS.UI.WinForms
         {
             if (_budgetGrid.Columns[e.ColumnIndex].DataPropertyName != "Remaining")
                 return;
+            if (_budgetGrid.Rows[e.RowIndex].DataBoundItem is FinanceDashboardBudgetRow budget &&
+                budget.Role != CategoryRole.Expense)
+                return;
             if (e.Value is decimal remaining && remaining < 0)
                 DataGridViewUtil.SetContentForeColor(e.CellStyle, Color.Firebrick);
+        }
+
+        private void OnTrendClick(object? sender, MouseEventArgs e)
+        {
+            if (sender is not Chart chart)
+                return;
+            var hit = chart.HitTest(e.X, e.Y);
+            if (hit.ChartElementType != ChartElementType.DataPoint || hit.PointIndex < 0 || hit.Series is null)
+                return;
+            if (hit.Series.Points[hit.PointIndex].Tag is not DateTime month)
+                return;
+            FinanceDashboardDrillDown.ShowMonth(this, _snapshot, month);
+        }
+
+        private void OnPieClick(object? sender, MouseEventArgs e)
+        {
+            if (sender is not Chart chart)
+                return;
+            var hit = chart.HitTest(e.X, e.Y);
+            if (hit.ChartElementType != ChartElementType.DataPoint || hit.PointIndex < 0 || hit.Series is null)
+                return;
+            if (hit.Series.Points[hit.PointIndex].Tag is not FinanceDashboardCategorySlice slice)
+                return;
+            FinanceDashboardDrillDown.ShowSlice(this, _snapshot, slice);
         }
 
         private static void ReplaceChart(Panel host, Chart chart)

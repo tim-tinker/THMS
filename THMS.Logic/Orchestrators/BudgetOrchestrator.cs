@@ -1,4 +1,5 @@
 using THMS.Data.Stores;
+using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Budget;
 
@@ -7,16 +8,23 @@ namespace THMS.Logic.Orchestrators
     public class BudgetOrchestrator
     {
         private readonly ITransactionDataStore _store;
+        private readonly IAccountDataStore? _accounts;
         private readonly ExpenseBudgetDetector _detector = new();
 
         public BudgetOrchestrator()
-            : this(new DataStoreFactory().GetTransactionStore())
+            : this(new DataStoreFactory().GetTransactionStore(), new DataStoreFactory().GetAccountStore())
         {
         }
 
         public BudgetOrchestrator(ITransactionDataStore store)
+            : this(store, accounts: null)
+        {
+        }
+
+        public BudgetOrchestrator(ITransactionDataStore store, IAccountDataStore? accounts)
         {
             _store = store;
+            _accounts = accounts;
         }
 
         public List<ExpenseBudgetRule> GetRules() =>
@@ -79,7 +87,11 @@ namespace THMS.Logic.Orchestrators
         public void SavePeriod(ExpenseBudgetHistory history)
         {
             ArgumentNullException.ThrowIfNull(history);
-            history.RecalculateRemaining();
+            var rule = _store.GetExpenseBudgetRule(history.BudgetRuleId);
+            if (rule is null)
+                history.RecalculateRemaining();
+            else
+                ApplyRemaining(rule, history);
             _store.UpdateExpenseBudgetHistory(history);
         }
 
@@ -87,7 +99,11 @@ namespace THMS.Logic.Orchestrators
         {
             var history = RequireOpenPeriod(historyId);
             history.StartingBalance = startingBalance;
-            history.RecalculateRemaining();
+            var rule = _store.GetExpenseBudgetRule(history.BudgetRuleId);
+            if (rule is null)
+                history.RecalculateRemaining();
+            else
+                ApplyRemaining(rule, history);
             _store.UpdateExpenseBudgetHistory(history);
         }
 
@@ -109,8 +125,8 @@ namespace THMS.Logic.Orchestrators
 
             fromPeriod.StartingBalance -= amount;
             toPeriod.StartingBalance += amount;
-            fromPeriod.RecalculateRemaining();
-            toPeriod.RecalculateRemaining();
+            ApplyRemaining(fromRule, fromPeriod);
+            ApplyRemaining(toRule, toPeriod);
             _store.UpdateExpenseBudgetHistory(fromPeriod);
             _store.UpdateExpenseBudgetHistory(toPeriod);
         }
@@ -143,7 +159,10 @@ namespace THMS.Logic.Orchestrators
                 RefreshPeriod(rule, history);
 
             history.IsClosed = true;
-            history.RecalculateRemaining();
+            if (rule is null)
+                history.RecalculateRemaining();
+            else
+                ApplyRemaining(rule, history);
             _store.UpdateExpenseBudgetHistory(history);
         }
 
@@ -158,7 +177,7 @@ namespace THMS.Logic.Orchestrators
             {
                 RefreshPeriod(rule, active);
                 active.IsClosed = true;
-                active.RecalculateRemaining();
+                ApplyRemaining(rule, active);
                 _store.UpdateExpenseBudgetHistory(active);
                 previous = active;
             }
@@ -170,10 +189,19 @@ namespace THMS.Logic.Orchestrators
             return created;
         }
 
-        public void RefreshAllActive()
+        public ActiveBudgetLedger RefreshAllActive()
         {
-            foreach (var rule in _store.GetAllExpenseBudgetRules().Where(r => r.IsActive))
-                RefreshRule(rule);
+            var rules = _store.GetAllExpenseBudgetRules().Where(r => r.IsActive).ToList();
+            var ledger = LoadLedger();
+            foreach (var rule in rules)
+                RefreshRule(rule, ledger);
+            return new ActiveBudgetLedger
+            {
+                Posted = ledger.Posted,
+                Transfers = ledger.Transfers,
+                Categories = ledger.Catalog,
+                Lines = ledger.Lines
+            };
         }
 
         public void RefreshAffected(IEnumerable<PostedTransaction> posted)
@@ -183,19 +211,23 @@ namespace THMS.Logic.Orchestrators
                 return;
 
             var catalog = _store.GetAllCategories(includeInactive: true).ToList();
+            var accounts = AccountMap();
             foreach (var rule in _store.GetAllExpenseBudgetRules().Where(r => r.IsActive))
             {
-                if (!txs.Any(tx => _detector.IncludesTransaction(tx, rule.IncludedCategoryIds, catalog)))
+                if (!txs.Any(tx => _detector.IncludesTransaction(tx, rule.IncludedCategoryIds, catalog, accounts)))
                     continue;
                 RefreshRule(rule);
             }
         }
 
-        private void RefreshRule(ExpenseBudgetRule rule)
+        private void RefreshRule(ExpenseBudgetRule rule) =>
+            RefreshRule(rule, LoadLedger());
+
+        private void RefreshRule(ExpenseBudgetRule rule, Ledger ledger)
         {
-            var open = EnsureActivePeriod(rule);
+            var open = EnsureActivePeriod(rule, ledger);
             if (open is not null && !open.IsClosed)
-                RefreshPeriod(rule, open);
+                RefreshPeriod(rule, open, ledger);
         }
 
         private void RebuildFromPeriodStart(ExpenseBudgetRule rule)
@@ -217,7 +249,10 @@ namespace THMS.Logic.Orchestrators
 
             var previous = existing.LastOrDefault(h => h.PeriodEnd.Date < seriesStart);
             var posted = _store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
+            var transfers = AllTransfers();
+            var accounts = AccountMap();
             var catalog = _store.GetAllCategories(includeInactive: true).ToList();
+            var lines = CategoryCashFlow.Read(posted, transfers, catalog, accounts);
             var created = new List<ExpenseBudgetHistory>();
 
             for (var i = 0; i < windows.Count; i++)
@@ -225,14 +260,14 @@ namespace THMS.Logic.Orchestrators
                 var contiguous = previous is not null &&
                     previous.PeriodEnd.Date.AddDays(1) == windows[i].Start.Date;
                 var history = CreatePeriod(rule, windows[i], contiguous ? previous : null);
-                history.ActualExpenses = _detector.ComputeActualExpenses(
-                    posted,
+                history.ActualExpenses = _detector.SumPrepared(
+                    lines,
                     rule.IncludedCategoryIds,
                     history.PeriodStart,
                     history.PeriodEnd,
                     catalog);
                 history.IsClosed = i < windows.Count - 1;
-                history.RecalculateRemaining();
+                ApplyRemaining(rule, history, catalog);
                 _store.UpdateExpenseBudgetHistory(history);
                 created.Add(history);
                 previous = history;
@@ -250,11 +285,15 @@ namespace THMS.Logic.Orchestrators
                 posted,
                 rule.IncludedCategoryIds,
                 catalog,
-                rule.PeriodStart);
+                rule.PeriodStart,
+                asOf: null,
+                accounts,
+                transfers,
+                lines);
             foreach (var history in created)
             {
                 history.RecommendedAmount = recommended;
-                history.RecalculateRemaining();
+                ApplyRemaining(rule, history, catalog);
                 _store.UpdateExpenseBudgetHistory(history);
             }
         }
@@ -286,14 +325,14 @@ namespace THMS.Logic.Orchestrators
             return windows;
         }
 
-        private ExpenseBudgetHistory? EnsureActivePeriod(ExpenseBudgetRule rule)
+        private ExpenseBudgetHistory? EnsureActivePeriod(ExpenseBudgetRule rule, Ledger ledger)
         {
             var active = _store.GetActiveBudgetHistory(rule.Id);
             while (active is not null && DateTime.Today > active.PeriodEnd.Date)
             {
-                RefreshPeriod(rule, active);
+                RefreshPeriod(rule, active, ledger);
                 active.IsClosed = true;
-                active.RecalculateRemaining();
+                ApplyRemaining(rule, active, ledger.Catalog);
                 _store.UpdateExpenseBudgetHistory(active);
                 active = CreatePeriod(
                     rule,
@@ -332,46 +371,118 @@ namespace THMS.Logic.Orchestrators
                 ActualExpenses = 0,
                 IsClosed = false
             };
-            history.RecalculateRemaining();
+            ApplyRemaining(rule, history);
             _store.AddExpenseBudgetHistory(history);
             return history;
         }
 
-        private void RefreshPeriod(ExpenseBudgetRule rule, ExpenseBudgetHistory history)
-        {
-            var posted = _store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
-            var catalog = _store.GetAllCategories(includeInactive: true).ToList();
-            RefreshPeriod(rule, history, posted, catalog);
-        }
+        private void RefreshPeriod(ExpenseBudgetRule rule, ExpenseBudgetHistory history) =>
+            RefreshPeriod(rule, history, LoadLedger());
 
-        private void RefreshPeriod(
-            ExpenseBudgetRule rule,
-            ExpenseBudgetHistory history,
-            IReadOnlyList<PostedTransaction> posted,
-            IReadOnlyList<ExpenseCategory> catalog)
+        private void RefreshPeriod(ExpenseBudgetRule rule, ExpenseBudgetHistory history, Ledger ledger)
         {
-            history.ActualExpenses = _detector.ComputeActualExpenses(
-                posted,
+            var actual = _detector.SumPrepared(
+                ledger.Lines,
                 rule.IncludedCategoryIds,
                 history.PeriodStart,
                 history.PeriodEnd,
-                catalog);
-
+                ledger.Catalog);
             var periods = _store.GetExpenseBudgetHistory(rule.Id)
                 .Select(h => h.Id == history.Id ? history : h)
                 .ToList();
             var recommended = _detector.ComputeRecommendedAmount(
                 periods,
                 rule.BudgetFrequency,
-                posted,
+                ledger.Posted,
                 rule.IncludedCategoryIds,
-                catalog,
-                rule.PeriodStart);
+                ledger.Catalog,
+                rule.PeriodStart,
+                asOf: null,
+                ledger.Accounts,
+                ledger.Transfers,
+                ledger.Lines);
+
+            var actualChanged = history.ActualExpenses != actual;
+            history.ActualExpenses = actual;
+            var remainingBefore = history.Remaining;
+            var endingBefore = history.EndingBalance;
+            var recommendedBefore = history.RecommendedAmount;
+            ApplyRemaining(rule, history, ledger.Catalog);
+            history.RecommendedAmount = recommended;
+            if (actualChanged
+                || recommendedBefore != recommended
+                || history.Remaining != remainingBefore
+                || history.EndingBalance != endingBefore)
+            {
+                _store.UpdateExpenseBudgetHistory(history);
+            }
+
             foreach (var period in periods)
+            {
+                if (period.Id == history.Id || period.RecommendedAmount == recommended)
+                    continue;
                 period.RecommendedAmount = recommended;
-            history.RecalculateRemaining();
-            foreach (var period in periods)
                 _store.UpdateExpenseBudgetHistory(period);
+            }
         }
+
+        private void ApplyRemaining(
+            ExpenseBudgetRule rule,
+            ExpenseBudgetHistory history,
+            IReadOnlyList<ExpenseCategory>? catalog = null)
+        {
+            catalog ??= _store.GetAllCategories(includeInactive: true).ToList();
+            if (BudgetBalance.UniformRole(rule, catalog) == CategoryRole.Income)
+            {
+                history.Remaining = Math.Abs(history.BudgetAmount) - history.ActualExpenses;
+                history.EndingBalance = 0m;
+                return;
+            }
+
+            history.RecalculateRemaining();
+        }
+
+        private Ledger LoadLedger()
+        {
+            var posted = _store.GetPostedTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
+            var transfers = AllTransfers();
+            var catalog = _store.GetAllCategories(includeInactive: true).ToList();
+            var accounts = AccountMap();
+            return new Ledger
+            {
+                Posted = posted,
+                Transfers = transfers,
+                Catalog = catalog,
+                Accounts = accounts,
+                Lines = CategoryCashFlow.Read(posted, transfers, catalog, accounts)
+            };
+        }
+
+        private sealed class Ledger
+        {
+            public List<PostedTransaction> Posted { get; init; } = [];
+            public List<PostedTransferTransaction> Transfers { get; init; } = [];
+            public List<ExpenseCategory> Catalog { get; init; } = [];
+            public Dictionary<Guid, Account> Accounts { get; init; } = [];
+            public List<CashContribution> Lines { get; init; } = [];
+        }
+
+        private List<PostedTransferTransaction> AllTransfers() =>
+            _store.GetPostedTransferTransactions(DateTime.MinValue, DateTime.MaxValue).ToList();
+
+        private Dictionary<Guid, Account> AccountMap() =>
+            _accounts is null
+                ? new Dictionary<Guid, Account>()
+                : _accounts.GetAllAccounts()
+                    .GroupBy(account => account.Id)
+                    .ToDictionary(group => group.Key, group => group.First());
+    }
+
+    public sealed class ActiveBudgetLedger
+    {
+        public List<PostedTransaction> Posted { get; init; } = [];
+        public List<PostedTransferTransaction> Transfers { get; init; } = [];
+        public List<ExpenseCategory> Categories { get; init; } = [];
+        public List<CashContribution> Lines { get; init; } = [];
     }
 }

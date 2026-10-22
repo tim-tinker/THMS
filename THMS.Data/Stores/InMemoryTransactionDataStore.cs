@@ -288,6 +288,9 @@ namespace THMS.Data.Stores
         public void MergeCategories(Guid keepCategoryId, Guid retireCategoryId) =>
             _store.MergeCategories(keepCategoryId, retireCategoryId);
 
+        public void RemoveCategory(Guid categoryId, Guid replacementCategoryId) =>
+            _store.RemoveCategory(categoryId, replacementCategoryId);
+
         public ExpenseCategory? GetCategory(Guid categoryId) =>
             _store.GetCategory(categoryId);
 

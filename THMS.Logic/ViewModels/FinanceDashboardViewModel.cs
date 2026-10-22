@@ -24,7 +24,7 @@ namespace THMS.Logic.ViewModels.Finance
         {
             _accounts = accounts;
             _transactions = transactions;
-            _budgets = new BudgetOrchestrator(transactions);
+            _budgets = new BudgetOrchestrator(transactions, accounts);
             _txOrchestrator = new TransactionOrchestrator(transactions);
         }
 
@@ -56,25 +56,26 @@ namespace THMS.Logic.ViewModels.Finance
         public FinanceDashboardSnapshot CreateSnapshot(DateTime asOf)
         {
             _transactions.EnsureDefaultCategories();
-            _budgets.RefreshAllActive();
+            var ledger = _budgets.RefreshAllActive();
 
             var accounts = HouseholdAccounts();
             var accountIds = accounts.Select(a => a.Id).ToHashSet();
-
-            var posted = new List<PostedTransaction>();
-            var transfers = new List<PostedTransferTransaction>();
-            foreach (var account in accounts)
-            {
-                posted.AddRange(_transactions.GetPostedTransactions(account.Id));
-                transfers.AddRange(_transactions.GetPostedTransferTransactions(account.Id));
-            }
+            var posted = ledger.Posted
+                .Where(transaction => accountIds.Contains(transaction.AccountId))
+                .ToList();
+            var transfers = ledger.Transfers
+                .Where(transaction => accountIds.Contains(transaction.AccountId))
+                .ToList();
+            var activity = ledger.Lines
+                .Where(line => accountIds.Contains(line.AccountId))
+                .ToList();
 
             var rules = _transactions.GetAllExpenseBudgetRules().ToList();
             var periods = rules.ToDictionary(r => r.Id, r => _budgets.GetActivePeriod(r.Id));
             var recurring = _transactions.GetAllRecurringSingleRules()
                 .Where(r => accountIds.Contains(r.AccountId))
                 .ToList();
-            var categories = _transactions.GetAllCategories(includeInactive: true).ToList();
+            var categories = ledger.Categories;
             var forecast = BuildForecast(asOf.Date, accounts);
 
             return _composer.Compose(
@@ -86,7 +87,8 @@ namespace THMS.Logic.ViewModels.Finance
                 periods,
                 recurring,
                 forecast,
-                categories);
+                categories,
+                activity);
         }
 
         private List<Account> HouseholdAccounts() =>

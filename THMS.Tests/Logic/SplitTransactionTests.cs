@@ -74,7 +74,7 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void ComputeActualExpenses_UsesSplitRows_IgnoresPrincipalAndTransfers()
+        public void ComputeActualExpenses_UsesSplitRows_CountsPrincipalAndIgnoresTransfers()
         {
             var groceries = DefaultExpenseCategories.GroceriesId;
             var payment = DefaultExpenseCategories.PaymentId;
@@ -122,7 +122,7 @@ namespace THMS.Tests.Logic
                 posted, [payment], new DateTime(2026, 3, 1), new DateTime(2026, 3, 31));
 
             Assert.That(groceryActual, Is.EqualTo(50m));
-            Assert.That(paymentActual, Is.EqualTo(300m));
+            Assert.That(paymentActual, Is.EqualTo(1000m));
         }
 
         [Test]
