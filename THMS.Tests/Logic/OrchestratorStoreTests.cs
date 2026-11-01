@@ -292,7 +292,7 @@ namespace THMS.Tests.Logic
             Assert.That(completed.KwhDrawn, Is.GreaterThan(0));
             Assert.That(
                 completed.SessionCost,
-                Is.EqualTo(completed.GridKwh * (0.10m + 0.05m)));
+                Is.EqualTo(decimal.Round(completed.GridKwh * (0.10m + 0.05m), 2, MidpointRounding.AwayFromZero)));
 
             vehicles.UpsertHomeEvChargeAttribution(homeCompute.Id, completed.Attribution!);
             vehicles.UpsertHomeEvChargeBilling(homeCompute.Id, completed.Billing!);
@@ -362,7 +362,7 @@ namespace THMS.Tests.Logic
             var derived = orchestrator.GetEvChargeSessions("Lifetime").OfType<HomeEvChargeSession>()
                 .First(s => s.Id == importedZeros.Id);
             Assert.That(derived.KwhDrawn, Is.EqualTo(17.642m + 23.868m));
-            Assert.That(derived.SessionCost, Is.EqualTo(23.868m * (0.10m + 0.05m)));
+            Assert.That(derived.SessionCost, Is.EqualTo(3.58m));
 
             var endDateMidnight = new HomeEvChargeSession
             {
@@ -379,7 +379,7 @@ namespace THMS.Tests.Logic
             });
             var billedOnExpiry = orchestrator.GetEvChargeSessions("Lifetime").OfType<HomeEvChargeSession>()
                 .First(s => s.Id == endDateMidnight.Id);
-            Assert.That(billedOnExpiry.SessionCost, Is.EqualTo(10m * (0.12m + 0.06m)));
+            Assert.That(billedOnExpiry.SessionCost, Is.EqualTo(1.80m));
         }
 
         [Test]
@@ -428,7 +428,7 @@ namespace THMS.Tests.Logic
             Assert.That(completed.SolarKwh, Is.EqualTo(0m));
             Assert.That(completed.BatteryKwh, Is.EqualTo(0m));
             Assert.That(completed.KwhDrawn, Is.EqualTo(2m));
-            Assert.That(completed.SessionCost, Is.EqualTo(2m * 0.15m));
+            Assert.That(completed.SessionCost, Is.EqualTo(0.30m));
         }
 
         [Test]

@@ -8,6 +8,7 @@ using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Planning;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
+using THMS.Logic.Finance.Investments;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.UI.WinForms.Controls
@@ -20,6 +21,7 @@ namespace THMS.UI.WinForms.Controls
         private readonly AccountActivityOrchestrator _activityOrchestrator = new();
         private readonly BillsOrchestrator _billsOrchestrator = new();
         private readonly CategoryOrchestrator _categoryOrchestrator = new();
+        private readonly InvestmentImportOrchestrator _investments = new();
         private readonly IAccountStatementDataStore _statements = new DataStoreFactory().GetAccountStatementStore();
         private readonly ITransactionDataStore _transactions = new DataStoreFactory().GetTransactionStore();
         private readonly IAccountDataStore _accounts = new DataStoreFactory().GetAccountStore();
@@ -430,13 +432,19 @@ namespace THMS.UI.WinForms.Controls
                 case CreditAccount:
                     _accountMenu.Items.Add(MenuItem("Add Charge", (_, _) => AddCharge(account)));
                     _accountMenu.Items.Add(PayMenuItem(account, latest));
+                    _accountMenu.Items.Add(BalanceTransferMenuItem(account));
                     _accountMenu.Items.Add(MenuItem("Payment plan", (_, _) => OpenPaymentPlan(account, latest)));
                     break;
                 case LoanAccount or MortgageAccount:
                     _accountMenu.Items.Add(MenuItem("Add Transaction", (_, _) => AddBankTransaction(account)));
                     _accountMenu.Items.Add(PayMenuItem(account, latest));
                     break;
-                case BankAccount or InvestmentAccount or InternalAccount:
+                case InvestmentAccount:
+                    _accountMenu.Items.Add(MenuItem("Add Transaction", (_, _) => AddBankTransaction(account)));
+                    _accountMenu.Items.Add(TransferMenuItem(account));
+                    _accountMenu.Items.Add(MenuItem("Positions", (_, _) => OpenPositions(account)));
+                    break;
+                case BankAccount or InternalAccount:
                     _accountMenu.Items.Add(MenuItem("Add Transaction", (_, _) => AddBankTransaction(account)));
                     _accountMenu.Items.Add(TransferMenuItem(account));
                     break;
@@ -457,6 +465,13 @@ namespace THMS.UI.WinForms.Controls
         {
             var item = MenuItem("Transfer", (_, _) => TransferFrom(account));
             item.Enabled = TransferAccounts(account.Id).Count > 0;
+            return item;
+        }
+
+        private ToolStripMenuItem BalanceTransferMenuItem(Account account)
+        {
+            var item = MenuItem("Balance transfer", (_, _) => BalanceTransfer(account));
+            item.Enabled = BalanceTransferDestinations(account).Count > 0;
             return item;
         }
 
@@ -527,6 +542,20 @@ namespace THMS.UI.WinForms.Controls
             RunActivity(() => SavePosted(account, dlg));
         }
 
+        private void OpenPositions(Account account)
+        {
+            try
+            {
+                using var dialog = new InvestmentPositionsDialog(_investments, account.Id, account.Name);
+                dialog.ShowDialog(FindForm());
+                LoadAccounts();
+            }
+            catch (Exception ex)
+            {
+                ExceptionDialog.Show(FindForm(), "Positions", ex);
+            }
+        }
+
         private void TransferFrom(Account account)
         {
             var others = TransferAccounts(account.Id);
@@ -541,6 +570,27 @@ namespace THMS.UI.WinForms.Controls
                 return;
             RunActivity(() => _activityOrchestrator.AddTransfer(
                 account.Id, dlg.CounterpartyAccountId, dlg.Date, dlg.Amount, dlg.Description));
+        }
+
+        private void BalanceTransfer(Account account)
+        {
+            var destinations = BalanceTransferDestinations(account);
+            if (destinations.Count == 0)
+            {
+                MessageBox.Show(FindForm(), "Add a credit card or a bank account to transfer to.", "Balance transfer",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var latest = LatestStatement(account);
+            using var dlg = new BalanceTransferDialog(
+                account,
+                destinations,
+                PromotionPaymentPlanner.StatementBalanceOf(latest));
+            if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
+                return;
+            RunActivity(() => _activityOrchestrator.AddTransfer(
+                account.Id, dlg.ToAccountId, dlg.Date, dlg.Amount, dlg.Description));
         }
 
         private void OpenPaymentPlan(Account account, AccountStatement? latest)
@@ -671,6 +721,12 @@ namespace THMS.UI.WinForms.Controls
                 .OrderBy(a => a.Name)
                 .ToList();
 
+        private List<Account> BalanceTransferDestinations(Account source) =>
+            AllAccounts()
+                .Where(a => a.Id != source.Id && a is CreditAccount or BankAccount)
+                .OrderBy(a => a.Name)
+                .ToList();
+
         private List<ExpenseCategory> Categories() =>
             _categoryOrchestrator.GetActiveCategories().ToList();
 
@@ -745,11 +801,11 @@ namespace THMS.UI.WinForms.Controls
             if (acct == null)
                 return;
 
-            using var dlg = new AccountEditForm(acct, AllAccounts());
+            using var dlg = new AccountEditForm(acct, AllAccounts(), persisted: true);
             if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
 
-            SaveAndReload(dlg.Account);
+            SaveAndReload(dlg.Account, dlg.DiscardActivity);
         }
 
         private void OnDeleteAccount(object sender, EventArgs e)
@@ -783,11 +839,11 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
-        private void SaveAndReload(Account account)
+        private void SaveAndReload(Account account, bool discardActivity = false)
         {
             try
             {
-                _accountOrchestrator.Save(account);
+                _accountOrchestrator.Save(account, discardActivity);
                 _planningOrchestrator.SyncAutoPayForAccount(account);
                 LoadAccounts();
             }

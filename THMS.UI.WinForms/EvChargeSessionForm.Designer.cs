@@ -287,9 +287,17 @@ namespace THMS.UI.WinForms
             // _btnCancel
             // 
             _btnCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            _btnCancel.Location = new Point(406, 574);
+            _btnCancel.AutoSize = true;
+            _btnCancel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            _btnCancel.BackColor = Color.FromArgb(39, 137, 71);
+            _btnCancel.FlatStyle = FlatStyle.Flat;
+            _btnCancel.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            _btnCancel.ForeColor = Color.White;
+            _btnCancel.Location = new Point(424, 560);
+            _btnCancel.MinimumSize = new Size(0, 36);
             _btnCancel.Name = "_btnCancel";
-            _btnCancel.Size = new Size(131, 40);
+            _btnCancel.Padding = new Padding(12, 6, 12, 6);
+            _btnCancel.Size = new Size(113, 54);
             _btnCancel.TabIndex = 45;
             _btnCancel.Text = "Cancel";
             _btnCancel.UseVisualStyleBackColor = true;
@@ -298,9 +306,17 @@ namespace THMS.UI.WinForms
             // _btnSave
             // 
             _btnSave.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            _btnSave.Location = new Point(269, 574);
+            _btnSave.AutoSize = true;
+            _btnSave.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            _btnSave.BackColor = Color.FromArgb(39, 137, 71);
+            _btnSave.FlatStyle = FlatStyle.Flat;
+            _btnSave.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            _btnSave.ForeColor = Color.White;
+            _btnSave.Location = new Point(306, 560);
+            _btnSave.MinimumSize = new Size(0, 36);
             _btnSave.Name = "_btnSave";
-            _btnSave.Size = new Size(131, 40);
+            _btnSave.Padding = new Padding(12, 6, 12, 6);
+            _btnSave.Size = new Size(94, 54);
             _btnSave.TabIndex = 46;
             _btnSave.Text = "Save";
             _btnSave.UseVisualStyleBackColor = true;
@@ -359,6 +375,7 @@ namespace THMS.UI.WinForms
             Controls.Add(label2);
             Controls.Add(_numOdometer);
             Name = "EvChargeSessionForm";
+            StartPosition = FormStartPosition.CenterParent;
             Text = "EV Charge Session";
             Load += OnLoadForm;
             ((System.ComponentModel.ISupportInitialize)_numOdometer).EndInit();

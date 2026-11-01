@@ -128,8 +128,9 @@ namespace THMS.Logic.Finance.Aggregation
                         totals.LoansAccounts.Add(Line(mortgage, mortgageOwed));
                         break;
                     case InvestmentAccount invested:
-                        totals.Investment += invested.CashBalance;
-                        totals.Investments.Add(Line(invested, invested.CashBalance));
+                        var investedValue = invested.CashBalance + invested.PositionValue;
+                        totals.Investment += investedValue;
+                        totals.Investments.Add(Line(invested, investedValue));
                         break;
                 }
             }

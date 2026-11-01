@@ -244,7 +244,7 @@ namespace THMS.UI.WinForms
             table.Controls.Add(CreateCard("Bank", _valueBank, _bankAccounts), 0, 0);
             table.Controls.Add(CreateCard("Credit owed", _valueCredit, _creditAccounts), 1, 0);
             table.Controls.Add(CreateCard("Loans / mortgages", _valueLoans, _loanAccounts), 2, 0);
-            table.Controls.Add(CreateCard("Investment cash", _valueInvest, _investmentAccounts), 3, 0);
+            table.Controls.Add(CreateCard("Investments", _valueInvest, _investmentAccounts), 3, 0);
             table.Controls.Add(CreateCard("Net liquid", _valueLiquid), 4, 0);
             table.Controls.Add(CreateCard("Net position", _valueNet), 5, 0);
             return table;

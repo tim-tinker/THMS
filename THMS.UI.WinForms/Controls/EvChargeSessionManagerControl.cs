@@ -21,6 +21,7 @@ namespace THMS.UI.WinForms.Controls
             _gridSessions.AutoGenerateColumns = false;
             _gridSessions.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
             _gridSessions.CellFormatting += OnCellFormatting;
+            _gridSessions.CellDoubleClick += OnCellDoubleClick;
             _unavailableFont = new Font(_gridSessions.Font, FontStyle.Italic);
             ApplyColumnAutoSize();
         }
@@ -101,6 +102,45 @@ namespace THMS.UI.WinForms.Controls
             VehicleColumn.MinimumWidth = Math.Max(VehicleColumn.Width, 80);
             VehicleColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             DataGridViewUtil.FitDisplayedDateAndMoneyColumns(_gridSessions);
+        }
+
+        private void OnCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0)
+                return;
+            if (_gridSessions.Rows[e.RowIndex].DataBoundItem is not BaseEvChargeSession session)
+                return;
+
+            var vehicle = _orchestrator.GetEvVehicles().FirstOrDefault(candidate => candidate.Id == session.VehicleId);
+            if (vehicle is null)
+            {
+                MessageBox.Show(
+                    "The vehicle for this charging session is no longer available.",
+                    "Edit EV Charge Session",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            using var form = new EvChargeSessionForm(vehicle, session);
+            if (form.ShowDialog(FindForm()) != DialogResult.OK || form.SavedSession is null)
+                return;
+
+            _orchestrator.Update(form.SavedSession);
+            SetGridDataSource(_currentPeriod);
+            SelectSession(form.SavedSession.Id);
+        }
+
+        private void SelectSession(Guid sessionId)
+        {
+            for (var i = 0; i < _gridSessions.Rows.Count; i++)
+            {
+                if (_gridSessions.Rows[i].DataBoundItem is BaseEvChargeSession session && session.Id == sessionId)
+                {
+                    DataGridViewUtil.SelectCellWhenReady(_gridSessions, i, 0);
+                    return;
+                }
+            }
         }
 
         private void OnLoad(object sender, EventArgs e)

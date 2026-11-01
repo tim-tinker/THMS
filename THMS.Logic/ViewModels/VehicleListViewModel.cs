@@ -94,12 +94,7 @@ namespace THMS.Logic.ViewModels
                 vehicle.Name,
                 vehicle is VehicleEv);
 
-            var summary = _aggregator.GetCostSummary(
-                vehicle.Id,
-                PeriodStart,
-                PeriodEnd);
-
-            item.ApplySummary(summary);
+            _aggregator.ApplyTo(item, vehicle, PeriodStart, PeriodEnd);
             return item;
         }
     }

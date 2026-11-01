@@ -859,14 +859,16 @@ namespace THMS.Tests.Logic
             var changed = new List<string>();
             item.PropertyChanged += (_, e) => changed.Add(e.PropertyName!);
 
-            item.ApplySummary(new EvTransportationCostSummary { CostPerMile = 0.2m, TotalMiles = 10, TotalCost = 2 });
-            item.ApplySummary(new IceTransportationCostSummary { CostPerMile = 0.3m, TotalMiles = 20, TotalCost = 6 });
+            item.ApplySummary(new EvTransportationCostSummary { CostPerMile = 0.2m, TotalMiles = 10, TotalCost = 2, Gallons = 1, Mpg = 10 });
+            item.ApplySummary(new IceTransportationCostSummary { CostPerMile = 0.3m, TotalMiles = 20, TotalCost = 6, Gallons = 2, Mpg = 10 });
             item.ApplySummary("nope");
 
             Assert.That(item.IsEv, Is.True);
             Assert.That(item.CostPerMile, Is.EqualTo(0.3m));
             Assert.That(item.TotalMiles, Is.EqualTo(20));
             Assert.That(item.TotalCost, Is.EqualTo(6));
+            Assert.That(item.Gallons, Is.EqualTo(2));
+            Assert.That(item.Mpg, Is.EqualTo(10));
             Assert.That(changed, Does.Contain("CostPerMile"));
         }
 
@@ -894,6 +896,31 @@ namespace THMS.Tests.Logic
             var noMileage = new VehicleDetailViewModel(Guid.NewGuid(), new InMemoryVehicleDataStore());
             Assert.That(noMileage.HistoryPeriod, Is.EqualTo("Month"));
             Assert.That(noMileage.StartTime, Is.EqualTo(DateTime.Today.AddMonths(-1)));
+        }
+
+        [Test]
+        public void VehicleListViewModel_AttachesContributingFillUps()
+        {
+            var vehicles = new InMemoryVehicleDataStore();
+            var detail = new VehicleIce { Id = Guid.NewGuid(), Name = "Detail" };
+            vehicles.UpsertVehicle(detail);
+            vehicles.UpsertIceMileageRecord(new IceMileageRecord
+            {
+                VehicleId = detail.Id,
+                EndTime = DateTime.Today,
+                OdometerMiles = 10,
+                GallonsAdded = 2,
+                FuelCost = 7
+            });
+
+            var contributed = new VehicleListViewModel(vehicles, new InMemoryFinanceDataStore())
+                .Query("Lifetime")
+                .Single(vehicle => vehicle.VehicleId == detail.Id);
+
+            Assert.That(contributed.FillUps, Has.Count.EqualTo(1));
+            Assert.That(contributed.FillUps[0].Gallons, Is.EqualTo(2));
+            Assert.That(contributed.FillUps[0].Cost, Is.EqualTo(7));
+            Assert.That(contributed.ChargeSessions, Is.Empty);
         }
 
         [Test]

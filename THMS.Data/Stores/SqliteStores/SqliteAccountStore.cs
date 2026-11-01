@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using THMS.Data.Stores.SQLite;
 using THMS.Data.Stores.SqlTables;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
@@ -27,6 +28,7 @@ namespace THMS.Data.Stores.SqliteStores
             _loanAccountTable.InitializeSchema(conn);
             _mortgageAccountTable.InitializeSchema(conn);
             _investmentAccountTable.InitializeSchema(conn);
+            InvestmentBookSql.Initialize(conn);
             _internalAccountTable.InitializeSchema(conn);
             _plaidItemSync.InitializeSchema(conn);
             _transactionFileMaps.InitializeSchema(conn);
@@ -36,6 +38,7 @@ namespace THMS.Data.Stores.SqliteStores
         {
             _accountTable.Upsert(conn, account);
             UpsertExternalLink(conn, account);
+            RemoveOtherSubtypes(conn, account);
 
             switch (account)
             {
@@ -127,9 +130,29 @@ namespace THMS.Data.Stores.SqliteStores
             _loanAccountTable.Delete(conn, id);
             _mortgageAccountTable.Delete(conn, id);
             _investmentAccountTable.Delete(conn, id);
+            InvestmentBookSql.DeleteAccount(conn, id);
             _internalAccountTable.Delete(conn, id);
             _transactionFileMaps.Delete(conn, id);
             _accountTable.Delete(conn, id);
+        }
+
+        private void RemoveOtherSubtypes(SqliteConnection conn, Account account)
+        {
+            if (account is not BankAccount)
+                _bankAccountTable.Delete(conn, account.Id);
+            if (account is not CreditAccount)
+                _creditAccountTable.Delete(conn, account.Id);
+            if (account is not LoanAccount)
+                _loanAccountTable.Delete(conn, account.Id);
+            if (account is not MortgageAccount)
+                _mortgageAccountTable.Delete(conn, account.Id);
+            if (account is not InvestmentAccount)
+            {
+                _investmentAccountTable.Delete(conn, account.Id);
+                InvestmentBookSql.DeleteAccount(conn, account.Id);
+            }
+            if (account is not InternalAccount)
+                _internalAccountTable.Delete(conn, account.Id);
         }
 
         private void UpsertExternalLink(SqliteConnection conn, Account account)
@@ -200,17 +223,8 @@ namespace THMS.Data.Stores.SqliteStores
             };
         }
 
-        private InvestmentAccount? LoadInvestment(SqliteConnection conn, Guid id)
-        {
-            var cashBalance = _investmentAccountTable.Get(conn, id);
-            if (cashBalance == null)
-                return null;
-
-            return new InvestmentAccount
-            {
-                CashBalance = cashBalance.Value
-            };
-        }
+        private InvestmentAccount? LoadInvestment(SqliteConnection conn, Guid id) =>
+            _investmentAccountTable.Get(conn, id);
 
         private InternalAccount? LoadInternal(SqliteConnection conn, Guid id)
         {

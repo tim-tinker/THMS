@@ -183,7 +183,7 @@ namespace THMS.Logic.Orchestrators
             var energyCost = gridKwh * contract.EnergyChargeRate;
             var deliveryCost = gridKwh * contract.DeliveryChargeRate;
 
-            var sessionCost = energyCost + deliveryCost;
+            var sessionCost = decimal.Round(energyCost + deliveryCost, 2, MidpointRounding.AwayFromZero);
 
             var billing = new HomeEvChargeBilling
             {

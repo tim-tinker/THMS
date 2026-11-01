@@ -2,6 +2,7 @@
 using System.Windows.Forms;
 using THMS.Domain.Finance.Accounts;
 using THMS.Logic.Finance.Model;
+using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.UI.WinForms.Controls
@@ -9,15 +10,21 @@ namespace THMS.UI.WinForms.Controls
     public partial class AccountEditForm : Form
     {
         private readonly List<Account> _accounts;
+        private readonly Account _opened;
+        private readonly bool _persisted;
 
         public Account Account { get; private set; }
 
-        public AccountEditForm(Account? existing, IEnumerable<Account>? accounts = null)
+        public bool DiscardActivity { get; private set; }
+
+        public AccountEditForm(Account? existing, IEnumerable<Account>? accounts = null, bool persisted = false)
         {
             InitializeComponent();
 
             _accounts = accounts?.ToList() ?? [];
-            Account = existing ?? new BankAccount { Type = AccountType.Checking };
+            _persisted = persisted;
+            _opened = existing ?? new BankAccount { Type = AccountType.Checking };
+            Account = _opened;
 
             PopulateAccountTypeCombo();
             chkAutoPay.CheckedChanged += (_, _) => UpdateAutoPayEnabled();
@@ -105,7 +112,9 @@ namespace THMS.UI.WinForms.Controls
                     break;
 
                 case InvestmentAccount invest:
-                    numInvestCash.Value = invest.CashBalance;
+                    numInvestCash.Enabled = !invest.TracksPositions;
+                    if (invest.CashBalance >= numInvestCash.Minimum && invest.CashBalance <= numInvestCash.Maximum)
+                        numInvestCash.Value = invest.CashBalance;
                     break;
 
                 case InternalAccount internalAcct:
@@ -154,7 +163,7 @@ namespace THMS.UI.WinForms.Controls
                     mortgage.NextPaymentDate = dtMortNext.Value;
                     break;
 
-                case InvestmentAccount invest:
+                case InvestmentAccount invest when !invest.TracksPositions:
                     invest.CashBalance = numInvestCash.Value;
                     break;
 
@@ -275,28 +284,40 @@ namespace THMS.UI.WinForms.Controls
                 ? choice.Id
                 : (Guid?)null;
 
-            Account = selected switch
+            if (selected == ComboLabel(_opened))
             {
-                "Bank" => new BankAccount { Type = AccountType.Checking },
-                "Credit" => new CreditAccount
+                Account = _opened;
+            }
+            else
+            {
+                Account = selected switch
                 {
-                    Type = AccountType.CreditCard,
-                    StatementDate = DateTime.Today,
-                    DueDate = DateTime.Today
-                },
-                "Loan" => new LoanAccount { Type = AccountType.Loan },
-                "Mortgage" => new MortgageAccount
-                {
-                    Type = AccountType.Mortgage,
-                    NextPaymentDate = DateTime.Today
-                },
-                "Investment" => new InvestmentAccount { Type = AccountType.Investment },
-                "Internal" => new InternalAccount { Type = AccountType.Internal },
-                "Utility" => new UntrackedAccount { Type = AccountType.Utility },
-                "Service" => new UntrackedAccount { Type = AccountType.Service },
-                "Insurance" => new UntrackedAccount { Type = AccountType.Insurance },
-                _ => Account
-            };
+                    "Bank" => new BankAccount { Type = AccountType.Checking },
+                    "Credit" => new CreditAccount
+                    {
+                        Type = AccountType.CreditCard,
+                        StatementDate = DateTime.Today,
+                        DueDate = DateTime.Today
+                    },
+                    "Loan" => new LoanAccount { Type = AccountType.Loan },
+                    "Mortgage" => new MortgageAccount
+                    {
+                        Type = AccountType.Mortgage,
+                        NextPaymentDate = DateTime.Today
+                    },
+                    "Investment" => new InvestmentAccount { Type = AccountType.Investment },
+                    "Internal" => new InternalAccount { Type = AccountType.Internal },
+                    "Utility" => new UntrackedAccount { Type = AccountType.Utility },
+                    "Service" => new UntrackedAccount { Type = AccountType.Service },
+                    "Insurance" => new UntrackedAccount { Type = AccountType.Insurance },
+                    _ => Account
+                };
+                Account.Id = _opened.Id;
+                Account.CreatedOn = _opened.CreatedOn;
+                Account.ModifiedOn = _opened.ModifiedOn;
+                Account.ExternalLink = _opened.ExternalLink;
+                Account.BalanceAsOf = _opened.BalanceAsOf;
+            }
 
             Account.Name = name;
             Account.Institution = institution;
@@ -310,6 +331,7 @@ namespace THMS.UI.WinForms.Controls
 
         private void OnSave(object sender, EventArgs e)
         {
+            DiscardActivity = false;
             SaveFields();
             if (string.IsNullOrWhiteSpace(Account.Name))
             {
@@ -330,6 +352,23 @@ namespace THMS.UI.WinForms.Controls
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
                 return;
+            }
+
+            if (_persisted
+                && !AccountConversion.SameKind(_opened, Account)
+                && !AccountConversion.CanCarryTransactions(_opened, Account))
+            {
+                var answer = MessageBox.Show(
+                    this,
+                    AccountConversion.LossWarning,
+                    "Account Editor",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2);
+                if (answer != DialogResult.Yes)
+                    return;
+
+                DiscardActivity = true;
             }
 
             DialogResult = DialogResult.OK;

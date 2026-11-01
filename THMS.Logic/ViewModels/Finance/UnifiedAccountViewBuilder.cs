@@ -53,7 +53,7 @@ namespace THMS.Logic.ViewModels.Finance
                         break;
 
                     case InvestmentAccount inv:
-                        view.Balance = inv.CashBalance;
+                        view.Balance = inv.CashBalance + inv.PositionValue;
                         break;
 
                     case LoanAccount loan:

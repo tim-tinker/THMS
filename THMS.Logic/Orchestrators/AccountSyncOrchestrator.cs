@@ -84,7 +84,7 @@ namespace THMS.Logic.Orchestrators
                     credit.CreditLimit = plaid.Limit ?? credit.CreditLimit;
                     break;
 
-                case InvestmentAccount invest:
+                case InvestmentAccount invest when !invest.TracksPositions:
                     invest.CashBalance = plaid.Current ?? invest.CashBalance;
                     break;
             }

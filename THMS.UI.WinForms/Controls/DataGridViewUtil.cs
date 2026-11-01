@@ -16,6 +16,7 @@ namespace THMS.UI.WinForms.Controls
 
         private static readonly ConditionalWeakTable<DataGridView, object> DateMoneySizingHooked = new();
         private static readonly ConditionalWeakTable<DataGridView, object> SelectionSummaryHooked = new();
+        private static readonly ConditionalWeakTable<DataGridView, PendingCellSelection> PendingSelections = new();
 
         private static readonly HashSet<string> DateProperties = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -82,17 +83,115 @@ namespace THMS.UI.WinForms.Controls
             if (cell is null)
                 return false;
 
-            grid.ClearSelection();
             try
             {
-                grid.CurrentCell = cell;
+                if (!ReferenceEquals(grid.CurrentCell, cell))
+                    grid.CurrentCell = cell;
             }
             catch (InvalidOperationException)
             {
                 return false;
             }
 
-            return true;
+            if (!ReferenceEquals(grid.CurrentCell, cell))
+                return false;
+
+            if (!cell.Selected || grid.SelectedCells.Count != 1)
+            {
+                try
+                {
+                    grid.ClearSelection();
+                    cell.Selected = true;
+                }
+                catch (InvalidOperationException)
+                {
+                    return false;
+                }
+            }
+
+            return cell.Selected;
+        }
+
+        public static void SelectCellWhenReady(DataGridView grid, int rowIndex, int columnIndex)
+        {
+            ArgumentNullException.ThrowIfNull(grid);
+            if (rowIndex < 0 || grid.IsDisposed)
+                return;
+            if (grid.RowCount == 0 || rowIndex >= grid.RowCount)
+            {
+                DetachPendingSelection(grid);
+                return;
+            }
+
+            if (TrySelectCell(grid, rowIndex, columnIndex))
+            {
+                DetachPendingSelection(grid);
+                return;
+            }
+
+            DetachPendingSelection(grid);
+            var pending = new PendingCellSelection
+            {
+                RowIndex = rowIndex,
+                ColumnIndex = columnIndex
+            };
+            pending.Handler = (_, _) => OnPendingSelection(grid, pending);
+            PendingSelections.Add(grid, pending);
+            grid.HandleCreated += pending.Handler;
+            grid.VisibleChanged += pending.Handler;
+            grid.SizeChanged += pending.Handler;
+        }
+
+        private static void OnPendingSelection(DataGridView grid, PendingCellSelection pending)
+        {
+            if (grid.IsDisposed || pending.Posted)
+                return;
+            if (!PendingSelections.TryGetValue(grid, out var current) || !ReferenceEquals(current, pending))
+                return;
+            if (!grid.IsHandleCreated || !grid.Visible || grid.Width <= 0 || grid.Height <= 0)
+                return;
+
+            pending.Posted = true;
+            try
+            {
+                grid.BeginInvoke(() =>
+                {
+                    pending.Posted = false;
+                    if (grid.IsDisposed)
+                        return;
+                    if (!PendingSelections.TryGetValue(grid, out var still) || !ReferenceEquals(still, pending))
+                        return;
+                    if (TrySelectCell(grid, still.RowIndex, still.ColumnIndex))
+                        DetachPendingSelection(grid);
+                });
+            }
+            catch (InvalidOperationException)
+            {
+                pending.Posted = false;
+            }
+        }
+
+        private static bool TrySelectCell(DataGridView grid, int rowIndex, int columnIndex)
+        {
+            if (grid.IsDisposed || !grid.IsHandleCreated || !grid.Visible || grid.Width <= 0 || grid.Height <= 0)
+                return false;
+
+            return SelectOnlyCell(grid, rowIndex, columnIndex);
+        }
+
+        private static void DetachPendingSelection(DataGridView grid)
+        {
+            if (!PendingSelections.TryGetValue(grid, out var pending))
+                return;
+
+            if (pending.Handler is not null)
+            {
+                grid.HandleCreated -= pending.Handler;
+                grid.VisibleChanged -= pending.Handler;
+                grid.SizeChanged -= pending.Handler;
+            }
+
+            PendingSelections.Remove(grid);
         }
 
         public static void FitDisplayedDateAndMoneyColumns(DataGridView grid)
@@ -317,6 +416,14 @@ namespace THMS.UI.WinForms.Controls
             catch (InvalidOperationException)
             {
             }
+        }
+
+        private sealed class PendingCellSelection
+        {
+            public int RowIndex;
+            public int ColumnIndex;
+            public EventHandler? Handler;
+            public bool Posted;
         }
 
         /// <summary>

@@ -5,6 +5,8 @@
         public decimal TotalMiles { get; set; }
         public decimal TotalCost { get; set; }
         public decimal CostPerMile { get; set; }
+        public decimal Gallons { get; set; }
+        public decimal Mpg { get; set; }
 
         public decimal HomeChargeCost { get; set; }
         public decimal CommercialChargeCost { get; set; }

@@ -2,6 +2,7 @@ using THMS.Data.Stores;
 using THMS.Domain.Energy;
 using THMS.Domain.Transportation;
 using THMS.Logic.Transportation;
+using THMS.Logic.ViewModels;
 using THMS.Tests.Logic.TestSupport;
 
 namespace THMS.Tests.Logic
@@ -246,14 +247,16 @@ namespace THMS.Tests.Logic
                 VehicleId = ice.Id,
                 EndTime = new DateTime(2026, 1, 1),
                 OdometerMiles = 100,
-                FuelCost = 30
+                FuelCost = 30,
+                GallonsAdded = 4
             });
             vehicles.UpsertIceMileageRecord(new IceMileageRecord
             {
                 VehicleId = ice.Id,
                 EndTime = new DateTime(2026, 1, 10),
                 OdometerMiles = 200,
-                FuelCost = 20
+                FuelCost = 20,
+                GallonsAdded = 6
             });
 
             var summary = new TransportationCostAggregator(vehicles, new InMemoryFinanceDataStore())
@@ -264,6 +267,104 @@ namespace THMS.Tests.Logic
             Assert.That(iceSummary.TotalMiles, Is.EqualTo(100));
             Assert.That(iceSummary.FuelCost, Is.EqualTo(50));
             Assert.That(iceSummary.CostPerMile, Is.EqualTo(0.5m));
+            Assert.That(iceSummary.Gallons, Is.EqualTo(10));
+            Assert.That(iceSummary.Mpg, Is.EqualTo(10));
+
+            var fillUps = new TransportationCostAggregator(vehicles, new InMemoryFinanceDataStore())
+                .GetFillUps(ice.Id, new DateTime(2026, 1, 1), new DateTime(2026, 1, 31));
+            Assert.That(fillUps.Select(fillUp => fillUp.Gallons), Is.EqualTo(new[] { 6m, 4m }));
+            Assert.That(fillUps.Select(fillUp => fillUp.Cost), Is.EqualTo(new[] { 20m, 30m }));
+            Assert.That(fillUps.Sum(fillUp => fillUp.Gallons), Is.EqualTo(iceSummary.Gallons));
+            Assert.That(fillUps.Sum(fillUp => fillUp.Cost), Is.EqualTo(iceSummary.TotalCost));
+        }
+
+        [Test]
+        public void ApplyTo_GroupsFillUpsAndSessionsByMonth()
+        {
+            var vehicles = new InMemoryVehicleDataStore();
+            var finance = new InMemoryFinanceDataStore();
+            var ice = new VehicleIce { Id = Guid.NewGuid(), Name = "Monthly" };
+            vehicles.UpsertVehicle(ice);
+            vehicles.UpsertIceMileageRecord(new IceMileageRecord
+            {
+                VehicleId = ice.Id,
+                EndTime = new DateTime(2026, 1, 2),
+                OdometerMiles = 100,
+                GallonsAdded = 4,
+                FuelCost = 30
+            });
+            vehicles.UpsertIceMileageRecord(new IceMileageRecord
+            {
+                VehicleId = ice.Id,
+                EndTime = new DateTime(2026, 1, 20),
+                OdometerMiles = 200,
+                GallonsAdded = 6,
+                FuelCost = 20
+            });
+            vehicles.UpsertIceMileageRecord(new IceMileageRecord
+            {
+                VehicleId = ice.Id,
+                EndTime = new DateTime(2026, 3, 4),
+                OdometerMiles = 260,
+                GallonsAdded = 5,
+                FuelCost = 18
+            });
+
+            var iceItem = new VehicleListItemViewModel(ice.Id, ice.Name, false);
+            new TransportationCostAggregator(vehicles, finance)
+                .ApplyTo(iceItem, ice, DateTime.MinValue, DateTime.MaxValue);
+
+            Assert.That(iceItem.Months.Select(month => month.Month), Is.EqualTo(new[]
+            {
+                new DateTime(2026, 3, 1),
+                new DateTime(2026, 1, 1)
+            }));
+            Assert.That(iceItem.Months[1].Gallons, Is.EqualTo(10));
+            Assert.That(iceItem.Months[1].TotalCost, Is.EqualTo(50));
+            Assert.That(iceItem.Months[1].TotalMiles, Is.EqualTo(100));
+            Assert.That(iceItem.Months[1].FillUps, Has.Count.EqualTo(2));
+            Assert.That(iceItem.Months[0].Gallons, Is.EqualTo(5));
+            Assert.That(iceItem.Months[0].FillUps, Has.Count.EqualTo(1));
+
+            var ev = new VehicleEv { Id = Guid.NewGuid(), Name = "Monthly EV" };
+            vehicles.UpsertVehicle(ev);
+            vehicles.UpsertBaseEvChargeSession(new CommercialEvChargeSession
+            {
+                Id = Guid.NewGuid(),
+                VehicleId = ev.Id,
+                StartTime = new DateTime(2026, 6, 2),
+                EndTime = new DateTime(2026, 6, 2, 1, 0, 0),
+                LastOdometer = 1000,
+                OdometerMiles = 1040,
+                SessionCost = 8,
+                KwhDrawn = 10
+            });
+            vehicles.UpsertBaseEvChargeSession(new CommercialEvChargeSession
+            {
+                Id = Guid.NewGuid(),
+                VehicleId = ev.Id,
+                StartTime = new DateTime(2026, 7, 3),
+                EndTime = new DateTime(2026, 7, 3, 1, 0, 0),
+                LastOdometer = 1040,
+                OdometerMiles = 1100,
+                SessionCost = 12,
+                KwhDrawn = 20
+            });
+
+            var evItem = new VehicleListItemViewModel(ev.Id, ev.Name, true);
+            new TransportationCostAggregator(vehicles, finance, new InMemoryEnergyDataStore())
+                .ApplyTo(evItem, ev, DateTime.MinValue, DateTime.MaxValue);
+
+            Assert.That(evItem.Months.Select(month => month.Month), Is.EqualTo(new[]
+            {
+                new DateTime(2026, 7, 1),
+                new DateTime(2026, 6, 1)
+            }));
+            Assert.That(evItem.Months[0].TotalMiles, Is.EqualTo(60));
+            Assert.That(evItem.Months[0].TotalCost, Is.EqualTo(12));
+            Assert.That(evItem.Months[0].ChargeSessions, Has.Count.EqualTo(1));
+            Assert.That(evItem.Months[1].TotalMiles, Is.EqualTo(40));
+            Assert.That(evItem.Months[1].ChargeSessions, Has.Count.EqualTo(1));
         }
 
         [Test]
@@ -279,6 +380,33 @@ namespace THMS.Tests.Logic
 
             Assert.That(summary.TotalMiles, Is.EqualTo(0));
             Assert.That(summary.CostPerMile, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void GetCostSummary_RoundsCostPerMileToFourDecimals()
+        {
+            var vehicles = new InMemoryVehicleDataStore();
+            var ice = new VehicleIce { Id = Guid.NewGuid(), Name = "Rounding" };
+            vehicles.UpsertVehicle(ice);
+            vehicles.UpsertIceMileageRecord(new IceMileageRecord
+            {
+                VehicleId = ice.Id,
+                EndTime = new DateTime(2026, 2, 1),
+                OdometerMiles = 0
+            });
+            vehicles.UpsertIceMileageRecord(new IceMileageRecord
+            {
+                VehicleId = ice.Id,
+                EndTime = new DateTime(2026, 2, 2),
+                OdometerMiles = 3,
+                FuelCost = 10
+            });
+
+            var summary = (THMS.Domain.Finance.IceTransportationCostSummary)
+                new TransportationCostAggregator(vehicles, new InMemoryFinanceDataStore())
+                    .GetCostSummary(ice.Id, new DateTime(2026, 2, 1), new DateTime(2026, 2, 28));
+
+            Assert.That(summary.CostPerMile, Is.EqualTo(3.3333m));
         }
 
         [Test]
@@ -298,7 +426,8 @@ namespace THMS.Tests.Logic
                 EndTime = start.AddDays(1).AddHours(2),
                 LastOdometer = 1000,
                 OdometerMiles = 1050,
-                SessionCost = 10
+                SessionCost = 10,
+                KwhDrawn = 16.85m
             });
             vehicles.UpsertBaseEvChargeSession(new CommercialEvChargeSession
             {
@@ -308,7 +437,8 @@ namespace THMS.Tests.Logic
                 EndTime = start.AddDays(2).AddHours(1),
                 LastOdometer = 1050,
                 OdometerMiles = 1100,
-                SessionCost = 15
+                SessionCost = 15,
+                KwhDrawn = 16.85m
             });
 
             var summary = (THMS.Domain.Finance.EvTransportationCostSummary)
@@ -320,6 +450,59 @@ namespace THMS.Tests.Logic
             Assert.That(summary.TotalCost, Is.EqualTo(25));
             Assert.That(summary.TotalMiles, Is.EqualTo(100));
             Assert.That(summary.CostPerMile, Is.EqualTo(0.25m));
+            Assert.That(summary.Gallons, Is.EqualTo(1m));
+            Assert.That(summary.Mpg, Is.EqualTo(100m));
+
+            var sessions = new TransportationCostAggregator(vehicles, finance, new InMemoryEnergyDataStore())
+                .GetChargeSessions(ev.Id, start, end);
+            Assert.That(sessions.Select(session => session.Cost), Is.EqualTo(new[] { 15m, 10m }));
+            Assert.That(sessions.Select(session => session.IsHome), Is.EqualTo(new[] { false, true }));
+            Assert.That(sessions.Select(session => session.Miles), Is.EqualTo(new[] { 50m, 50m }));
+            Assert.That(sessions.Select(session => session.CostPerMile), Is.EqualTo(new[] { 0.3m, 0.2m }));
+            Assert.That(sessions.Select(session => session.Mpg), Is.EqualTo(new[] { 100m, 100m }));
+            Assert.That(sessions.Sum(session => session.Gallons), Is.EqualTo(summary.Gallons));
+            Assert.That(sessions.Sum(session => session.Miles), Is.EqualTo(summary.TotalMiles));
+        }
+
+        [Test]
+        public void GetChargeSessions_HomeUsesTotalDrawnNotBatteryOrGrid()
+        {
+            var vehicles = new InMemoryVehicleDataStore();
+            var ev = new VehicleEv { Id = Guid.NewGuid(), Name = "Attributed", BatteryCapacityKwh = 70 };
+            vehicles.UpsertVehicle(ev);
+            var session = new HomeEvChargeSession
+            {
+                Id = Guid.NewGuid(),
+                VehicleId = ev.Id,
+                StartTime = new DateTime(2026, 3, 1, 20, 0, 0),
+                EndTime = new DateTime(2026, 3, 2, 6, 0, 0),
+                LastOdometer = 1000,
+                OdometerMiles = 1060,
+                KwhAdded = 40,
+                KwhDrawn = 99,
+                SessionCost = 1.5m
+            };
+            vehicles.UpsertBaseEvChargeSession(session);
+            vehicles.UpsertHomeEvChargeAttribution(session.Id, new HomeEvChargeAttribution
+            {
+                GridKwh = 1,
+                SolarKwh = 2,
+                BatteryKwh = 3
+            });
+
+            var rows = new TransportationCostAggregator(
+                    vehicles,
+                    new InMemoryFinanceDataStore(),
+                    new InMemoryEnergyDataStore())
+                .GetChargeSessions(ev.Id, new DateTime(2026, 3, 1), new DateTime(2026, 3, 31));
+
+            Assert.That(rows, Has.Count.EqualTo(1));
+            Assert.That(rows[0].Gallons, Is.EqualTo(6000m / 33700m));
+            Assert.That(rows[0].Miles, Is.EqualTo(60m));
+            Assert.That(rows[0].Mpg, Is.EqualTo(60m / (6000m / 33700m)));
+            Assert.That(rows[0].CostPerMile, Is.EqualTo(0.025m));
+            Assert.That(rows[0].Cost, Is.EqualTo(1.5m));
+            Assert.That(rows[0].IsHome, Is.True);
         }
 
         [Test]

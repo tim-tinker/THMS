@@ -16,6 +16,24 @@ namespace THMS.UI.WinForms.Controls
             split.SizeChanged += OnLaidOut;
         }
 
+        public static bool TrySetLeadingRatio(SplitContainer split, int leadingParts, int trailingParts)
+        {
+            ArgumentNullException.ThrowIfNull(split);
+            if (leadingParts < 1 || trailingParts < 1)
+                return false;
+
+            var span = split.Orientation == Orientation.Horizontal ? split.Height : split.Width;
+            var available = span - split.SplitterWidth;
+            var min = split.Panel1MinSize;
+            var max = available - split.Panel2MinSize;
+            if (available < 200 || max < min)
+                return false;
+
+            var leading = available * leadingParts / (leadingParts + trailingParts);
+            split.SplitterDistance = Math.Clamp(leading, min, max);
+            return true;
+        }
+
         private static void OnLaidOut(object? sender, EventArgs e)
         {
             if (sender is SplitContainer split)
