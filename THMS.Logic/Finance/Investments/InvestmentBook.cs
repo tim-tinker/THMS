@@ -21,6 +21,7 @@ namespace THMS.Logic.Finance.Investments
         public decimal? Price { get; init; }
         public decimal? MarketValue { get; init; }
         public decimal? EstimatedAnnualIncome { get; init; }
+        public decimal? AmountPerShare { get; init; }
         public DateTime? ExDate { get; init; }
         public DateTime? PayDate { get; init; }
     }

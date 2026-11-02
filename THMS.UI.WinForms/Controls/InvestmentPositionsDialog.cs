@@ -87,7 +87,7 @@ namespace THMS.UI.WinForms.Controls
 
         private void Import()
         {
-            using var dialog = new InvestmentImportDialog(_orchestrator, _accountId);
+            using var dialog = new InvestmentImportDialog(_orchestrator, _accountId, InvestmentImportFile.Positions);
             dialog.ShowDialog(this);
             Reload();
         }
@@ -241,12 +241,20 @@ namespace THMS.UI.WinForms.Controls
         }
     }
 
+    internal enum InvestmentImportFile
+    {
+        Positions,
+        History
+    }
+
     internal sealed class InvestmentImportDialog : Form
     {
         private readonly InvestmentImportOrchestrator _orchestrator;
         private readonly Guid _accountId;
-        private readonly TextBox _positions = new() { Width = 560 };
-        private readonly TextBox _history = new() { Width = 560 };
+        private readonly InvestmentImportFile _file;
+        private readonly bool _batch;
+        private IReadOnlyDictionary<Guid, string> _accountNames = new Dictionary<Guid, string>();
+        private readonly TextBox _path = new() { Width = 560 };
         private readonly TextBox _messages = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Height = 88, Dock = DockStyle.Top };
         private readonly DataGridView _changes = new()
         {
@@ -261,11 +269,24 @@ namespace THMS.UI.WinForms.Controls
         private readonly ThmsButton _apply = new() { Text = "Import", Enabled = false };
         private bool _ready;
 
-        public InvestmentImportDialog(InvestmentImportOrchestrator orchestrator, Guid accountId)
+        public InvestmentImportDialog(InvestmentImportOrchestrator orchestrator, string? path = null)
+            : this(orchestrator, Guid.Empty, InvestmentImportFile.Positions, path)
+        {
+            _batch = true;
+            _changes.Columns.Insert(0, TextColumn("Account", "Account"));
+        }
+
+        public InvestmentImportDialog(
+            InvestmentImportOrchestrator orchestrator,
+            Guid accountId,
+            InvestmentImportFile file,
+            string? path = null)
         {
             _orchestrator = orchestrator;
             _accountId = accountId;
-            Text = "Import Fidelity";
+            _file = file;
+            _batch = false;
+            Text = file == InvestmentImportFile.Positions ? "Import positions" : "Import history";
             FormBorderStyle = FormBorderStyle.Sizable;
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false;
@@ -278,14 +299,13 @@ namespace THMS.UI.WinForms.Controls
                 Dock = DockStyle.Top,
                 AutoSize = true,
                 ColumnCount = 3,
-                RowCount = 2,
+                RowCount = 1,
                 Padding = new Padding(16, 16, 16, 8)
             };
             fields.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
             fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             fields.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
-            AddFileRow(fields, 0, "Positions view", _positions);
-            AddFileRow(fields, 1, "History", _history);
+            AddFileRow(fields, 0, file == InvestmentImportFile.Positions ? "Positions view" : "History", _path);
 
             _changes.Columns.AddRange(
                 TextColumn("Date", "Date"),
@@ -321,6 +341,11 @@ namespace THMS.UI.WinForms.Controls
             Controls.Add(_messages);
             Controls.Add(fields);
             Controls.Add(buttons);
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                _path.Text = path;
+                Shown += (_, _) => Preview();
+            }
         }
 
         private void AddFileRow(TableLayoutPanel fields, int row, string label, TextBox path)
@@ -340,7 +365,7 @@ namespace THMS.UI.WinForms.Controls
             using var dialog = new OpenFileDialog
             {
                 Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
-                Title = "Fidelity download"
+                Title = Text
             };
             if (dialog.ShowDialog(this) == DialogResult.OK)
             {
@@ -354,10 +379,27 @@ namespace THMS.UI.WinForms.Controls
         {
             try
             {
-                var preview = _orchestrator.Preview(
-                    _accountId,
-                    Blank(_positions.Text),
-                    Blank(_history.Text));
+                var chosen = Blank(_path.Text);
+                if (_batch)
+                {
+                    var batch = _orchestrator.PreviewPositions(chosen);
+                    _accountNames = batch.AccountNames;
+                    _messages.Text = batch.Messages.Count == 0
+                        ? $"{batch.Applied} applied, {batch.Skipped} already imported, {batch.Updated} updated."
+                        : string.Join(Environment.NewLine, batch.Messages)
+                            + Environment.NewLine
+                            + $"{batch.Applied} applied, {batch.Skipped} already imported, {batch.Updated} updated.";
+                    _changes.DataSource = batch.Changes
+                        .Select(action => new ChangeLine(action, AccountName(action)))
+                        .ToList();
+                    _ready = true;
+                    _apply.Enabled = batch.Changes.Count > 0;
+                    return;
+                }
+
+                var preview = _file == InvestmentImportFile.Positions
+                    ? _orchestrator.Preview(_accountId, chosen, null)
+                    : _orchestrator.Preview(_accountId, null, chosen);
                 _messages.Text = preview.Messages.Count == 0
                     ? $"{preview.Applied} applied, {preview.Skipped} already imported, {preview.Updated} updated, {preview.Review} waiting for review."
                     : string.Join(Environment.NewLine, preview.Messages)
@@ -373,7 +415,7 @@ namespace THMS.UI.WinForms.Controls
             {
                 _ready = false;
                 _apply.Enabled = false;
-                MessageBox.Show(this, ex.Message, "Import Fidelity", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -383,15 +425,21 @@ namespace THMS.UI.WinForms.Controls
                 return;
             try
             {
-                _orchestrator.Commit(_accountId);
+                if (_batch)
+                    _orchestrator.CommitPositions();
+                else
+                    _orchestrator.Commit(_accountId);
                 DialogResult = DialogResult.OK;
                 Close();
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, ex.Message, "Import Fidelity", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
+
+        private string AccountName(InvestmentAction action) =>
+            _accountNames.TryGetValue(action.AccountId, out var name) ? name : "";
 
         private static string? Blank(string text) =>
             string.IsNullOrWhiteSpace(text) ? null : text.Trim();
@@ -401,8 +449,9 @@ namespace THMS.UI.WinForms.Controls
 
         private sealed class ChangeLine
         {
-            public ChangeLine(InvestmentAction action)
+            public ChangeLine(InvestmentAction action, string? account = null)
             {
+                Account = account ?? "";
                 Date = action.RunDate.ToShortDateString();
                 Action = action.ActionText;
                 Symbol = action.Symbol;
@@ -413,6 +462,7 @@ namespace THMS.UI.WinForms.Controls
                 Note = action.Note ?? "";
             }
 
+            public string Account { get; }
             public string Date { get; }
             public string Action { get; }
             public string Symbol { get; }

@@ -94,6 +94,8 @@ namespace THMS.Data.Stores.SQLite
                     UNIQUE(AccountId, Symbol, AsOf)
                 );
 
+                UPDATE SecurityQuotes SET Price = NULL WHERE Price IS NOT NULL;
+
                 CREATE TABLE IF NOT EXISTS InvestmentActions (
                     Id TEXT PRIMARY KEY,
                     AccountId TEXT NOT NULL,
@@ -230,7 +232,7 @@ namespace THMS.Data.Stores.SQLite
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT Id, AccountId, Symbol, AsOf, Price, AnnualIncomePerShare, DistributionRate,
+                SELECT Id, AccountId, Symbol, AsOf, AnnualIncomePerShare, DistributionRate,
                        AmountPerShare, ExDate, PayDate
                 FROM SecurityQuotes
                 WHERE AccountId = @Id;";
@@ -245,12 +247,11 @@ namespace THMS.Data.Stores.SQLite
                     AccountId = Guid.Parse(reader.GetString(1)),
                     Symbol = reader.GetString(2),
                     AsOf = ReadDate(reader.GetString(3)),
-                    Price = ReadDecimal(reader, 4),
-                    AnnualIncomePerShare = ReadDecimal(reader, 5),
-                    DistributionRate = ReadDecimal(reader, 6),
-                    AmountPerShare = ReadDecimal(reader, 7),
-                    ExDate = ReadOptionalDate(reader, 8),
-                    PayDate = ReadOptionalDate(reader, 9)
+                    AnnualIncomePerShare = ReadDecimal(reader, 4),
+                    DistributionRate = ReadDecimal(reader, 5),
+                    AmountPerShare = ReadDecimal(reader, 6),
+                    ExDate = ReadOptionalDate(reader, 7),
+                    PayDate = ReadOptionalDate(reader, 8)
                 });
             }
 
@@ -265,10 +266,10 @@ namespace THMS.Data.Stores.SQLite
                     Id, AccountId, Symbol, AsOf, Price, AnnualIncomePerShare, DistributionRate,
                     AmountPerShare, ExDate, PayDate)
                 VALUES (
-                    @Id, @AccountId, @Symbol, @AsOf, @Price, @AnnualIncomePerShare, @DistributionRate,
+                    @Id, @AccountId, @Symbol, @AsOf, NULL, @AnnualIncomePerShare, @DistributionRate,
                     @AmountPerShare, @ExDate, @PayDate)
                 ON CONFLICT(AccountId, Symbol, AsOf) DO UPDATE SET
-                    Price = excluded.Price,
+                    Price = NULL,
                     AnnualIncomePerShare = excluded.AnnualIncomePerShare,
                     DistributionRate = excluded.DistributionRate,
                     AmountPerShare = excluded.AmountPerShare,
@@ -278,7 +279,6 @@ namespace THMS.Data.Stores.SQLite
             cmd.Parameters.AddWithValue("@AccountId", quote.AccountId.ToString());
             cmd.Parameters.AddWithValue("@Symbol", quote.Symbol);
             cmd.Parameters.AddWithValue("@AsOf", WriteDate(quote.AsOf));
-            AddDecimal(cmd, "@Price", quote.Price);
             AddDecimal(cmd, "@AnnualIncomePerShare", quote.AnnualIncomePerShare);
             AddDecimal(cmd, "@DistributionRate", quote.DistributionRate);
             AddDecimal(cmd, "@AmountPerShare", quote.AmountPerShare);

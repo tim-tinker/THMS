@@ -168,6 +168,26 @@ namespace THMS.Logic.Orchestrators.Finance
             RefreshBudgets(imported);
         }
 
+        public int DeleteUnreconciled(IEnumerable<Guid> importedIds)
+        {
+            var affected = new List<PostedTransaction>();
+            var seen = new HashSet<Guid>();
+            foreach (var id in importedIds)
+            {
+                if (!seen.Add(id))
+                    continue;
+
+                var imported = RequireUnreconciled(id);
+                if (imported is PostedTransferTransaction transfer)
+                    CollectUnreconciledCounterpart(transfer, seen, affected);
+                RemoveImported(imported);
+                affected.Add(imported);
+            }
+
+            RefreshBudgets(affected.ToArray());
+            return affected.Count;
+        }
+
         public HashSet<Guid> AccountIdsWithUnreconciled() =>
             _transactions.GetAccountIdsWithUnreconciledImports().ToHashSet();
 
@@ -483,6 +503,41 @@ namespace THMS.Logic.Orchestrators.Finance
                 !e.IsRealized && e.OriginId == originId && e.Date.Date == date.Date)
             || _transactions.GetAllFutureTransferTransactions().Any(e =>
                 !e.IsRealized && e.OriginId == originId && e.Date.Date == date.Date);
+
+        private void CollectUnreconciledCounterpart(
+            PostedTransferTransaction transfer,
+            HashSet<Guid> seen,
+            List<PostedTransaction> affected)
+        {
+            var relatedId = transfer.RelatedPostedTransactionId;
+            if (relatedId == Guid.Empty || relatedId == transfer.Id)
+                return;
+
+            var other = FindImported(relatedId);
+            if (other is null)
+                return;
+
+            if (other.ImportedStatus == ImportedStatus.Unreconciled && seen.Add(other.Id))
+            {
+                RemoveImported(other);
+                affected.Add(other);
+                return;
+            }
+
+            if (other is PostedTransferTransaction otherTransfer && otherTransfer.RelatedPostedTransactionId == transfer.Id)
+            {
+                otherTransfer.RelatedPostedTransactionId = Guid.Empty;
+                _transactions.UpdatePostedTransferTransaction(otherTransfer);
+            }
+        }
+
+        private void RemoveImported(PostedTransaction imported)
+        {
+            if (imported is PostedTransferTransaction)
+                _transactions.DeletePostedTransferTransaction(imported.Id);
+            else
+                _transactions.DeletePostedTransaction(imported.Id);
+        }
 
         private PostedTransaction RequireUnreconciled(Guid importedId)
         {

@@ -9,6 +9,7 @@ namespace THMS.Logic.Finance.Investments
     {
         public const string ContributionCategoryName = "Investment Contribution";
         public const string DistributionCategoryName = "Investment Distribution";
+        public const string IncomeCategoryName = "Investment Income";
 
         private readonly IAccountDataStore _accounts;
         private readonly IInvestmentBookStore _books;
@@ -16,6 +17,7 @@ namespace THMS.Logic.Finance.Investments
         private readonly ICategoryDataStore _categories;
         private InvestmentBookState? _pending;
         private Guid _pendingAccountId;
+        private List<InvestmentBookState> _pendingPositions = [];
 
         public InvestmentImportOrchestrator()
             : this(
@@ -82,6 +84,55 @@ namespace THMS.Logic.Finance.Investments
             return preview;
         }
 
+        public InvestmentPositionsBatch PreviewPositions(string? positionsPath)
+        {
+            if (string.IsNullOrWhiteSpace(positionsPath))
+                throw new InvalidOperationException("Choose a positions view.");
+
+            var investments = _accounts.GetAllAccounts().OfType<InvestmentAccount>().ToList();
+            var matched = new List<InvestmentBookState>();
+            var names = new Dictionary<Guid, string>();
+            var changes = new List<InvestmentAction>();
+            var messages = new List<string>();
+            var applied = 0;
+            var skipped = 0;
+            var updated = 0;
+            foreach (var file in FidelityInvestmentFile.ReadPositionAccounts(positionsPath))
+            {
+                var account = investments.FirstOrDefault(item => AccountNumbersMatch(item.AccountNumber, file.AccountNumber));
+                var label = string.IsNullOrWhiteSpace(file.AccountName)
+                    ? file.AccountNumber
+                    : $"{file.AccountName} ({file.AccountNumber})";
+                if (account is null)
+                {
+                    messages.Add($"No portfolio has account number {label}.");
+                    continue;
+                }
+
+                var state = Load(account.Id);
+                var preview = InvestmentBookkeeper.Import(state, file, history: null);
+                matched.Add(state);
+                names[account.Id] = account.Name ?? label;
+                changes.AddRange(preview.Changes);
+                applied += preview.Applied;
+                skipped += preview.Skipped;
+                updated += preview.Updated;
+                messages.Add($"{account.Name}: {string.Join(" ", preview.Messages)}".Trim());
+            }
+
+            _pendingPositions = matched;
+            _pending = null;
+            return new InvestmentPositionsBatch
+            {
+                Applied = applied,
+                Skipped = skipped,
+                Updated = updated,
+                Messages = messages,
+                Changes = changes,
+                AccountNames = names
+            };
+        }
+
         public void Commit(Guid accountId)
         {
             if (_pending is null || _pendingAccountId != accountId)
@@ -89,6 +140,16 @@ namespace THMS.Logic.Finance.Investments
 
             Save(_pending);
             _pending = null;
+        }
+
+        public void CommitPositions()
+        {
+            if (_pendingPositions.Count == 0)
+                throw new InvalidOperationException("Preview the positions file before importing it.");
+
+            foreach (var state in _pendingPositions)
+                Save(state);
+            _pendingPositions = [];
         }
 
         public void Classify(Guid accountId, Guid actionId, InvestmentActionKind kind)
@@ -132,14 +193,18 @@ namespace THMS.Logic.Finance.Investments
                     continue;
                 if (action.Status != InvestmentActionStatus.Applied)
                     continue;
-                if (action.Kind is not (InvestmentActionKind.Contribution or InvestmentActionKind.Distribution))
-                    continue;
                 if (action.Amount is not decimal amount || amount == 0)
                     continue;
 
-                var categoryName = action.Kind == InvestmentActionKind.Contribution
-                    ? ContributionCategoryName
-                    : DistributionCategoryName;
+                var categoryName = action.Kind switch
+                {
+                    InvestmentActionKind.Contribution => ContributionCategoryName,
+                    InvestmentActionKind.Distribution => DistributionCategoryName,
+                    InvestmentActionKind.Dividend or InvestmentActionKind.Interest => IncomeCategoryName,
+                    _ => null
+                };
+                if (categoryName is null)
+                    continue;
                 var posted = new PostedTransaction
                 {
                     AccountId = action.AccountId,
@@ -225,11 +290,26 @@ namespace THMS.Logic.Finance.Investments
         {
             if (string.IsNullOrWhiteSpace(stored) || string.IsNullOrWhiteSpace(file))
                 return true;
-            stored = stored.Trim();
-            file = file.Trim();
-            return stored.Equals(file, StringComparison.OrdinalIgnoreCase)
-                || file.EndsWith(stored, StringComparison.OrdinalIgnoreCase)
-                || stored.EndsWith(file, StringComparison.OrdinalIgnoreCase);
+            return AccountNumbersMatch(stored, file)
+                || file.Trim().EndsWith(stored.Trim(), StringComparison.OrdinalIgnoreCase)
+                || stored.Trim().EndsWith(file.Trim(), StringComparison.OrdinalIgnoreCase);
         }
+
+        private static bool AccountNumbersMatch(string? stored, string? file)
+        {
+            if (string.IsNullOrWhiteSpace(stored) || string.IsNullOrWhiteSpace(file))
+                return false;
+            return string.Equals(stored.Trim(), file.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    public sealed class InvestmentPositionsBatch
+    {
+        public int Applied { get; init; }
+        public int Skipped { get; init; }
+        public int Updated { get; init; }
+        public IReadOnlyList<string> Messages { get; init; } = [];
+        public IReadOnlyList<InvestmentAction> Changes { get; init; } = [];
+        public IReadOnlyDictionary<Guid, string> AccountNames { get; init; } = new Dictionary<Guid, string>();
     }
 }

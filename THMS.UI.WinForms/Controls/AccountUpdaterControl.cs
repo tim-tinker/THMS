@@ -7,8 +7,8 @@ using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Planning;
 using THMS.Logic.Orchestrators;
-using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.Finance.Investments;
+using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.UI.WinForms.Controls
@@ -21,7 +21,6 @@ namespace THMS.UI.WinForms.Controls
         private readonly AccountActivityOrchestrator _activityOrchestrator = new();
         private readonly BillsOrchestrator _billsOrchestrator = new();
         private readonly CategoryOrchestrator _categoryOrchestrator = new();
-        private readonly InvestmentImportOrchestrator _investments = new();
         private readonly IAccountStatementDataStore _statements = new DataStoreFactory().GetAccountStatementStore();
         private readonly ITransactionDataStore _transactions = new DataStoreFactory().GetTransactionStore();
         private readonly IAccountDataStore _accounts = new DataStoreFactory().GetAccountStore();
@@ -324,6 +323,25 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
+        private void ImportInvestmentHistory(Account account)
+        {
+            using var fileDialog = new OpenFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                Title = $"Import history for {account.Name}"
+            };
+            if (fileDialog.ShowDialog(FindForm()) != DialogResult.OK)
+                return;
+
+            using var dialog = new InvestmentImportDialog(
+                new InvestmentImportOrchestrator(),
+                account.Id,
+                InvestmentImportFile.History,
+                fileDialog.FileName);
+            if (dialog.ShowDialog(FindForm()) == DialogResult.OK)
+                LoadAccounts();
+        }
+
         private void ImportTransactionsForAccount(Account account)
         {
             using var fileDialog = new OpenFileDialog
@@ -425,7 +443,10 @@ namespace THMS.UI.WinForms.Controls
             var addStatement = MenuItem("Add Statement", (_, _) => AddStatement(account));
             addStatement.Enabled = canStatement;
             _accountMenu.Items.Add(addStatement);
-            _accountMenu.Items.Add(MenuItem("Import Transactions", (_, _) => ImportTransactionsForAccount(account)));
+            if (account is InvestmentAccount)
+                _accountMenu.Items.Add(MenuItem("Import history", (_, _) => ImportInvestmentHistory(account)));
+            else
+                _accountMenu.Items.Add(MenuItem("Import Transactions", (_, _) => ImportTransactionsForAccount(account)));
 
             switch (account)
             {
@@ -442,7 +463,6 @@ namespace THMS.UI.WinForms.Controls
                 case InvestmentAccount:
                     _accountMenu.Items.Add(MenuItem("Add Transaction", (_, _) => AddBankTransaction(account)));
                     _accountMenu.Items.Add(TransferMenuItem(account));
-                    _accountMenu.Items.Add(MenuItem("Positions", (_, _) => OpenPositions(account)));
                     break;
                 case BankAccount or InternalAccount:
                     _accountMenu.Items.Add(MenuItem("Add Transaction", (_, _) => AddBankTransaction(account)));
@@ -540,20 +560,6 @@ namespace THMS.UI.WinForms.Controls
             if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
             RunActivity(() => SavePosted(account, dlg));
-        }
-
-        private void OpenPositions(Account account)
-        {
-            try
-            {
-                using var dialog = new InvestmentPositionsDialog(_investments, account.Id, account.Name);
-                dialog.ShowDialog(FindForm());
-                LoadAccounts();
-            }
-            catch (Exception ex)
-            {
-                ExceptionDialog.Show(FindForm(), "Positions", ex);
-            }
         }
 
         private void TransferFrom(Account account)

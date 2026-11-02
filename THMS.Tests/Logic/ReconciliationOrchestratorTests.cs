@@ -330,5 +330,61 @@ namespace THMS.Tests.Logic
             Assert.That(expected.Status, Is.EqualTo(ExpectedStatus.Planned));
             Assert.That(expected.DisplayStatus(), Is.EqualTo(TransactionStatuses.Pending));
         }
+
+        [Test]
+        public void DeleteUnreconciled_RemovesSelectedImportsAndLeavesPosted()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var account = Guid.NewGuid();
+            var duplicate = new PostedTransaction
+            {
+                AccountId = account,
+                Date = new DateTime(2026, 11, 1),
+                Amount = -12,
+                Description = "Grocery",
+                ImportedStatus = ImportedStatus.Unreconciled
+            };
+            var posted = new PostedTransaction
+            {
+                AccountId = account,
+                Date = new DateTime(2026, 11, 1),
+                Amount = -12,
+                Description = "Grocery",
+                ImportedStatus = ImportedStatus.Matched
+            };
+            store.AddPostedTransaction(duplicate);
+            store.AddPostedTransaction(posted);
+            var otherAccount = Guid.NewGuid();
+            var importSide = new PostedTransferTransaction
+            {
+                AccountId = account,
+                Date = new DateTime(2026, 11, 2),
+                Amount = -40,
+                Description = "Transfer",
+                ImportedStatus = ImportedStatus.Unreconciled
+            };
+            var otherSide = new PostedTransferTransaction
+            {
+                AccountId = otherAccount,
+                Date = new DateTime(2026, 11, 2),
+                Amount = 40,
+                Description = "Transfer",
+                ImportedStatus = ImportedStatus.Unreconciled,
+                RelatedPostedTransactionId = importSide.Id
+            };
+            importSide.RelatedPostedTransactionId = otherSide.Id;
+            store.AddPostedTransferTransaction(importSide);
+            store.AddPostedTransferTransaction(otherSide);
+
+            var orchestrator = new ReconciliationOrchestrator(store);
+            var removed = orchestrator.DeleteUnreconciled([duplicate.Id, importSide.Id]);
+
+            Assert.That(removed, Is.EqualTo(3));
+            Assert.That(store.GetPostedTransaction(duplicate.Id), Is.Null);
+            Assert.That(store.GetPostedTransaction(posted.Id)!.ImportedStatus, Is.EqualTo(ImportedStatus.Matched));
+            Assert.That(store.GetPostedTransferTransaction(importSide.Id), Is.Null);
+            Assert.That(store.GetPostedTransferTransaction(otherSide.Id), Is.Null);
+            Assert.That(orchestrator.GetUnreconciled(account), Is.Empty);
+        }
     }
 }

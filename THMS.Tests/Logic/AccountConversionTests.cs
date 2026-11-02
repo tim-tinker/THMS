@@ -203,7 +203,7 @@ namespace THMS.Tests.Logic
                     AccountId = hsa.Id,
                     Symbol = "AGNC",
                     AsOf = new DateTime(2026, 10, 30),
-                    Price = 8.65m
+                    AnnualIncomePerShare = 1.44m
                 });
 
                 orchestrator.Save(
@@ -333,7 +333,7 @@ namespace THMS.Tests.Logic
                 AccountId = hsaId,
                 Symbol = "AGNC",
                 AsOf = new DateTime(2026, 10, 30),
-                Price = 8.65m
+                AnnualIncomePerShare = 1.44m
             });
             return incoming.Id;
         }

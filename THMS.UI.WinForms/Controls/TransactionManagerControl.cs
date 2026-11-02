@@ -7,6 +7,7 @@ using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Transactions;
 using THMS.Logic.Orchestrators;
+using THMS.Logic.Finance.Investments;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels;
 using THMS.Logic.ViewModels.Finance;
@@ -519,6 +520,18 @@ namespace THMS.UI.WinForms.Controls
             var account = _accountOrchestrator.GetAccount(id);
             if (account is null)
                 return;
+
+            if (account is InvestmentAccount)
+            {
+                using var dialog = new InvestmentImportDialog(
+                    new InvestmentImportOrchestrator(),
+                    account.Id,
+                    InvestmentImportFile.History,
+                    path);
+                if (dialog.ShowDialog(FindForm()) == DialogResult.OK)
+                    RefreshAll();
+                return;
+            }
 
             TransactionFileImportLauncher.ImportFile(FindForm(), account, path, RefreshAll);
         }

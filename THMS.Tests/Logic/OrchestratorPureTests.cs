@@ -1245,6 +1245,22 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void Save_InvestmentAccount_KeepsLettersInTheAccountNumber()
+        {
+            var store = new InMemoryAccountDataStore();
+            var orchestrator = new AccountOrchestrator(store);
+            orchestrator.Save(new InvestmentAccount
+            {
+                Name = "SLB LTI",
+                Institution = "Fidelity",
+                AccountNumber = "Z37381599",
+                Type = AccountType.Investment
+            });
+
+            Assert.That(store.GetAccount("SLB LTI")!.AccountNumber, Is.EqualTo("Z37381599"));
+        }
+
+        [Test]
         public void UpdatePostedBalance_CoversAllAccountTypes()
         {
             var store = new InMemoryAccountDataStore();

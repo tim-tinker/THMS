@@ -51,11 +51,13 @@ namespace THMS.UI
         {
             AddSectionLabel("Dashboards");
             AddDashboard("Finance", new FinanceDashboardForm());
+            AddDashboard("Investments", new InvestmentsDashboardForm());
             AddDashboard("Vehicles", new VehicleListDashboardForm());
             AddDashboard("Energy", new EnergyDashboardForm());
 
             AddSectionLabel("Data Management");
             AddEmbeddedForm("Register", new RegisterForm());
+            AddEmbeddedForm("Portfolios", new PortfoliosForm());
             AddEmbeddedForm("Energy", new DataCenterForm());
         }
 
@@ -113,6 +115,8 @@ namespace THMS.UI
         {
             if (_embeddedForms.TryGetValue("Register", out var register) && register is RegisterForm form)
                 form.RefreshAfterExternalData();
+            if (_embeddedForms.TryGetValue("Portfolios", out var portfolios) && portfolios is PortfoliosForm portfolioForm)
+                portfolioForm.RefreshView();
             if (_dashboards.TryGetValue("Finance", out var dashboard))
                 dashboard.RefreshDashboard();
         }
@@ -328,6 +332,8 @@ namespace THMS.UI
                 dashboard.Visible = true;
                 if (navButton is not null && dashboard is RegisterForm register)
                     register.ShowHome();
+                if (navButton is not null && dashboard is PortfoliosForm portfolios)
+                    portfolios.ShowHome();
                 HighlightNavButton(navButton ?? FindNavButton(formName));
             }
             finally

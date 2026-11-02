@@ -52,8 +52,9 @@ namespace THMS.Tests.Logic
             var agnc = first.Snapshot.Positions.Single();
             Assert.That(agnc.Shares, Is.EqualTo(20));
             Assert.That(agnc.AverageCost, Is.EqualTo(4.915m));
-            Assert.That(agnc.MarketValue, Is.EqualTo(86.50m));
+            Assert.That(agnc.Price, Is.Null);
             Assert.That(agnc.EstimatedAnnualIncome, Is.EqualTo(14.40m));
+            Assert.That(agnc.AmountPerShare, Is.EqualTo(0.06m));
             Assert.That(first.Snapshot.Cash, Is.EqualTo(151.20m));
             Assert.That(first.Snapshot.Income.Any(point => point.Date == new DateTime(2026, 10, 31) && point.EstimatedAnnualIncome == 14.40m), Is.True);
             Assert.That(first.Snapshot.Income.Last().EstimatedAnnualIncome, Is.EqualTo(14.40m));
@@ -104,24 +105,125 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void LaterPositionsFile_ReplacesQuotesAndDoesNotAddShares()
+        public void LaterPositionsFile_ReplacesSharesBasisCashAndIncome()
         {
             var state = Book();
             InvestmentBookkeeper.Import(state, FidelityInvestmentFile.ParsePositions(Positions, PositionsName), history: null);
             var second = """
-                Account number,Account name,Symbol,Description,Quantity,Current value,Last price,Cost basis total,Average cost basis,Account type,Amount per share,Est. annual income,Dist. rate, Distribution rate as of,Ex-date,Pay date
-                257460702,HSA,FDRXX**,HELD IN MONEY MARKET,,$100.00,,,,Cash,,--,--,--,,,
-                257460702,HSA,AGNC,AGNC INVT CORP COM,12,$120.00,$10.00,$98.30,$9.83,Cash,$0.12,$17.28,16.31%,Nov-13-2026,Nov-13-2026,Dec-10-2026,
+                Account number,Account name,Symbol,Description,Quantity,Cost basis total,Amount per share,Est. annual income,Ex-date,Pay date,Current value
+                257460702,HSA,FDRXX**,HELD IN MONEY MARKET,,,,--,,,$80.00
+                257460702,HSA,AGNC,AGNC INVT CORP COM,12,$120.00,$0.12,$17.28,Nov-13-2026,Dec-10-2026,$120.00
                 """;
             var preview = InvestmentBookkeeper.Import(
                 state,
                 FidelityInvestmentFile.ParsePositions(second, "Portfolio_Positions_Nov-14-2026.csv"),
                 history: null);
 
-            Assert.That(preview.Snapshot.Positions.Single().Shares, Is.EqualTo(10));
-            Assert.That(preview.Snapshot.Positions.Single().Price, Is.EqualTo(10m));
-            Assert.That(preview.Snapshot.Positions.Single().EstimatedAnnualIncome, Is.EqualTo(14.40m));
-            Assert.That(preview.Messages, Has.Some.Contains("12 shares in the positions file and 10"));
+            var agnc = preview.Snapshot.Positions.Single();
+            Assert.That(agnc.Shares, Is.EqualTo(12));
+            Assert.That(agnc.TotalBasis, Is.EqualTo(120.00m));
+            Assert.That(agnc.Price, Is.Null);
+            Assert.That(agnc.EstimatedAnnualIncome, Is.EqualTo(17.28m));
+            Assert.That(agnc.ExDate, Is.EqualTo(new DateTime(2026, 11, 13)));
+            Assert.That(agnc.PayDate, Is.EqualTo(new DateTime(2026, 12, 10)));
+            Assert.That(preview.Snapshot.Cash, Is.EqualTo(80m));
+            Assert.That(preview.Messages, Has.Some.Contains("Updated positions"));
+        }
+
+        [Test]
+        public void LaterPositionsFile_RemovesAHoldingMissingFromTheFile()
+        {
+            var state = Book();
+            InvestmentBookkeeper.Import(state, FidelityInvestmentFile.ParsePositions(Positions, PositionsName), history: null);
+            var second = """
+                Account number,Account name,Symbol,Description,Quantity,Cost basis total,Amount per share,Est. annual income,Ex-date,Pay date,Current value
+                257460702,HSA,FDRXX**,HELD IN MONEY MARKET,,,,--,,,$100.00
+                """;
+            var preview = InvestmentBookkeeper.Import(
+                state,
+                FidelityInvestmentFile.ParsePositions(second, "Portfolio_Positions_Nov-14-2026.csv"),
+                history: null);
+
+            Assert.That(preview.Snapshot.Positions, Is.Empty);
+            Assert.That(preview.Snapshot.Cash, Is.EqualTo(100m));
+        }
+
+        [Test]
+        public void PositionsFile_SplitsEveryAccountAndTreatsSweepCashAsCash()
+        {
+            var csv = """
+                Account number,Account name,Symbol,Description,Quantity,Cost basis total,Amount per share,Est. annual income,Ex-date,Pay date,Current value
+                Z37381599,Individual - TOD,FCASH**,HELD IN FCASH,,,,--,,,$2.83
+                257297693,Tim's Rollover IRA,SPAXX**,HELD IN MONEY MARKET,,,,--,,,$10.00
+                257297693,Tim's Rollover IRA,AGNC,AGNC INVT CORP COM,10,$98.30,$0.12,$14.40,Oct-30-2026,Nov-10-2026,$86.50
+                257460702,HSA,FDRXX**,HELD IN MONEY MARKET,,,,--,,,$100.00
+                257460702,HSA,Pending activity,,,,--,,,$5.00
+
+                "The data and information in this spreadsheet is provided to you solely for your use."
+                """;
+            var accounts = FidelityInvestmentFile.ParsePositionAccounts(csv, "Fidelity_Portfolio_Positions_Nov-01-2026.csv");
+
+            Assert.That(accounts.Select(file => file.AccountNumber), Is.EqualTo(new[] { "Z37381599", "257297693", "257460702" }));
+            Assert.That(accounts[0].FileDate, Is.EqualTo(new DateTime(2026, 11, 1)));
+            Assert.That(accounts[0].Cash, Is.EqualTo(2.83m));
+            Assert.That(accounts[0].Holdings, Is.Empty);
+            Assert.That(accounts[1].Cash, Is.EqualTo(10m));
+            Assert.That(accounts[1].Holdings.Single().Symbol, Is.EqualTo("AGNC"));
+            Assert.That(accounts[1].Holdings.Single().CostBasisTotal, Is.EqualTo(98.30m));
+            Assert.That(accounts[2].Cash, Is.EqualTo(100m));
+            Assert.That(accounts[2].Holdings, Is.Empty);
+        }
+
+        [Test]
+        public void PreviewPositions_MatchesEachAccountNumberAndReportsTheRest()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var ira = new InvestmentAccount { Name = "Fidelity IRA", AccountNumber = "257297693", Type = AccountType.Investment };
+            var hsa = new InvestmentAccount { Name = "Fidelity HSA", AccountNumber = "257460702", Type = AccountType.Investment };
+            var plan = new InvestmentAccount { Name = "SLB 401(k)", AccountNumber = "", Type = AccountType.Investment };
+            accounts.UpsertAccount(ira);
+            accounts.UpsertAccount(hsa);
+            accounts.UpsertAccount(plan);
+            var books = new InMemoryInvestmentBookStore();
+            var orchestrator = new InvestmentImportOrchestrator(accounts, books, new InMemoryTransactionDataStore(), new InMemoryTransactionDataStore());
+            var directory = Path.Combine(Path.GetTempPath(), "thms-positions-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var path = Path.Combine(directory, "Fidelity_Portfolio_Positions_Nov-01-2026.csv");
+                File.WriteAllText(path, """
+                    Account number,Account name,Symbol,Description,Quantity,Cost basis total,Amount per share,Est. annual income,Ex-date,Pay date,Current value
+                    Z37381599,Individual - TOD,FCASH**,HELD IN FCASH,,,,--,,,$2.83
+                    257297693,Tim's Rollover IRA,SPAXX**,HELD IN MONEY MARKET,,,,--,,,$10.00
+                    257297693,Tim's Rollover IRA,AGNC,AGNC,10,$98.30,$0.12,$14.40,Oct-30-2026,Nov-10-2026,$86.50
+                    257460702,HSA,FDRXX**,HELD IN MONEY MARKET,,,,--,,,$100.00
+                    257460702,HSA,AGNC,AGNC,4,$40.00,$0.12,$5.76,Oct-30-2026,Nov-10-2026,$34.60
+                    """);
+                var preview = orchestrator.PreviewPositions(path);
+                Assert.That(preview.Messages, Has.Some.Contains("Z37381599"));
+                Assert.That(preview.AccountNames.Values, Is.EquivalentTo(new[] { "Fidelity IRA", "Fidelity HSA" }));
+                orchestrator.CommitPositions();
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+
+            var savedIra = (InvestmentAccount)accounts.GetAllAccounts().Single(account => account.Id == ira.Id);
+            var savedHsa = (InvestmentAccount)accounts.GetAllAccounts().Single(account => account.Id == hsa.Id);
+            var savedPlan = (InvestmentAccount)accounts.GetAllAccounts().Single(account => account.Id == plan.Id);
+            Assert.That(savedIra.CashBalance, Is.EqualTo(10m));
+            Assert.That(savedIra.TracksPositions, Is.True);
+            Assert.That(savedHsa.CashBalance, Is.EqualTo(100m));
+            Assert.That(savedPlan.TracksPositions, Is.False);
+            var iraState = new InvestmentBookState { AccountId = ira.Id, OpenedOn = savedIra.BookOpenedOn };
+            iraState.Actions.AddRange(books.GetActions(ira.Id));
+            iraState.Quotes.AddRange(books.GetQuotes(ira.Id));
+            var iraPosition = InvestmentBookkeeper.Replay(iraState).Positions.Single();
+            Assert.That(iraPosition.Shares, Is.EqualTo(10));
+            Assert.That(iraPosition.TotalBasis, Is.EqualTo(98.30m));
+            Assert.That(iraPosition.Price, Is.Null);
+            Assert.That(iraPosition.EstimatedAnnualIncome, Is.EqualTo(14.40m));
         }
 
         [Test]
@@ -170,8 +272,9 @@ namespace THMS.Tests.Logic
                 File.WriteAllText(positions, Positions);
                 File.WriteAllText(history, """
                     Run Date,Action,Symbol,Description,Type,Price ($),Quantity,Commission ($),Fees ($),Accrued Interest ($),Amount ($),Cash Balance ($),Settlement Date
-                    11/04/2026,NORMAL DISTR PARTIAL (Cash),"",No Description,Cash,"",0,"","","","-20",130,""
-                    11/03/2026,PARTIC CONTR CURRENT (Cash),"",No Description,Cash,"",0,"","","",50,150,""
+                    11/04/2026,NORMAL DISTR PARTIAL (Cash),"",No Description,Cash,"",0,"","","","-20",131.20,""
+                    11/03/2026,PARTIC CONTR CURRENT (Cash),"",No Description,Cash,"",0,"","","",50,151.20,""
+                    11/02/2026,DIVIDEND RECEIVED AGNC (AGNC) (Cash),AGNC,AGNC,Cash,"",0,"","","",1.20,101.20,""
                     """);
                 orchestrator.Preview(account.Id, positions, history);
                 orchestrator.Commit(account.Id);
@@ -183,12 +286,13 @@ namespace THMS.Tests.Logic
 
             var saved = (InvestmentAccount)accounts.GetAllAccounts().Single();
             Assert.That(saved.TracksPositions, Is.True);
-            Assert.That(saved.CashBalance, Is.EqualTo(130m));
-            Assert.That(saved.PositionValue, Is.EqualTo(86.50m));
+            Assert.That(saved.CashBalance, Is.EqualTo(131.20m));
+            Assert.That(saved.PositionValue, Is.EqualTo(0m));
             var posted = transactions.GetPostedTransactions(account.Id).OrderBy(tx => tx.Date).ToList();
-            Assert.That(posted.Select(tx => tx.Amount), Is.EqualTo(new[] { 50m, -20m }));
+            Assert.That(posted.Select(tx => tx.Amount), Is.EqualTo(new[] { 1.20m, 50m, -20m }));
             Assert.That(posted.Select(tx => tx.Category), Is.EqualTo(new[]
             {
+                InvestmentImportOrchestrator.IncomeCategoryName,
                 InvestmentImportOrchestrator.ContributionCategoryName,
                 InvestmentImportOrchestrator.DistributionCategoryName
             }));
@@ -275,7 +379,6 @@ namespace THMS.Tests.Logic
                     AccountId = accountId,
                     Symbol = "AGNC",
                     AsOf = new DateTime(2026, 10, 30),
-                    Price = 8.65m,
                     AnnualIncomePerShare = 1.44m
                 });
                 store.UpsertSecurity(new InvestmentSecurity { Symbol = "FDRXX", Name = "Cash", IsSweep = true });
@@ -314,8 +417,8 @@ namespace THMS.Tests.Logic
             Assert.That(preview.Snapshot.Positions.Any(row => row.Symbol.Contains("Pending", StringComparison.OrdinalIgnoreCase)), Is.False);
             var agnc = preview.Snapshot.Positions.Single(row => row.Symbol == "AGNC");
             Assert.That(agnc.Shares, Is.EqualTo(72));
-            Assert.That(agnc.AverageCost, Is.EqualTo(9.83m));
-            Assert.That(agnc.Price, Is.EqualTo(8.65m));
+            Assert.That(agnc.AverageCost, Is.EqualTo(707.40m / 72));
+            Assert.That(agnc.Price, Is.Null);
             Assert.That(agnc.EstimatedAnnualIncome, Is.EqualTo(103.68m));
 
             var afterOpening = history.Rows.Where(row => row.RunDate > new DateTime(2026, 10, 31)).Sum(row => row.Amount ?? 0);

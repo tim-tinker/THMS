@@ -219,7 +219,7 @@ namespace THMS.Logic.Orchestrators.Finance
         {
             account.Institution ??= "";
             account.AccountNumber ??= "";
-            if (account is UntrackedAccount)
+            if (account is UntrackedAccount or InvestmentAccount)
                 return;
 
             account.AccountNumber = new string(

@@ -26,6 +26,7 @@ namespace THMS.Logic.Finance.Investments
     {
         public DateTime FileDate { get; init; }
         public string AccountNumber { get; init; } = "";
+        public string AccountName { get; init; } = "";
         public decimal? Cash { get; init; }
         public string CashSymbol { get; init; } = "";
         public string CashDescription { get; init; } = "";
@@ -53,12 +54,19 @@ namespace THMS.Logic.Finance.Investments
     public static class FidelityInvestmentFile
     {
         public static FidelityPositionsFile ReadPositions(string path) =>
-            ParsePositions(File.ReadAllText(path), Path.GetFileName(path));
+            ReadPositionAccounts(path).FirstOrDefault() ?? new FidelityPositionsFile();
+
+        public static IReadOnlyList<FidelityPositionsFile> ReadPositionAccounts(string path) =>
+            ParsePositionAccounts(File.ReadAllText(path), Path.GetFileName(path));
 
         public static FidelityHistoryFile ReadHistory(string path) =>
             ParseHistory(File.ReadAllText(path));
 
-        public static FidelityPositionsFile ParsePositions(string csv, string? fileName = null)
+        public static FidelityPositionsFile ParsePositions(string csv, string? fileName = null) =>
+            ParsePositionAccounts(csv, fileName).FirstOrDefault()
+            ?? new FidelityPositionsFile { FileDate = FileDate(fileName, csv, []) };
+
+        public static IReadOnlyList<FidelityPositionsFile> ParsePositionAccounts(string csv, string? fileName = null)
         {
             var rows = ParseCsv(csv);
             var headerIndex = HeaderIndex(rows);
@@ -80,13 +88,10 @@ namespace THMS.Logic.Finance.Investments
             var exDate = Optional(columns, "Ex-date");
             var payDate = Optional(columns, "Pay date");
             var account = Optional(columns, "Account number");
+            var accountName = Optional(columns, "Account name");
 
-            var holdings = new List<FidelityPositionRow>();
-            decimal? cash = null;
-            var cashSymbol = "";
-            var cashDescription = "";
-            var accountNumber = "";
-
+            var groups = new List<PositionGroup>();
+            PositionGroup? current = null;
             for (var i = headerIndex + 1; i < rows.Count; i++)
             {
                 var row = rows[i];
@@ -97,8 +102,15 @@ namespace THMS.Logic.Finance.Investments
                 if (account >= 0 && !IsAccountNumber(accountCell))
                     break;
 
-                if (string.IsNullOrWhiteSpace(accountNumber) && IsAccountNumber(accountCell))
-                    accountNumber = accountCell;
+                if (current is null || !string.Equals(current.AccountNumber, accountCell, StringComparison.OrdinalIgnoreCase))
+                {
+                    current = new PositionGroup { AccountNumber = accountCell };
+                    groups.Add(current);
+                }
+
+                var name = Cell(row, accountName);
+                if (current.AccountName.Length == 0 && name.Length > 0)
+                    current.AccountName = name;
 
                 var symbolText = InvestmentSymbols.Normalize(Cell(row, symbol));
                 var descriptionText = Cell(row, description);
@@ -126,27 +138,30 @@ namespace THMS.Logic.Finance.Investments
 
                 if (parsed.IsCash)
                 {
-                    cash = parsed.CurrentValue;
-                    cashSymbol = parsed.Symbol;
-                    cashDescription = parsed.Description;
+                    current.Cash = parsed.CurrentValue ?? parsed.Quantity;
+                    current.CashSymbol = parsed.Symbol;
+                    current.CashDescription = parsed.Description;
                     continue;
                 }
 
                 if (string.IsNullOrWhiteSpace(parsed.Symbol) || parsed.Quantity is null or 0)
                     continue;
 
-                holdings.Add(parsed);
+                current.Holdings.Add(parsed);
             }
 
-            return new FidelityPositionsFile
+            var holdings = groups.SelectMany(group => group.Holdings).ToList();
+            var fileDate = FileDate(fileName, csv, holdings);
+            return groups.Select(group => new FidelityPositionsFile
             {
-                FileDate = FileDate(fileName, csv, holdings),
-                AccountNumber = accountNumber,
-                Cash = cash,
-                CashSymbol = cashSymbol,
-                CashDescription = cashDescription,
-                Holdings = holdings
-            };
+                FileDate = fileDate,
+                AccountNumber = group.AccountNumber,
+                AccountName = group.AccountName,
+                Cash = group.Cash,
+                CashSymbol = group.CashSymbol,
+                CashDescription = group.CashDescription,
+                Holdings = group.Holdings
+            }).ToList();
         }
 
         public static FidelityHistoryFile ParseHistory(string csv)
@@ -218,7 +233,17 @@ namespace THMS.Logic.Finance.Investments
         }
 
         private static bool IsAccountNumber(string text) =>
-            text.Length >= 4 && text.All(char.IsDigit);
+            text.Length is >= 4 and <= 20 && text.All(char.IsAsciiLetterOrDigit);
+
+        private sealed class PositionGroup
+        {
+            public string AccountNumber { get; init; } = "";
+            public string AccountName { get; set; } = "";
+            public decimal? Cash { get; set; }
+            public string CashSymbol { get; set; } = "";
+            public string CashDescription { get; set; } = "";
+            public List<FidelityPositionRow> Holdings { get; } = [];
+        }
 
         private static int HeaderIndex(List<List<string>> rows) =>
             rows.FindIndex(row => row.Any(cell => !string.IsNullOrWhiteSpace(cell)));
@@ -358,7 +383,12 @@ namespace THMS.Logic.Finance.Investments
 
     public static class InvestmentSymbols
     {
-        private static readonly HashSet<string> Sweeps = new(StringComparer.OrdinalIgnoreCase) { "FDRXX" };
+        private static readonly HashSet<string> Sweeps = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "FDRXX",
+            "SPAXX",
+            "FCASH"
+        };
 
         public static string Normalize(string? symbol)
         {
@@ -371,7 +401,7 @@ namespace THMS.Logic.Finance.Investments
         {
             if (Sweeps.Contains(Normalize(symbol)))
                 return true;
-            return description?.Contains("HELD IN MONEY MARKET", StringComparison.OrdinalIgnoreCase) == true;
+            return description?.Contains("HELD IN ", StringComparison.OrdinalIgnoreCase) == true;
         }
     }
 }

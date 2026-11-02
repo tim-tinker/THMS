@@ -54,6 +54,7 @@ namespace THMS.UI.WinForms.Controls
             };
             _grid.DataSource = _source;
             _grid.MouseDown += OnMouseDown;
+            _grid.KeyDown += OnKeyDown;
 
             Controls.Add(_grid);
             Controls.Add(headerHost);
@@ -101,13 +102,54 @@ namespace THMS.UI.WinForms.Controls
             var before = new ToolStripMenuItem("Accept all unreconciled up to last statement");
             before.Enabled = _accountId is Guid;
             before.Click += (_, _) => AcceptUpToLastStatement();
+            var delete = new ToolStripMenuItem(selected.Count > 1 ? $"Delete {selected.Count} transactions" : "Delete");
+            delete.Enabled = selected.Count > 0;
+            delete.Click += (_, _) => ConfirmDelete(selected);
             menu.Items.Add(accept);
             menu.Items.Add(change);
             menu.Items.Add(asNew);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(before);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(delete);
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
             menu.Show(_grid, location);
+        }
+
+        private void OnKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.KeyCode != Keys.Delete)
+                return;
+
+            var selected = Selected().ToList();
+            if (selected.Count == 0)
+                return;
+
+            e.Handled = true;
+            ConfirmDelete(selected);
+        }
+
+        private void ConfirmDelete(IReadOnlyList<ImportedTransactionView> rows)
+        {
+            if (rows.Count == 0)
+                return;
+
+            var prompt = rows.Count == 1
+                ? $"Delete the unreconciled transaction on {rows[0].Date:d}, {rows[0].Description}, {rows[0].Amount:c2}?"
+                : $"Delete {rows.Count} unreconciled transactions?";
+            if (MessageBox.Show(FindForm(), prompt, "Delete Unreconciled",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+
+            try
+            {
+                _reconciliation.DeleteUnreconciled(rows.Select(row => row.Id));
+                FinishReconcile();
+            }
+            catch (InvalidOperationException ex)
+            {
+                ExceptionDialog.Show(FindForm(), "Delete Unreconciled", ex, icon: MessageBoxIcon.Information);
+            }
         }
 
         private IEnumerable<ImportedTransactionView> Selected()

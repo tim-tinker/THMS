@@ -21,7 +21,7 @@ namespace THMS.Logic.Finance.Investments
             var openedThisCall = false;
             if (state.OpenedOn is null && positions is not null)
             {
-                ApplyPositions(state, positions, messages, changes, ref applied, ref skipped);
+                ApplyPositions(state, positions, messages, changes, ref applied, ref skipped, ref updated);
                 openedThisCall = state.OpenedOn is not null;
             }
 
@@ -29,7 +29,7 @@ namespace THMS.Logic.Finance.Investments
                 ApplyHistory(state, history, messages, changes, ref applied, ref skipped, ref updated, ref review);
 
             if (positions is not null && state.OpenedOn is not null && !openedThisCall)
-                ApplyPositions(state, positions, messages, changes, ref applied, ref skipped);
+                ApplyPositions(state, positions, messages, changes, ref applied, ref skipped, ref updated);
 
             return new InvestmentImportPreview
             {
@@ -143,7 +143,8 @@ namespace THMS.Logic.Finance.Investments
             List<string> messages,
             List<InvestmentAction> changes,
             ref int applied,
-            ref int skipped)
+            ref int skipped,
+            ref int updated)
         {
             if (!string.IsNullOrWhiteSpace(file.CashSymbol))
             {
@@ -153,96 +154,123 @@ namespace THMS.Logic.Finance.Investments
             foreach (var holding in file.Holdings)
                 Remember(state, holding.Symbol, holding.Description, isSweep: false);
 
-            if (state.OpenedOn is null)
+            if (file.Cash is null && file.Holdings.Count == 0)
             {
-                if (file.Cash is null && file.Holdings.Count == 0)
-                {
-                    messages.Add("The positions file has no cash and no holdings.");
-                    return;
-                }
-
-                state.OpenedOn = file.FileDate.Date;
-                if (file.Cash is decimal cash)
-                {
-                    var openingCash = Add(state, new InvestmentAction
-                    {
-                        AccountId = state.AccountId,
-                        RunDate = file.FileDate.Date,
-                        Kind = InvestmentActionKind.OpeningCash,
-                        Status = InvestmentActionStatus.Applied,
-                        Amount = cash,
-                        CashChange = cash,
-                        ActionText = "Opening cash",
-                        Symbol = file.CashSymbol,
-                        Description = file.CashDescription,
-                        ImportKey = $"opening-cash|{file.FileDate:yyyy-MM-dd}"
-                    });
-                    changes.Add(openingCash);
-                    applied++;
-                }
-                else
-                {
-                    messages.Add("The positions file has no money-market cash row. Opening cash is zero.");
-                }
-
-                foreach (var holding in file.Holdings)
-                {
-                    var cost = CostPerShare(holding);
-                    var action = Add(state, new InvestmentAction
-                    {
-                        AccountId = state.AccountId,
-                        RunDate = file.FileDate.Date,
-                        Kind = InvestmentActionKind.Opening,
-                        Status = InvestmentActionStatus.Applied,
-                        Symbol = holding.Symbol,
-                        Description = holding.Description,
-                        Quantity = holding.Quantity,
-                        Price = cost,
-                        Amount = holding.CostBasisTotal,
-                        ShareChange = holding.Quantity,
-                        ActionText = "Opening position",
-                        ImportKey = $"opening|{holding.Symbol}|{file.FileDate:yyyy-MM-dd}"
-                    });
-                    changes.Add(action);
-                    applied++;
-                    UpsertQuote(state, holding, file.FileDate);
-                }
-
-                messages.Add($"Opened the book as of {file.FileDate:d} with {file.Holdings.Count} holdings.");
+                messages.Add("The positions file has no cash and no holdings.");
                 return;
             }
 
-            foreach (var holding in file.Holdings)
-                UpsertQuote(state, holding, file.FileDate);
-
-            var snapshot = Replay(state);
-            var onBooks = snapshot.Positions.ToDictionary(row => row.Symbol, StringComparer.OrdinalIgnoreCase);
+            var opening = state.OpenedOn is null;
+            state.OpenedOn ??= file.FileDate.Date;
             var inFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (file.Cash is decimal cash)
+            {
+                UpsertSnapshot(state, changes, ref applied, ref updated, ref skipped, new InvestmentAction
+                {
+                    RunDate = file.FileDate.Date,
+                    Kind = InvestmentActionKind.OpeningCash,
+                    Status = InvestmentActionStatus.Applied,
+                    Amount = cash,
+                    CashChange = cash,
+                    ActionText = "Opening cash",
+                    Symbol = file.CashSymbol,
+                    Description = file.CashDescription,
+                    ImportKey = $"opening-cash|{file.FileDate:yyyy-MM-dd}"
+                });
+            }
+            else
+            {
+                messages.Add("The positions file has no money-market cash row.");
+            }
+
+            var before = Replay(state).Positions.Select(row => row.Symbol).ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var holding in file.Holdings)
             {
                 inFile.Add(holding.Symbol);
-                var shares = holding.Quantity ?? 0;
-                if (!onBooks.TryGetValue(holding.Symbol, out var position))
+                var cost = CostPerShare(holding);
+                UpsertSnapshot(state, changes, ref applied, ref updated, ref skipped, new InvestmentAction
                 {
-                    messages.Add($"{holding.Symbol} has {shares} shares in the positions file and none on the books.");
-                    continue;
-                }
-
-                if (!SharesEqual(position.Shares, shares))
-                    messages.Add($"{holding.Symbol} has {shares} shares in the positions file and {position.Shares} on the books.");
+                    RunDate = file.FileDate.Date,
+                    Kind = InvestmentActionKind.Opening,
+                    Status = InvestmentActionStatus.Applied,
+                    Symbol = holding.Symbol,
+                    Description = holding.Description,
+                    Quantity = holding.Quantity,
+                    Price = cost,
+                    Amount = holding.CostBasisTotal,
+                    ShareChange = holding.Quantity,
+                    ActionText = "Opening position",
+                    ImportKey = $"opening|{holding.Symbol}|{file.FileDate:yyyy-MM-dd}"
+                });
+                UpsertQuote(state, holding, file.FileDate);
             }
 
-            foreach (var position in snapshot.Positions)
+            foreach (var symbol in before)
             {
-                if (!inFile.Contains(position.Symbol))
-                    messages.Add($"{position.Symbol} has {position.Shares} shares on the books and is missing from the positions file.");
+                if (inFile.Contains(symbol))
+                    continue;
+                UpsertSnapshot(state, changes, ref applied, ref updated, ref skipped, new InvestmentAction
+                {
+                    RunDate = file.FileDate.Date,
+                    Kind = InvestmentActionKind.Opening,
+                    Status = InvestmentActionStatus.Applied,
+                    Symbol = symbol,
+                    ActionText = "Opening position",
+                    Quantity = 0,
+                    Price = 0,
+                    Amount = 0,
+                    ShareChange = 0,
+                    ImportKey = $"opening|{symbol}|{file.FileDate:yyyy-MM-dd}"
+                });
             }
 
-            if (file.Cash is decimal fileCash && !MoneyEqual(fileCash, snapshot.Cash))
-                messages.Add($"Money-market cash in the file is {fileCash:c} and the book has {snapshot.Cash:c}.");
+            messages.Add(opening
+                ? $"Opened the book as of {file.FileDate:d} with {file.Holdings.Count} holdings."
+                : applied + updated > 0
+                    ? $"Updated positions as of {file.FileDate:d}."
+                    : $"Positions as of {file.FileDate:d} are already imported.");
+        }
 
-            skipped++;
-            messages.Add($"Updated prices and income rates as of {file.FileDate:d}. Share quantities were not changed.");
+        private static void UpsertSnapshot(
+            InvestmentBookState state,
+            List<InvestmentAction> changes,
+            ref int applied,
+            ref int updated,
+            ref int skipped,
+            InvestmentAction incoming)
+        {
+            var existing = state.Actions.FirstOrDefault(action => action.ImportKey == incoming.ImportKey);
+            if (existing is null)
+            {
+                changes.Add(Add(state, incoming));
+                applied++;
+                return;
+            }
+
+            if (existing.Kind == incoming.Kind
+                && existing.Status == InvestmentActionStatus.Applied
+                && SameSymbol(existing.Symbol, incoming.Symbol)
+                && SharesEqual(existing.Quantity ?? 0, incoming.Quantity ?? 0)
+                && MoneyEqual(existing.Amount ?? 0, incoming.Amount ?? 0)
+                && MoneyEqual(existing.Price ?? 0, incoming.Price ?? 0))
+            {
+                skipped++;
+                return;
+            }
+
+            existing.Kind = incoming.Kind;
+            existing.Status = InvestmentActionStatus.Applied;
+            existing.RunDate = incoming.RunDate;
+            existing.Symbol = incoming.Symbol;
+            existing.Description = incoming.Description;
+            existing.Quantity = incoming.Quantity;
+            existing.Price = incoming.Price;
+            existing.Amount = incoming.Amount;
+            existing.CashChange = incoming.CashChange;
+            existing.ShareChange = incoming.ShareChange;
+            existing.ActionText = incoming.ActionText;
+            changes.Add(existing);
+            updated++;
         }
 
         private static void ApplyHistory(
@@ -453,7 +481,10 @@ namespace THMS.Logic.Finance.Investments
                     cash = action.Amount ?? 0;
                     return true;
                 case InvestmentActionKind.Opening:
-                    lots.Add(new Lot(action.Symbol, action.RunDate, action.Quantity ?? 0, action.Price ?? 0, action.Sequence));
+                    lots.RemoveAll(lot => SameSymbol(lot.Symbol, action.Symbol));
+                    var opened = action.Quantity ?? 0;
+                    if (opened > 0.0000001m)
+                        lots.Add(new Lot(action.Symbol, action.RunDate, opened, action.Price ?? 0, action.Sequence));
                     return true;
                 case InvestmentActionKind.Dividend:
                 case InvestmentActionKind.Interest:
@@ -534,8 +565,6 @@ namespace THMS.Logic.Finance.Investments
                 state.Quotes.Add(quote);
             }
 
-            quote.Price = holding.LastPrice;
-            quote.DistributionRate = holding.DistributionRate;
             quote.AmountPerShare = holding.AmountPerShare;
             quote.ExDate = holding.ExDate;
             quote.PayDate = holding.PayDate;
@@ -562,7 +591,6 @@ namespace THMS.Logic.Finance.Investments
                 AccountId = state.AccountId,
                 Symbol = symbol,
                 AsOf = date.Date,
-                Price = prior.Price / factor,
                 AnnualIncomePerShare = prior.AnnualIncomePerShare / factor,
                 AmountPerShare = prior.AmountPerShare / factor,
                 DistributionRate = prior.DistributionRate,
@@ -580,7 +608,6 @@ namespace THMS.Logic.Finance.Investments
                 var basis = group.Sum(lot => lot.Shares * lot.CostPerShare);
                 var quote = LatestQuote(state, group.Key, DateTime.MaxValue.Date);
                 var name = state.Securities.FirstOrDefault(security => SameSymbol(security.Symbol, group.Key))?.Name ?? "";
-                decimal? price = quote?.Price;
                 decimal? income = quote?.AnnualIncomePerShare is decimal rate ? shares * rate : null;
                 rows.Add(new InvestmentPositionRow
                 {
@@ -589,9 +616,8 @@ namespace THMS.Logic.Finance.Investments
                     Shares = shares,
                     AverageCost = shares == 0 ? 0 : basis / shares,
                     TotalBasis = basis,
-                    Price = price,
-                    MarketValue = price is decimal last ? shares * last : null,
                     EstimatedAnnualIncome = income,
+                    AmountPerShare = quote?.AmountPerShare,
                     ExDate = quote?.ExDate,
                     PayDate = quote?.PayDate
                 });
@@ -725,10 +751,10 @@ namespace THMS.Logic.Finance.Investments
 
         private static decimal? CostPerShare(FidelityPositionRow holding)
         {
-            if (holding.AverageCost is decimal average)
-                return average;
             if (holding.CostBasisTotal is decimal total && holding.Quantity is decimal quantity && quantity != 0)
                 return total / quantity;
+            if (holding.AverageCost is decimal average)
+                return average;
             return 0;
         }
 
