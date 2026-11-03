@@ -9,6 +9,11 @@ namespace THMS.UI.WinForms.Controls
 {
     public partial class StatementEditorDialog : Form
     {
+        private static readonly Font TitleFont = new("Segoe UI", 14F, FontStyle.Bold);
+        private static readonly Font IdentityFont = new("Segoe UI", 10F, FontStyle.Bold);
+        private static readonly Font SectionFont = new("Segoe UI", 11F, FontStyle.Bold);
+        private static readonly Color SectionBarColor = Color.FromArgb(255, 232, 168);
+
         private readonly IAccountStatementDataStore _statementStore;
         private readonly PlanningOrchestrator? _orchestrator;
         private readonly AccountStatement? _existingStatement;
@@ -16,8 +21,15 @@ namespace THMS.UI.WinForms.Controls
         private readonly List<Account> _accounts;
         private bool _loading;
         private Guid? _datedForAccountId;
+        private decimal? _creditLimit;
 
-        private const string StatementFieldsTag = "statement-fields";
+        private DateTimePicker dtStatementDate = null!;
+        private DateTimePicker dtDueDate = null!;
+        private NumericUpDown numAmountDue = null!;
+        private TextBox txtNotes = null!;
+        private Label? lblPeriod;
+        private Label? lblPreviousBalance;
+        private Label? lblAvailableCredit;
 
         private NumericUpDown? numEscrowBalance;
         private NumericUpDown? numStatementBalance;
@@ -72,10 +84,10 @@ namespace THMS.UI.WinForms.Controls
                 _accounts.Add(_lockedAccount);
 
             InitializeComponent();
+            CreateEditors();
             cboAccount.SelectedIndexChanged += OnAccountChanged;
             WireComboDrawing();
             _loading = true;
-            BindStatementTypes();
             LoadExisting();
             ApplyLockedAccountUi();
         }
@@ -84,45 +96,31 @@ namespace THMS.UI.WinForms.Controls
         {
             base.OnShown(e);
             SizeDialogInputs();
+            ComposeStatement(SelectedType());
             FitToWorkingArea();
-            ShowObligationFields(SelectedType() is StatementType type && !StatementAccountMatch.IsNonPayable(type));
             BeginInvoke(FitPromotionDateColumns);
         }
 
         private void WireComboDrawing()
         {
-            foreach (var combo in new[] { cboAccount, cboStatementType })
-            {
-                combo.DrawMode = DrawMode.OwnerDrawFixed;
-                combo.IntegralHeight = false;
-                combo.DrawItem -= OnComboDrawItem;
-                combo.DrawItem += OnComboDrawItem;
-            }
+            cboAccount.DrawMode = DrawMode.OwnerDrawFixed;
+            cboAccount.IntegralHeight = false;
+            cboAccount.DrawItem -= OnComboDrawItem;
+            cboAccount.DrawItem += OnComboDrawItem;
         }
 
         private void SizeDialogInputs()
         {
-            var comboHeight = Math.Max(LogicalToDeviceUnits(32), Font.Height + LogicalToDeviceUnits(14));
-            var itemHeight = Math.Max(LogicalToDeviceUnits(20), Font.Height);
-            foreach (var combo in new[] { cboAccount, cboStatementType })
-            {
-                combo.ItemHeight = itemHeight;
-                combo.Height = comboHeight;
-            }
+            var comboHeight = Math.Max(Scale(32), Font.Height + Scale(14));
+            cboAccount.ItemHeight = Math.Max(Scale(20), Font.Height);
+            cboAccount.Height = comboHeight;
 
-            var typeRows = cboStatementType.Visible ? 2 : 1;
-            typeSelectorLayout.RowStyles[0].SizeType = SizeType.Absolute;
-            typeSelectorLayout.RowStyles[0].Height = cboStatementType.Visible ? comboHeight : 0;
-            typeSelectorLayout.RowStyles[1].SizeType = SizeType.Absolute;
-            typeSelectorLayout.RowStyles[1].Height = comboHeight;
+            var showAccount = _lockedAccount is null;
+            accountBar.Visible = showAccount;
             layout.RowStyles[0].SizeType = SizeType.Absolute;
-            layout.RowStyles[0].Height = comboHeight * typeRows + LogicalToDeviceUnits(8);
-
-            var fieldHeight = Math.Max(LogicalToDeviceUnits(36), Font.Height + LogicalToDeviceUnits(16));
-            pnlCommon.RowStyles[0].Height = fieldHeight;
-            if (numAmountDue.Visible)
-                pnlCommon.RowStyles[1].Height = fieldHeight;
-            AlignStatementFields(fieldHeight);
+            layout.RowStyles[0].Height = showAccount ? comboHeight + Scale(8) : 0;
+            pnlDocument.Padding = new Padding(Scale(20), Scale(16), Scale(16), Scale(12));
+            pnlDocument.BackColor = Color.White;
         }
 
         private static void OnComboDrawItem(object? sender, DrawItemEventArgs e)
@@ -167,12 +165,8 @@ namespace THMS.UI.WinForms.Controls
 
         private void BindAccounts(Guid? selectedId = null)
         {
-            var type = SelectedType();
-            IEnumerable<Account> source = _accounts;
-            if (type is StatementType statementType)
-                source = _accounts.Where(a => StatementAccountMatch.Matches(a, statementType));
-
-            var items = source
+            var items = _accounts
+                .Where(a => StatementAccountMatch.ForAccount(a) is not null || a.Id == selectedId)
                 .OrderBy(a => a.Name)
                 .Select(a => new AccountListItem(a))
                 .ToList();
@@ -199,34 +193,12 @@ namespace THMS.UI.WinForms.Controls
             if (_lockedAccount is null)
                 return;
 
-            lblStatementType.Visible = false;
-            cboStatementType.Visible = false;
             btnNewAccount.Visible = false;
             cboAccount.Enabled = false;
-            typeSelectorLayout.RowStyles[0].SizeType = SizeType.Absolute;
-            typeSelectorLayout.RowStyles[0].Height = 0;
+            accountBar.Visible = false;
+            layout.RowStyles[0].Height = 0;
             if (IsHandleCreated)
                 SizeDialogInputs();
-            else
-                layout.RowStyles[0].Height = 44F;
-        }
-
-        private void BindStatementTypes()
-        {
-            cboStatementType.DisplayMember = nameof(StatementTypeOption.Name);
-            cboStatementType.ValueMember = nameof(StatementTypeOption.Type);
-            cboStatementType.DataSource = new List<StatementTypeOption>
-            {
-                new("Loan", StatementType.Loan),
-                new("Mortgage", StatementType.Mortgage),
-                new("Credit Card", StatementType.CreditCard),
-                new("Utility", StatementType.Utility),
-                new("Service", StatementType.Service),
-                new("Insurance", StatementType.Insurance),
-                new("Bank", StatementType.Bank),
-                new("Investment", StatementType.Investment)
-            };
-            cboStatementType.SelectedIndex = -1;
         }
 
         private void LoadExisting()
@@ -239,7 +211,6 @@ namespace THMS.UI.WinForms.Controls
                 if (_lockedAccount is Account locked
                     && StatementAccountMatch.ForAccount(locked) is StatementType lockedType)
                 {
-                    SelectType(lockedType);
                     BindAccounts(locked.Id);
                     _loading = false;
                     ApplyNewStatementDates();
@@ -248,16 +219,13 @@ namespace THMS.UI.WinForms.Controls
                     return;
                 }
 
-                cboStatementType.SelectedIndex = -1;
                 BindAccounts();
                 _loading = false;
                 ApplyNewStatementDates();
-                pnlTypeSpecific.Controls.Clear();
-                ShowObligationFields(false);
+                ComposeStatement(null);
                 return;
             }
 
-            SelectType(_existingStatement.Type);
             BindAccounts(_existingStatement.AccountId);
             dtStatementDate.Value = SafeDate(_existingStatement.StatementDate);
             dtDueDate.Value = SafeDate(_existingStatement.DueDate);
@@ -270,24 +238,19 @@ namespace THMS.UI.WinForms.Controls
             BindTypeSpecific(_existingStatement);
         }
 
-        private void SelectType(StatementType type)
-        {
-            foreach (StatementTypeOption option in cboStatementType.Items)
-            {
-                if (option.Type == type)
-                {
-                    cboStatementType.SelectedItem = option;
-                    return;
-                }
-            }
-        }
-
         private void OnAccountChanged(object? sender, EventArgs e)
         {
             if (_loading || _existingStatement is not null)
                 return;
 
             ApplyNewStatementDates();
+            if (SelectedType() is not StatementType type)
+            {
+                ComposeStatement(null);
+                return;
+            }
+
+            LoadTypePanel(type);
             CopyPreviousPromotions();
         }
 
@@ -305,24 +268,6 @@ namespace THMS.UI.WinForms.Controls
             dtStatementDate.Value = SafeDate(dates.StatementDate);
             dtDueDate.Value = SafeDate(dates.DueDate);
             _datedForAccountId = account?.Id;
-        }
-
-        private void OnStatementTypeChanged(object? sender, EventArgs e)
-        {
-            if (_loading)
-                return;
-
-            var keep = SelectedAccount()?.Id;
-            BindAccounts(keep);
-            if (SelectedType() is not StatementType type)
-            {
-                pnlTypeSpecific.Controls.Clear();
-                ShowObligationFields(false);
-                return;
-            }
-
-            LoadTypePanel(type);
-            CopyPreviousPromotions();
         }
 
         private void OnNewAccount(object? sender, EventArgs e)
@@ -350,8 +295,6 @@ namespace THMS.UI.WinForms.Controls
             _accounts.Add(dlg.Account);
 
             _loading = true;
-            if (SelectedType() is null && StatementAccountMatch.ForAccount(dlg.Account) is StatementType inferred)
-                SelectType(inferred);
             BindAccounts(dlg.Account.Id);
             _loading = false;
             if (SelectedType() is StatementType selected)
@@ -359,10 +302,20 @@ namespace THMS.UI.WinForms.Controls
                 LoadTypePanel(selected);
                 CopyPreviousPromotions();
             }
+            else
+            {
+                ComposeStatement(null);
+            }
         }
 
-        private StatementType? SelectedType() =>
-            cboStatementType.SelectedItem is StatementTypeOption option ? option.Type : null;
+        private StatementType? SelectedType()
+        {
+            if (_existingStatement is not null)
+                return _existingStatement.Type;
+
+            var account = SelectedAccount() ?? _lockedAccount;
+            return account is null ? null : StatementAccountMatch.ForAccount(account);
+        }
 
         private Account? SelectedAccount() =>
             cboAccount.SelectedItem is AccountListItem item ? item.Account : null;
@@ -376,126 +329,437 @@ namespace THMS.UI.WinForms.Controls
 
         private void LoadTypePanel(StatementType type)
         {
-            pnlTypeSpecific.SuspendLayout();
-            pnlTypeSpecific.Controls.Clear();
-            numEscrowBalance = null;
-            numStatementBalance = null;
-            gridPromotions = null;
-            gridUsage = null;
-            gridCharges = null;
             _promotions = [];
             _usage = [];
             _charges = [];
-
-            Control panel = type switch
-            {
-                StatementType.Bank or StatementType.Investment => BuildBankPanel(),
-                StatementType.Loan => BuildLoanPanel(),
-                StatementType.Mortgage => BuildMortgagePanel(),
-                StatementType.CreditCard => BuildCreditCardPanel(),
-                StatementType.Utility => BuildUtilityPanel(),
-                StatementType.Service => BuildServicePanel(),
-                _ => new Panel()
-            };
-            panel.Dock = UsesFixedFields(type) ? DockStyle.Top : DockStyle.Fill;
-            pnlTypeSpecific.Controls.Add(panel);
-            pnlTypeSpecific.ResumeLayout();
-            ShowObligationFields(!StatementAccountMatch.IsNonPayable(type));
-            if (IsHandleCreated)
-                AlignStatementFields(CurrentFieldHeight());
+            SetMoney(numStatementBalance, 0);
+            SetMoney(numEscrowBalance, 0);
+            ComposeStatement(type);
         }
 
-        private static bool UsesFixedFields(StatementType type) =>
-            type is StatementType.Bank or StatementType.Investment or StatementType.Loan or StatementType.Mortgage;
-
-        private void ShowObligationFields(bool visible)
+        private void CreateEditors()
         {
-            lblDueDate.Visible = visible;
-            dtDueDate.Visible = visible;
-            lblAmountDue.Visible = visible;
-            numAmountDue.Visible = visible;
-
-            var rowHeight = IsHandleCreated
-                ? Math.Max(LogicalToDeviceUnits(36), Font.Height + LogicalToDeviceUnits(16))
-                : 36;
-            pnlCommon.RowStyles[1].Height = visible ? rowHeight : 0;
-            if (IsHandleCreated)
-                SizeDialogInputs();
-        }
-
-        private Control BuildBankPanel()
-        {
-            var layout = FieldLayout(1);
-            layout.Name = "pnlBankStatement";
-            numStatementBalance = MoneyBox();
-            AddField(layout, 0, "Statement Balance", numStatementBalance);
-            return layout;
-        }
-
-        private Control BuildLoanPanel()
-        {
-            var layout = FieldLayout(1);
-            numStatementBalance = MoneyBox();
-            AddField(layout, 0, "Statement Balance", numStatementBalance);
-            return layout;
-        }
-
-        private Control BuildMortgagePanel()
-        {
-            var layout = FieldLayout(2);
+            dtStatementDate = new DateTimePicker { Format = DateTimePickerFormat.Short };
+            dtDueDate = new DateTimePicker { Format = DateTimePickerFormat.Short };
+            numAmountDue = MoneyBox();
             numStatementBalance = MoneyBox();
             numEscrowBalance = MoneyBox();
-            AddField(layout, 0, "Outstanding Principal", numStatementBalance);
-            AddField(layout, 1, "Escrow Balance", numEscrowBalance);
-            return layout;
+            numStatementBalance.Font = new Font(Font, FontStyle.Bold);
+            txtNotes = new TextBox
+            {
+                Multiline = true,
+                ScrollBars = ScrollBars.Vertical,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            dtStatementDate.ValueChanged += OnStatementDateChanged;
+            numStatementBalance.ValueChanged += (_, _) => RefreshAvailableCredit();
         }
 
-        private Control BuildCreditCardPanel()
+        private void OnStatementDateChanged(object? sender, EventArgs e)
         {
-            var layout = new TableLayoutPanel
+            if (_loading)
+                return;
+            RefreshPeriod();
+            RefreshPreviousBalance();
+        }
+
+        private void ComposeStatement(StatementType? type)
+        {
+            lblPeriod = null;
+            lblPreviousBalance = null;
+            lblAvailableCredit = null;
+            _creditLimit = null;
+            gridPromotions = null;
+            gridUsage = null;
+            gridCharges = null;
+            DetachEditors();
+
+            pnlDocument.SuspendLayout();
+            pnlDocument.AutoScroll = false;
+            var stale = pnlDocument.Controls.Cast<Control>().ToList();
+            pnlDocument.Controls.Clear();
+            foreach (var child in stale)
+                child.Dispose();
+
+            var host = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
-                RowCount = 3
+                RowCount = 2,
+                GrowStyle = TableLayoutPanelGrowStyle.FixedSize,
+                BackColor = Color.White,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty
             };
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            host.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            host.RowStyles.Add(new RowStyle(SizeType.Absolute, HeaderHeight()));
+            host.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            var fields = FieldLayout(1);
-            numStatementBalance = MoneyBox();
-            AddField(fields, 0, "Statement Balance", numStatementBalance);
-            fields.Dock = DockStyle.Top;
+            var header = BuildHeader();
+            header.Dock = DockStyle.Fill;
+            header.Margin = Padding.Empty;
+            host.Controls.Add(header, 0, 0);
 
-            gridPromotions = CreateGrid();
-            gridPromotions.Columns.Add(DatePickerColumn(nameof(PromotionEditRow.DateAcquired), "Date Acquired"));
-            gridPromotions.Columns.Add(AmountColumn(nameof(PromotionEditRow.InitialAmount), "Initial Amount"));
-            gridPromotions.Columns.Add(AmountColumn(nameof(PromotionEditRow.CurrentBalance), "Current Balance"));
-            gridPromotions.Columns.Add(DatePickerColumn(nameof(PromotionEditRow.Deadline), "Deadline"));
-            gridPromotions.Columns.Add(PromoTypeColumn());
-            gridPromotions.HandleCreated += (_, _) => QueueFitPromotionDateColumns();
-            gridPromotions.DataBindingComplete += (_, _) => QueueFitPromotionDateColumns();
-            gridPromotions.RowsAdded += (_, _) => QueueFitPromotionDateColumns();
-            gridPromotions.DataSource = _promotions;
+            var scroller = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                BackColor = Color.White,
+                Margin = Padding.Empty
+            };
 
-            layout.Controls.Add(fields, 0, 0);
-            layout.Controls.Add(GridToolbar("Add Promotion", "Delete Promotion", OnAddPromotion, OnDeletePromotion), 0, 1);
-            layout.Controls.Add(gridPromotions, 0, 2);
-            return layout;
+            var page = new TableLayoutPanel
+            {
+                ColumnCount = 1,
+                GrowStyle = TableLayoutPanelGrowStyle.AddRows,
+                BackColor = Color.White,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty
+            };
+            page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+
+            var row = 0;
+            var total = 0;
+            void Add(Control control, int height)
+            {
+                page.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+                control.Dock = DockStyle.Fill;
+                control.Margin = Padding.Empty;
+                page.Controls.Add(control, 0, row);
+                row++;
+                total += height;
+            }
+
+            if (BuildFacts(type) is (Control facts, int factsHeight))
+                Add(facts, factsHeight);
+
+            if (type is StatementType lineItemType && BuildLineItems(lineItemType) is Control lineItems)
+                Add(lineItems, LineItemHeight(lineItemType));
+
+            Add(BuildNotes(), NotesHeight());
+
+            page.RowCount = row;
+            page.MinimumSize = new Size(0, total);
+            page.Height = total;
+            page.Dock = DockStyle.Top;
+            scroller.Controls.Add(page);
+            host.Controls.Add(scroller, 0, 1);
+            pnlDocument.Controls.Add(host);
+            pnlDocument.ResumeLayout();
+        }
+
+        private void DetachEditors()
+        {
+            Detach(dtStatementDate);
+            Detach(dtDueDate);
+            Detach(numAmountDue);
+            Detach(numStatementBalance);
+            Detach(numEscrowBalance);
+            Detach(txtNotes);
+        }
+
+        private static void Detach(Control? control) =>
+            control?.Parent?.Controls.Remove(control);
+
+        private Control BuildHeader()
+        {
+            var account = SelectedAccount() ?? _lockedAccount;
+            var ending = EndingIn(account?.AccountNumber);
+            var stack = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                BackColor = Color.White,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+                RowCount = ending is null ? 2 : 3
+            };
+            stack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+
+            var name = new Label
+            {
+                Text = string.IsNullOrWhiteSpace(account?.Name) ? "Select an account" : account!.Name,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleRight,
+                AutoEllipsis = true,
+                Font = account is null ? Font : TitleFont,
+                ForeColor = account is null ? SystemColors.GrayText : Color.Black,
+                Margin = Padding.Empty,
+                Padding = new Padding(0, 0, Scale(4), 0)
+            };
+            stack.Controls.Add(name, 0, 0);
+            stack.RowStyles.Add(new RowStyle(SizeType.Absolute, NameRowHeight));
+
+            var row = 1;
+            if (ending is not null)
+            {
+                stack.Controls.Add(new Label
+                {
+                    Text = ending,
+                    Dock = DockStyle.Fill,
+                    TextAlign = ContentAlignment.MiddleRight,
+                    AutoEllipsis = true,
+                    Font = IdentityFont,
+                    Margin = Padding.Empty,
+                    Padding = new Padding(0, 0, Scale(4), 0)
+                }, 0, row);
+                stack.RowStyles.Add(new RowStyle(SizeType.Absolute, EndingRowHeight));
+                row++;
+            }
+
+            lblPeriod = new Label
+            {
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleRight,
+                AutoEllipsis = true,
+                Font = IdentityFont,
+                Margin = Padding.Empty,
+                Padding = new Padding(0, 0, Scale(8), 0)
+            };
+            RefreshPeriod();
+
+            var period = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                GrowStyle = TableLayoutPanelGrowStyle.FixedSize,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty
+            };
+            period.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            period.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, ValueColumnWidth()));
+            period.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            period.Controls.Add(lblPeriod, 0, 0);
+            period.Controls.Add(EditorHost(dtStatementDate, RowHeight), 1, 0);
+            stack.Controls.Add(period, 0, row);
+            stack.RowStyles.Add(new RowStyle(SizeType.Absolute, RowHeight));
+            return stack;
+        }
+
+        private int HeaderHeight()
+        {
+            var ending = EndingIn((SelectedAccount() ?? _lockedAccount)?.AccountNumber);
+            return NameRowHeight + (ending is null ? 0 : EndingRowHeight) + RowHeight;
+        }
+
+        private void RefreshPeriod()
+        {
+            if (lblPeriod is null)
+                return;
+
+            var previous = CurrentPreviousStatement();
+            lblPeriod.Text = previous is null
+                ? "Statement date"
+                : $"Statement Period {previous.StatementDate.Date.AddDays(1):d} to";
+        }
+
+        private (Control Control, int Height)? BuildFacts(StatementType? type)
+        {
+            Control? payment = null;
+            var paymentHeight = 0;
+            if (type is StatementType payable && !StatementAccountMatch.IsNonPayable(payable))
+            {
+                payment = BuildPaymentSection(payable);
+                paymentHeight = SectionHeight(2);
+            }
+
+            Control? summary = null;
+            var summaryHeight = 0;
+            if (type is StatementType summaryType && SummaryRows(summaryType) is { Count: > 0 } rows)
+            {
+                summary = Section("Account Summary", rows);
+                summaryHeight = SectionHeight(rows.Count);
+            }
+
+            if (payment is null && summary is null)
+                return null;
+            if (payment is null)
+                return (summary!, summaryHeight);
+            if (summary is null)
+                return (payment, paymentHeight);
+
+            var pair = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                GrowStyle = TableLayoutPanelGrowStyle.FixedSize,
+                BackColor = Color.White,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty
+            };
+            pair.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            pair.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            pair.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            payment.Dock = DockStyle.Top;
+            payment.Height = paymentHeight;
+            payment.Margin = new Padding(0, 0, Scale(8), 0);
+            summary.Margin = new Padding(Scale(8), 0, 0, 0);
+            pair.Controls.Add(payment, 0, 0);
+            pair.Controls.Add(summary, 1, 0);
+            return (pair, Math.Max(paymentHeight, summaryHeight));
+        }
+
+        private Control BuildPaymentSection(StatementType type)
+        {
+            var amountLabel = type == StatementType.CreditCard ? "Minimum Payment" : "Amount Due";
+            return Section("Payment",
+            [
+                StatementRow("Payment Due Date", dtDueDate),
+                StatementRow(amountLabel, numAmountDue)
+            ]);
+        }
+
+        private List<Control> SummaryRows(StatementType type)
+        {
+            if (type is StatementType.Utility or StatementType.Service or StatementType.Insurance)
+                return [];
+
+            var rows = new List<Control>();
+            lblPreviousBalance = ValueLabel("—");
+            RefreshPreviousBalance();
+            rows.Add(StatementRow("Previous Balance", lblPreviousBalance));
+
+            switch (type)
+            {
+                case StatementType.CreditCard:
+                    rows.Add(StatementRow("New Balance", numStatementBalance!, bold: true));
+                    if ((SelectedAccount() ?? _lockedAccount) is CreditAccount credit)
+                    {
+                        _creditLimit = credit.CreditLimit;
+                        rows.Add(StatementRow("Credit Limit", ValueLabel(credit.CreditLimit.ToString("C2"))));
+                        lblAvailableCredit = ValueLabel((credit.CreditLimit - numStatementBalance!.Value).ToString("C2"));
+                        rows.Add(StatementRow("Available Credit", lblAvailableCredit));
+                        rows.Add(StatementRow("APR", ValueLabel(Percent(credit.APR))));
+                    }
+                    break;
+                case StatementType.Bank or StatementType.Investment:
+                    rows.Add(StatementRow("New Balance", numStatementBalance!, bold: true));
+                    break;
+                case StatementType.Loan:
+                    rows.Add(StatementRow("New Balance", numStatementBalance!, bold: true));
+                    if ((SelectedAccount() ?? _lockedAccount) is LoanAccount loan)
+                        rows.Add(StatementRow("Interest Rate", ValueLabel(Percent(loan.InterestRate))));
+                    break;
+                case StatementType.Mortgage:
+                    rows.Add(StatementRow("Outstanding Principal", numStatementBalance!, bold: true));
+                    rows.Add(StatementRow("Escrow Balance", numEscrowBalance!));
+                    if ((SelectedAccount() ?? _lockedAccount) is MortgageAccount mortgage)
+                        rows.Add(StatementRow("Interest Rate", ValueLabel(Percent(mortgage.InterestRate))));
+                    break;
+            }
+
+            return rows;
+        }
+
+        private void RefreshPreviousBalance()
+        {
+            if (lblPreviousBalance is null)
+                return;
+            var balance = CurrentPreviousStatement() is AccountStatement previous
+                ? BalanceOf(previous)
+                : null;
+            lblPreviousBalance.Text = balance is decimal amount ? amount.ToString("C2") : "—";
+        }
+
+        private void RefreshAvailableCredit()
+        {
+            if (lblAvailableCredit is null || _creditLimit is not decimal limit || numStatementBalance is null)
+                return;
+            lblAvailableCredit.Text = (limit - numStatementBalance.Value).ToString("C2");
+        }
+
+        private AccountStatement? CurrentPreviousStatement()
+        {
+            var account = SelectedAccount() ?? _lockedAccount;
+            if (account is null)
+                return null;
+
+            var end = dtStatementDate.Value.Date;
+            return _statementStore.GetForAccount(account.Id)
+                .Where(statement => statement.Id != _existingStatement?.Id && statement.StatementDate.Date < end)
+                .OrderByDescending(statement => statement.StatementDate.Date)
+                .ThenByDescending(statement => statement.DueDate.Date)
+                .FirstOrDefault();
+        }
+
+        private static decimal? BalanceOf(AccountStatement statement) => statement switch
+        {
+            BankStatement bank => bank.StatementBalance,
+            InvestmentStatement investment => investment.StatementBalance,
+            LoanStatement loan => loan.StatementBalance,
+            MortgageStatement mortgage => mortgage.StatementBalance,
+            CreditCardStatement card => card.StatementBalance,
+            _ => null
+        };
+
+        private static string? EndingIn(string? accountNumber)
+        {
+            if (string.IsNullOrWhiteSpace(accountNumber))
+                return null;
+            var digits = new string(accountNumber.Where(char.IsDigit).ToArray());
+            if (digits.Length == 0)
+                return null;
+            var last = digits.Length <= 4 ? digits : digits[^4..];
+            return $"Account ending in {last}";
+        }
+
+        private static string Percent(decimal rate) => rate.ToString("0.00") + "%";
+
+        private Control? BuildLineItems(StatementType type) => type switch
+        {
+            StatementType.CreditCard => BuildCreditCardPanel(),
+            StatementType.Utility => BuildUtilityPanel(),
+            StatementType.Service => BuildServicePanel(),
+            _ => null
+        };
+
+        private static int LineItemLogicalHeight(StatementType type) => type switch
+        {
+            StatementType.Utility => 360,
+            StatementType.CreditCard or StatementType.Service => 260,
+            _ => 0
+        };
+
+        private int LineItemHeight(StatementType type) => Scale(LineItemLogicalHeight(type));
+
+        private Control BuildCreditCardPanel()
+        {
+            var panel = LineItemHost(3);
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute, BarHeight));
+            panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            var promotions = CreateGrid();
+            gridPromotions = promotions;
+            promotions.Columns.Add(DatePickerColumn(nameof(PromotionEditRow.DateAcquired), "Date Acquired"));
+            promotions.Columns.Add(AmountColumn(nameof(PromotionEditRow.InitialAmount), "Initial Amount"));
+            promotions.Columns.Add(AmountColumn(nameof(PromotionEditRow.CurrentBalance), "Current Balance"));
+            promotions.Columns.Add(DatePickerColumn(nameof(PromotionEditRow.Deadline), "Deadline"));
+            promotions.Columns.Add(PromoTypeColumn());
+            promotions.HandleCreated += (_, _) => QueueFitPromotionDateColumns();
+            promotions.DataBindingComplete += (_, _) => QueueFitPromotionDateColumns();
+            promotions.RowsAdded += (_, _) => QueueFitPromotionDateColumns();
+            promotions.DeleteRow += (_, _) => DeleteSelected(_promotions, promotions);
+            promotions.DataSource = _promotions;
+            AttachPromotionMenu(promotions);
+
+            panel.Controls.Add(SectionBar("Promotions"), 0, 0);
+            panel.Controls.Add(gridPromotions, 0, 1);
+            panel.Controls.Add(AddBar(OnAddPromotion), 0, 2);
+            return panel;
         }
 
         private Control BuildUtilityPanel()
         {
-            var layout = new TableLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 4
-            };
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            var panel = LineItemHost(6);
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute, BarHeight));
+            panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            panel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute, BarHeight));
+            panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            panel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
 
             var usage = CreateGrid();
             usage.AppendRow += (_, _) => AppendUsageRow();
@@ -517,23 +781,21 @@ namespace THMS.UI.WinForms.Controls
             gridCharges.Columns.Add(AmountColumn(nameof(ChargeEditRow.Amount), "Amount"));
             gridCharges.DataSource = _charges;
 
-            layout.Controls.Add(GridToolbar("Add Usage", "Delete Usage", OnAddUsage, OnDeleteUsage), 0, 0);
-            layout.Controls.Add(gridUsage, 0, 1);
-            layout.Controls.Add(GridToolbar("Add Charge", "Delete Charge", OnAddCharge, OnDeleteCharge), 0, 2);
-            layout.Controls.Add(gridCharges, 0, 3);
-            return layout;
+            panel.Controls.Add(SectionBar("Usage"), 0, 0);
+            panel.Controls.Add(GridToolbar("Add Usage", "Delete Usage", OnAddUsage, OnDeleteUsage), 0, 1);
+            panel.Controls.Add(gridUsage, 0, 2);
+            panel.Controls.Add(SectionBar("Charges"), 0, 3);
+            panel.Controls.Add(GridToolbar("Add Charge", "Delete Charge", OnAddCharge, OnDeleteCharge), 0, 4);
+            panel.Controls.Add(gridCharges, 0, 5);
+            return panel;
         }
 
         private Control BuildServicePanel()
         {
-            var layout = new TableLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 2
-            };
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            var panel = LineItemHost(3);
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute, BarHeight));
+            panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             var charges = CreateGrid();
             charges.AppendRow += (_, _) => AppendChargeRow();
@@ -542,10 +804,183 @@ namespace THMS.UI.WinForms.Controls
             gridCharges.Columns.Add(AmountColumn(nameof(ChargeEditRow.Amount), "Amount"));
             gridCharges.DataSource = _charges;
 
-            layout.Controls.Add(GridToolbar("Add Charge", "Delete Charge", OnAddCharge, OnDeleteCharge), 0, 0);
-            layout.Controls.Add(gridCharges, 0, 1);
-            return layout;
+            panel.Controls.Add(SectionBar("Charges"), 0, 0);
+            panel.Controls.Add(GridToolbar("Add Charge", "Delete Charge", OnAddCharge, OnDeleteCharge), 0, 1);
+            panel.Controls.Add(gridCharges, 0, 2);
+            return panel;
         }
+
+        private TableLayoutPanel LineItemHost(int rows)
+        {
+            var panel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = rows,
+                BackColor = Color.White,
+                Margin = Padding.Empty,
+                Padding = new Padding(0, Scale(8), 0, 0)
+            };
+            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            return panel;
+        }
+
+        private Control BuildNotes()
+        {
+            var stack = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3,
+                BackColor = Color.White,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty
+            };
+            stack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            stack.Controls.Add(Spacer(Scale(8)), 0, 0);
+            stack.RowStyles.Add(new RowStyle(SizeType.Absolute, Scale(8)));
+            stack.Controls.Add(SectionBar("Notes"), 0, 1);
+            stack.RowStyles.Add(new RowStyle(SizeType.Absolute, BarHeight));
+            txtNotes.Dock = DockStyle.Fill;
+            txtNotes.Margin = new Padding(0, Scale(6), 0, 0);
+            stack.Controls.Add(txtNotes, 0, 2);
+            stack.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            return stack;
+        }
+
+        private int NotesHeight() => Scale(8) + BarHeight + Scale(64);
+
+        private Control Section(string title, IReadOnlyList<Control> rows)
+        {
+            var stack = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = rows.Count + 2,
+                BackColor = Color.White,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty
+            };
+            stack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            stack.Controls.Add(Spacer(Scale(8)), 0, 0);
+            stack.RowStyles.Add(new RowStyle(SizeType.Absolute, Scale(8)));
+            stack.Controls.Add(SectionBar(title), 0, 1);
+            stack.RowStyles.Add(new RowStyle(SizeType.Absolute, BarHeight));
+            for (var i = 0; i < rows.Count; i++)
+            {
+                stack.Controls.Add(rows[i], 0, i + 2);
+                stack.RowStyles.Add(new RowStyle(SizeType.Absolute, RowHeight));
+            }
+
+            return stack;
+        }
+
+        private int SectionHeight(int dataRows) => Scale(8) + BarHeight + RowHeight * dataRows;
+
+        private Label SectionBar(string title) => new()
+        {
+            Text = title,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = SectionFont,
+            BackColor = SectionBarColor,
+            ForeColor = Color.Black,
+            Padding = new Padding(Scale(10), 0, Scale(8), 0),
+            Margin = Padding.Empty
+        };
+
+        private Control StatementRow(string caption, Control value, bool bold = false)
+        {
+            var row = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                GrowStyle = TableLayoutPanelGrowStyle.FixedSize,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+                BackColor = Color.White
+            };
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, ValueColumnWidth()));
+            row.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            row.Controls.Add(new Label
+            {
+                Text = caption,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = bold ? new Font(Font, FontStyle.Bold) : Font,
+                Margin = Padding.Empty,
+                Padding = new Padding(Scale(4), 0, Scale(6), 0)
+            }, 0, 0);
+
+            if (value is Label readOnly)
+            {
+                readOnly.Dock = DockStyle.Fill;
+                readOnly.TextAlign = ContentAlignment.MiddleRight;
+                readOnly.Font = bold ? new Font(Font, FontStyle.Bold) : Font;
+                readOnly.Padding = new Padding(0, 0, Scale(2), 0);
+                readOnly.Margin = Padding.Empty;
+                row.Controls.Add(readOnly, 1, 0);
+            }
+            else
+            {
+                row.Controls.Add(EditorHost(value, RowHeight), 1, 0);
+            }
+
+            return row;
+        }
+
+        private Control EditorHost(Control editor, int rowHeight)
+        {
+            var height = editor.PreferredSize.Height;
+            if (height <= 0)
+                height = editor.Height > 0 ? editor.Height : Scale(23);
+            var extra = Math.Max(0, rowHeight - height);
+            var top = extra / 2;
+            var host = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Margin = Padding.Empty,
+                Padding = new Padding(0, top, 0, extra - top),
+                BackColor = Color.White
+            };
+            editor.Dock = DockStyle.Fill;
+            editor.Margin = Padding.Empty;
+            host.Controls.Add(editor);
+            return host;
+        }
+
+        private Label ValueLabel(string text) => new()
+        {
+            Text = text,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleRight,
+            AutoEllipsis = true,
+            Margin = Padding.Empty
+        };
+
+        private static Panel Spacer(int height) => new()
+        {
+            Height = height,
+            Margin = Padding.Empty,
+            BackColor = Color.White
+        };
+
+        private int Scale(int logical) => LogicalToDeviceUnits(logical);
+
+        private int NameRowHeight => Scale(32);
+
+        private int EndingRowHeight => Scale(22);
+
+        private int RowHeight => Math.Max(Scale(26), EditorBandHeight + Scale(4));
+
+        private int EditorBandHeight =>
+            Math.Max(dtStatementDate.PreferredSize.Height, numAmountDue.PreferredSize.Height);
+
+        private int BarHeight => Scale(26);
+
+        private int ValueColumnWidth() => Scale(176);
 
         private void BindTypeSpecific(AccountStatement statement)
         {
@@ -634,8 +1069,62 @@ namespace THMS.UI.WinForms.Controls
                 Type = PromoType.LumpSum
             });
 
-        private void OnDeletePromotion(object? sender, EventArgs e) =>
-            DeleteSelected(_promotions, gridPromotions);
+        private void AttachPromotionMenu(StatementEntryGrid grid)
+        {
+            var menu = PromotionMenu(grid);
+            grid.Disposed += (_, _) =>
+            {
+                if (!menu.IsDisposed)
+                    menu.Dispose();
+            };
+            grid.MouseDown += (_, e) =>
+            {
+                if (e.Button == MouseButtons.Right)
+                    ShowPromotionMenu(grid, menu, e.Location);
+            };
+            grid.EditingControlShowing += (_, e) =>
+            {
+                if (!menu.IsDisposed && !ReferenceEquals(e.Control.ContextMenuStrip, menu))
+                    e.Control.ContextMenuStrip = menu;
+            };
+        }
+
+        private static void ShowPromotionMenu(StatementEntryGrid grid, ContextMenuStrip menu, Point location)
+        {
+            if (grid.IsDisposed || menu.IsDisposed)
+                return;
+
+            var hit = grid.HitTest(location.X, location.Y);
+            if (hit.RowIndex < 0 || grid.Rows[hit.RowIndex].DataBoundItem is not PromotionEditRow)
+                return;
+
+            if (grid.IsCurrentCellInEditMode)
+                grid.EndEdit();
+            if (!DataGridViewUtil.SelectOnlyCell(grid, hit.RowIndex, hit.ColumnIndex))
+                return;
+
+            grid.BeginInvoke(() =>
+            {
+                if (!grid.IsDisposed && !menu.IsDisposed)
+                    menu.Show(grid, location);
+            });
+        }
+
+        private ContextMenuStrip PromotionMenu(StatementEntryGrid grid)
+        {
+            var menu = new ContextMenuStrip();
+            var delete = new ToolStripMenuItem("Delete")
+            {
+                ShortcutKeyDisplayString = "Del"
+            };
+            delete.Click += (_, _) =>
+            {
+                if (!grid.IsDisposed)
+                    grid.BeginInvoke(() => DeleteSelected(_promotions, grid));
+            };
+            menu.Items.Add(delete);
+            return menu;
+        }
 
         private void OnAddUsage(object? sender, EventArgs e)
         {
@@ -722,7 +1211,7 @@ namespace THMS.UI.WinForms.Controls
 
             if (SelectedType() is not StatementType type)
             {
-                error = "Select a statement type.";
+                error = "This account does not support statements.";
                 return false;
             }
 
@@ -790,7 +1279,7 @@ namespace THMS.UI.WinForms.Controls
 
             if (statement is null)
             {
-                error = "Select a statement type.";
+                error = "This account does not support statements.";
                 return false;
             }
 
@@ -827,107 +1316,28 @@ namespace THMS.UI.WinForms.Controls
 
         private static void DeleteSelected<T>(BindingList<T> list, DataGridView? grid)
         {
-            if (grid?.CurrentRow?.DataBoundItem is T item)
+            if (grid is null)
+                return;
+            if (grid.IsCurrentCellInEditMode)
+                grid.EndEdit();
+            if (grid.CurrentRow?.DataBoundItem is T item)
                 list.Remove(item);
         }
 
-        private TableLayoutPanel FieldLayout(int rows)
+        private Control AddBar(EventHandler add)
         {
-            var labelWidth = pnlCommon.ColumnStyles.Count > 0 ? pnlCommon.ColumnStyles[0].Width : 150F;
-            var rowHeight = CurrentFieldHeight();
-            var layout = new TableLayoutPanel
+            var bar = new FlowLayoutPanel
             {
-                Dock = DockStyle.Top,
+                Dock = DockStyle.Fill,
                 AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                GrowStyle = TableLayoutPanelGrowStyle.FixedSize,
-                ColumnCount = 2,
-                RowCount = rows,
-                Padding = ScaledPadding(0, 4, 0, 4),
-                Tag = StatementFieldsTag
+                WrapContents = false,
+                Margin = Padding.Empty,
+                Padding = new Padding(0, Scale(6), 0, 0)
             };
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, labelWidth));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            for (var i = 0; i < rows; i++)
-                layout.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
-            return layout;
-        }
-
-        private void AddField(TableLayoutPanel layout, int row, string label, Control field)
-        {
-            layout.Controls.Add(new Label
-            {
-                Text = label,
-                AutoSize = false,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Dock = DockStyle.Fill
-            }, 0, row);
-            field.Dock = DockStyle.None;
-            field.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
-            field.Margin = numAmountDue.Margin;
-            layout.Controls.Add(field, 1, row);
-        }
-
-        private float CurrentFieldHeight()
-        {
-            if (pnlCommon.RowStyles.Count == 0)
-                return 36F;
-
-            var amountRow = numAmountDue.Visible ? pnlCommon.RowStyles[1].Height : 0F;
-            if (amountRow > 0)
-                return amountRow;
-            return pnlCommon.RowStyles[0].Height > 0 ? pnlCommon.RowStyles[0].Height : 36F;
-        }
-
-        private Padding ScaledPadding(int left, int top, int right, int bottom) =>
-            IsHandleCreated
-                ? new Padding(
-                    LogicalToDeviceUnits(left),
-                    LogicalToDeviceUnits(top),
-                    LogicalToDeviceUnits(right),
-                    LogicalToDeviceUnits(bottom))
-                : new Padding(left, top, right, bottom);
-
-        private void AlignStatementFields(float rowHeight)
-        {
-            if (rowHeight <= 0 || pnlCommon.ColumnStyles.Count == 0)
-                return;
-
-            var labelWidth = pnlCommon.ColumnStyles[0].Width;
-            foreach (var table in FindStatementFields(pnlTypeSpecific))
-            {
-                if (table.ColumnStyles.Count > 0)
-                {
-                    table.ColumnStyles[0].SizeType = SizeType.Absolute;
-                    table.ColumnStyles[0].Width = labelWidth;
-                }
-
-                for (var i = 0; i < table.RowCount && i < table.RowStyles.Count; i++)
-                {
-                    table.RowStyles[i].SizeType = SizeType.Absolute;
-                    table.RowStyles[i].Height = rowHeight;
-                }
-
-                foreach (Control control in table.Controls)
-                {
-                    if (control is not NumericUpDown)
-                        continue;
-                    control.Margin = numAmountDue.Margin;
-                    control.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
-                }
-            }
-        }
-
-        private static IEnumerable<TableLayoutPanel> FindStatementFields(Control parent)
-        {
-            foreach (Control child in parent.Controls)
-            {
-                if (child is TableLayoutPanel table && Equals(table.Tag, StatementFieldsTag))
-                    yield return table;
-
-                foreach (var nested in FindStatementFields(child))
-                    yield return nested;
-            }
+            var button = new ThmsButton { Text = "Add", Margin = Padding.Empty };
+            button.Click += add;
+            bar.Controls.Add(button);
+            return bar;
         }
 
         private static Control GridToolbar(string addText, string deleteText, EventHandler add, EventHandler delete)
@@ -1059,7 +1469,8 @@ namespace THMS.UI.WinForms.Controls
                 DecimalPlaces = 2,
                 Maximum = 100_000_000,
                 Minimum = allowNegative ? -100_000_000 : 0,
-                ThousandsSeparator = true
+                ThousandsSeparator = true,
+                TextAlign = HorizontalAlignment.Right
             };
 
         private static void SetMoney(NumericUpDown? box, decimal value)
@@ -1073,12 +1484,6 @@ namespace THMS.UI.WinForms.Controls
 
         private static DateTime SafeDate(DateTime value) =>
             value == default ? DateTime.Today : value;
-
-        private sealed class StatementTypeOption(string name, StatementType type)
-        {
-            public string Name { get; } = name;
-            public StatementType Type { get; } = type;
-        }
 
         private sealed class PromoTypeOption(string name, PromoType type)
         {

@@ -169,6 +169,12 @@ namespace THMS.Data.Stores.SQLite
             return commercial;
         }
 
+        public void DeleteCommercialEvChargeSession(Guid sessionId)
+        {
+            using var conn = OpenConnection();
+            _commercialEvStore.Delete(conn, sessionId);
+        }
+
         // ---------------------------------------------------------
         // HOME EV CHARGE SESSIONS
         // ---------------------------------------------------------
@@ -190,6 +196,14 @@ namespace THMS.Data.Stores.SQLite
             home.Attribution = _attribStore.Get(conn, sessionId);
             home.Billing = _billingStore.Get(conn, sessionId);
             return home;
+        }
+
+        public void DeleteHomeEvChargeSession(Guid sessionId)
+        {
+            using var conn = OpenConnection();
+            _attribStore.Delete(conn, sessionId);
+            _billingStore.Delete(conn, sessionId);
+            _homeEvStore.Delete(conn, sessionId);
         }
 
         // ---------------------------------------------------------

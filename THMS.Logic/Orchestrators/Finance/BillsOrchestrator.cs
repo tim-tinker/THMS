@@ -130,7 +130,7 @@ namespace THMS.Logic.Orchestrators.Finance
                     FundingAccountId = rule.FromAccountId,
                     FundingName = NameOf(byId, rule.FromAccountId),
                     OtherAccountId = otherId,
-                    OtherAccountName = NameOf(byId, otherId),
+                    OtherAccountName = TransferCounterpartyName(accountId, rule.FromAccountId, rule.ToAccountId, byId),
                     OtherWebsiteUrl = UrlOf(byId, otherId),
                     Kind = BillKinds.Transfer,
                     DueDate = rule.NextOccurrence.Date,
@@ -316,7 +316,7 @@ namespace THMS.Logic.Orchestrators.Finance
 
             var credit = creditAccountId is Guid creditId && creditId != Guid.Empty ? creditId : (Guid?)null;
             if (credit == billAccountId)
-                throw new InvalidOperationException("Account to credit must be a different account.");
+                throw new InvalidOperationException("Pay from must be a different account.");
 
             var billCategory = RequireCategory(billCategoryId);
             var when = date.Date;
@@ -971,6 +971,19 @@ namespace THMS.Logic.Orchestrators.Finance
         private static string NameOf(IReadOnlyDictionary<Guid, Account> accounts, Guid id) =>
             accounts.TryGetValue(id, out var account) ? account.Name : "";
 
+        private static string TransferCounterpartyName(
+            Guid viewedAccountId,
+            Guid fromAccountId,
+            Guid toAccountId,
+            IReadOnlyDictionary<Guid, Account> accounts)
+        {
+            if (viewedAccountId == fromAccountId)
+                return "To " + NameOf(accounts, toAccountId);
+            if (viewedAccountId == toAccountId)
+                return "From " + NameOf(accounts, fromAccountId);
+            return NameOf(accounts, toAccountId);
+        }
+
         private static string UrlOf(IReadOnlyDictionary<Guid, Account> accounts, Guid id) =>
             accounts.TryGetValue(id, out var account) ? account.WebsiteUrl ?? "" : "";
 
@@ -1025,7 +1038,7 @@ namespace THMS.Logic.Orchestrators.Finance
                 FundingAccountId = expected.FromAccountId,
                 FundingName = NameOf(accounts, expected.FromAccountId),
                 OtherAccountId = otherId,
-                OtherAccountName = otherId is Guid id ? NameOf(accounts, id) : "",
+                OtherAccountName = TransferCounterpartyName(accountId, expected.FromAccountId, expected.ToAccountId, accounts),
                 OtherWebsiteUrl = otherId is Guid other ? UrlOf(accounts, other) : "",
                 CanChoosePayFrom = expected.FromAccountId == Guid.Empty,
                 Kind = KindOf(source, isTransfer: true),

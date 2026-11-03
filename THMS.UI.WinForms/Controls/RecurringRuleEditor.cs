@@ -21,6 +21,9 @@ namespace THMS.UI.WinForms.Controls
         private bool _loadingCategories;
         private Guid? _categoryId;
         private Guid? _targetCategoryId;
+        private Guid? _accountId;
+        private Guid? _fromAccountId;
+        private Guid? _toAccountId;
 
         public RecurringRuleEditor()
         {
@@ -62,6 +65,13 @@ namespace THMS.UI.WinForms.Controls
             UpdateButtonState();
         }
 
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            ReapplyAccounts();
+            BeginInvoke(new Action(ReapplyAccounts));
+        }
+
         private RecurringRuleOrchestrator Rules =>
             _ruleOrchestrator ??= new RecurringRuleOrchestrator();
 
@@ -74,9 +84,12 @@ namespace THMS.UI.WinForms.Controls
         private void PopulateLookups(Guid? preferredAccountId)
         {
             var accounts = Accounts.GetAllAccounts().OrderBy(a => a.Name).ToList();
-            BindAccountCombo(cmbAccount, accounts, preferredAccountId);
-            BindAccountCombo(cmbFromAccount, accounts, preferredAccountId);
-            BindAccountCombo(cmbToAccount, accounts, accounts.FirstOrDefault(a => a.Id != preferredAccountId)?.Id);
+            _accountId = preferredAccountId;
+            _fromAccountId = preferredAccountId;
+            _toAccountId = accounts.FirstOrDefault(a => a.Id != preferredAccountId)?.Id;
+            BindAccountCombo(cmbAccount, accounts, _accountId);
+            BindAccountCombo(cmbFromAccount, accounts, _fromAccountId);
+            BindAccountCombo(cmbToAccount, accounts, _toAccountId);
 
             cmbRuleType.Items.Clear();
             cmbRuleType.Items.Add("Single");
@@ -98,15 +111,11 @@ namespace THMS.UI.WinForms.Controls
 
         private static void BindAccountCombo(ComboBox combo, List<Account> accounts, Guid? selectedId)
         {
+            combo.BindingContext = new BindingContext();
             combo.DisplayMember = nameof(Account.Name);
             combo.ValueMember = nameof(Account.Id);
             combo.DataSource = new List<Account>(accounts);
-            if (selectedId is Guid id)
-            {
-                var match = accounts.FirstOrDefault(a => a.Id == id);
-                if (match is not null)
-                    combo.SelectedItem = match;
-            }
+            SelectAccount(combo, selectedId);
         }
 
         private void BindSingle(RecurringSingleTransactionRule rule)
@@ -115,6 +124,7 @@ namespace THMS.UI.WinForms.Controls
             _existingTransferId = null;
             cmbRuleType.SelectedItem = "Single";
             ShowSingleFields();
+            _accountId = rule.AccountId;
             SelectAccount(cmbAccount, rule.AccountId);
             txtDescription.Text = rule.Description ?? "";
             numAmount.Value = ClampAmount(rule.Amount);
@@ -131,6 +141,8 @@ namespace THMS.UI.WinForms.Controls
             _existingSingleId = null;
             cmbRuleType.SelectedItem = "Transfer";
             ShowTransferFields();
+            _fromAccountId = rule.FromAccountId;
+            _toAccountId = rule.ToAccountId;
             SelectAccount(cmbFromAccount, rule.FromAccountId);
             SelectAccount(cmbToAccount, rule.ToAccountId);
             txtDescription.Text = rule.Description ?? "";
@@ -144,14 +156,35 @@ namespace THMS.UI.WinForms.Controls
             _pendingSplits = rule.Splits.Select(s => s.Clone()).ToList();
         }
 
-        private static void SelectAccount(ComboBox combo, Guid accountId)
+        private void ReapplyAccounts()
         {
-            if (combo.DataSource is IEnumerable<Account> accounts)
+            SelectAccount(cmbAccount, _accountId);
+            SelectAccount(cmbFromAccount, _fromAccountId);
+            SelectAccount(cmbToAccount, _toAccountId);
+        }
+
+        private static void SelectAccount(ComboBox combo, Guid? accountId)
+        {
+            if (accountId is not Guid id || combo.DataSource is not IList<Account> accounts)
+                return;
+
+            for (var i = 0; i < accounts.Count; i++)
             {
-                var match = accounts.FirstOrDefault(a => a.Id == accountId);
-                if (match is not null)
-                    combo.SelectedItem = match;
+                if (accounts[i].Id != id)
+                    continue;
+                if (i < combo.Items.Count)
+                    combo.SelectedIndex = i;
+                return;
             }
+        }
+
+        private static Account? SelectedAccount(ComboBox combo)
+        {
+            if (combo.DataSource is not IList<Account> accounts)
+                return combo.SelectedItem as Account;
+            if (combo.SelectedIndex < 0 || combo.SelectedIndex >= accounts.Count)
+                return null;
+            return accounts[combo.SelectedIndex];
         }
 
         private static decimal ClampAmount(decimal amount)
@@ -359,7 +392,7 @@ namespace THMS.UI.WinForms.Controls
 
             if (isTransfer)
             {
-                if (cmbFromAccount.SelectedItem is not Account from || cmbToAccount.SelectedItem is not Account to)
+                if (SelectedAccount(cmbFromAccount) is not Account from || SelectedAccount(cmbToAccount) is not Account to)
                 {
                     MessageBox.Show(this, "From and To accounts are required.", "Recurring Rule", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return false;
@@ -393,7 +426,7 @@ namespace THMS.UI.WinForms.Controls
                 return true;
             }
 
-            if (cmbAccount.SelectedItem is not Account account)
+            if (SelectedAccount(cmbAccount) is not Account account)
             {
                 MessageBox.Show(this, "Account is required.", "Recurring Rule", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return false;

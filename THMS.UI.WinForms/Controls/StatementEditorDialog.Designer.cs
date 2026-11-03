@@ -4,23 +4,11 @@ namespace THMS.UI.WinForms.Controls
     {
         private System.ComponentModel.IContainer components = null;
         private TableLayoutPanel layout;
-        private Panel pnlTypeSelector;
-        private TableLayoutPanel typeSelectorLayout;
-        private Label lblStatementType;
-        private ComboBox cboStatementType;
+        private TableLayoutPanel accountBar;
         private Label lblAccount;
         private ComboBox cboAccount;
         private ThmsButton btnNewAccount;
-        private TableLayoutPanel pnlCommon;
-        private Label lblStatementDate;
-        private DateTimePicker dtStatementDate;
-        private Label lblDueDate;
-        private DateTimePicker dtDueDate;
-        private Label lblAmountDue;
-        private NumericUpDown numAmountDue;
-        private Label lblNotes;
-        private TextBox txtNotes;
-        private Panel pnlTypeSpecific;
+        private Panel pnlDocument;
         private FlowLayoutPanel pnlButtons;
         private ThmsButton btnSave;
         private ThmsButton btnCancel;
@@ -35,205 +23,187 @@ namespace THMS.UI.WinForms.Controls
         private void InitializeComponent()
         {
             layout = new TableLayoutPanel();
-            pnlTypeSelector = new Panel();
-            typeSelectorLayout = new TableLayoutPanel();
-            lblStatementType = new Label();
-            cboStatementType = new ComboBox();
+            accountBar = new TableLayoutPanel();
             lblAccount = new Label();
             cboAccount = new ComboBox();
             btnNewAccount = new ThmsButton();
-            pnlCommon = new TableLayoutPanel();
-            lblStatementDate = new Label();
-            dtStatementDate = new DateTimePicker();
-            lblDueDate = new Label();
-            dtDueDate = new DateTimePicker();
-            lblAmountDue = new Label();
-            numAmountDue = new NumericUpDown();
-            lblNotes = new Label();
-            txtNotes = new TextBox();
-            pnlTypeSpecific = new Panel();
+            pnlDocument = new Panel();
             pnlButtons = new FlowLayoutPanel();
-            btnSave = new ThmsButton();
             btnCancel = new ThmsButton();
+            btnSave = new ThmsButton();
             layout.SuspendLayout();
-            pnlTypeSelector.SuspendLayout();
-            typeSelectorLayout.SuspendLayout();
-            pnlCommon.SuspendLayout();
+            accountBar.SuspendLayout();
             pnlButtons.SuspendLayout();
             SuspendLayout();
-
+            // 
+            // layout
+            // 
+            layout.BackColor = SystemColors.Control;
             layout.ColumnCount = 1;
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            layout.Controls.Add(pnlTypeSelector, 0, 0);
-            layout.Controls.Add(pnlCommon, 0, 1);
-            layout.Controls.Add(pnlTypeSpecific, 0, 2);
-            layout.Controls.Add(pnlButtons, 0, 3);
+            layout.Controls.Add(accountBar, 0, 0);
+            layout.Controls.Add(pnlDocument, 0, 1);
+            layout.Controls.Add(pnlButtons, 0, 2);
             layout.Dock = DockStyle.Fill;
+            layout.Location = new Point(0, 0);
+            layout.Margin = new Padding(0);
             layout.Name = "layout";
-            layout.Padding = new Padding(12);
-            layout.RowCount = 4;
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.Padding = new Padding(18, 12, 18, 12);
+            layout.RowCount = 3;
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 84F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-
-            typeSelectorLayout.ColumnCount = 3;
-            typeSelectorLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110F));
-            typeSelectorLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            typeSelectorLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            typeSelectorLayout.RowCount = 2;
-            typeSelectorLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            typeSelectorLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            typeSelectorLayout.Dock = DockStyle.Fill;
-            typeSelectorLayout.Name = "typeSelectorLayout";
-            typeSelectorLayout.Controls.Add(lblStatementType, 0, 0);
-            typeSelectorLayout.Controls.Add(cboStatementType, 1, 0);
-            typeSelectorLayout.SetColumnSpan(cboStatementType, 2);
-            typeSelectorLayout.Controls.Add(lblAccount, 0, 1);
-            typeSelectorLayout.Controls.Add(cboAccount, 1, 1);
-            typeSelectorLayout.Controls.Add(btnNewAccount, 2, 1);
-
-            pnlTypeSelector.Controls.Add(typeSelectorLayout);
-            pnlTypeSelector.Dock = DockStyle.Fill;
-            pnlTypeSelector.Name = "pnlTypeSelector";
-
-            lblStatementType.AutoSize = false;
-            lblStatementType.Dock = DockStyle.Fill;
-            lblStatementType.Name = "lblStatementType";
-            lblStatementType.Text = "Statement Type";
-            lblStatementType.TextAlign = ContentAlignment.MiddleLeft;
-            cboStatementType.DropDownStyle = ComboBoxStyle.DropDownList;
-            cboStatementType.Dock = DockStyle.Fill;
-            cboStatementType.DrawMode = DrawMode.OwnerDrawFixed;
-            cboStatementType.IntegralHeight = false;
-            cboStatementType.Name = "cboStatementType";
-            cboStatementType.SelectedIndexChanged += OnStatementTypeChanged;
-            lblAccount.AutoSize = false;
+            layout.RowStyles.Add(new RowStyle());
+            layout.Size = new Size(1260, 1200);
+            layout.TabIndex = 0;
+            // 
+            // accountBar
+            // 
+            accountBar.ColumnCount = 3;
+            accountBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 192F));
+            accountBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            accountBar.ColumnStyles.Add(new ColumnStyle());
+            accountBar.Controls.Add(lblAccount, 0, 0);
+            accountBar.Controls.Add(cboAccount, 1, 0);
+            accountBar.Controls.Add(btnNewAccount, 2, 0);
+            accountBar.Dock = DockStyle.Fill;
+            accountBar.Location = new Point(18, 12);
+            accountBar.Margin = new Padding(0, 0, 0, 8);
+            accountBar.Name = "accountBar";
+            accountBar.RowCount = 1;
+            accountBar.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            accountBar.Size = new Size(1224, 76);
+            accountBar.TabIndex = 0;
+            // 
+            // lblAccount
+            // 
             lblAccount.Dock = DockStyle.Fill;
+            lblAccount.Location = new Point(5, 0);
+            lblAccount.Margin = new Padding(5, 0, 5, 0);
             lblAccount.Name = "lblAccount";
+            lblAccount.Size = new Size(182, 76);
+            lblAccount.TabIndex = 0;
             lblAccount.Text = "Account";
             lblAccount.TextAlign = ContentAlignment.MiddleLeft;
-            cboAccount.DropDownStyle = ComboBoxStyle.DropDownList;
+            // 
+            // cboAccount
+            // 
             cboAccount.Dock = DockStyle.Fill;
             cboAccount.DrawMode = DrawMode.OwnerDrawFixed;
+            cboAccount.DropDownStyle = ComboBoxStyle.DropDownList;
             cboAccount.IntegralHeight = false;
+            cboAccount.Location = new Point(197, 5);
+            cboAccount.Margin = new Padding(5);
             cboAccount.Name = "cboAccount";
+            cboAccount.Size = new Size(812, 36);
+            cboAccount.TabIndex = 1;
             cboAccount.SelectedIndexChanged += OnStatementAccountChanged;
+            // 
+            // btnNewAccount
+            // 
             btnNewAccount.AutoSize = true;
-            btnNewAccount.Margin = new Padding(6, 4, 0, 4);
+            btnNewAccount.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            btnNewAccount.BackColor = Color.FromArgb(39, 137, 71);
+            btnNewAccount.FlatStyle = FlatStyle.Flat;
+            btnNewAccount.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            btnNewAccount.ForeColor = Color.White;
+            btnNewAccount.Location = new Point(1024, 7);
+            btnNewAccount.Margin = new Padding(10, 7, 0, 7);
+            btnNewAccount.MinimumSize = new Size(0, 63);
             btnNewAccount.Name = "btnNewAccount";
+            btnNewAccount.Padding = new Padding(21, 10, 21, 10);
+            btnNewAccount.Size = new Size(200, 63);
+            btnNewAccount.TabIndex = 2;
             btnNewAccount.Text = "New Account";
+            btnNewAccount.UseVisualStyleBackColor = false;
             btnNewAccount.Click += OnNewAccount;
-
-            pnlCommon.ColumnCount = 4;
-            pnlCommon.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));
-            pnlCommon.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            pnlCommon.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));
-            pnlCommon.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            pnlCommon.RowCount = 3;
-            pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
-            pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
-            pnlCommon.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
-            pnlCommon.AutoSize = true;
-            pnlCommon.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-            pnlCommon.Dock = DockStyle.Fill;
-            pnlCommon.Name = "pnlCommon";
-            pnlCommon.Padding = new Padding(0, 0, 0, 4);
-            pnlCommon.Controls.Add(lblStatementDate, 0, 0);
-            pnlCommon.Controls.Add(dtStatementDate, 1, 0);
-            pnlCommon.Controls.Add(lblDueDate, 2, 0);
-            pnlCommon.Controls.Add(dtDueDate, 3, 0);
-            pnlCommon.Controls.Add(lblAmountDue, 0, 1);
-            pnlCommon.Controls.Add(numAmountDue, 1, 1);
-            pnlCommon.SetColumnSpan(numAmountDue, 3);
-            pnlCommon.Controls.Add(lblNotes, 0, 2);
-            pnlCommon.Controls.Add(txtNotes, 1, 2);
-            pnlCommon.SetColumnSpan(txtNotes, 3);
-
-            lblStatementDate.AutoSize = false;
-            lblStatementDate.Dock = DockStyle.Fill;
-            lblStatementDate.Name = "lblStatementDate";
-            lblStatementDate.Text = "Statement Date";
-            lblStatementDate.TextAlign = ContentAlignment.MiddleLeft;
-            dtStatementDate.Dock = DockStyle.Fill;
-            dtStatementDate.Format = DateTimePickerFormat.Short;
-            dtStatementDate.Margin = new Padding(0, 4, 8, 4);
-            dtStatementDate.Name = "dtStatementDate";
-            lblDueDate.AutoSize = false;
-            lblDueDate.Dock = DockStyle.Fill;
-            lblDueDate.Name = "lblDueDate";
-            lblDueDate.Text = "Due Date";
-            lblDueDate.TextAlign = ContentAlignment.MiddleLeft;
-            dtDueDate.Dock = DockStyle.Fill;
-            dtDueDate.Format = DateTimePickerFormat.Short;
-            dtDueDate.Margin = new Padding(0, 4, 0, 4);
-            dtDueDate.Name = "dtDueDate";
-            lblAmountDue.AutoSize = false;
-            lblAmountDue.Dock = DockStyle.Fill;
-            lblAmountDue.Name = "lblAmountDue";
-            lblAmountDue.Text = "Amount Due";
-            lblAmountDue.TextAlign = ContentAlignment.MiddleLeft;
-            numAmountDue.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
-            numAmountDue.DecimalPlaces = 2;
-            numAmountDue.Margin = new Padding(0, 4, 0, 4);
-            numAmountDue.Maximum = 100000000;
-            numAmountDue.Name = "numAmountDue";
-            numAmountDue.ThousandsSeparator = true;
-            lblNotes.AutoSize = false;
-            lblNotes.Dock = DockStyle.Fill;
-            lblNotes.Name = "lblNotes";
-            lblNotes.Text = "Notes";
-            lblNotes.TextAlign = ContentAlignment.MiddleLeft;
-            txtNotes.Dock = DockStyle.Fill;
-            txtNotes.Margin = new Padding(0, 4, 0, 4);
-            txtNotes.Multiline = true;
-            txtNotes.Name = "txtNotes";
-            txtNotes.ScrollBars = ScrollBars.Vertical;
-
-            pnlTypeSpecific.AutoScroll = true;
-            pnlTypeSpecific.Dock = DockStyle.Fill;
-            pnlTypeSpecific.Name = "pnlTypeSpecific";
-
+            // 
+            // pnlDocument
+            // 
+            pnlDocument.AutoScroll = true;
+            pnlDocument.BackColor = Color.White;
+            pnlDocument.Dock = DockStyle.Fill;
+            pnlDocument.Location = new Point(18, 96);
+            pnlDocument.Margin = new Padding(0);
+            pnlDocument.Name = "pnlDocument";
+            pnlDocument.Size = new Size(1224, 1007);
+            pnlDocument.TabIndex = 1;
+            // 
+            // pnlButtons
+            // 
             pnlButtons.AutoSize = true;
             pnlButtons.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-            pnlButtons.Dock = DockStyle.Fill;
-            pnlButtons.FlowDirection = FlowDirection.RightToLeft;
-            pnlButtons.Name = "pnlButtons";
-            pnlButtons.Padding = new Padding(12, 12, 12, 16);
-            pnlButtons.WrapContents = false;
-            btnSave.AutoSize = true;
-            btnSave.Name = "btnSave";
-            btnSave.Text = "Save";
-            btnSave.Click += OnSave;
-            btnCancel.AutoSize = true;
-            btnCancel.Name = "btnCancel";
-            btnCancel.Text = "Cancel";
-            btnCancel.Click += OnCancel;
             pnlButtons.Controls.Add(btnCancel);
             pnlButtons.Controls.Add(btnSave);
-
+            pnlButtons.Dock = DockStyle.Fill;
+            pnlButtons.FlowDirection = FlowDirection.RightToLeft;
+            pnlButtons.Location = new Point(18, 1103);
+            pnlButtons.Margin = new Padding(0);
+            pnlButtons.Name = "pnlButtons";
+            pnlButtons.Padding = new Padding(0, 12, 0, 0);
+            pnlButtons.Size = new Size(1224, 85);
+            pnlButtons.TabIndex = 2;
+            pnlButtons.WrapContents = false;
+            // 
+            // btnCancel
+            // 
+            btnCancel.AutoSize = true;
+            btnCancel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            btnCancel.BackColor = Color.FromArgb(39, 137, 71);
+            btnCancel.FlatStyle = FlatStyle.Flat;
+            btnCancel.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            btnCancel.ForeColor = Color.White;
+            btnCancel.Location = new Point(1093, 17);
+            btnCancel.Margin = new Padding(5, 5, 0, 5);
+            btnCancel.MinimumSize = new Size(0, 63);
+            btnCancel.Name = "btnCancel";
+            btnCancel.Padding = new Padding(21, 10, 21, 10);
+            btnCancel.Size = new Size(131, 63);
+            btnCancel.TabIndex = 0;
+            btnCancel.Text = "Cancel";
+            btnCancel.UseVisualStyleBackColor = false;
+            btnCancel.Click += OnCancel;
+            // 
+            // btnSave
+            // 
+            btnSave.AutoSize = true;
+            btnSave.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            btnSave.BackColor = Color.FromArgb(39, 137, 71);
+            btnSave.FlatStyle = FlatStyle.Flat;
+            btnSave.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            btnSave.ForeColor = Color.White;
+            btnSave.Location = new Point(971, 17);
+            btnSave.Margin = new Padding(5);
+            btnSave.MinimumSize = new Size(0, 63);
+            btnSave.Name = "btnSave";
+            btnSave.Padding = new Padding(21, 10, 21, 10);
+            btnSave.Size = new Size(112, 63);
+            btnSave.TabIndex = 1;
+            btnSave.Text = "Save";
+            btnSave.UseVisualStyleBackColor = false;
+            btnSave.Click += OnSave;
+            // 
+            // StatementEditorDialog
+            // 
             AcceptButton = btnSave;
-            CancelButton = btnCancel;
-            AutoScaleDimensions = new SizeF(96F, 96F);
+            AutoScaleDimensions = new SizeF(168F, 168F);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(720, 540);
+            BackColor = SystemColors.Control;
+            CancelButton = btnCancel;
+            ClientSize = new Size(1260, 1200);
             Controls.Add(layout);
-            FormBorderStyle = FormBorderStyle.Sizable;
-            MaximizeBox = true;
+            Margin = new Padding(5);
             MinimizeBox = false;
-            MinimumSize = new Size(560, 420);
+            MinimumSize = new Size(962, 900);
             Name = "StatementEditorDialog";
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterParent;
             Text = "Statement";
             layout.ResumeLayout(false);
-            typeSelectorLayout.ResumeLayout(false);
-            typeSelectorLayout.PerformLayout();
-            pnlTypeSelector.ResumeLayout(false);
-            pnlTypeSelector.PerformLayout();
-            pnlCommon.ResumeLayout(false);
-            pnlCommon.PerformLayout();
+            layout.PerformLayout();
+            accountBar.ResumeLayout(false);
+            accountBar.PerformLayout();
             pnlButtons.ResumeLayout(false);
+            pnlButtons.PerformLayout();
             ResumeLayout(false);
         }
     }

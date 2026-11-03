@@ -16,5 +16,7 @@ namespace THMS.Data.Stores.InMemoryStores
             _items.TryGetValue(sessionId, out var session);
             return session;
         }
+
+        public void Delete(Guid sessionId) => _items.Remove(sessionId);
     }
 }

@@ -22,6 +22,14 @@ namespace THMS.Data.Stores.InMemoryStores
                 return;
             }
 
+            // A commercial session corrected to home (or the reverse) is a different type.
+            if (existing.GetType() != session.GetType())
+            {
+                _items[_items.IndexOf(existing)] = session;
+                _mileageStore.Upsert(session);
+                return;
+            }
+
             // Update base fields
             existing.VehicleId = session.VehicleId;
             existing.VehicleName = session.VehicleName;

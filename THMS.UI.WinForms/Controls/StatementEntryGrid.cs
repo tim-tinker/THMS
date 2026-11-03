@@ -6,6 +6,8 @@ namespace THMS.UI.WinForms.Controls
 
         public event EventHandler? AppendRow;
 
+        public event EventHandler? DeleteRow;
+
         public StatementEntryGrid()
         {
             Dock = DockStyle.Fill;
@@ -37,6 +39,12 @@ namespace THMS.UI.WinForms.Controls
 
         protected override bool ProcessDataGridViewKey(KeyEventArgs e)
         {
+            if (e.KeyCode == Keys.Delete && !IsCurrentCellInEditMode && DeleteRow is not null)
+            {
+                DeleteRow(this, EventArgs.Empty);
+                return true;
+            }
+
             if (e.KeyCode is Keys.Tab or Keys.Enter)
                 CommitCurrentEdit();
             if (TryAppendRowOnTab(e.KeyData))

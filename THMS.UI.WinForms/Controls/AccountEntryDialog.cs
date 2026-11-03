@@ -23,6 +23,11 @@ namespace THMS.UI.WinForms.Controls
         private bool _displaySplit;
         private bool _loadingCategories;
 
+        private static readonly Font DescriptionFont = new("Segoe UI", 14F, FontStyle.Bold);
+        private static readonly Font AmountFont = new("Segoe UI", 16F, FontStyle.Bold);
+        private static readonly Font LabelFont = new("Segoe UI", 9F, FontStyle.Bold);
+        private static readonly Font HintFont = new("Segoe UI", 9F);
+
         public decimal Amount { get; private set; }
         public DateTime Date { get; private set; }
         public string Description { get; private set; } = "";
@@ -31,7 +36,6 @@ namespace THMS.UI.WinForms.Controls
         public IReadOnlyList<SplitTransactionRow> PendingSplits => _pendingSplits;
 
         public AccountEntryDialog(
-            string title,
             string hint,
             IReadOnlyList<ExpenseCategory> categories,
             Guid? lockedCategoryId = null,
@@ -45,14 +49,15 @@ namespace THMS.UI.WinForms.Controls
             IReadOnlyList<Account>? accounts = null,
             IEnumerable<SplitTransactionRow>? existingSplits = null)
         {
-            Text = title;
+            Text = "Transaction Details";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false;
             MaximizeBox = false;
             ShowInTaskbar = false;
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(460, 316);
+            BackColor = Color.White;
+            ClientSize = new Size(728, 360);
 
             _categories = categories.ToList();
             _accounts = accounts ?? [];
@@ -64,83 +69,115 @@ namespace THMS.UI.WinForms.Controls
             _requireCategory = lockedCategoryId is not null;
             _lockedCategoryValue = lockedCategoryId ?? (lockCategory ? initialCategoryId : null);
 
-            const int margin = 16;
-            const int contentWidth = 428;
+            const int margin = 24;
+            const int contentWidth = 680;
+            const int fieldGap = 18;
+            const int labelGap = 4;
             var y = margin;
-            if (!string.IsNullOrWhiteSpace(hint))
-            {
-                var hintLabel = new Label
-                {
-                    Text = hint,
-                    Left = margin,
-                    Top = y,
-                    AutoSize = true,
-                    MaximumSize = new Size(contentWidth, 0)
-                };
-                Controls.Add(hintLabel);
-                y += hintLabel.Height + 12;
-            }
 
-            Controls.Add(LabelAt("Date", 16, y));
-            _date.Left = 140;
-            _date.Top = y;
-            _date.Width = 280;
-            _date.Format = DateTimePickerFormat.Short;
-            _date.Value = initialDate is DateTime date && date.Year > 1 ? date.Date : DateTime.Today;
-            Controls.Add(_date);
-            y += 40;
-
-            Controls.Add(LabelAt("Amount", 16, y));
-            _amount.Left = 140;
-            _amount.Top = y;
-            _amount.Width = 280;
-            _amount.DecimalPlaces = 2;
-            _amount.Minimum = -1_000_000;
-            _amount.Maximum = 1_000_000;
-            if (initialAmount is decimal amount)
-                _amount.Value = Math.Clamp(amount, _amount.Minimum, _amount.Maximum);
-            _amount.Enabled = !lockAmount;
-            Controls.Add(_amount);
-            y += 40;
-
-            Controls.Add(LabelAt("Category", 16, y));
-            _category.Left = 140;
-            _category.Top = y;
-            _category.Width = 280;
-            _category.DropDownStyle = ComboBoxStyle.DropDownList;
-            _category.SelectionChangeCommitted += OnCategoryCommitted;
-            BindCategories();
-            _category.Enabled = !_lockCategory;
-            Controls.Add(_category);
-            y += 40;
-
-            Controls.Add(LabelAt("Description", 16, y));
-            _description.Left = 140;
+            _description.Font = DescriptionFont;
+            _description.Left = margin;
             _description.Top = y;
-            _description.Width = 280;
+            _description.Width = contentWidth;
+            _description.TabIndex = 0;
             _description.Text = defaultDescription ?? "";
             Controls.Add(_description);
+            y += _description.Height + fieldGap;
 
-            y += 48;
-            var save = new ThmsButton { Text = "Save", Top = y };
+            _amount.Font = AmountFont;
+            _amount.TextAlign = HorizontalAlignment.Right;
+            _amount.DecimalPlaces = 2;
+            _amount.ThousandsSeparator = true;
+            _amount.Minimum = -1_000_000;
+            _amount.Maximum = 1_000_000;
+            _amount.Width = 200;
+            _amount.Left = margin;
+            _amount.TabIndex = 1;
+            _amount.Enabled = !lockAmount;
+            if (initialAmount is decimal amount)
+                _amount.Value = Math.Clamp(amount, _amount.Minimum, _amount.Maximum);
+
+            var hintWidth = contentWidth - _amount.Width - 16;
+            Label? hintLabel = null;
+            if (!string.IsNullOrWhiteSpace(hint))
+            {
+                hintLabel = new Label
+                {
+                    Text = hint,
+                    Font = HintFont,
+                    ForeColor = Color.FromArgb(70, 70, 70),
+                    AutoSize = true,
+                    MaximumSize = new Size(hintWidth, 0)
+                };
+                Controls.Add(hintLabel);
+            }
+
+            var rowHeight = Math.Max(_amount.Height, hintLabel?.Height ?? 0);
+            _amount.Top = y + Math.Max(0, (rowHeight - _amount.Height) / 2);
+            if (hintLabel is not null)
+            {
+                hintLabel.Left = _amount.Right + 16;
+                hintLabel.Top = y + Math.Max(0, (rowHeight - hintLabel.Height) / 2);
+            }
+
+            Controls.Add(_amount);
+            y += rowHeight + fieldGap;
+
+            var dateLabel = FieldLabel("Date");
+            dateLabel.Left = margin;
+            dateLabel.Top = y;
+            Controls.Add(dateLabel);
+            y += dateLabel.Height + labelGap;
+
+            _date.Left = margin;
+            _date.Top = y;
+            _date.Width = _amount.Width;
+            _date.Format = DateTimePickerFormat.Short;
+            _date.TabIndex = 2;
+            _date.Value = initialDate is DateTime date && date.Year > 1 ? date.Date : DateTime.Today;
+            Controls.Add(_date);
+            y += _date.Height + fieldGap;
+
+            var categoryLabel = FieldLabel("Category");
+            categoryLabel.Left = margin;
+            categoryLabel.Top = y;
+            Controls.Add(categoryLabel);
+            y += categoryLabel.Height + labelGap;
+
+            _category.Left = margin;
+            _category.Top = y;
+            _category.Width = contentWidth;
+            _category.DropDownStyle = ComboBoxStyle.DropDownList;
+            _category.TabIndex = 3;
+            _category.SelectionChangeCommitted += OnCategoryCommitted;
+            _category.Enabled = !_lockCategory;
+            Controls.Add(_category);
+            BindCategories();
+            y += _category.Height + fieldGap + 8;
+
+            var save = new ThmsButton { Text = "Save", TabIndex = 4 };
             save.Click += OnSave;
-            var cancel = new ThmsButton { Text = "Cancel", Top = y };
+            var cancel = new ThmsButton { Text = "Cancel", TabIndex = 5 };
             cancel.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
             Controls.Add(save);
             Controls.Add(cancel);
             var cancelWidth = Math.Max(cancel.Width, cancel.PreferredSize.Width);
             var saveWidth = Math.Max(save.Width, save.PreferredSize.Width);
+            save.Top = y;
+            cancel.Top = y;
             cancel.Left = margin + contentWidth - cancelWidth;
             save.Left = cancel.Left - saveWidth - 12;
             ClientSize = new Size(margin + contentWidth + margin, y + save.Height + margin);
             AcceptButton = save;
             CancelButton = cancel;
+            ActiveControl = _description;
         }
 
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
             BindCategories();
+            _description.Focus();
         }
 
         private void BindCategories()
@@ -273,8 +310,8 @@ namespace THMS.UI.WinForms.Controls
             BindCategories();
         }
 
-        private static Label LabelAt(string text, int left, int top) =>
-            new() { Text = text, Left = left, Top = top + 4, AutoSize = true };
+        private static Label FieldLabel(string text) =>
+            new() { Text = text, Font = LabelFont, AutoSize = true };
 
         private void OnSave(object? sender, EventArgs e)
         {

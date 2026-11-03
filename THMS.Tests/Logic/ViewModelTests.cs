@@ -531,6 +531,50 @@ namespace THMS.Tests.Logic
             Assert.That(vm.Snapshot.UpcomingPayments.Any(p => p.Description == "Rent"), Is.True);
             Assert.That(vm.Snapshot.UpcomingForecast.Any(f => f.Description == "Rent"), Is.True);
         }
+
+        [Test]
+        public void FinanceDashboardViewModel_TransferIntoInvestment_ShowsMoneyLeavingChecking()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var txs = new InMemoryTransactionDataStore();
+            var hsa = new InvestmentAccount
+            {
+                Name = "Fidelity HSA",
+                Institution = "Fidelity",
+                AccountNumber = "1",
+                WebsiteUrl = "",
+                Type = AccountType.Investment
+            };
+            var checking = new BankAccount
+            {
+                Name = "WF Checking",
+                Institution = "WF",
+                AccountNumber = "2",
+                WebsiteUrl = "",
+                Type = AccountType.Checking
+            };
+            accounts.UpsertAccount(hsa);
+            accounts.UpsertAccount(checking);
+            txs.AddRecurringTransferRule(new RecurringTransferRule
+            {
+                FromAccountId = checking.Id,
+                ToAccountId = hsa.Id,
+                Description = "HSA contribution",
+                Amount = 161m,
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = DateTime.Today.AddDays(5),
+                IsActive = true
+            });
+
+            var vm = new FinanceDashboardViewModel(accounts, txs);
+            vm.Initialize();
+
+            var rows = vm.Snapshot.UpcomingForecast.Where(row => row.Description == "HSA contribution").ToList();
+            Assert.That(rows, Is.Not.Empty);
+            Assert.That(
+                rows.All(row => row.AccountId == checking.Id && row.AccountName == "WF Checking" && row.Amount == -161m),
+                Is.True);
+        }
     }
 
     [TestFixture]

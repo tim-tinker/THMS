@@ -79,8 +79,8 @@ namespace THMS.Tests.Logic
             var hsaRows = new BillsOrchestrator(accounts, transactions, statements).GetBills(hsa.Id, DateTime.Today);
 
             Assert.That(rows, Has.Some.Matches<BillRow>(r => r.Notes == "Comcast" && r.Kind == BillKinds.Recurring && r.Amount == -80m));
-            Assert.That(rows, Has.Some.Matches<BillRow>(r => r.Notes == "HSA Transfer" && r.Kind == BillKinds.Transfer && r.Amount == -448m && r.OtherAccountId == hsa.Id));
-            Assert.That(hsaRows, Has.Some.Matches<BillRow>(r => r.Notes == "HSA Transfer" && r.Amount == 448m && r.OtherAccountId == checking.Id));
+            Assert.That(rows, Has.Some.Matches<BillRow>(r => r.Notes == "HSA Transfer" && r.Kind == BillKinds.Transfer && r.Amount == -448m && r.OtherAccountId == hsa.Id && r.OtherAccountName == "To HSA"));
+            Assert.That(hsaRows, Has.Some.Matches<BillRow>(r => r.Notes == "HSA Transfer" && r.Amount == 448m && r.OtherAccountId == checking.Id && r.OtherAccountName == "From Checking"));
         }
 
         [Test]
@@ -927,6 +927,44 @@ namespace THMS.Tests.Logic
             Assert.That(rule.TargetCategoryId, Is.EqualTo(DefaultExpenseCategories.InterestId));
             Assert.That(orchestrator.GetBills(card.Id, new DateTime(2026, 10, 2)), Has.Count.EqualTo(1));
             Assert.That(orchestrator.GetBills(checking.Id, new DateTime(2026, 10, 2)), Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public void AddEnteredBill_RecurringContributionToInvestment_LeavesCheckingAndEntersTheInvestment()
+        {
+            var (accounts, transactions, statements, checking, _) = SeedCheckingAndCard();
+            var hsa = new InvestmentAccount
+            {
+                Name = "Fidelity HSA",
+                Institution = "Fidelity",
+                AccountNumber = "3",
+                WebsiteUrl = "",
+                Type = AccountType.Investment
+            };
+            accounts.UpsertAccount(hsa);
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var due = new DateTime(2026, 11, 13);
+
+            orchestrator.AddEnteredBill(
+                hsa.Id, "HSA contribution", 161m, DefaultExpenseCategories.UncategorizedId, due,
+                checking.Id, DefaultExpenseCategories.UncategorizedId, RecurrenceFrequency.Monthly);
+
+            var rule = transactions.GetAllRecurringTransferRules().Single();
+            Assert.That(rule.FromAccountId, Is.EqualTo(checking.Id));
+            Assert.That(rule.ToAccountId, Is.EqualTo(hsa.Id));
+            Assert.That(rule.Amount, Is.EqualTo(161m));
+
+            var asOf = new DateTime(2026, 11, 2);
+            var checkingBill = orchestrator.GetBills(checking.Id, asOf).Single();
+            var investmentBill = orchestrator.GetBills(hsa.Id, asOf).Single();
+            Assert.That(checkingBill.Amount, Is.EqualTo(-161m));
+            Assert.That(checkingBill.OtherAccountName, Is.EqualTo("To Fidelity HSA"));
+            Assert.That(checkingBill.FundingAccountId, Is.EqualTo(checking.Id));
+            Assert.That(checkingBill.FundingName, Is.EqualTo("Checking"));
+            Assert.That(investmentBill.Amount, Is.EqualTo(161m));
+            Assert.That(investmentBill.OtherAccountName, Is.EqualTo("From Checking"));
+            Assert.That(investmentBill.FundingAccountId, Is.EqualTo(checking.Id));
+            Assert.That(investmentBill.FundingName, Is.EqualTo("Checking"));
         }
 
         [Test]

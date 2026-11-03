@@ -1182,7 +1182,6 @@ namespace THMS.UI.WinForms.Controls
                 hint += " Amount and category are changed from Split Transaction.";
 
             using var dialog = new AccountEntryDialog(
-                "Edit Transaction",
                 hint,
                 categories,
                 defaultDescription: parent.Description,

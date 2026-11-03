@@ -53,14 +53,17 @@ namespace THMS.Logic.Orchestrators
             // Save base
             _vehicleStore.UpsertBaseEvChargeSession(session);
 
-            // Save subtype
+            // Save subtype. Drop the other subtype so a corrected Home Charger
+            // choice replaces the previous charge type instead of leaving both.
             switch (session)
             {
                 case CommercialEvChargeSession commercial:
+                    _vehicleStore.DeleteHomeEvChargeSession(commercial.Id);
                     _vehicleStore.UpsertCommercialEvChargeSession(commercial);
                     break;
 
                 case HomeEvChargeSession home:
+                    _vehicleStore.DeleteCommercialEvChargeSession(home.Id);
                     _vehicleStore.UpsertHomeEvChargeSession(home);
                     break;
 

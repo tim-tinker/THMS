@@ -115,6 +115,9 @@ namespace THMS.Data.Stores
         public CommercialEvChargeSession? GetCommercialEvChargeSession(Guid sessionId) =>
             _commercialEvStore.Get(sessionId);
 
+        public void DeleteCommercialEvChargeSession(Guid sessionId) =>
+            _commercialEvStore.Delete(sessionId);
+
         // ---------------------------------------------------------
         // HOME EV CHARGE SESSIONS
         // ---------------------------------------------------------
@@ -124,6 +127,13 @@ namespace THMS.Data.Stores
 
         public HomeEvChargeSession? GetHomeEvChargeSession(Guid sessionId) =>
             _homeEvStore.Get(sessionId);
+
+        public void DeleteHomeEvChargeSession(Guid sessionId)
+        {
+            _attribStore.Delete(sessionId);
+            _billingStore.Delete(sessionId);
+            _homeEvStore.Delete(sessionId);
+        }
 
         // ---------------------------------------------------------
         // HOME EV CHARGE ATTRIBUTION

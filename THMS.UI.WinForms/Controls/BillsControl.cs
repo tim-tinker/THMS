@@ -337,7 +337,7 @@ namespace THMS.UI.WinForms.Controls
 
             if (name == nameof(BillRow.FundingAccountId) && !row.CanChoosePayFrom)
             {
-                e.Value = "";
+                e.Value = row.FundingAccountId == Guid.Empty ? "" : row.FundingName;
                 e.FormattingApplied = true;
             }
         }
@@ -599,7 +599,6 @@ namespace THMS.UI.WinForms.Controls
                 hint += " Amount and category are changed from Split Transaction.";
 
             using var dialog = new AccountEntryDialog(
-                "Edit Transaction",
                 hint,
                 categories,
                 defaultDescription: parent.Description,
@@ -768,6 +767,12 @@ namespace THMS.UI.WinForms.Controls
         private readonly ComboBox _billCategory = new();
         private readonly DateTimePicker _date = new();
         private readonly ComboBox _creditAccount = new();
+        private readonly Label _directionHint = new()
+        {
+            AutoSize = false,
+            Height = 44,
+            Text = "Money leaves Pay from and arrives in Account to Bill. Leave Pay from blank for a bill on one account."
+        };
         private readonly Label _creditCategoryLabel;
         private readonly ComboBox _creditCategory = new();
         private readonly ComboBox _frequency = new();
@@ -838,7 +843,7 @@ namespace THMS.UI.WinForms.Controls
             _frequency.Items.AddRange([OneTime, "Weekly", "Biweekly", "Monthly", "Quarterly", "Yearly"]);
             _frequency.SelectedIndex = 0;
 
-            _creditCategoryLabel = LabelAt("Credit Category");
+            _creditCategoryLabel = LabelAt("Pay from category");
             _creditCategory.Visible = false;
             _creditCategoryLabel.Visible = false;
 
@@ -847,7 +852,8 @@ namespace THMS.UI.WinForms.Controls
             AddRow(LabelAt("Amount"), _amount);
             AddRow(LabelAt("Bill Category"), _billCategory);
             AddRow(LabelAt("Date"), _date);
-            AddRow(LabelAt("Account to Credit"), _creditAccount);
+            AddRow(LabelAt("Pay from"), _creditAccount);
+            AddRow(LabelAt(""), _directionHint);
             AddRow(_creditCategoryLabel, _creditCategory);
             AddRow(LabelAt("Frequency"), _frequency);
             _save.Click += OnSave;
@@ -1257,14 +1263,14 @@ namespace THMS.UI.WinForms.Controls
             {
                 if (credit.Id == bill.Id)
                 {
-                    MessageBox.Show(this, "Account to credit must be a different account.", Text,
+                    MessageBox.Show(this, "Pay from must be a different account.", Text,
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
                 if (_creditCategory.SelectedItem is not CategoryListItem creditCategory || creditCategory.CategoryId is not Guid selectedCreditCategoryId)
                 {
-                    MessageBox.Show(this, "Select a credit category.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(this, "Select a pay from category.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 

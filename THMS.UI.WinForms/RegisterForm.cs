@@ -231,18 +231,22 @@ namespace THMS.UI.WinForms
             gridTransactions.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True;
             var txDate = TextColumn(nameof(UnifiedTransactionView.Date), "Transaction Date");
             txDate.DefaultCellStyle.Format = "d";
+            txDate.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             var txAmount = TextColumn(nameof(UnifiedTransactionView.Amount), "Amount");
             txAmount.DefaultCellStyle.Format = "c2";
             txAmount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             txAmount.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+            txAmount.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            var txCategory = TextColumn(nameof(UnifiedTransactionView.Category), "Category");
+            txCategory.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             var txDescription = TextColumn(nameof(UnifiedTransactionView.Description), "Description");
             txDescription.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             txDescription.MinimumWidth = 120;
             gridTransactions.Columns.AddRange(
                 txDate,
+                txDescription,
                 txAmount,
-                TextColumn(nameof(UnifiedTransactionView.Category), "Category"),
-                txDescription);
+                txCategory);
             gridTransactions.DataSource = _statementTransactionsSource;
             gridTransactions.CellFormatting += (_, e) =>
             {

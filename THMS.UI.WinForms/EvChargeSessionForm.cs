@@ -101,7 +101,6 @@ namespace THMS.UI.WinForms
             try
             {
                 _checkHomeCharger.Checked = session.IsHomeCharge;
-                _checkHomeCharger.Enabled = false;
                 EnableHomeControls(session.IsHomeCharge);
                 _numLastOdometer.Value = ClampToNumeric(_numLastOdometer, session.LastOdometer);
                 _numLastSoc.Value = ClampToNumeric(_numLastSoc, session.LastSoc);

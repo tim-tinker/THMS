@@ -459,6 +459,81 @@ namespace THMS.Tests.Logic
             Assert.That(completed.SourceSplitIsEstimated, Is.False);
             Assert.That(completed.Attribution, Is.Null);
         }
+
+        [Test]
+        public void Update_ChangesChargeTypeAndDropsThePreviousSubtype()
+        {
+            var vehicles = new InMemoryVehicleDataStore();
+            var energy = new InMemoryEnergyDataStore();
+            var finance = new InMemoryFinanceDataStore();
+            var ev = vehicles.GetAllVehicles().OfType<VehicleEv>().First();
+            var orchestrator = new EvChargeSessionOrchestrator(vehicles, energy, finance)
+            {
+                VehicleId = ev.Id
+            };
+
+            finance.UpsertElectricContract(new ElectricContract
+            {
+                Id = Guid.NewGuid(),
+                Name = "Contract",
+                StartDate = new DateTime(2026, 1, 1),
+                EndDate = new DateTime(2026, 12, 31),
+                EnergyChargeRate = 0.10m,
+                DeliveryChargeRate = 0.05m
+            });
+            energy.UpsertHomeCircuitReading(new HomeCircuitReading
+            {
+                Timestamp = new DateTime(2026, 9, 8, 20, 19, 0),
+                KiloWattHours = 2m
+            });
+
+            var commercial = new CommercialEvChargeSession
+            {
+                VehicleId = ev.Id,
+                StartTime = new DateTime(2026, 9, 8, 20, 19, 0),
+                EndTime = new DateTime(2026, 9, 9, 1, 34, 0),
+                KwhDrawn = 11m,
+                SessionCost = 4.25m
+            };
+            orchestrator.Save(commercial);
+
+            var asHome = new HomeEvChargeSession
+            {
+                Id = commercial.Id,
+                VehicleId = ev.Id,
+                StartTime = commercial.StartTime,
+                EndTime = commercial.EndTime,
+                KwhAdded = commercial.KwhAdded
+            };
+            orchestrator.Update(asHome);
+
+            var home = orchestrator.GetEvChargeSessions("Lifetime").Single(s => s.Id == commercial.Id);
+            Assert.That(home, Is.InstanceOf<HomeEvChargeSession>());
+            Assert.That(home.IsHomeCharge, Is.True);
+            Assert.That(vehicles.GetCommercialEvChargeSession(commercial.Id), Is.Null);
+            Assert.That(home.KwhDrawn, Is.EqualTo(2m));
+            Assert.That(home.SessionCost, Is.EqualTo(0.30m));
+
+            var asCommercial = new CommercialEvChargeSession
+            {
+                Id = commercial.Id,
+                VehicleId = ev.Id,
+                StartTime = commercial.StartTime,
+                EndTime = commercial.EndTime,
+                KwhDrawn = 11m,
+                SessionCost = 4.25m
+            };
+            orchestrator.Update(asCommercial);
+
+            var restored = orchestrator.GetEvChargeSessions("Lifetime").Single(s => s.Id == commercial.Id);
+            Assert.That(restored, Is.InstanceOf<CommercialEvChargeSession>());
+            Assert.That(restored.IsHomeCharge, Is.False);
+            Assert.That(vehicles.GetHomeEvChargeSession(commercial.Id), Is.Null);
+            Assert.That(vehicles.GetHomeEvChargeAttribution(commercial.Id), Is.Null);
+            Assert.That(vehicles.GetHomeEvChargeBilling(commercial.Id), Is.Null);
+            Assert.That(restored.KwhDrawn, Is.EqualTo(11m));
+            Assert.That(restored.SessionCost, Is.EqualTo(4.25m));
+        }
     }
 
     [TestFixture]

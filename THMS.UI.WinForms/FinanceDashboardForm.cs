@@ -352,6 +352,7 @@ namespace THMS.UI.WinForms
             _forecastGrid.DataSource = _forecastSource;
             _forecastGrid.Columns.AddRange(
                 DateColumn("Date", "Date"),
+                TextColumn("AccountName", "Account", DataGridViewAutoSizeColumnMode.AllCells, 140),
                 TextColumn("Description", "Description", DataGridViewAutoSizeColumnMode.Fill, 220),
                 CurrencyColumn("Amount", "Amount"),
                 TextColumn("Category", "Category", DataGridViewAutoSizeColumnMode.AllCells, 120));

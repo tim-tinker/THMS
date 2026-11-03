@@ -41,12 +41,15 @@ namespace THMS.Data.Stores
         // ---------------------------------------------------------
         void UpsertCommercialEvChargeSession(CommercialEvChargeSession session);
         CommercialEvChargeSession? GetCommercialEvChargeSession(Guid sessionId);
+        void DeleteCommercialEvChargeSession(Guid sessionId);
 
         // ---------------------------------------------------------
         // HOME EV CHARGE SESSIONS (incrementally completed)
         // ---------------------------------------------------------
         void UpsertHomeEvChargeSession(HomeEvChargeSession session);
         HomeEvChargeSession? GetHomeEvChargeSession(Guid sessionId);
+        /// <summary>Removes the home session row and any stored attribution or billing.</summary>
+        void DeleteHomeEvChargeSession(Guid sessionId);
 
         // ---------------------------------------------------------
         // HOME EV CHARGE ATTRIBUTION (solar + circuit data)

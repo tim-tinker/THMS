@@ -99,10 +99,17 @@ namespace THMS.Logic.ViewModels.Finance
         private List<UnifiedTransactionView> BuildForecast(DateTime from, List<Account> accounts)
         {
             var to = from.AddDays(90);
+            var names = accounts.ToDictionary(account => account.Id, account => account.Name);
             return accounts
                 .SelectMany(account => _txOrchestrator.GenerateForecast(account.Id, from, to))
+                .Select(row =>
+                {
+                    if (names.TryGetValue(row.AccountId, out var name))
+                        row.AccountName = name;
+                    return row;
+                })
                 .GroupBy(f => (f.Date.Date, f.Description, Amount: Math.Abs(f.Amount), f.Type.Contains("Transfer")))
-                .Select(g => g.First())
+                .Select(g => g.OrderBy(f => f.Amount).ThenBy(f => f.AccountName, StringComparer.Ordinal).First())
                 .OrderBy(f => f.Date)
                 .ThenBy(f => f.Description)
                 .ToList();
