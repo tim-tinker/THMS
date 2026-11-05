@@ -37,6 +37,10 @@ namespace THMS.UI.WinForms
                 LinkFillColumn(nameof(InvestmentPortfolioRow.Institution), "Institution"),
                 TextColumn(nameof(InvestmentPortfolioRow.AccountNumber), "Account"),
                 MoneyColumn(nameof(InvestmentPortfolioRow.Cash), "Cash"),
+                MoneyColumn(nameof(InvestmentPortfolioRow.MarketValue), "Market value"),
+                MoneyColumn(nameof(InvestmentPortfolioRow.AccountValue), "Account value"),
+                TextColumn(nameof(InvestmentPortfolioRow.PricesAsOfText), "Prices as of"),
+                TextColumn(nameof(InvestmentPortfolioRow.PriceSource), "Prices"),
                 MoneyColumn(nameof(InvestmentPortfolioRow.EstimatedAnnualIncome), "Est. annual income"));
             _securities.Columns.AddRange(
                 TextColumn(nameof(InvestmentPositionRow.Symbol), "Symbol"),
@@ -44,6 +48,9 @@ namespace THMS.UI.WinForms
                 NumberColumn(nameof(InvestmentPositionRow.Shares), "Shares", "n4"),
                 MoneyColumn(nameof(InvestmentPositionRow.AverageCost), "Average cost"),
                 MoneyColumn(nameof(InvestmentPositionRow.TotalBasis), "Total basis"),
+                MoneyColumn(nameof(InvestmentPositionRow.Price), "Price", "c4"),
+                MoneyColumn(nameof(InvestmentPositionRow.MarketValue), "Market value"),
+                DateColumn(nameof(InvestmentPositionRow.PriceAsOf), "Price as of"),
                 MoneyColumn(nameof(InvestmentPositionRow.EstimatedAnnualIncome), "Est. annual income"),
                 NumberColumn(nameof(InvestmentPositionRow.AmountPerShare), "Amount / share", "n4"),
                 DateColumn(nameof(InvestmentPositionRow.ExDate), "Ex-date"),
@@ -394,10 +401,10 @@ namespace THMS.UI.WinForms
             return column;
         }
 
-        private static DataGridViewTextBoxColumn MoneyColumn(string property, string header)
+        private static DataGridViewTextBoxColumn MoneyColumn(string property, string header, string format = "c2")
         {
             var column = TextColumn(property, header);
-            column.DefaultCellStyle.Format = "c2";
+            column.DefaultCellStyle.Format = format;
             column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             column.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
             return column;

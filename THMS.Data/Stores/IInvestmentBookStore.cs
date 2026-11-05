@@ -10,6 +10,9 @@ namespace THMS.Data.Stores
         IReadOnlyList<SecurityQuote> GetQuotes(Guid accountId);
         void UpsertQuote(SecurityQuote quote);
 
+        IReadOnlyList<SecurityMarketQuote> GetMarketQuotes();
+        void UpsertMarketQuote(SecurityMarketQuote quote);
+
         IReadOnlyList<InvestmentSecurity> GetSecurities();
         void UpsertSecurity(InvestmentSecurity security);
 

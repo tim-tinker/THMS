@@ -139,6 +139,7 @@ namespace THMS.Logic.Finance.Investments
                 throw new InvalidOperationException("Preview the files before importing them.");
 
             Save(_pending);
+            RefreshQuotedValues();
             _pending = null;
         }
 
@@ -149,6 +150,7 @@ namespace THMS.Logic.Finance.Investments
 
             foreach (var state in _pendingPositions)
                 Save(state);
+            RefreshQuotedValues();
             _pendingPositions = [];
         }
 
@@ -159,6 +161,7 @@ namespace THMS.Logic.Finance.Investments
             if (message is not null)
                 throw new InvalidOperationException(message);
             Save(state);
+            RefreshQuotedValues();
         }
 
         private void Save(InvestmentBookState state)
@@ -168,6 +171,8 @@ namespace THMS.Logic.Finance.Investments
                 _books.UpsertSecurity(security);
             foreach (var quote in state.Quotes)
                 _books.UpsertQuote(quote);
+            foreach (var quote in state.MarketQuotes)
+                _books.UpsertMarketQuote(quote);
             PostLedger(state.Actions);
             foreach (var action in state.Actions)
                 _books.UpsertAction(action);
@@ -257,8 +262,24 @@ namespace THMS.Logic.Finance.Investments
             };
             state.Actions.AddRange(_books.GetActions(accountId));
             state.Quotes.AddRange(_books.GetQuotes(accountId));
+            state.MarketQuotes.AddRange(_books.GetMarketQuotes());
             state.Securities.AddRange(_books.GetSecurities());
             return state;
+        }
+
+        private void RefreshQuotedValues()
+        {
+            foreach (var account in _accounts.GetAllAccounts().OfType<InvestmentAccount>().ToList())
+            {
+                var state = Load(account.Id);
+                if (state.OpenedOn is null && !state.Actions.Any(action => action.Status == InvestmentActionStatus.Applied))
+                    continue;
+
+                var snapshot = InvestmentBookkeeper.Replay(state);
+                account.CashBalance = decimal.Round(snapshot.Cash, 2);
+                account.PositionValue = decimal.Round(snapshot.PositionValue, 2);
+                _accounts.UpsertAccount(account);
+            }
         }
 
         private InvestmentAccount RequireInvestment(Guid accountId)

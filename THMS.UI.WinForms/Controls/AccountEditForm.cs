@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Windows.Forms;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Investments;
 using THMS.Logic.Finance.Model;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.Logic.ViewModels.Finance;
@@ -113,6 +114,7 @@ namespace THMS.UI.WinForms.Controls
 
                 case InvestmentAccount invest:
                     numInvestCash.Enabled = !invest.TracksPositions;
+                    chkInvestImportOnly.Checked = invest.QuoteAccess == QuoteAccess.ImportOnly;
                     if (invest.CashBalance >= numInvestCash.Minimum && invest.CashBalance <= numInvestCash.Maximum)
                         numInvestCash.Value = invest.CashBalance;
                     break;
@@ -163,8 +165,10 @@ namespace THMS.UI.WinForms.Controls
                     mortgage.NextPaymentDate = dtMortNext.Value;
                     break;
 
-                case InvestmentAccount invest when !invest.TracksPositions:
-                    invest.CashBalance = numInvestCash.Value;
+                case InvestmentAccount invest:
+                    invest.QuoteAccess = chkInvestImportOnly.Checked ? QuoteAccess.ImportOnly : QuoteAccess.Service;
+                    if (!invest.TracksPositions)
+                        invest.CashBalance = numInvestCash.Value;
                     break;
 
                 case InternalAccount internalAcct:

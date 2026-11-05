@@ -41,6 +41,19 @@ namespace THMS.Data.Stores.SQLite
             FinanceDataRevision.NoteChanged();
         }
 
+        public IReadOnlyList<SecurityMarketQuote> GetMarketQuotes()
+        {
+            using var conn = Open();
+            return InvestmentBookSql.GetMarketQuotes(conn);
+        }
+
+        public void UpsertMarketQuote(SecurityMarketQuote quote)
+        {
+            using var conn = Open();
+            InvestmentBookSql.UpsertMarketQuote(conn, quote);
+            FinanceDataRevision.NoteChanged();
+        }
+
         public IReadOnlyList<InvestmentSecurity> GetSecurities()
         {
             using var conn = Open();
@@ -78,6 +91,14 @@ namespace THMS.Data.Stores.SQLite
                     Symbol TEXT PRIMARY KEY,
                     Name TEXT NOT NULL,
                     IsSweep INTEGER NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS SecurityMarketQuotes (
+                    Symbol TEXT NOT NULL COLLATE NOCASE,
+                    AsOf TEXT NOT NULL,
+                    Origin INTEGER NOT NULL,
+                    UnitValue TEXT NOT NULL,
+                    PRIMARY KEY (Symbol, AsOf, Origin)
                 );
 
                 CREATE TABLE IF NOT EXISTS SecurityQuotes (
@@ -121,6 +142,9 @@ namespace THMS.Data.Stores.SQLite
                     UNIQUE(AccountId, ImportKey)
                 );";
             cmd.ExecuteNonQuery();
+            AddColumnIfMissing(conn, "InvestmentSecurities", "LookupKey", "TEXT NOT NULL DEFAULT ''");
+            AddColumnIfMissing(conn, "InvestmentSecurities", "QuoteAccess", "INTEGER NOT NULL DEFAULT 0");
+            EnsureMarketQuoteHistory(conn);
         }
 
         public static void DeleteAccount(SqliteConnection conn, Guid accountId)
@@ -287,10 +311,45 @@ namespace THMS.Data.Stores.SQLite
             cmd.ExecuteNonQuery();
         }
 
+        public static List<SecurityMarketQuote> GetMarketQuotes(SqliteConnection conn)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT Symbol, UnitValue, AsOf, Origin FROM SecurityMarketQuotes;";
+            var list = new List<SecurityMarketQuote>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                list.Add(new SecurityMarketQuote
+                {
+                    Symbol = reader.GetString(0),
+                    UnitValue = ReadDecimal(reader, 1) ?? 0,
+                    AsOf = ReadDate(reader.GetString(2)),
+                    Origin = (MarketQuoteOrigin)reader.GetInt32(3)
+                });
+            }
+
+            return list;
+        }
+
+        public static void UpsertMarketQuote(SqliteConnection conn, SecurityMarketQuote quote)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO SecurityMarketQuotes (Symbol, AsOf, Origin, UnitValue)
+                VALUES (@Symbol, @AsOf, @Origin, @UnitValue)
+                ON CONFLICT(Symbol, AsOf, Origin) DO UPDATE SET
+                    UnitValue = excluded.UnitValue;";
+            cmd.Parameters.AddWithValue("@Symbol", quote.Symbol);
+            cmd.Parameters.AddWithValue("@AsOf", WriteDate(quote.AsOf));
+            cmd.Parameters.AddWithValue("@Origin", (int)quote.Origin);
+            AddDecimal(cmd, "@UnitValue", quote.UnitValue);
+            cmd.ExecuteNonQuery();
+        }
+
         public static List<InvestmentSecurity> GetSecurities(SqliteConnection conn)
         {
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT Symbol, Name, IsSweep FROM InvestmentSecurities;";
+            cmd.CommandText = "SELECT Symbol, Name, IsSweep, LookupKey FROM InvestmentSecurities;";
             var list = new List<InvestmentSecurity>();
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -299,7 +358,8 @@ namespace THMS.Data.Stores.SQLite
                 {
                     Symbol = reader.GetString(0),
                     Name = reader.GetString(1),
-                    IsSweep = reader.GetInt32(2) != 0
+                    IsSweep = reader.GetInt32(2) != 0,
+                    LookupKey = reader.IsDBNull(3) ? "" : reader.GetString(3)
                 });
             }
 
@@ -310,15 +370,66 @@ namespace THMS.Data.Stores.SQLite
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO InvestmentSecurities (Symbol, Name, IsSweep)
-                VALUES (@Symbol, @Name, @IsSweep)
+                INSERT INTO InvestmentSecurities (Symbol, Name, IsSweep, LookupKey)
+                VALUES (@Symbol, @Name, @IsSweep, @LookupKey)
                 ON CONFLICT(Symbol) DO UPDATE SET
                     Name = excluded.Name,
-                    IsSweep = excluded.IsSweep;";
+                    IsSweep = excluded.IsSweep,
+                    LookupKey = excluded.LookupKey;";
             cmd.Parameters.AddWithValue("@Symbol", security.Symbol);
             cmd.Parameters.AddWithValue("@Name", security.Name ?? "");
             cmd.Parameters.AddWithValue("@IsSweep", security.IsSweep ? 1 : 0);
+            cmd.Parameters.AddWithValue("@LookupKey", security.LookupKey ?? "");
             cmd.ExecuteNonQuery();
+        }
+
+        private static void EnsureMarketQuoteHistory(SqliteConnection conn)
+        {
+            using var lookup = conn.CreateCommand();
+            lookup.CommandText = "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'SecurityMarketQuotes';";
+            var sql = lookup.ExecuteScalar() as string;
+            if (sql is null
+                || sql.Contains("PRIMARY KEY (Symbol, AsOf, Origin)", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            using var migrate = conn.CreateCommand();
+            migrate.CommandText = @"
+                CREATE TABLE SecurityMarketQuotes_History (
+                    Symbol TEXT NOT NULL COLLATE NOCASE,
+                    AsOf TEXT NOT NULL,
+                    Origin INTEGER NOT NULL,
+                    UnitValue TEXT NOT NULL,
+                    PRIMARY KEY (Symbol, AsOf, Origin)
+                );
+                INSERT INTO SecurityMarketQuotes_History (Symbol, AsOf, Origin, UnitValue)
+                SELECT Symbol, AsOf, Origin, UnitValue FROM SecurityMarketQuotes;
+                DROP TABLE SecurityMarketQuotes;
+                ALTER TABLE SecurityMarketQuotes_History RENAME TO SecurityMarketQuotes;";
+            migrate.ExecuteNonQuery();
+        }
+
+        private static void AddColumnIfMissing(SqliteConnection conn, string table, string column, string definition)
+        {
+            if (ColumnExists(conn, table, column))
+                return;
+
+            using var add = conn.CreateCommand();
+            add.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition};";
+            add.ExecuteNonQuery();
+        }
+
+        private static bool ColumnExists(SqliteConnection conn, string table, string column)
+        {
+            using var pragma = conn.CreateCommand();
+            pragma.CommandText = $"PRAGMA table_info({table});";
+            using var reader = pragma.ExecuteReader();
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
 
         private static void Execute(SqliteConnection conn, string sql, Guid accountId)

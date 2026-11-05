@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Investments;
 
 namespace THMS.Data.Stores.SqlTables
 {
@@ -19,19 +20,21 @@ namespace THMS.Data.Stores.SqlTables
             AddColumnIfMissing(conn, "PositionValue", "REAL NOT NULL DEFAULT 0");
             AddColumnIfMissing(conn, "TracksPositions", "INTEGER NOT NULL DEFAULT 0");
             AddColumnIfMissing(conn, "BookOpenedOn", "TEXT");
+            AddColumnIfMissing(conn, "QuoteAccess", "INTEGER NOT NULL DEFAULT 0");
         }
 
         public void Upsert(SqliteConnection conn, InvestmentAccount account)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO InvestmentAccounts (AccountId, CashBalance, PositionValue, TracksPositions, BookOpenedOn)
-                VALUES (@AccountId, @CashBalance, @PositionValue, @TracksPositions, @BookOpenedOn)
+                INSERT INTO InvestmentAccounts (AccountId, CashBalance, PositionValue, TracksPositions, BookOpenedOn, QuoteAccess)
+                VALUES (@AccountId, @CashBalance, @PositionValue, @TracksPositions, @BookOpenedOn, @QuoteAccess)
                 ON CONFLICT(AccountId) DO UPDATE SET
                     CashBalance = excluded.CashBalance,
                     PositionValue = excluded.PositionValue,
                     TracksPositions = excluded.TracksPositions,
-                    BookOpenedOn = excluded.BookOpenedOn;";
+                    BookOpenedOn = excluded.BookOpenedOn,
+                    QuoteAccess = excluded.QuoteAccess;";
 
             cmd.Parameters.AddWithValue("@AccountId", account.Id.ToString());
             cmd.Parameters.AddWithValue("@CashBalance", account.CashBalance);
@@ -42,6 +45,7 @@ namespace THMS.Data.Stores.SqlTables
                 account.BookOpenedOn is DateTime opened
                     ? opened.ToString("yyyy-MM-dd")
                     : DBNull.Value);
+            cmd.Parameters.AddWithValue("@QuoteAccess", (int)account.QuoteAccess);
             cmd.ExecuteNonQuery();
         }
 
@@ -49,7 +53,7 @@ namespace THMS.Data.Stores.SqlTables
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT CashBalance, PositionValue, TracksPositions, BookOpenedOn
+                SELECT CashBalance, PositionValue, TracksPositions, BookOpenedOn, QuoteAccess
                 FROM InvestmentAccounts
                 WHERE AccountId = @AccountId;";
             cmd.Parameters.AddWithValue("@AccountId", id.ToString());
@@ -65,7 +69,8 @@ namespace THMS.Data.Stores.SqlTables
                 TracksPositions = reader.GetInt32(2) != 0,
                 BookOpenedOn = reader.IsDBNull(3)
                     ? null
-                    : DateTime.ParseExact(reader.GetString(3), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+                    : DateTime.ParseExact(reader.GetString(3), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                QuoteAccess = reader.IsDBNull(4) ? QuoteAccess.Service : (QuoteAccess)reader.GetInt32(4)
             };
         }
 

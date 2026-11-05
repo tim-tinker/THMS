@@ -8,6 +8,7 @@ namespace THMS.Logic.Finance.Investments
         public DateTime? OpenedOn { get; set; }
         public List<InvestmentAction> Actions { get; } = [];
         public List<SecurityQuote> Quotes { get; } = [];
+        public List<SecurityMarketQuote> MarketQuotes { get; } = [];
         public List<InvestmentSecurity> Securities { get; } = [];
     }
 
@@ -20,6 +21,7 @@ namespace THMS.Logic.Finance.Investments
         public decimal TotalBasis { get; init; }
         public decimal? Price { get; init; }
         public decimal? MarketValue { get; init; }
+        public DateTime? PriceAsOf { get; init; }
         public decimal? EstimatedAnnualIncome { get; init; }
         public decimal? AmountPerShare { get; init; }
         public DateTime? ExDate { get; init; }
@@ -37,11 +39,32 @@ namespace THMS.Logic.Finance.Investments
         public decimal Cash { get; init; }
         public decimal PositionValue { get; init; }
         public decimal AccountValue { get; init; }
+        public DateTime? PricesAsOf { get; init; }
+        public bool PricesIncomplete { get; init; }
         public decimal EstimatedAnnualIncome { get; init; }
         public IReadOnlyList<InvestmentPositionRow> Positions { get; init; } = [];
         public IReadOnlyList<InvestmentIncomePoint> Income { get; init; } = [];
         public IReadOnlyDictionary<Guid, decimal> CashAfter { get; init; } = new Dictionary<Guid, decimal>();
         public IReadOnlySet<Guid> Failed { get; init; } = new HashSet<Guid>();
+    }
+
+    public readonly record struct SecurityValuation(decimal? Price, DateTime? AsOf);
+
+    public sealed class SecurityValuePoint
+    {
+        public string Symbol { get; init; } = "";
+        public decimal Shares { get; init; }
+        public decimal Price { get; init; }
+        public decimal MarketValue { get; init; }
+    }
+
+    public sealed class PortfolioValuePoint
+    {
+        public DateTime Date { get; init; }
+        public decimal MarketValue { get; init; }
+        public decimal Cash { get; init; }
+        public decimal AccountValue => Cash + MarketValue;
+        public IReadOnlyList<SecurityValuePoint> Securities { get; init; } = [];
     }
 
     public sealed class InvestmentImportPreview

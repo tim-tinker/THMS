@@ -1,4 +1,6 @@
-﻿namespace THMS.Domain.Finance.Accounts
+﻿using THMS.Domain.Finance.Investments;
+
+namespace THMS.Domain.Finance.Accounts
 {
     public class InvestmentAccount : Account
     {
@@ -12,6 +14,11 @@
 
         /// <summary>History on this date is already inside the opening share quantities.</summary>
         public DateTime? BookOpenedOn { get; set; }
+
+        /// <summary>Every security in the portfolio uses this price source.</summary>
+        public QuoteAccess QuoteAccess { get; set; } = QuoteAccess.Service;
+
+        public string PriceSource => QuoteAccess == QuoteAccess.Service ? "Queryable" : "Import only";
 
         public decimal AccountValue => CashBalance + PositionValue;
     }

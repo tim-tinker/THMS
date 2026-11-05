@@ -95,8 +95,7 @@ namespace THMS.UI.WinForms.Controls
         private void Reload()
         {
             var snapshot = _orchestrator.Snapshot(_accountId);
-            _summary.Text =
-                $"Cash {snapshot.Cash:c}    Market value {snapshot.PositionValue:c}    Account value {snapshot.AccountValue:c}    Estimated annual income {snapshot.EstimatedAnnualIncome:c}";
+            _summary.Text = Summary(snapshot);
             Bind(_positions,
             [
                 Column("Symbol", "Symbol", 90),
@@ -104,8 +103,9 @@ namespace THMS.UI.WinForms.Controls
                 Number("Shares", "Shares", "n4"),
                 Money("AverageCost", "Average cost"),
                 Money("TotalBasis", "Total basis"),
-                Money("Price", "Price"),
+                Number("Price", "Price", "c4"),
                 Money("MarketValue", "Market value"),
+                DateColumn("PriceAsOf", "Price as of"),
                 Money("EstimatedAnnualIncome", "Est. annual income"),
                 DateColumn("ExDate", "Ex-date"),
                 DateColumn("PayDate", "Pay date")
@@ -150,6 +150,14 @@ namespace THMS.UI.WinForms.Controls
             {
                 MessageBox.Show(this, ex.Message, "Positions", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
+        }
+
+        private static string Summary(InvestmentSnapshot snapshot)
+        {
+            var prices = snapshot.PricesAsOf is DateTime asOf ? $" as of {asOf:d}" : "";
+            if (snapshot.PricesIncomplete)
+                prices = prices.Length == 0 ? " (no price)" : prices + " (incomplete)";
+            return $"Cash {snapshot.Cash:c}    Market value {snapshot.PositionValue:c}{prices}    Account value {snapshot.AccountValue:c}    Estimated annual income {snapshot.EstimatedAnnualIncome:c}";
         }
 
         private static TabPage Page(string title, Control content)

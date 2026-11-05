@@ -12,8 +12,22 @@ namespace THMS.Logic.Finance.Investments
         public string WebsiteUrl { get; init; } = "";
         public string AccountNumber { get; init; } = "";
         public decimal Cash { get; init; }
-        public decimal MarketValue { get; init; }
-        public decimal AccountValue { get; init; }
+        public decimal? MarketValue { get; init; }
+        public decimal? AccountValue { get; init; }
+        public DateTime? PricesAsOf { get; init; }
+        public bool PricesIncomplete { get; init; }
+        public string PricesAsOfText
+        {
+            get
+            {
+                if (PricesAsOf is not DateTime asOf)
+                    return PricesIncomplete ? "No price" : "";
+                var date = asOf.ToShortDateString();
+                return PricesIncomplete ? date + " (incomplete)" : date;
+            }
+        }
+        public QuoteAccess QuoteAccess { get; init; }
+        public string PriceSource => QuoteAccess == QuoteAccess.Service ? "Queryable" : "Import only";
         public decimal EstimatedAnnualIncome { get; init; }
     }
 
@@ -51,8 +65,11 @@ namespace THMS.Logic.Finance.Investments
                     WebsiteUrl = account.WebsiteUrl ?? "",
                     AccountNumber = account.AccountNumber ?? "",
                     Cash = tracked ? snapshot.Cash : account.CashBalance,
-                    MarketValue = tracked ? snapshot.PositionValue : account.PositionValue,
-                    AccountValue = tracked ? snapshot.AccountValue : account.AccountValue,
+                    MarketValue = tracked && snapshot.PricesIncomplete ? null : tracked ? snapshot.PositionValue : account.PositionValue,
+                    AccountValue = tracked && snapshot.PricesIncomplete ? null : tracked ? snapshot.AccountValue : account.AccountValue,
+                    PricesAsOf = tracked ? snapshot.PricesAsOf : account.BalanceAsOf,
+                    PricesIncomplete = tracked && snapshot.PricesIncomplete,
+                    QuoteAccess = account.QuoteAccess,
                     EstimatedAnnualIncome = tracked ? snapshot.EstimatedAnnualIncome : 0
                 });
             }
@@ -90,11 +107,15 @@ namespace THMS.Logic.Finance.Investments
                     .Where(item => string.Equals(InvestmentSymbols.Normalize(item.Symbol), symbol, StringComparison.OrdinalIgnoreCase))
                     .OrderByDescending(item => item.AsOf)
                     .FirstOrDefault();
+                var valuation = InvestmentBookkeeper.Valuation(state, symbol);
                 open.Add(new InvestmentPositionRow
                 {
                     Symbol = symbol,
                     Name = security?.Name ?? "",
                     Shares = 0,
+                    Price = valuation.Price,
+                    MarketValue = valuation.Price is null ? null : 0,
+                    PriceAsOf = valuation.AsOf,
                     EstimatedAnnualIncome = 0,
                     AmountPerShare = quote?.AmountPerShare,
                     ExDate = quote?.ExDate,
@@ -127,6 +148,7 @@ namespace THMS.Logic.Finance.Investments
             };
             state.Actions.AddRange(_books.GetActions(account.Id));
             state.Quotes.AddRange(_books.GetQuotes(account.Id));
+            state.MarketQuotes.AddRange(_books.GetMarketQuotes());
             state.Securities.AddRange(_books.GetSecurities());
             return state;
         }

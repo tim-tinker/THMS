@@ -81,6 +81,7 @@ namespace THMS.UI.WinForms.Controls
 
         private Label lblInvestCash;
         private NumericUpDown numInvestCash;
+        private CheckBox chkInvestImportOnly;
 
         private Label lblInternalPurpose;
         private TextBox txtInternalPurpose;
@@ -149,7 +150,7 @@ namespace THMS.UI.WinForms.Controls
             pnlCredit = new Panel { Left = 20, Top = 280, Width = 400, Height = 280 };
             pnlLoan = new Panel { Left = 20, Top = 280, Width = 400, Height = 120 };
             pnlMortgage = new Panel { Left = 20, Top = 280, Width = 400, Height = 160 };
-            pnlInvestment = new Panel { Left = 20, Top = 280, Width = 400, Height = 80 };
+            pnlInvestment = new Panel { Left = 20, Top = 280, Width = 400, Height = 110 };
             pnlInternal = new Panel { Left = 20, Top = 280, Width = 400, Height = 80 };
             pnlUntracked = new Panel { Left = 20, Top = 280, Width = 400, Height = 96 };
 
@@ -308,9 +309,16 @@ namespace THMS.UI.WinForms.Controls
             numInvestCash = MoneyBox(panelFieldLeft, 8);
             numInvestCash.Minimum = 0;
             numInvestCash.Maximum = 1000000;
+            chkInvestImportOnly = new CheckBox
+            {
+                Text = "Prices come from import only",
+                Left = 10,
+                Top = 40,
+                AutoSize = true
+            };
 
             pnlInvestment.Controls.AddRange(new Control[] {
-                lblInvestCash, numInvestCash
+                lblInvestCash, numInvestCash, chkInvestImportOnly
             });
 
             lblInternalPurpose = FieldLabel("Purpose:", 10, 8, 150);

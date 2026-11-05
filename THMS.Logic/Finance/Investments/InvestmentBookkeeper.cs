@@ -122,19 +122,89 @@ namespace THMS.Logic.Finance.Investments
             }
 
             var positions = Positions(lots, state);
-            var positionValue = positions.Sum(row => row.MarketValue ?? 0);
+            var incomplete = positions.Any(row => row.Price is null);
+            var positionValue = incomplete ? 0 : positions.Sum(row => row.MarketValue ?? 0);
             var annual = Income(lots, state, DateTime.MaxValue.Date);
             return new InvestmentSnapshot
             {
                 Cash = cash,
                 PositionValue = positionValue,
                 AccountValue = cash + positionValue,
+                PricesAsOf = incomplete ? null : positions.Select(row => row.PriceAsOf).FirstOrDefault(),
+                PricesIncomplete = incomplete,
                 EstimatedAnnualIncome = annual,
                 Positions = positions,
                 Income = income,
                 CashAfter = cashAfter,
                 Failed = failed
             };
+        }
+
+        public static IReadOnlyList<PortfolioValuePoint> ValueHistory(InvestmentBookState state)
+        {
+            var points = new List<PortfolioValuePoint>();
+            foreach (var date in state.MarketQuotes.Select(quote => quote.AsOf.Date).Distinct().OrderBy(date => date))
+            {
+                var book = BookAsOf(state, date);
+                var held = ShareTotals(book.Lots);
+                if (held.Count == 0)
+                    continue;
+                if (held.Keys.Any(symbol => SecurityMarketQuote.ForDate(state.MarketQuotes, symbol, date) is null))
+                    continue;
+
+                var rows = new List<SecurityValuePoint>();
+                decimal total = 0;
+                foreach (var (symbol, shares) in held.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+                {
+                    var price = SecurityMarketQuote.ForDate(state.MarketQuotes, symbol, date) ?? 0;
+                    var value = shares * price;
+                    total += value;
+                    rows.Add(new SecurityValuePoint
+                    {
+                        Symbol = symbol,
+                        Shares = shares,
+                        Price = price,
+                        MarketValue = value
+                    });
+                }
+
+                points.Add(new PortfolioValuePoint
+                {
+                    Date = date,
+                    MarketValue = total,
+                    Cash = book.Cash,
+                    Securities = rows
+                });
+            }
+
+            return points;
+        }
+
+        private static BookSlice BookAsOf(InvestmentBookState state, DateTime through)
+        {
+            var lots = new List<Lot>();
+            decimal cash = 0;
+            foreach (var action in state.Actions
+                .Where(action => action.Status == InvestmentActionStatus.Applied && action.RunDate.Date <= through.Date)
+                .OrderBy(action => action.RunDate)
+                .ThenBy(action => action.Sequence))
+            {
+                Apply(action, lots, ref cash);
+            }
+
+            return new BookSlice(lots, cash);
+        }
+
+        private static Dictionary<string, decimal> ShareTotals(List<Lot> lots)
+        {
+            var totals = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+            foreach (var lot in lots.Where(lot => lot.Shares > 0.0000001m))
+            {
+                totals.TryGetValue(lot.Symbol, out var shares);
+                totals[lot.Symbol] = shares + lot.Shares;
+            }
+
+            return totals;
         }
 
         private static void ApplyPositions(
@@ -203,6 +273,7 @@ namespace THMS.Logic.Finance.Investments
                     ImportKey = $"opening|{holding.Symbol}|{file.FileDate:yyyy-MM-dd}"
                 });
                 UpsertQuote(state, holding, file.FileDate);
+                UpsertMarketQuote(state, holding, file.FileDate);
             }
 
             foreach (var symbol in before)
@@ -572,6 +643,89 @@ namespace THMS.Logic.Finance.Investments
                 quote.AnnualIncomePerShare = income / quantity;
         }
 
+        private static void UpsertMarketQuote(InvestmentBookState state, FidelityPositionRow holding, DateTime fileDate)
+        {
+            if (UnitPrice(holding) is not decimal unit)
+                return;
+
+            var incoming = new SecurityMarketQuote
+            {
+                Symbol = holding.Symbol,
+                UnitValue = unit,
+                AsOf = fileDate.Date,
+                Origin = MarketQuoteOrigin.Import
+            };
+            var index = state.MarketQuotes.FindIndex(quote => SecurityMarketQuote.SameObservation(quote, incoming));
+            if (index >= 0)
+                state.MarketQuotes[index] = incoming;
+            else
+                state.MarketQuotes.Add(incoming);
+        }
+
+        private static decimal? UnitPrice(FidelityPositionRow holding)
+        {
+            if (holding.LastPrice is decimal last)
+                return last;
+            if (holding.CurrentValue is decimal current && holding.Quantity is decimal quantity && quantity != 0)
+                return current / quantity;
+            return null;
+        }
+
+        public static SecurityValuation Valuation(InvestmentBookState state, string symbol)
+        {
+            DateTime? latest = null;
+            foreach (var quote in state.MarketQuotes)
+            {
+                if (!SameSymbol(quote.Symbol, symbol))
+                    continue;
+                if (latest is null || quote.AsOf.Date > latest)
+                    latest = quote.AsOf.Date;
+            }
+
+            if (latest is not DateTime date || SecurityMarketQuote.ForDate(state.MarketQuotes, symbol, date) is not decimal unit)
+                return new SecurityValuation(null, null);
+            return new SecurityValuation(AdjustForSplits(state, symbol, date, unit), date);
+        }
+
+        public static DateTime? PortfolioPriceDate(InvestmentBookState state, IEnumerable<string> symbols)
+        {
+            var held = new List<string>();
+            foreach (var symbol in symbols)
+            {
+                if (string.IsNullOrWhiteSpace(symbol) || held.Any(item => SameSymbol(item, symbol)))
+                    continue;
+                held.Add(symbol);
+            }
+
+            if (held.Count == 0)
+                return null;
+
+            foreach (var date in state.MarketQuotes.Select(quote => quote.AsOf.Date).Distinct().OrderByDescending(date => date))
+            {
+                if (held.All(symbol => SecurityMarketQuote.ForDate(state.MarketQuotes, symbol, date) is not null))
+                    return date;
+            }
+
+            return null;
+        }
+
+        private static decimal AdjustForSplits(InvestmentBookState state, string symbol, DateTime asOf, decimal price)
+        {
+            foreach (var action in state.Actions)
+            {
+                if (action.Status != InvestmentActionStatus.Applied
+                    || action.Kind != InvestmentActionKind.Split
+                    || !SameSymbol(action.Symbol, symbol)
+                    || action.RunDate.Date <= asOf.Date
+                    || action.SplitFactor is not decimal factor
+                    || factor <= 0)
+                    continue;
+                price /= factor;
+            }
+
+            return price;
+        }
+
         private static void AddSplitQuote(InvestmentBookState state, string symbol, DateTime date, decimal factor)
         {
             if (factor <= 0 || string.IsNullOrWhiteSpace(symbol))
@@ -601,12 +755,20 @@ namespace THMS.Logic.Finance.Investments
 
         private static List<InvestmentPositionRow> Positions(List<Lot> lots, InvestmentBookState state)
         {
+            var groups = lots
+                .Where(lot => lot.Shares > 0.0000001m)
+                .GroupBy(lot => lot.Symbol, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var priceDate = PortfolioPriceDate(state, groups.Select(group => group.Key));
             var rows = new List<InvestmentPositionRow>();
-            foreach (var group in lots.Where(lot => lot.Shares > 0.0000001m).GroupBy(lot => lot.Symbol, StringComparer.OrdinalIgnoreCase))
+            foreach (var group in groups)
             {
                 var shares = group.Sum(lot => lot.Shares);
                 var basis = group.Sum(lot => lot.Shares * lot.CostPerShare);
                 var quote = LatestQuote(state, group.Key, DateTime.MaxValue.Date);
+                decimal? price = null;
+                if (priceDate is DateTime date && SecurityMarketQuote.ForDate(state.MarketQuotes, group.Key, date) is decimal unit)
+                    price = AdjustForSplits(state, group.Key, date, unit);
                 var name = state.Securities.FirstOrDefault(security => SameSymbol(security.Symbol, group.Key))?.Name ?? "";
                 decimal? income = quote?.AnnualIncomePerShare is decimal rate ? shares * rate : null;
                 rows.Add(new InvestmentPositionRow
@@ -616,6 +778,9 @@ namespace THMS.Logic.Finance.Investments
                     Shares = shares,
                     AverageCost = shares == 0 ? 0 : basis / shares,
                     TotalBasis = basis,
+                    Price = price,
+                    MarketValue = price is decimal unitPrice ? shares * unitPrice : null,
+                    PriceAsOf = price is null ? null : priceDate,
                     EstimatedAnnualIncome = income,
                     AmountPerShare = quote?.AmountPerShare,
                     ExDate = quote?.ExDate,
@@ -677,7 +842,13 @@ namespace THMS.Logic.Finance.Investments
             var existing = state.Securities.FirstOrDefault(security => SameSymbol(security.Symbol, symbol));
             if (existing is null)
             {
-                state.Securities.Add(new InvestmentSecurity { Symbol = symbol, Name = name, IsSweep = isSweep });
+                state.Securities.Add(new InvestmentSecurity
+                {
+                    Symbol = symbol,
+                    Name = name,
+                    IsSweep = isSweep,
+                    LookupKey = symbol
+                });
                 return;
             }
 
@@ -766,6 +937,12 @@ namespace THMS.Logic.Finance.Investments
 
         private static bool MoneyEqual(decimal left, decimal right) =>
             decimal.Round(left, 2) == decimal.Round(right, 2);
+
+        private sealed class BookSlice(List<Lot> lots, decimal cash)
+        {
+            public List<Lot> Lots { get; } = lots;
+            public decimal Cash { get; } = cash;
+        }
 
         private static Regex SplitRatio() => new(
             @"(\d+(?:\.\d+)?)\s*(?:FOR|:)\s*(\d+(?:\.\d+)?)",

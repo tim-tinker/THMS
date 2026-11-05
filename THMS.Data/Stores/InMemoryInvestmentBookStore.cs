@@ -6,6 +6,7 @@ namespace THMS.Data.Stores
     {
         private readonly List<InvestmentAction> _actions = [];
         private readonly List<SecurityQuote> _quotes = [];
+        private readonly List<SecurityMarketQuote> _marketQuotes = [];
         private readonly Dictionary<string, InvestmentSecurity> _securities = new(StringComparer.OrdinalIgnoreCase);
 
         public IReadOnlyList<InvestmentAction> GetActions(Guid accountId) =>
@@ -42,6 +43,18 @@ namespace THMS.Data.Stores
             {
                 _quotes.Add(quote);
             }
+        }
+
+        public IReadOnlyList<SecurityMarketQuote> GetMarketQuotes() =>
+            _marketQuotes.Select(quote => quote.Copy()).ToList();
+
+        public void UpsertMarketQuote(SecurityMarketQuote quote)
+        {
+            var index = _marketQuotes.FindIndex(existing => SecurityMarketQuote.SameObservation(existing, quote));
+            if (index >= 0)
+                _marketQuotes[index] = quote.Copy();
+            else
+                _marketQuotes.Add(quote.Copy());
         }
 
         public IReadOnlyList<InvestmentSecurity> GetSecurities() => _securities.Values.ToList();
