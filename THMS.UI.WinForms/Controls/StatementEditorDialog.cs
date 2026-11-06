@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
@@ -20,7 +21,12 @@ namespace THMS.UI.WinForms.Controls
         private readonly Account? _lockedAccount;
         private readonly List<Account> _accounts;
         private bool _loading;
+        private bool _suppressEditorEvents;
         private Guid? _datedForAccountId;
+        private StatementType? _composedType;
+        private DateTime? _chosenStatementDate;
+        private DateTime? _chosenDueDate;
+        private decimal? _chosenAmountDue;
         private decimal? _creditLimit;
 
         private DateTimePicker dtStatementDate = null!;
@@ -243,14 +249,22 @@ namespace THMS.UI.WinForms.Controls
             if (_loading || _existingStatement is not null)
                 return;
 
+            // Binding the account list raises this again when the combo creates
+            // its handle. Rebuilding then throws away dates, the amount, and
+            // line items the user already typed.
+            var account = SelectedAccount() ?? _lockedAccount;
+            var type = account is null ? null : StatementAccountMatch.ForAccount(account);
+            if (account is not null && _datedForAccountId == account.Id && _composedType == type)
+                return;
+
             ApplyNewStatementDates();
-            if (SelectedType() is not StatementType type)
+            if (type is not StatementType selected)
             {
                 ComposeStatement(null);
                 return;
             }
 
-            LoadTypePanel(type);
+            LoadTypePanel(selected);
             CopyPreviousPromotions();
         }
 
@@ -265,8 +279,17 @@ namespace THMS.UI.WinForms.Controls
 
             var existing = account is null ? [] : _statementStore.GetForAccount(account.Id);
             var dates = NextStatementDates.Suggest(existing, DateTime.Today);
-            dtStatementDate.Value = SafeDate(dates.StatementDate);
-            dtDueDate.Value = SafeDate(dates.DueDate);
+            _suppressEditorEvents = true;
+            try
+            {
+                dtStatementDate.Value = SafeDate(dates.StatementDate);
+                dtDueDate.Value = SafeDate(dates.DueDate);
+            }
+            finally
+            {
+                _suppressEditorEvents = false;
+            }
+
             _datedForAccountId = account?.Id;
         }
 
@@ -352,6 +375,8 @@ namespace THMS.UI.WinForms.Controls
                 BorderStyle = BorderStyle.FixedSingle
             };
             dtStatementDate.ValueChanged += OnStatementDateChanged;
+            dtDueDate.ValueChanged += OnDueDateChanged;
+            numAmountDue.ValueChanged += OnAmountDueChanged;
             numStatementBalance.ValueChanged += (_, _) => RefreshAvailableCredit();
         }
 
@@ -359,12 +384,55 @@ namespace THMS.UI.WinForms.Controls
         {
             if (_loading)
                 return;
+            if (!_suppressEditorEvents)
+                _chosenStatementDate = dtStatementDate.Value.Date;
+            if (_suppressEditorEvents)
+                return;
             RefreshPeriod();
             RefreshPreviousBalance();
         }
 
+        private void OnDueDateChanged(object? sender, EventArgs e)
+        {
+            if (_loading || _suppressEditorEvents)
+                return;
+            _chosenDueDate = dtDueDate.Value.Date;
+        }
+
+        private void OnAmountDueChanged(object? sender, EventArgs e)
+        {
+            if (_loading || _suppressEditorEvents)
+                return;
+            _chosenAmountDue = numAmountDue.Value;
+        }
+
         private void ComposeStatement(StatementType? type)
         {
+            _suppressEditorEvents = true;
+            try
+            {
+                ComposeStatementPage(type);
+                RestoreChosenEditors();
+            }
+            finally
+            {
+                _suppressEditorEvents = false;
+            }
+        }
+
+        private void RestoreChosenEditors()
+        {
+            if (_chosenStatementDate is DateTime statementDate)
+                dtStatementDate.Value = SafeDate(statementDate);
+            if (_chosenDueDate is DateTime dueDate)
+                dtDueDate.Value = SafeDate(dueDate);
+            if (_chosenAmountDue is decimal amount)
+                SetMoney(numAmountDue, amount);
+        }
+
+        private void ComposeStatementPage(StatementType? type)
+        {
+            _composedType = type;
             lblPeriod = null;
             lblPreviousBalance = null;
             lblAvailableCredit = null;
@@ -1215,7 +1283,7 @@ namespace THMS.UI.WinForms.Controls
                 return false;
             }
 
-            var amountDue = StatementAccountMatch.IsNonPayable(type) ? 0 : numAmountDue.Value;
+            var amountDue = StatementAccountMatch.IsNonPayable(type) ? 0 : ReadAmountDue();
 
             statement = type switch
             {
@@ -1285,10 +1353,10 @@ namespace THMS.UI.WinForms.Controls
 
             statement.Id = _existingStatement?.Id ?? Guid.NewGuid();
             statement.AccountId = account.Id;
-            statement.StatementDate = dtStatementDate.Value.Date;
+            statement.StatementDate = ReadStatementDate();
             statement.DueDate = StatementAccountMatch.IsNonPayable(type)
                 ? statement.StatementDate
-                : dtDueDate.Value.Date;
+                : ReadDueDate();
             statement.AmountDue = amountDue;
             statement.BillCleared = _existingStatement?.BillCleared ?? false;
             statement.Notes = string.IsNullOrWhiteSpace(txtNotes.Text) ? null : txtNotes.Text.Trim();
@@ -1481,6 +1549,38 @@ namespace THMS.UI.WinForms.Controls
         }
 
         private static decimal ValueOf(NumericUpDown? box) => box?.Value ?? 0;
+
+        private DateTime ReadStatementDate() =>
+            ReadDate(dtStatementDate, _chosenStatementDate);
+
+        private DateTime ReadDueDate() =>
+            ReadDate(dtDueDate, _chosenDueDate);
+
+        private decimal ReadAmountDue() =>
+            ReadMoney(numAmountDue, _chosenAmountDue);
+
+        // DateTimePicker and NumericUpDown keep typed text out of Value until
+        // focus leaves. A later rebuild can also put the suggested dates back.
+        // Prefer the text the user still sees, then the value they already chose.
+        private static DateTime ReadDate(DateTimePicker picker, DateTime? chosen)
+        {
+            if (DateTime.TryParse(picker.Text, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces, out var typed)
+                && typed.Date != picker.Value.Date
+                && typed >= picker.MinDate
+                && typed <= picker.MaxDate)
+                return typed.Date;
+
+            return (chosen ?? picker.Value).Date;
+        }
+
+        private static decimal ReadMoney(NumericUpDown box, decimal? chosen)
+        {
+            if (decimal.TryParse(box.Text, NumberStyles.Currency, CultureInfo.CurrentCulture, out var typed)
+                && typed != box.Value)
+                return Math.Clamp(typed, box.Minimum, box.Maximum);
+
+            return chosen ?? box.Value;
+        }
 
         private static DateTime SafeDate(DateTime value) =>
             value == default ? DateTime.Today : value;

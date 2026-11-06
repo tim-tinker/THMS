@@ -41,6 +41,27 @@ namespace THMS.Tests.Logic
     }
 
     [TestFixture]
+    public class HomeCircuitIntervalTests
+    {
+        [Test]
+        public void StartContaining_FloorsIntoTheTenMinuteIntervalWithoutCrossingABoundary()
+        {
+            Assert.That(
+                HomeCircuitInterval.StartContaining(new DateTime(2026, 11, 2, 13, 3, 0)),
+                Is.EqualTo(new DateTime(2026, 11, 2, 13, 0, 0)));
+            Assert.That(
+                HomeCircuitInterval.StartContaining(new DateTime(2026, 11, 2, 13, 9, 59)),
+                Is.EqualTo(new DateTime(2026, 11, 2, 13, 0, 0)));
+            Assert.That(
+                HomeCircuitInterval.StartContaining(new DateTime(2026, 11, 2, 13, 0, 0)),
+                Is.EqualTo(new DateTime(2026, 11, 2, 13, 0, 0)));
+            Assert.That(
+                HomeCircuitInterval.StartContaining(new DateTime(2026, 11, 2, 13, 10, 0)),
+                Is.EqualTo(new DateTime(2026, 11, 2, 13, 10, 0)));
+        }
+    }
+
+    [TestFixture]
     public class SolarBucketTests
     {
         [Test]

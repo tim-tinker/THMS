@@ -134,7 +134,11 @@ namespace THMS.Logic.Orchestrators
         private void CompleteHomeSession(HomeEvChargeSession session)
         {
             var engine = new HomeCircuitAttributionEngine(_energyStore);
-            engine.Compute(session.StartTime, session.EndTime);
+            // Circuit rows are stamped at the start of each 10-minute interval.
+            // A session that begins during an interval still draws that interval,
+            // so the query has to open at the interval start rather than at StartTime.
+            var queryStart = HomeCircuitInterval.StartContaining(session.StartTime);
+            engine.Compute(queryStart, session.EndTime);
             session.HasCircuitData = engine.HadPositiveCircuitDraw;
             session.HasSolarData = engine.HadSolarIntervals;
             session.HasElectricContract =

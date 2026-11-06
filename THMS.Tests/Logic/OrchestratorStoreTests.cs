@@ -383,6 +383,76 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void CompleteHomeSession_IncludesTheCircuitIntervalThatContainsTheStart()
+        {
+            var vehicles = new InMemoryVehicleDataStore();
+            var energy = new InMemoryEnergyDataStore();
+            var finance = new InMemoryFinanceDataStore();
+            var ev = vehicles.GetAllVehicles().OfType<VehicleEv>().First();
+            var orchestrator = new EvChargeSessionOrchestrator(vehicles, energy, finance)
+            {
+                VehicleId = ev.Id
+            };
+
+            var day = new DateTime(2026, 11, 2);
+            energy.UpsertHomeCircuitReading(new HomeCircuitReading
+            {
+                Timestamp = day.AddHours(12).AddMinutes(50),
+                KiloWattHours = 5m
+            });
+            energy.UpsertHomeCircuitReading(new HomeCircuitReading
+            {
+                Timestamp = day.AddHours(13),
+                KiloWattHours = 0.21m
+            });
+            energy.UpsertHomeCircuitReading(new HomeCircuitReading
+            {
+                Timestamp = day.AddHours(13).AddMinutes(10),
+                KiloWattHours = 1.86m
+            });
+            energy.UpsertHomeCircuitReading(new HomeCircuitReading
+            {
+                Timestamp = day.AddHours(15).AddMinutes(50),
+                KiloWattHours = 1.29m
+            });
+            energy.UpsertHomeCircuitReading(new HomeCircuitReading
+            {
+                Timestamp = day.AddHours(16),
+                KiloWattHours = 9m
+            });
+            energy.UpsertSolarProductionInterval(new SolarProductionInterval
+            {
+                Timestamp = day.AddHours(13),
+                EnergyProducedWh = 500,
+                EnergyConsumedWh = 210
+            });
+
+            var startedMidInterval = new HomeEvChargeSession
+            {
+                VehicleId = ev.Id,
+                StartTime = day.AddHours(13).AddMinutes(3),
+                EndTime = day.AddHours(15).AddMinutes(55)
+            };
+            orchestrator.Save(startedMidInterval);
+
+            var included = orchestrator.GetEvChargeSessions("Lifetime").OfType<HomeEvChargeSession>()
+                .First(s => s.Id == startedMidInterval.Id);
+            Assert.That(included.KwhDrawn, Is.EqualTo(0.21m + 1.86m + 1.29m));
+
+            var startedOnBoundary = new HomeEvChargeSession
+            {
+                VehicleId = ev.Id,
+                StartTime = day.AddHours(13).AddMinutes(10),
+                EndTime = day.AddHours(15).AddMinutes(55)
+            };
+            orchestrator.Save(startedOnBoundary);
+
+            var boundary = orchestrator.GetEvChargeSessions("Lifetime").OfType<HomeEvChargeSession>()
+                .First(s => s.Id == startedOnBoundary.Id);
+            Assert.That(boundary.KwhDrawn, Is.EqualTo(1.86m + 1.29m));
+        }
+
+        [Test]
         public void CompleteHomeSession_WithoutSolar_ChargesCircuitToGrid()
         {
             var vehicles = new InMemoryVehicleDataStore();
