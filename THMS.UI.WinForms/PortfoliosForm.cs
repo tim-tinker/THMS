@@ -275,7 +275,7 @@ namespace THMS.UI.WinForms
 
         private void ImportPositions(string path)
         {
-            using var dialog = new InvestmentImportDialog(_import, path);
+            using var dialog = new InvestmentImportDialog(_import, path, SelectedPortfolio()?.AccountId);
             if (dialog.ShowDialog(this) != DialogResult.OK)
                 return;
 

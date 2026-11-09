@@ -1,5 +1,6 @@
 using THMS.Data.Stores.InMemoryStores;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Investments;
 using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores
@@ -9,6 +10,8 @@ namespace THMS.Data.Stores
         private readonly InMemoryAccountStore _accountStore = new();
         private readonly Dictionary<string, PlaidItemSyncState> _itemSync = new(StringComparer.Ordinal);
         private readonly Dictionary<Guid, TransactionFileColumnMap> _transactionFileMaps = new();
+        private readonly Dictionary<Guid, InvestmentPositionColumnMap> _positionMaps = new();
+        private readonly Dictionary<Guid, InvestmentHistoryColumnMap> _historyMaps = new();
 
         public void UpsertAccount(Account account)
         {
@@ -26,6 +29,8 @@ namespace THMS.Data.Stores
         {
             _accountStore.Delete(id);
             _transactionFileMaps.Remove(id);
+            _positionMaps.Remove(id);
+            _historyMaps.Remove(id);
             FinanceDataRevision.NoteChanged();
         }
 
@@ -47,6 +52,24 @@ namespace THMS.Data.Stores
         {
             ArgumentNullException.ThrowIfNull(map);
             _transactionFileMaps[map.AccountId] = map;
+        }
+
+        public InvestmentPositionColumnMap? GetInvestmentPositionColumnMap(Guid accountId) =>
+            _positionMaps.TryGetValue(accountId, out var map) ? map : null;
+
+        public void UpsertInvestmentPositionColumnMap(InvestmentPositionColumnMap map)
+        {
+            ArgumentNullException.ThrowIfNull(map);
+            _positionMaps[map.AccountId] = map;
+        }
+
+        public InvestmentHistoryColumnMap? GetInvestmentHistoryColumnMap(Guid accountId) =>
+            _historyMaps.TryGetValue(accountId, out var map) ? map : null;
+
+        public void UpsertInvestmentHistoryColumnMap(InvestmentHistoryColumnMap map)
+        {
+            ArgumentNullException.ThrowIfNull(map);
+            _historyMaps[map.AccountId] = map;
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Investments;
 using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores
@@ -21,5 +22,10 @@ namespace THMS.Data.Stores
 
         TransactionFileColumnMap? GetTransactionFileColumnMap(Guid accountId);
         void UpsertTransactionFileColumnMap(TransactionFileColumnMap map);
+
+        InvestmentPositionColumnMap? GetInvestmentPositionColumnMap(Guid accountId);
+        void UpsertInvestmentPositionColumnMap(InvestmentPositionColumnMap map);
+        InvestmentHistoryColumnMap? GetInvestmentHistoryColumnMap(Guid accountId);
+        void UpsertInvestmentHistoryColumnMap(InvestmentHistoryColumnMap map);
     }
 }

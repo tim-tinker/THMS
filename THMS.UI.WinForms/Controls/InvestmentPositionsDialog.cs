@@ -63,7 +63,7 @@ namespace THMS.UI.WinForms.Controls
             tabs.TabPages.Add(Page("Estimated annual income", _income));
             tabs.TabPages.Add(Page("Review", reviewPage));
 
-            var import = new ThmsButton { Text = "Import Fidelity" };
+            var import = new ThmsButton { Text = "Import positions" };
             import.Click += (_, _) => Import();
             var close = new ThmsButton { Text = "Close" };
             close.Click += (_, _) => Close();
@@ -261,6 +261,10 @@ namespace THMS.UI.WinForms.Controls
         private readonly Guid _accountId;
         private readonly InvestmentImportFile _file;
         private readonly bool _batch;
+        private readonly Guid _preferredAccountId;
+        private InvestmentPositionColumnMap? _positionMap;
+        private InvestmentHistoryColumnMap? _historyMap;
+        private Guid? _targetAccountId;
         private IReadOnlyDictionary<Guid, string> _accountNames = new Dictionary<Guid, string>();
         private readonly TextBox _path = new() { Width = 560 };
         private readonly TextBox _messages = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Height = 88, Dock = DockStyle.Top };
@@ -277,10 +281,11 @@ namespace THMS.UI.WinForms.Controls
         private readonly ThmsButton _apply = new() { Text = "Import", Enabled = false };
         private bool _ready;
 
-        public InvestmentImportDialog(InvestmentImportOrchestrator orchestrator, string? path = null)
+        public InvestmentImportDialog(InvestmentImportOrchestrator orchestrator, string? path = null, Guid? selectedAccountId = null)
             : this(orchestrator, Guid.Empty, InvestmentImportFile.Positions, path)
         {
             _batch = true;
+            _preferredAccountId = selectedAccountId ?? Guid.Empty;
             _changes.Columns.Insert(0, TextColumn("Account", "Account"));
         }
 
@@ -294,6 +299,7 @@ namespace THMS.UI.WinForms.Controls
             _accountId = accountId;
             _file = file;
             _batch = false;
+            _preferredAccountId = Guid.Empty;
             Text = file == InvestmentImportFile.Positions ? "Import positions" : "Import history";
             FormBorderStyle = FormBorderStyle.Sizable;
             StartPosition = FormStartPosition.CenterParent;
@@ -388,9 +394,20 @@ namespace THMS.UI.WinForms.Controls
             try
             {
                 var chosen = Blank(_path.Text);
+                if (chosen is null)
+                    throw new InvalidOperationException(_file == InvestmentImportFile.Positions
+                        ? "Choose a positions view."
+                        : "Choose a history file.");
+                if (!TryMap(chosen))
+                {
+                    _ready = false;
+                    _apply.Enabled = false;
+                    return;
+                }
+
                 if (_batch)
                 {
-                    var batch = _orchestrator.PreviewPositions(chosen);
+                    var batch = _orchestrator.PreviewPositions(chosen, _positionMap, _targetAccountId);
                     _accountNames = batch.AccountNames;
                     _messages.Text = batch.Messages.Count == 0
                         ? $"{batch.Applied} applied, {batch.Skipped} already imported, {batch.Updated} updated."
@@ -406,8 +423,8 @@ namespace THMS.UI.WinForms.Controls
                 }
 
                 var preview = _file == InvestmentImportFile.Positions
-                    ? _orchestrator.Preview(_accountId, chosen, null)
-                    : _orchestrator.Preview(_accountId, null, chosen);
+                    ? _orchestrator.Preview(_accountId, chosen, null, _positionMap, null)
+                    : _orchestrator.Preview(_accountId, null, chosen, null, _historyMap);
                 _messages.Text = preview.Messages.Count == 0
                     ? $"{preview.Applied} applied, {preview.Skipped} already imported, {preview.Updated} updated, {preview.Review} waiting for review."
                     : string.Join(Environment.NewLine, preview.Messages)
@@ -425,6 +442,57 @@ namespace THMS.UI.WinForms.Controls
                 _apply.Enabled = false;
                 MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
+        }
+
+        private bool TryMap(string path)
+        {
+            var sheet = FidelityInvestmentFile.ReadSheet(path);
+            if (sheet.Headers.Count == 0 || sheet.Rows.Count == 0)
+            {
+                MessageBox.Show(this, "The selected file did not contain any rows.", Text,
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return false;
+            }
+
+            if (_file == InvestmentImportFile.Positions)
+            {
+                var accountId = _batch ? _preferredAccountId : _accountId;
+                var saved = _orchestrator.GetPositionMap(accountId);
+                var suggested = InvestmentPositionColumnMapping.Resolve(saved, sheet.Headers, accountId);
+                using var mapping = new InvestmentColumnMapDialog(
+                    InvestmentImportFile.Positions,
+                    sheet,
+                    suggested,
+                    historyMap: null,
+                    _batch ? _orchestrator.InvestmentAccounts() : [],
+                    accountId,
+                    choosePortfolio: _batch);
+                if (mapping.ShowDialog(this) != DialogResult.OK || mapping.PositionMap is null)
+                    return false;
+
+                _positionMap = mapping.PositionMap;
+                _targetAccountId = _batch ? mapping.TargetAccountId : _accountId;
+                if (_targetAccountId is Guid id)
+                    _orchestrator.SavePositionMap(_positionMap.ForAccount(id));
+                return true;
+            }
+
+            var savedHistory = _orchestrator.GetHistoryMap(_accountId);
+            var suggestedHistory = InvestmentHistoryColumnMapping.Resolve(savedHistory, sheet.Headers, _accountId);
+            using var historyMapping = new InvestmentColumnMapDialog(
+                InvestmentImportFile.History,
+                sheet,
+                positionMap: null,
+                suggestedHistory,
+                portfolios: [],
+                _accountId,
+                choosePortfolio: false);
+            if (historyMapping.ShowDialog(this) != DialogResult.OK || historyMapping.HistoryMap is null)
+                return false;
+
+            _historyMap = historyMapping.HistoryMap.ForAccount(_accountId);
+            _orchestrator.SaveHistoryMap(_historyMap);
+            return true;
         }
 
         private void Commit()

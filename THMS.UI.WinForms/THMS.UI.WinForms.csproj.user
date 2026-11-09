@@ -85,6 +85,9 @@
     <Compile Update="Controls\HomeCircuitManagerControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Update="Controls\InvestmentColumnMapDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Controls\InvestmentPositionsDialog.cs">
       <SubType>Form</SubType>
     </Compile>

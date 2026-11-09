@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using THMS.Data.Stores.SQLite;
 using THMS.Data.Stores.SqlTables;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Investments;
 using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores.SqliteStores
@@ -18,6 +19,7 @@ namespace THMS.Data.Stores.SqliteStores
         private readonly InternalAccountTable _internalAccountTable = new();
         private readonly PlaidItemSyncStateTable _plaidItemSync = new();
         private readonly AccountTransactionImportMapTable _transactionFileMaps = new();
+        private readonly AccountInvestmentImportMapTable _investmentFileMaps = new();
 
         public void InitializeSchema(SqliteConnection conn)
         {
@@ -32,6 +34,7 @@ namespace THMS.Data.Stores.SqliteStores
             _internalAccountTable.InitializeSchema(conn);
             _plaidItemSync.InitializeSchema(conn);
             _transactionFileMaps.InitializeSchema(conn);
+            _investmentFileMaps.InitializeSchema(conn);
         }
 
         public void Upsert(SqliteConnection conn, Account account)
@@ -133,6 +136,7 @@ namespace THMS.Data.Stores.SqliteStores
             InvestmentBookSql.DeleteAccount(conn, id);
             _internalAccountTable.Delete(conn, id);
             _transactionFileMaps.Delete(conn, id);
+            _investmentFileMaps.Delete(conn, id);
             _accountTable.Delete(conn, id);
         }
 
@@ -252,5 +256,17 @@ namespace THMS.Data.Stores.SqliteStores
 
         public void UpsertTransactionFileColumnMap(SqliteConnection conn, TransactionFileColumnMap map) =>
             _transactionFileMaps.Upsert(conn, map);
+
+        public InvestmentPositionColumnMap? GetInvestmentPositionColumnMap(SqliteConnection conn, Guid accountId) =>
+            _investmentFileMaps.GetPosition(conn, accountId);
+
+        public void UpsertInvestmentPositionColumnMap(SqliteConnection conn, InvestmentPositionColumnMap map) =>
+            _investmentFileMaps.UpsertPosition(conn, map);
+
+        public InvestmentHistoryColumnMap? GetInvestmentHistoryColumnMap(SqliteConnection conn, Guid accountId) =>
+            _investmentFileMaps.GetHistory(conn, accountId);
+
+        public void UpsertInvestmentHistoryColumnMap(SqliteConnection conn, InvestmentHistoryColumnMap map) =>
+            _investmentFileMaps.UpsertHistory(conn, map);
     }
 }

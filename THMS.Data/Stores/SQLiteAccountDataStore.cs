@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using THMS.Data.Stores.SqliteStores;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Finance.Investments;
 using THMS.Domain.Finance.Transactions;
 
 namespace THMS.Data.Stores.SQLite
@@ -82,6 +83,30 @@ namespace THMS.Data.Stores.SQLite
         {
             using var conn = OpenConnection();
             _accountStore.UpsertTransactionFileColumnMap(conn, map);
+        }
+
+        public InvestmentPositionColumnMap? GetInvestmentPositionColumnMap(Guid accountId)
+        {
+            using var conn = OpenConnection();
+            return _accountStore.GetInvestmentPositionColumnMap(conn, accountId);
+        }
+
+        public void UpsertInvestmentPositionColumnMap(InvestmentPositionColumnMap map)
+        {
+            using var conn = OpenConnection();
+            _accountStore.UpsertInvestmentPositionColumnMap(conn, map);
+        }
+
+        public InvestmentHistoryColumnMap? GetInvestmentHistoryColumnMap(Guid accountId)
+        {
+            using var conn = OpenConnection();
+            return _accountStore.GetInvestmentHistoryColumnMap(conn, accountId);
+        }
+
+        public void UpsertInvestmentHistoryColumnMap(InvestmentHistoryColumnMap map)
+        {
+            using var conn = OpenConnection();
+            _accountStore.UpsertInvestmentHistoryColumnMap(conn, map);
         }
     }
 }

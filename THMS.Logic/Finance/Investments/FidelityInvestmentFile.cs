@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using THMS.Domain.Finance.Investments;
 
 namespace THMS.Logic.Finance.Investments
 {
@@ -61,6 +62,60 @@ namespace THMS.Logic.Finance.Investments
 
         public static FidelityHistoryFile ReadHistory(string path) =>
             ParseHistory(File.ReadAllText(path));
+
+        public static InvestmentFileSheet ReadSheet(string path) =>
+            ParseSheet(File.ReadAllText(path));
+
+        public static InvestmentFileSheet ParseSheet(string csv)
+        {
+            var rows = ParseCsv(csv);
+            var headerIndex = HeaderIndex(rows);
+            if (headerIndex < 0)
+                return new InvestmentFileSheet();
+
+            var headers = DisplayHeaders(rows[headerIndex]);
+            var body = new List<InvestmentFileRawRow>();
+            for (var i = headerIndex + 1; i < rows.Count; i++)
+            {
+                if (rows[i].All(string.IsNullOrWhiteSpace))
+                    continue;
+                body.Add(new InvestmentFileRawRow
+                {
+                    SourceRow = i + 1,
+                    Cells = rows[i]
+                });
+            }
+
+            return new InvestmentFileSheet
+            {
+                Headers = headers,
+                Rows = body
+            };
+        }
+
+        private static List<string> DisplayHeaders(List<string> header)
+        {
+            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var result = new List<string>();
+            for (var i = 0; i < header.Count; i++)
+            {
+                var name = header[i].Trim();
+                if (name.Length == 0)
+                {
+                    if (i == header.Count - 1)
+                        break;
+                    name = $"Column {i + 1}";
+                }
+
+                var display = name;
+                var suffix = 2;
+                while (!used.Add(display))
+                    display = $"{name} ({suffix++})";
+                result.Add(display);
+            }
+
+            return result;
+        }
 
         public static FidelityPositionsFile ParsePositions(string csv, string? fileName = null) =>
             ParsePositionAccounts(csv, fileName).FirstOrDefault()

@@ -49,19 +49,43 @@ namespace THMS.Logic.Finance.Investments
                 .OrderBy(action => action.RunDate)
                 .ToList();
 
-        public InvestmentImportPreview Preview(Guid accountId, string? positionsPath, string? historyPath)
+        public InvestmentPositionColumnMap? GetPositionMap(Guid accountId) =>
+            accountId == Guid.Empty ? null : _accounts.GetInvestmentPositionColumnMap(accountId);
+
+        public void SavePositionMap(InvestmentPositionColumnMap map) =>
+            _accounts.UpsertInvestmentPositionColumnMap(map);
+
+        public InvestmentHistoryColumnMap? GetHistoryMap(Guid accountId) =>
+            accountId == Guid.Empty ? null : _accounts.GetInvestmentHistoryColumnMap(accountId);
+
+        public void SaveHistoryMap(InvestmentHistoryColumnMap map) =>
+            _accounts.UpsertInvestmentHistoryColumnMap(map);
+
+        public IReadOnlyList<InvestmentAccount> InvestmentAccounts() =>
+            _accounts.GetAllAccounts().OfType<InvestmentAccount>().OrderBy(account => account.Name).ToList();
+
+        public InvestmentImportPreview Preview(
+            Guid accountId,
+            string? positionsPath,
+            string? historyPath,
+            InvestmentPositionColumnMap? positionMap = null,
+            InvestmentHistoryColumnMap? historyMap = null)
         {
             if (string.IsNullOrWhiteSpace(positionsPath) && string.IsNullOrWhiteSpace(historyPath))
                 throw new InvalidOperationException("Choose a positions view, a history file, or both.");
 
             var account = RequireInvestment(accountId);
             var state = Load(accountId);
-            var positions = string.IsNullOrWhiteSpace(positionsPath)
-                ? null
-                : FidelityInvestmentFile.ReadPositions(positionsPath);
+            var positions = ReadPositions(account, positionsPath, positionMap);
             var history = string.IsNullOrWhiteSpace(historyPath)
                 ? null
-                : FidelityInvestmentFile.ReadHistory(historyPath);
+                : historyMap is null
+                    ? FidelityInvestmentFile.ReadHistory(historyPath)
+                    : InvestmentHistoryMapper.Parse(FidelityInvestmentFile.ReadSheet(historyPath), historyMap);
+            if (historyMap is not null)
+                SaveHistoryMap(historyMap.ForAccount(accountId));
+            if (positionMap is not null)
+                SavePositionMap(positionMap.ForAccount(accountId));
             var preview = InvestmentBookkeeper.Import(state, positions, history);
             if (positions is not null && !SameAccount(account.AccountNumber, positions.AccountNumber))
             {
@@ -84,12 +108,25 @@ namespace THMS.Logic.Finance.Investments
             return preview;
         }
 
-        public InvestmentPositionsBatch PreviewPositions(string? positionsPath)
+        public InvestmentPositionsBatch PreviewPositions(string? positionsPath) =>
+            PreviewPositions(positionsPath, map: null, targetAccountId: null);
+
+        public InvestmentPositionsBatch PreviewPositions(string? positionsPath, InvestmentPositionColumnMap? map, Guid? targetAccountId)
         {
             if (string.IsNullOrWhiteSpace(positionsPath))
                 throw new InvalidOperationException("Choose a positions view.");
 
+            var files = map is null
+                ? FidelityInvestmentFile.ReadPositionAccounts(positionsPath)
+                : InvestmentPositionMapper.Parse(FidelityInvestmentFile.ReadSheet(positionsPath), map, Path.GetFileName(positionsPath));
             var investments = _accounts.GetAllAccounts().OfType<InvestmentAccount>().ToList();
+            InvestmentAccount? target = null;
+            if (targetAccountId is Guid targetId)
+            {
+                target = investments.FirstOrDefault(item => item.Id == targetId);
+                if (target is null)
+                    throw new InvalidOperationException("Choose an investment account.");
+            }
             var matched = new List<InvestmentBookState>();
             var names = new Dictionary<Guid, string>();
             var changes = new List<InvestmentAction>();
@@ -97,15 +134,25 @@ namespace THMS.Logic.Finance.Investments
             var applied = 0;
             var skipped = 0;
             var updated = 0;
-            foreach (var file in FidelityInvestmentFile.ReadPositionAccounts(positionsPath))
+            foreach (var file in files)
             {
-                var account = investments.FirstOrDefault(item => AccountNumbersMatch(item.AccountNumber, file.AccountNumber));
+                var account = target ?? investments.FirstOrDefault(item => AccountNumbersMatch(item.AccountNumber, file.AccountNumber));
                 var label = string.IsNullOrWhiteSpace(file.AccountName)
                     ? file.AccountNumber
                     : $"{file.AccountName} ({file.AccountNumber})";
                 if (account is null)
                 {
-                    messages.Add($"No portfolio has account number {label}.");
+                    messages.Add(string.IsNullOrWhiteSpace(file.AccountNumber)
+                        ? "This file has no account number. Choose the portfolio in the column mapping."
+                        : $"No portfolio has account number {label}.");
+                    continue;
+                }
+
+                if (target is not null
+                    && !string.IsNullOrWhiteSpace(file.AccountNumber)
+                    && !NumberMatches(target.AccountNumber, file.AccountNumber))
+                {
+                    messages.Add($"{label} was left out. This import is for {target.Name}.");
                     continue;
                 }
 
@@ -118,6 +165,8 @@ namespace THMS.Logic.Finance.Investments
                 skipped += preview.Skipped;
                 updated += preview.Updated;
                 messages.Add($"{account.Name}: {string.Join(" ", preview.Messages)}".Trim());
+                if (map is not null)
+                    SavePositionMap(map.ForAccount(account.Id));
             }
 
             _pendingPositions = matched;
@@ -321,6 +370,50 @@ namespace THMS.Logic.Finance.Investments
             if (string.IsNullOrWhiteSpace(stored) || string.IsNullOrWhiteSpace(file))
                 return false;
             return string.Equals(stored.Trim(), file.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool NumberMatches(string? stored, string? file)
+        {
+            if (string.IsNullOrWhiteSpace(file))
+                return true;
+            if (string.IsNullOrWhiteSpace(stored))
+                return false;
+            return AccountNumbersMatch(stored, file)
+                || file.Trim().EndsWith(stored.Trim(), StringComparison.OrdinalIgnoreCase)
+                || stored.Trim().EndsWith(file.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static FidelityPositionsFile? ReadPositions(InvestmentAccount account, string? path, InvestmentPositionColumnMap? map)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return null;
+            if (map is null)
+                return FidelityInvestmentFile.ReadPositions(path);
+
+            var files = InvestmentPositionMapper.Parse(
+                FidelityInvestmentFile.ReadSheet(path),
+                map,
+                Path.GetFileName(path));
+            var chosen = files.Where(file =>
+                string.IsNullOrWhiteSpace(file.AccountNumber)
+                || NumberMatches(account.AccountNumber, file.AccountNumber)).ToList();
+            if (chosen.Count == 0)
+                chosen = files.Take(1).ToList();
+            if (chosen.Count == 0)
+                return new FidelityPositionsFile();
+            if (chosen.Count == 1)
+                return chosen[0];
+
+            return new FidelityPositionsFile
+            {
+                FileDate = chosen[0].FileDate,
+                AccountNumber = chosen[0].AccountNumber,
+                AccountName = chosen[0].AccountName,
+                Cash = chosen.Select(file => file.Cash).LastOrDefault(cash => cash is not null),
+                CashSymbol = chosen.Select(file => file.CashSymbol).LastOrDefault(symbol => !string.IsNullOrWhiteSpace(symbol)) ?? "",
+                CashDescription = chosen.Select(file => file.CashDescription).LastOrDefault(text => !string.IsNullOrWhiteSpace(text)) ?? "",
+                Holdings = chosen.SelectMany(file => file.Holdings).ToList()
+            };
         }
     }
 
