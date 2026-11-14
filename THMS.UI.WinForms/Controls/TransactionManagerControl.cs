@@ -448,12 +448,7 @@ namespace THMS.UI.WinForms.Controls
                 menu.Items.Add(undo);
             }
 
-            if (menu.Items.Count == 0)
-            {
-                menu.Dispose();
-                return;
-            }
-
+            GridCsvExport.AddCommand(menu, grid);
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
             menu.Show(grid, location);
         }

@@ -310,6 +310,7 @@ namespace THMS.UI.WinForms.Controls
             var delete = new ToolStripMenuItem("Delete");
             delete.Click += (_, _) => DeleteSelectedCategory(row);
             menu.Items.Add(delete);
+            GridCsvExport.AddCommand(menu, gridCategories);
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
             menu.Show(gridCategories, location);
         }
@@ -762,12 +763,7 @@ namespace THMS.UI.WinForms.Controls
                 menu.Items.Add(split);
             }
 
-            if (menu.Items.Count == 0)
-            {
-                menu.Dispose();
-                return;
-            }
-
+            GridCsvExport.AddCommand(menu, gridTransactions);
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
             menu.Show(gridTransactions, location);
         }

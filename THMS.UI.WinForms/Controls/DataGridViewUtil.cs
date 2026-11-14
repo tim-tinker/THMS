@@ -46,6 +46,7 @@ namespace THMS.UI.WinForms.Controls
             HookDisplayedDateAndMoneyColumns(grid);
             HookStableDisplayedRow(grid);
             HookSelectionSummary(grid);
+            GridCsvExport.Attach(grid);
         }
 
         public static IEnumerable<DataGridViewRow> SelectedDataRows(DataGridView grid)

@@ -94,6 +94,9 @@
     <Compile Update="Controls\MatchImportedDialog.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Controls\NavCalculator.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Update="Controls\PayAccountDialog.cs">
       <SubType>Form</SubType>
     </Compile>

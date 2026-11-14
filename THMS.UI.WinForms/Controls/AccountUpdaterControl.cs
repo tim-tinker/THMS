@@ -472,6 +472,8 @@ namespace THMS.UI.WinForms.Controls
                     _accountMenu.Items.Add(PayMenuItem(account, latest));
                     break;
             }
+
+            GridCsvExport.AddCommand(_accountMenu, gridAccounts);
         }
 
         private ToolStripMenuItem PayMenuItem(Account account, AccountStatement? latest)

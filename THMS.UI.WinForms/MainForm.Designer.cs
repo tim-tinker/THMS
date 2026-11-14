@@ -3,6 +3,7 @@ namespace THMS.UI
     partial class MainForm
     {
         private System.ComponentModel.IContainer components = null;
+        private Panel navigationColumn;
         private FlowLayoutPanel navigationPanel;
         private Panel dashboardHostPanel;
         private Panel statusStrip;
@@ -25,6 +26,7 @@ namespace THMS.UI
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
+            navigationColumn = new Panel();
             navigationPanel = new FlowLayoutPanel();
             dashboardHostPanel = new Panel();
             statusStrip = new Panel();
@@ -35,17 +37,23 @@ namespace THMS.UI
             statusStrip.SuspendLayout();
             SuspendLayout();
             // 
+            // navigationColumn
+            // 
+            navigationColumn.BackColor = Color.LightGray;
+            navigationColumn.Controls.Add(navigationPanel);
+            navigationColumn.Dock = DockStyle.Left;
+            navigationColumn.Name = "navigationColumn";
+            navigationColumn.Size = new Size(291, 1099);
+            navigationColumn.TabIndex = 1;
+            // 
             // navigationPanel
             // 
             navigationPanel.AutoScroll = true;
             navigationPanel.BackColor = Color.LightGray;
-            navigationPanel.Dock = DockStyle.Left;
+            navigationPanel.Dock = DockStyle.Fill;
             navigationPanel.FlowDirection = FlowDirection.TopDown;
-            navigationPanel.Location = new Point(0, 0);
             navigationPanel.Name = "navigationPanel";
-            navigationPanel.Padding = new Padding(12);
-            navigationPanel.Size = new Size(291, 1099);
-            navigationPanel.TabIndex = 1;
+            navigationPanel.Padding = new Padding(12, 12, 12, 0);
             navigationPanel.WrapContents = false;
             navigationPanel.Resize += OnNavigationPanelResize;
             // 
@@ -119,7 +127,7 @@ namespace THMS.UI
             // 
             ClientSize = new Size(2700, 1147);
             Controls.Add(dashboardHostPanel);
-            Controls.Add(navigationPanel);
+            Controls.Add(navigationColumn);
             Controls.Add(statusStrip);
             Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "MainForm";

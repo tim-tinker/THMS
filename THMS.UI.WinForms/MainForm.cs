@@ -26,6 +26,13 @@ namespace THMS.UI
             AppStatus.Bind(SetAppStatus);
             GridSelectionSummary.Bind(SetSelectionStatus);
             syncProgress.BringToFront();
+            // Added after the fill nav list, same dock order as the status strip:
+            // the bottom edge keeps its height and the list scrolls above it.
+            navigationColumn.Controls.Add(new NavCalculator
+            {
+                Dock = DockStyle.Bottom,
+                Name = "navCalculator"
+            });
         }
 
         private void SetSelectionStatus(string? summary)

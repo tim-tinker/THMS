@@ -4,6 +4,7 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
@@ -30,6 +31,7 @@
     <ProjectReference Include="..\THMS.External\THMS.External.csproj" />
     <ProjectReference Include="..\THMS.Ingestion\THMS.Ingestion.csproj" />
     <ProjectReference Include="..\THMS.Logic\THMS.Logic.csproj" />
+    <ProjectReference Include="..\THMS.UI.WinForms\THMS.UI.WinForms.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -112,6 +112,7 @@ namespace THMS.UI.WinForms.Controls
             menu.Items.Add(before);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(delete);
+            GridCsvExport.AddCommand(menu, _grid);
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
             menu.Show(_grid, location);
         }

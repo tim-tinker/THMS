@@ -1191,6 +1191,7 @@ namespace THMS.UI.WinForms.Controls
                     grid.BeginInvoke(() => DeleteSelected(_promotions, grid));
             };
             menu.Items.Add(delete);
+            GridCsvExport.AddCommand(menu, grid);
             return menu;
         }
 
