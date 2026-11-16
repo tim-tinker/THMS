@@ -3,6 +3,7 @@ using System.Globalization;
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
+using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Planning;
 using THMS.Logic.Orchestrators.Finance;
 
@@ -365,7 +366,7 @@ namespace THMS.UI.WinForms.Controls
             dtStatementDate = new DateTimePicker { Format = DateTimePickerFormat.Short };
             dtDueDate = new DateTimePicker { Format = DateTimePickerFormat.Short };
             numAmountDue = MoneyBox();
-            numStatementBalance = MoneyBox();
+            numStatementBalance = MoneyBox(allowNegative: true);
             numEscrowBalance = MoneyBox();
             numStatementBalance.Font = new Font(Font, FontStyle.Bold);
             txtNotes = new TextBox
@@ -684,6 +685,15 @@ namespace THMS.UI.WinForms.Controls
             if (type is StatementType.Utility or StatementType.Service or StatementType.Insurance)
                 return [];
 
+            if (numStatementBalance is not null)
+            {
+                var debt = type is StatementType.CreditCard or StatementType.Loan or StatementType.Mortgage;
+                var minimum = debt ? -100_000_000m : 0m;
+                if (numStatementBalance.Value < minimum)
+                    numStatementBalance.Value = minimum;
+                numStatementBalance.Minimum = minimum;
+            }
+
             var rows = new List<Control>();
             lblPreviousBalance = ValueLabel("—");
             RefreshPreviousBalance();
@@ -697,7 +707,7 @@ namespace THMS.UI.WinForms.Controls
                     {
                         _creditLimit = credit.CreditLimit;
                         rows.Add(StatementRow("Credit Limit", ValueLabel(credit.CreditLimit.ToString("C2"))));
-                        lblAvailableCredit = ValueLabel((credit.CreditLimit - numStatementBalance!.Value).ToString("C2"));
+                        lblAvailableCredit = ValueLabel(PostedBalanceCalculator.AvailableCredit(credit.CreditLimit, numStatementBalance!.Value).ToString("C2"));
                         rows.Add(StatementRow("Available Credit", lblAvailableCredit));
                         rows.Add(StatementRow("APR", ValueLabel(Percent(credit.APR))));
                     }
@@ -735,7 +745,7 @@ namespace THMS.UI.WinForms.Controls
         {
             if (lblAvailableCredit is null || _creditLimit is not decimal limit || numStatementBalance is null)
                 return;
-            lblAvailableCredit.Text = (limit - numStatementBalance.Value).ToString("C2");
+            lblAvailableCredit.Text = PostedBalanceCalculator.AvailableCredit(limit, numStatementBalance.Value).ToString("C2");
         }
 
         private AccountStatement? CurrentPreviousStatement()

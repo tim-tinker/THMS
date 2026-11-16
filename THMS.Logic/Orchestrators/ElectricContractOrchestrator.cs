@@ -28,6 +28,14 @@ namespace THMS.Logic.Orchestrators
             _financeStore.UpsertElectricContract(contract);
         }
 
+        public void Delete(Guid contractId)
+        {
+            if (contractId == Guid.Empty)
+                return;
+
+            _financeStore.DeleteElectricContract(contractId);
+        }
+
         // Lists contracts whose start–end range covers the selected calendar period.
         public IEnumerable<ElectricContract> GetElectricContracts(string period)
         {

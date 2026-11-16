@@ -405,7 +405,7 @@ namespace THMS.Tests.Logic
 
             var projection = orchestrator.GetProjection(card.Id, asOf);
             Assert.That(projection.Rows.Select(row => row.Description), Is.EqualTo(new[] { "Card payment" }));
-            Assert.That(projection.Rows[0].Amount, Is.EqualTo(-150m));
+            Assert.That(projection.Rows[0].Amount, Is.EqualTo(150m));
             Assert.That(projection.Rows[0].Date, Is.EqualTo(payDate));
         }
 
@@ -1144,7 +1144,7 @@ namespace THMS.Tests.Logic
             var projection = orchestrator.GetProjection(card.Id, asOf);
             Assert.That(projection.Rows, Is.Not.Empty);
             Assert.That(projection.Rows.Select(row => row.Description), Does.Not.Contain("Statement due"));
-            Assert.That(projection.Rows.Select(row => row.Amount), Is.All.EqualTo(-80m));
+            Assert.That(projection.Rows.Select(row => row.Amount), Is.All.EqualTo(80m));
 
             statements.Save(new CreditCardStatement
             {
@@ -1301,17 +1301,17 @@ namespace THMS.Tests.Logic
                 AccountId = card.Id,
                 StatementDate = new DateTime(2026, 9, 28),
                 DueDate = new DateTime(2026, 10, 20),
-                StatementBalance = 1000m,
+                StatementBalance = -1000m,
                 AmountDue = 200m
             };
             statements.Save(statement);
             var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
 
             var beforePay = orchestrator.GetProjection(card.Id, asOf);
-            Assert.That(beforePay.OpeningBalance, Is.EqualTo(1000m));
+            Assert.That(beforePay.OpeningBalance, Is.EqualTo(-1000m));
             Assert.That(beforePay.Rows.Single().Description, Is.EqualTo("Statement due"));
-            Assert.That(beforePay.Rows[0].Amount, Is.EqualTo(-200m));
-            Assert.That(beforePay.Rows[0].Balance, Is.EqualTo(800m));
+            Assert.That(beforePay.Rows[0].Amount, Is.EqualTo(200m));
+            Assert.That(beforePay.Rows[0].Balance, Is.EqualTo(-800m));
 
             transactions.AddFutureTransferTransaction(new FutureTransferTransaction
             {
@@ -1328,8 +1328,8 @@ namespace THMS.Tests.Logic
 
             var afterPay = orchestrator.GetProjection(card.Id, asOf);
             Assert.That(afterPay.Rows.Select(row => row.Description), Is.EqualTo(new[] { "Card payment" }));
-            Assert.That(afterPay.Rows[0].Amount, Is.EqualTo(-200m));
-            Assert.That(afterPay.Rows[0].Balance, Is.EqualTo(800m));
+            Assert.That(afterPay.Rows[0].Amount, Is.EqualTo(200m));
+            Assert.That(afterPay.Rows[0].Balance, Is.EqualTo(-800m));
         }
 
         private static (InMemoryAccountDataStore accounts, InMemoryTransactionDataStore transactions, InMemoryAccountStatementDataStore statements, BankAccount checking, CreditAccount card) SeedCheckingAndCard()

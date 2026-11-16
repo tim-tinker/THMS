@@ -150,10 +150,10 @@ namespace THMS.Tests.Logic
                 Assert.That(rows[1].Apr, Is.EqualTo(0.1999m));
                 Assert.That(rows[2].Type, Is.EqualTo("Loan"));
                 Assert.That(rows[2].Apr, Is.EqualTo(0.0699m));
-                Assert.That(rows[2].Principal, Is.EqualTo(29133.33m));
+                Assert.That(rows[2].Principal, Is.EqualTo(-29133.33m));
                 Assert.That(rows[3].Type, Is.EqualTo("Mortgage"));
                 Assert.That(rows[3].Apr, Is.EqualTo(2.875m));
-                Assert.That(rows[3].Principal, Is.EqualTo(39594.91m));
+                Assert.That(rows[3].Principal, Is.EqualTo(-39594.91m));
             }
             finally
             {

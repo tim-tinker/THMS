@@ -46,7 +46,7 @@ namespace THMS.Logic.ViewModels.Finance
                         if (live is null && useStoredPosted)
                             view.Balance = PostedBalanceCalculator.ToDisplayBalance(credit, credit.PostedBalance);
                         if (view.Balance is decimal creditBalance)
-                            view.BankCreditAvailable = credit.CreditLimit - creditBalance;
+                            view.BankCreditAvailable = PostedBalanceCalculator.AvailableCredit(credit.CreditLimit, creditBalance);
                         view.CreditLimit = credit.CreditLimit;
                         view.APR = PositiveRate(credit.APR);
                         view.DueDate = live?.DueDate ?? PostedBalanceCalculator.UsableDate(credit.DueDate);

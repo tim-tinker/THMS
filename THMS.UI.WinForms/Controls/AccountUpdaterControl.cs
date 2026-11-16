@@ -539,7 +539,7 @@ namespace THMS.UI.WinForms.Controls
         private void AddCharge(Account account)
         {
             using var dlg = new AccountEntryDialog(
-                "A charge is a positive amount. A refund is negative.",
+                "A charge is a negative amount. A refund is positive.",
                 Categories(),
                 defaultDescription: "Charge",
                 accounts: _accountOrchestrator.GetAllAccounts().ToList());
@@ -551,7 +551,7 @@ namespace THMS.UI.WinForms.Controls
         private void AddBankTransaction(Account account)
         {
             var hint = account is LoanAccount or MortgageAccount
-                ? "A charge or interest is a positive amount. A payment is negative."
+                ? "A charge or interest is a negative amount. A payment is positive."
                 : "Negative amounts leave this account. Positive amounts are deposits. The other party is not a THMS account.";
             using var dlg = new AccountEntryDialog(
                 hint,

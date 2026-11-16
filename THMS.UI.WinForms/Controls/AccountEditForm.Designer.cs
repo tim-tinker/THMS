@@ -247,7 +247,6 @@ namespace THMS.UI.WinForms.Controls
 
             lblLoanPrincipal = FieldLabel("Principal:", 10, 8, 150);
             numLoanPrincipal = MoneyBox(panelFieldLeft, 8);
-            numLoanPrincipal.Minimum = 0;
             numLoanPrincipal.Maximum = 1000000;
 
             lblLoanRate = FieldLabel("Interest Rate (%):", 10, 44, 150);
@@ -272,7 +271,6 @@ namespace THMS.UI.WinForms.Controls
 
             lblMortPrincipal = FieldLabel("Principal:", 10, 8, 150);
             numMortPrincipal = MoneyBox(panelFieldLeft, 8);
-            numMortPrincipal.Minimum = 0;
             numMortPrincipal.Maximum = 1000000;
 
             lblMortRate = FieldLabel("Interest Rate (%):", 10, 44, 150);

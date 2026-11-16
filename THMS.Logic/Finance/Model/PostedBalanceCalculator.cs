@@ -190,20 +190,25 @@ namespace THMS.Logic.Finance.Model
         }
 
         /// <summary>
-        /// Credit, loan, and mortgage balances are stored in ledger space (amount owed is negative).
-        /// Display space is inverted so a positive value is the amount owed. Statement balances stay
-        /// in display space and are converted only when used as a ledger anchor.
+        /// Credit, loan, and mortgage balances use the ledger sign everywhere they are shown.
+        /// A negative balance is money owed. A charge, including interest, is negative and increases
+        /// what is owed. A payment is positive and reduces what is owed. Statement balances are stored
+        /// in that same sign.
         /// </summary>
         public static decimal ToDisplayBalance(Account? account, decimal ledgerBalance) =>
-            UsesLiabilityLedger(account) ? -ledgerBalance : ledgerBalance;
+            ledgerBalance;
 
         public static decimal ToLedgerBalance(Account? account, decimal displayBalance) =>
-            UsesLiabilityLedger(account) ? -displayBalance : displayBalance;
+            displayBalance;
 
         public static decimal ToLedgerPostedDelta(Account? account, decimal displayDelta) =>
-            UsesLiabilityLedger(account) ? -displayDelta : displayDelta;
+            displayDelta;
 
-        private static bool UsesLiabilityLedger(Account? account) =>
+        public static bool UsesLiabilityLedger(Account? account) =>
             account is CreditAccount or LoanAccount or MortgageAccount;
+
+        /// <summary>Available credit when <paramref name="signedBalance"/> is negative for money owed.</summary>
+        public static decimal AvailableCredit(decimal creditLimit, decimal signedBalance) =>
+            creditLimit + signedBalance;
     }
 }

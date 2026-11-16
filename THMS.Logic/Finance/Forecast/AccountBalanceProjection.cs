@@ -131,7 +131,7 @@ namespace THMS.Logic.Finance.Forecast
                 movements.Add(new Movement(
                     statement.DueDate.Date,
                     string.IsNullOrWhiteSpace(statement.Notes) ? "Statement due" : statement.Notes.Trim(),
-                    PostedBalanceCalculator.ToLedgerBalance(account, -Math.Abs(statement.AmountDue))));
+                    DebtPaymentAmount(account, statement.AmountDue)));
             }
 
             return movements;
@@ -168,6 +168,11 @@ namespace THMS.Logic.Finance.Forecast
 
         private static bool AffectsTransfer(FutureTransferTransaction item, Guid accountId) =>
             item.FromAccountId == accountId || item.ToAccountId == accountId;
+
+        private static decimal DebtPaymentAmount(Account account, decimal amountDue) =>
+            PostedBalanceCalculator.UsesLiabilityLedger(account)
+                ? Math.Abs(amountDue)
+                : -Math.Abs(amountDue);
 
         private static decimal DisplayDelta(Account account, decimal ledgerAmount) =>
             PostedBalanceCalculator.ToDisplayBalance(account, ledgerAmount);

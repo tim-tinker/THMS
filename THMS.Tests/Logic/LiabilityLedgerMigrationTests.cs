@@ -221,6 +221,51 @@ namespace THMS.Tests.Logic
             }
         }
 
+        [Test]
+        public void Apply_NegatesDebtStatementBalancesOnce()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"thms-liability-{Guid.NewGuid():N}.db");
+            try
+            {
+                using var conn = Open(path);
+                Execute(conn, @"
+                    CREATE TABLE AccountStatements (
+                        Id TEXT PRIMARY KEY,
+                        StatementType TEXT NOT NULL
+                    );
+                    CREATE TABLE AccountStatementDetails (
+                        StatementId TEXT PRIMARY KEY,
+                        EscrowBalance REAL NOT NULL,
+                        StatementBalance REAL NOT NULL
+                    );
+                    INSERT INTO AccountStatements (Id, StatementType) VALUES
+                        ('card', 'CreditCard'),
+                        ('loan', 'Loan'),
+                        ('mortgage', 'Mortgage'),
+                        ('bank', 'Bank');
+                    INSERT INTO AccountStatementDetails (StatementId, EscrowBalance, StatementBalance) VALUES
+                        ('card', 0, 400),
+                        ('loan', 0, 27796.27),
+                        ('mortgage', 13360.26, 37884.67),
+                        ('bank', 0, 1090.73);");
+
+                LiabilityLedgerMigration.Apply(conn);
+                LiabilityLedgerMigration.Apply(conn);
+
+                Assert.That(Scalar(conn, "SELECT StatementBalance FROM AccountStatementDetails WHERE StatementId = 'card'"), Is.EqualTo(-400));
+                Assert.That(Scalar(conn, "SELECT StatementBalance FROM AccountStatementDetails WHERE StatementId = 'loan'"), Is.EqualTo(-27796.27));
+                Assert.That(Scalar(conn, "SELECT StatementBalance FROM AccountStatementDetails WHERE StatementId = 'mortgage'"), Is.EqualTo(-37884.67));
+                Assert.That(Scalar(conn, "SELECT EscrowBalance FROM AccountStatementDetails WHERE StatementId = 'mortgage'"), Is.EqualTo(13360.26));
+                Assert.That(Scalar(conn, "SELECT StatementBalance FROM AccountStatementDetails WHERE StatementId = 'bank'"), Is.EqualTo(1090.73));
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+        }
+
         private static SqliteConnection Open(string path)
         {
             var conn = new SqliteConnection($"Data Source={path}");

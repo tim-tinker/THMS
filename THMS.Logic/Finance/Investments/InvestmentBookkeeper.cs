@@ -180,6 +180,35 @@ namespace THMS.Logic.Finance.Investments
             return points;
         }
 
+        public readonly record struct HeldShares(string Symbol, decimal Shares);
+
+        public static (decimal Cash, IReadOnlyList<HeldShares> Holdings) HoldingsAsOf(
+            InvestmentBookState state,
+            DateTime through)
+        {
+            var book = BookAsOf(state, through);
+            var held = ShareTotals(book.Lots)
+                .Select(pair => new HeldShares(pair.Key, pair.Value))
+                .ToList();
+            return (book.Cash, held);
+        }
+
+        public static SecurityValuation PriceAsOf(InvestmentBookState state, string symbol, DateTime asOf)
+        {
+            DateTime? latest = null;
+            foreach (var quote in state.MarketQuotes)
+            {
+                if (!SameSymbol(quote.Symbol, symbol) || quote.AsOf.Date > asOf.Date)
+                    continue;
+                if (latest is null || quote.AsOf.Date > latest)
+                    latest = quote.AsOf.Date;
+            }
+
+            if (latest is not DateTime date || SecurityMarketQuote.ForDate(state.MarketQuotes, symbol, date) is not decimal unit)
+                return new SecurityValuation(null, null);
+            return new SecurityValuation(AdjustForSplits(state, symbol, date, unit), date);
+        }
+
         private static BookSlice BookAsOf(InvestmentBookState state, DateTime through)
         {
             var lots = new List<Lot>();

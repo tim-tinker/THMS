@@ -581,6 +581,9 @@ namespace THMS.UI.WinForms.Controls
 
         private async Task LoadTransactionsForAccountAsync(Guid accountId, CancellationToken token)
         {
+            if (_accountOrchestrator.GetAccount(accountId) is InvestmentAccount)
+                new InvestmentImportOrchestrator().PublishRegisterRows(accountId);
+
             var history = SelectedHistory();
             ShowLoadProgress($"Loading {history.ToLowerInvariant()} history...");
 
@@ -1166,7 +1169,7 @@ namespace THMS.UI.WinForms.Controls
             var showIssuerSign = parent is not FutureTransferTransaction
                 && account is CreditAccount or LoanAccount or MortgageAccount;
             var hint = showIssuerSign
-                ? "A charge is a positive amount. A payment is negative."
+                ? "A charge is a negative amount. A payment is positive."
                 : parent switch
                 {
                     FutureTransferTransaction => "Amount is the size of the transfer.",

@@ -96,7 +96,7 @@ namespace THMS.UI.WinForms
 
         private void HostGrid(TabPage page, UserControl grid, int tabIndex)
         {
-            var buttons = CreateButtons(tabIndex);
+            var buttons = CreateButtons(tabIndex, grid);
             if (buttons.Length > 0)
             {
                 var bar = new FlowLayoutPanel
@@ -119,7 +119,7 @@ namespace THMS.UI.WinForms
             }
         }
 
-        private Control[] CreateButtons(int tabIndex)
+        private Control[] CreateButtons(int tabIndex, UserControl grid)
         {
             return TabLabels[tabIndex] switch
             {
@@ -136,12 +136,31 @@ namespace THMS.UI.WinForms
                 [
                     ActionButton("Import", OnSolarImport, reload: false)
                 ],
-                TabElectricContracts =>
-                [
-                    ActionButton("Add", () => _electricContractUpdater.UpdateDataSource(TopLevelControl))
-                ],
+                TabElectricContracts when grid is ElectricContractManagerControl contracts =>
+                    ElectricContractButtons(contracts),
                 _ => []
             };
+        }
+
+        private Control[] ElectricContractButtons(ElectricContractManagerControl contracts)
+        {
+            var edit = new ThmsButton { Text = "Edit", Enabled = contracts.HasSelection };
+            var delete = new ThmsButton { Text = "Delete", Destructive = true, Enabled = contracts.HasSelection };
+            edit.Click += (_, _) => contracts.EditSelected();
+            delete.Click += (_, _) => contracts.DeleteSelected();
+            contracts.SelectionChanged += (_, _) =>
+            {
+                var selected = contracts.HasSelection;
+                edit.Enabled = selected;
+                delete.Enabled = selected;
+            };
+
+            return
+            [
+                ActionButton("Add", () => _electricContractUpdater.UpdateDataSource(TopLevelControl)),
+                edit,
+                delete
+            ];
         }
 
         private ThmsButton ActionButton(string text, Action action, bool reload = true)

@@ -1,4 +1,5 @@
 using THMS.Data.Stores;
+using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.Ingestion.Importers.Finance;
 using THMS.Logic.Finance.Transfer;
@@ -72,14 +73,18 @@ namespace THMS.Logic.Orchestrators
                 seen[key] = seen.TryGetValue(key, out var already) ? already || unreconciled : unreconciled;
             }
 
+            var account = _accounts.GetAllAccounts().FirstOrDefault(item => item.Id == accountId);
+            var liabilityAmountColumn = IsLiability(account) && !map.UseDebitCredit;
             var rows = new List<TransactionFileImportRow>();
             foreach (var mapped in _reader.Apply(sheet, map))
             {
+                var amount = LedgerAmount(mapped, map, liabilityAmountColumn);
+
                 var duplicate = false;
                 var duplicateIsUnreconciled = false;
-                if (mapped.Problem is null && mapped.Date is DateTime date && mapped.Amount is decimal amount)
+                if (mapped.Problem is null && mapped.Date is DateTime date && amount is decimal postedAmount)
                 {
-                    var key = Key(date, amount, mapped.Description);
+                    var key = Key(date, postedAmount, mapped.Description);
                     duplicate = seen.TryGetValue(key, out duplicateIsUnreconciled);
                     if (!duplicate)
                         seen[key] = false;
@@ -90,7 +95,7 @@ namespace THMS.Logic.Orchestrators
                     SourceRow = mapped.SourceRow,
                     Date = mapped.Date,
                     Description = mapped.Description,
-                    Amount = mapped.Amount,
+                    Amount = amount,
                     Problem = mapped.Problem,
                     IsDuplicate = duplicate,
                     DuplicateIsUnreconciled = duplicate && duplicateIsUnreconciled,
@@ -196,6 +201,21 @@ namespace THMS.Logic.Orchestrators
                 return fallback;
 
             return new ExpenseCategory { Id = categoryId, Name = name, IsActive = true };
+        }
+
+        private static bool IsLiability(Account? account) =>
+            account is CreditAccount or LoanAccount or MortgageAccount;
+
+        private static decimal? LedgerAmount(
+            MappedTransactionFileRow mapped,
+            TransactionFileColumnMap map,
+            bool liabilityAmountColumn)
+        {
+            if (!liabilityAmountColumn || mapped.Amount is not decimal amount)
+                return mapped.Amount;
+
+            var native = map.FlipSign ? -amount : amount;
+            return LiabilityLedgerMigration.ToLedgerAmount(native, category: null, mapped.Description);
         }
 
         private static DuplicateKey Key(DateTime date, decimal amount, string? description) =>

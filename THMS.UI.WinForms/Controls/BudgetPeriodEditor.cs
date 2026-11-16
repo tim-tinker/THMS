@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using THMS.Domain.Finance.Transactions;
+using THMS.Logic.Finance.Budget;
 using THMS.Logic.Orchestrators;
 
 namespace THMS.UI.WinForms.Controls
@@ -57,7 +58,7 @@ namespace THMS.UI.WinForms.Controls
             var open = !_history.IsClosed;
             lblPeriod.Text = $"{_history.PeriodStart:d} – {_history.PeriodEnd:d}";
             numStarting.Value = Clamp(_history.StartingBalance);
-            txtActual.Text = _history.ActualExpenses.ToString("c2");
+            txtActual.Text = DisplayActual(_history).ToString("c2");
             txtRecommended.Text = _history.RecommendedAmount.ToString("c2");
             numBudgetAmount.Value = Clamp(_history.BudgetAmount);
             UpdateDerived();
@@ -75,6 +76,16 @@ namespace THMS.UI.WinForms.Controls
         {
             UpdateDerived();
             UpdateTransferEnabled();
+        }
+
+        private decimal DisplayActual(ExpenseBudgetHistory history)
+        {
+            var rule = Orchestrator.GetRule(history.BudgetRuleId);
+            if (rule is null)
+                return history.ActualExpenses;
+
+            var role = BudgetBalance.UniformRole(rule, Orchestrator.GetCategories().ToList());
+            return role == CategoryRole.Expense ? -history.ActualExpenses : history.ActualExpenses;
         }
 
         private void UpdateDerived()

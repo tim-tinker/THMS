@@ -37,18 +37,18 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void Build_InvertsCreditAmountsSoChargesIncreaseTheAmountOwed()
+        public void Build_KeepsCreditChargesNegativeSoTheyIncreaseTheAmountOwed()
         {
             var account = new CreditAccount { Name = "Card" };
             var previous = new CreditCardStatement
             {
                 StatementDate = new DateTime(2026, 9, 8),
-                StatementBalance = 200m
+                StatementBalance = -200m
             };
             var statement = new CreditCardStatement
             {
                 StatementDate = new DateTime(2026, 10, 8),
-                StatementBalance = 215m
+                StatementBalance = -215m
             };
             var charge = Transaction(new DateTime(2026, 9, 20), -40m, "Store");
             var payment = Transaction(new DateTime(2026, 9, 20), 25m, "Payment");
@@ -58,8 +58,8 @@ namespace THMS.Tests.Logic
 
             Assert.That(validation.Rows.Select(row => (row.Description, row.Amount, row.Balance)), Is.EqualTo(new[]
             {
-                ("Store", 40m, 240m),
-                ("Payment", -25m, 215m)
+                ("Payment", 25m, -175m),
+                ("Store", -40m, -215m)
             }));
             Assert.That(validation.Difference, Is.EqualTo(0m));
         }
@@ -71,19 +71,19 @@ namespace THMS.Tests.Logic
             var previous = new LoanStatement
             {
                 StatementDate = new DateTime(2026, 8, 1),
-                StatementBalance = 8000m
+                StatementBalance = -8000m
             };
             var statement = new LoanStatement
             {
                 StatementDate = new DateTime(2026, 9, 1),
-                StatementBalance = 7900m
+                StatementBalance = -7900m
             };
 
             var validation = StatementBalanceValidation.Build(account, statement, previous, []);
 
             Assert.That(validation.Rows, Is.Empty);
-            Assert.That(validation.EndingBalance, Is.EqualTo(8000m));
-            Assert.That(validation.Difference, Is.EqualTo(100m));
+            Assert.That(validation.EndingBalance, Is.EqualTo(-8000m));
+            Assert.That(validation.Difference, Is.EqualTo(-100m));
         }
 
         private static UnifiedTransactionView Transaction(DateTime date, decimal amount, string description) => new()

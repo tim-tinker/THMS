@@ -309,16 +309,81 @@ namespace THMS.Tests.Logic
             Assert.That(saved.TracksPositions, Is.True);
             Assert.That(saved.CashBalance, Is.EqualTo(131.20m));
             Assert.That(saved.PositionValue, Is.EqualTo(86.50m));
-            var posted = transactions.GetPostedTransactions(account.Id).OrderBy(tx => tx.Date).ToList();
-            Assert.That(posted.Select(tx => tx.Amount), Is.EqualTo(new[] { 1.20m, 50m, -20m }));
-            Assert.That(posted.Select(tx => tx.Category), Is.EqualTo(new[]
-            {
-                InvestmentImportOrchestrator.IncomeCategoryName,
-                InvestmentImportOrchestrator.ContributionCategoryName,
-                InvestmentImportOrchestrator.DistributionCategoryName
-            }));
+            var posted = transactions.GetPostedTransactions(account.Id).ToList();
+            Assert.That(
+                posted.Select(tx => (tx.Date, tx.Amount, tx.Category)),
+                Is.EquivalentTo(new (DateTime, decimal, string)[]
+                {
+                    (new DateTime(2026, 10, 31), 8.65m, InvestmentImportOrchestrator.PriceCategoryName),
+                    (new DateTime(2026, 10, 31), 100m, InvestmentImportOrchestrator.ActivityCategoryName),
+                    (new DateTime(2026, 11, 2), 1.20m, InvestmentImportOrchestrator.IncomeCategoryName),
+                    (new DateTime(2026, 11, 3), 50m, InvestmentImportOrchestrator.ContributionCategoryName),
+                    (new DateTime(2026, 11, 4), -20m, InvestmentImportOrchestrator.DistributionCategoryName)
+                }));
+            Assert.That(posted.Single(tx => tx.Amount == 8.65m).Description, Does.Contain("10 shares").And.Contain(8.65m.ToString("C")));
             Assert.That(posted.All(tx => transactions.GetCategory(tx.CategoryId!.Value)!.Role == CategoryRole.Investment), Is.True);
             Assert.That(transactions.GetPostedTransferTransactions(account.Id), Is.Empty);
+        }
+
+        [Test]
+        public void CoveredHistory_StaysOutOfTheBookAndAppearsOnTheRegister()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var transactions = new InMemoryTransactionDataStore();
+            var books = new InMemoryInvestmentBookStore();
+            var account = new InvestmentAccount
+            {
+                Name = "IRA",
+                AccountNumber = "257297693",
+                Type = AccountType.Investment
+            };
+            accounts.UpsertAccount(account);
+            var state = new InvestmentBookState { AccountId = account.Id };
+            InvestmentBookkeeper.Import(
+                state,
+                FidelityInvestmentFile.ParsePositions(Positions, PositionsName),
+                FidelityInvestmentFile.ParseHistory("""
+                    Run Date,Action,Symbol,Description,Type,Price ($),Quantity,Commission ($),Fees ($),Accrued Interest ($),Amount ($),Cash Balance ($),Settlement Date
+                    10/30/2026,YOU BOUGHT AGNC (AGNC) (Cash),AGNC,AGNC,Cash,10,2,"","","",-20,80,""
+                    10/30/2026,DIVIDEND RECEIVED AGNC (AGNC) (Cash),AGNC,AGNC,Cash,"",0,"","","",1.00,100.00,""
+                    """));
+            foreach (var security in state.Securities)
+                books.UpsertSecurity(security);
+            foreach (var quote in state.Quotes)
+                books.UpsertQuote(quote);
+            foreach (var quote in state.MarketQuotes)
+                books.UpsertMarketQuote(quote);
+            foreach (var action in state.Actions)
+                books.UpsertAction(action);
+            account.BookOpenedOn = state.OpenedOn;
+            account.TracksPositions = true;
+            accounts.UpsertAccount(account);
+
+            var orchestrator = new InvestmentImportOrchestrator(accounts, books, transactions, transactions);
+            orchestrator.PublishRegisterRows(account.Id);
+
+            var snapshot = orchestrator.Snapshot(account.Id);
+            Assert.That(snapshot.Cash, Is.EqualTo(100m));
+            Assert.That(snapshot.Positions.Single().Shares, Is.EqualTo(10m));
+            var covered = books.GetActions(account.Id).Where(action => action.RunDate == new DateTime(2026, 10, 30)).ToList();
+            Assert.That(covered, Has.Count.EqualTo(2));
+            Assert.That(covered.All(action => action.Status == InvestmentActionStatus.Skipped), Is.True);
+            Assert.That(covered.All(action => action.CashChange == 0 && action.ShareChange == 0), Is.True);
+            Assert.That(covered.All(action => action.LedgerTransactionId is not null), Is.True);
+
+            var posted = transactions.GetPostedTransactions(account.Id).ToList();
+            var buy = posted.Single(tx => tx.Amount == -20m);
+            Assert.That(buy.Category, Is.EqualTo(InvestmentImportOrchestrator.ActivityCategoryName));
+            Assert.That(buy.Description, Does.Contain("2 shares").And.Contain(10m.ToString("C")));
+            Assert.That(posted.Single(tx => tx.Amount == 1m).Category, Is.EqualTo(InvestmentImportOrchestrator.IncomeCategoryName));
+            var price = posted.Single(tx => tx.Category == InvestmentImportOrchestrator.PriceCategoryName);
+            Assert.That(price.Amount, Is.EqualTo(8.65m));
+            Assert.That(price.Date, Is.EqualTo(new DateTime(2026, 10, 31)));
+            Assert.That(price.Description, Does.Contain("AGNC").And.Contain("10 shares").And.Contain(8.65m.ToString("C")));
+
+            var count = posted.Count;
+            orchestrator.PublishRegisterRows(account.Id);
+            Assert.That(transactions.GetPostedTransactions(account.Id).Count(), Is.EqualTo(count));
         }
 
         [Test]

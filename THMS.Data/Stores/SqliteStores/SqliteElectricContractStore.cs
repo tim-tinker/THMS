@@ -27,5 +27,8 @@ namespace THMS.Data.Stores.SqliteStores
 
         public ElectricContract? GetLatest(SqliteConnection conn) =>
             _table.GetLatest(conn);
+
+        public void Delete(SqliteConnection conn, Guid contractId) =>
+            _table.Delete(conn, contractId);
     }
 }

@@ -19,9 +19,6 @@ namespace THMS.Logic.Finance.Planning
                 case InvestmentStatement investment:
                     ValidateBalanceOnly(investment.StatementBalance, findings);
                     break;
-                case LoanStatement loan:
-                    ValidateLoan(loan, findings);
-                    break;
                 case MortgageStatement mortgage:
                     ValidateMortgage(mortgage, findings);
                     break;
@@ -60,24 +57,14 @@ namespace THMS.Logic.Finance.Planning
                 findings.Add("Statement balance cannot be negative.");
         }
 
-        private static void ValidateLoan(LoanStatement loan, List<string> findings)
-        {
-            if (loan.StatementBalance < 0)
-                findings.Add("Statement balance cannot be negative.");
-        }
-
         private static void ValidateMortgage(MortgageStatement mortgage, List<string> findings)
         {
-            if (mortgage.StatementBalance < 0)
-                findings.Add("Statement balance cannot be negative.");
             if (mortgage.EscrowBalance < 0)
                 findings.Add("Mortgage escrow balance cannot be negative.");
         }
 
         private static void ValidateCreditCard(CreditCardStatement card, List<string> findings)
         {
-            if (card.StatementBalance < 0)
-                findings.Add("Statement balance cannot be negative.");
             foreach (var promo in card.Promotions)
             {
                 if (promo.CurrentBalance < 0)

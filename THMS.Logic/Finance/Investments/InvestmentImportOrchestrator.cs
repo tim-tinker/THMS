@@ -10,6 +10,8 @@ namespace THMS.Logic.Finance.Investments
         public const string ContributionCategoryName = "Investment Contribution";
         public const string DistributionCategoryName = "Investment Distribution";
         public const string IncomeCategoryName = "Investment Income";
+        public const string ActivityCategoryName = "Investment Activity";
+        public const string PriceCategoryName = "Security Price";
 
         private readonly IAccountDataStore _accounts;
         private readonly IInvestmentBookStore _books;
@@ -203,6 +205,24 @@ namespace THMS.Logic.Finance.Investments
             _pendingPositions = [];
         }
 
+        public void PublishRegisterRows(Guid accountId)
+        {
+            if (_accounts.GetAllAccounts().FirstOrDefault(account => account.Id == accountId) is not InvestmentAccount)
+                return;
+
+            var state = Load(accountId);
+            var needsLink = state.Actions.Any(action =>
+                action.LedgerTransactionId is null
+                && TryRegisterRow(state, action, out _, out _, out _));
+            if (!needsLink)
+                return;
+
+            var linked = new List<InvestmentAction>();
+            PostLedger(state, linked);
+            foreach (var action in linked)
+                _books.UpsertAction(action);
+        }
+
         public void Classify(Guid accountId, Guid actionId, InvestmentActionKind kind)
         {
             var state = Load(accountId);
@@ -222,7 +242,7 @@ namespace THMS.Logic.Finance.Investments
                 _books.UpsertQuote(quote);
             foreach (var quote in state.MarketQuotes)
                 _books.UpsertMarketQuote(quote);
-            PostLedger(state.Actions);
+            PostLedger(state);
             foreach (var action in state.Actions)
                 _books.UpsertAction(action);
 
@@ -239,39 +259,115 @@ namespace THMS.Logic.Finance.Investments
             _accounts.UpsertAccount(account);
         }
 
-        private void PostLedger(IEnumerable<InvestmentAction> actions)
+        private void PostLedger(InvestmentBookState state, ICollection<InvestmentAction>? linked = null)
         {
-            foreach (var action in actions)
+            foreach (var action in state.Actions)
             {
-                if (action.LedgerTransactionId is not null)
-                    continue;
-                if (action.Status != InvestmentActionStatus.Applied)
-                    continue;
-                if (action.Amount is not decimal amount || amount == 0)
+                if (!TryRegisterRow(state, action, out var amount, out var description, out var categoryName))
                     continue;
 
-                var categoryName = action.Kind switch
+                if (action.LedgerTransactionId is Guid existingId)
                 {
-                    InvestmentActionKind.Contribution => ContributionCategoryName,
-                    InvestmentActionKind.Distribution => DistributionCategoryName,
-                    InvestmentActionKind.Dividend or InvestmentActionKind.Interest => IncomeCategoryName,
-                    _ => null
-                };
-                if (categoryName is null)
+                    var existing = _transactions.GetPostedTransaction(existingId);
+                    if (existing is null)
+                        continue;
+                    if (existing.Date.Date == action.RunDate.Date
+                        && existing.Amount == amount
+                        && existing.Description == description)
+                        continue;
+
+                    existing.Date = action.RunDate.Date;
+                    existing.Amount = amount;
+                    existing.Description = description;
+                    _transactions.UpdatePostedTransaction(existing);
                     continue;
+                }
+
                 var posted = new PostedTransaction
                 {
                     AccountId = action.AccountId,
                     Date = action.RunDate.Date,
                     Amount = amount,
-                    Description = string.IsNullOrWhiteSpace(action.ActionText) ? categoryName : action.ActionText.Trim(),
+                    Description = description,
                     ImportedStatus = ImportedStatus.Matched,
                     ExternalTransactionId = "investment:" + action.Id
                 };
                 posted.ApplyCategory(EnsureCategory(categoryName));
                 _transactions.AddPostedTransaction(posted);
                 action.LedgerTransactionId = posted.Id;
+                linked?.Add(action);
             }
+        }
+
+        private static bool TryRegisterRow(
+            InvestmentBookState state,
+            InvestmentAction action,
+            out decimal amount,
+            out string description,
+            out string categoryName)
+        {
+            amount = 0;
+            description = "";
+            categoryName = ActivityCategoryName;
+            switch (action.Kind)
+            {
+                case InvestmentActionKind.Opening:
+                    var shares = action.Quantity ?? 0;
+                    if (shares <= 0 || string.IsNullOrWhiteSpace(action.Symbol))
+                        return false;
+                    var unit = SecurityMarketQuote.ForDate(state.MarketQuotes, action.Symbol, action.RunDate.Date);
+                    description = unit is decimal price
+                        ? $"{action.Symbol.Trim()}, {ShareCount(shares)} at {price:C}"
+                        : $"{action.Symbol.Trim()}, {ShareCount(shares)}";
+                    amount = unit ?? 0;
+                    categoryName = PriceCategoryName;
+                    return true;
+                case InvestmentActionKind.OpeningCash:
+                    amount = action.Amount ?? 0;
+                    var cashSymbol = string.IsNullOrWhiteSpace(action.Symbol) ? "" : action.Symbol.Trim() + " ";
+                    description = cashSymbol + "opening cash";
+                    return true;
+                default:
+                    if (string.IsNullOrWhiteSpace(action.ActionText) && action.Amount is null && action.Quantity is null)
+                        return false;
+                    amount = action.Amount ?? 0;
+                    description = DescribeActivity(action);
+                    categoryName = CategoryFor(action.Kind);
+                    return !string.IsNullOrWhiteSpace(description);
+            }
+        }
+
+        private static string CategoryFor(InvestmentActionKind kind) => kind switch
+        {
+            InvestmentActionKind.Contribution => ContributionCategoryName,
+            InvestmentActionKind.Distribution => DistributionCategoryName,
+            InvestmentActionKind.Dividend or InvestmentActionKind.Interest or InvestmentActionKind.Income => IncomeCategoryName,
+            _ => ActivityCategoryName
+        };
+
+        private static string DescribeActivity(InvestmentAction action)
+        {
+            var text = string.IsNullOrWhiteSpace(action.ActionText)
+                ? action.Description.Trim()
+                : action.ActionText.Trim();
+            if (action.Quantity is decimal quantity && quantity != 0
+                && action.Price is decimal price && price != 0)
+            {
+                var shares = $"{ShareCount(Math.Abs(quantity))} at {price:C}";
+                text = string.IsNullOrEmpty(text)
+                    ? $"{action.Symbol.Trim()} {shares}".Trim()
+                    : $"{text} ({shares})";
+            }
+
+            if (string.IsNullOrEmpty(text) && !string.IsNullOrWhiteSpace(action.Symbol))
+                text = action.Symbol.Trim();
+            return text;
+        }
+
+        private static string ShareCount(decimal quantity)
+        {
+            var text = quantity.ToString("0.######");
+            return quantity == 1m ? "1 share" : text + " shares";
         }
 
         private ExpenseCategory EnsureCategory(string name)

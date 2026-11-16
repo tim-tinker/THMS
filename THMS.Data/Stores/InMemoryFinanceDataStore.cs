@@ -67,5 +67,8 @@ namespace THMS.Data.Stores
 
         public ElectricContract? GetLatestElectricContract() =>
             _electricContracts.GetLatest();
+
+        public void DeleteElectricContract(Guid contractId) =>
+            _electricContracts.Delete(contractId);
     }
 }

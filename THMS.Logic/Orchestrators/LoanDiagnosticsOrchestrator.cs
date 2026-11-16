@@ -203,7 +203,7 @@ namespace THMS.Logic.Orchestrators.Finance
         }
 
         private static decimal AmountOwed(Account account, decimal principal) =>
-            PostedBalanceCalculator.ToDisplayBalance(account, principal);
+            PostedBalanceCalculator.UsesLiabilityLedger(account) ? Math.Max(0m, -principal) : principal;
 
         private static decimal RemainingPrincipal(decimal originalPrincipal, IEnumerable<PostedTransaction> posted)
         {

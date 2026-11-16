@@ -40,7 +40,9 @@ namespace THMS.Logic.Finance.Aggregation
             return rows;
         }
 
-        public static List<CategoryBudgetPeriodRow> BuildPeriods(IEnumerable<ExpenseBudgetHistory> history) =>
+        public static List<CategoryBudgetPeriodRow> BuildPeriods(
+            IEnumerable<ExpenseBudgetHistory> history,
+            bool expenseActualsNegative = false) =>
             history
                 .OrderByDescending(h => h.PeriodStart)
                 .Select(h => new CategoryBudgetPeriodRow
@@ -52,7 +54,7 @@ namespace THMS.Logic.Finance.Aggregation
                     PeriodEnd = h.PeriodEnd.Date,
                     Starting = h.StartingBalance,
                     BudgetAmount = h.BudgetAmount,
-                    Actual = h.ActualExpenses,
+                    Actual = expenseActualsNegative ? -h.ActualExpenses : h.ActualExpenses,
                     Remaining = h.Remaining,
                     Recommended = h.RecommendedAmount,
                     Status = h.IsClosed ? "Closed" : "Open",

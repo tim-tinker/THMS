@@ -179,14 +179,14 @@ namespace THMS.Logic.Orchestrators
             switch (statement)
             {
                 case LoanStatement loan:
-                    loan.StatementBalance = row.StatementBalance;
+                    loan.StatementBalance = LiabilityLedgerMigration.ImportedDebtBalance(row.StatementBalance);
                     break;
                 case MortgageStatement mortgage:
-                    mortgage.StatementBalance = row.StatementBalance;
+                    mortgage.StatementBalance = LiabilityLedgerMigration.ImportedDebtBalance(row.StatementBalance);
                     mortgage.EscrowBalance = row.EscrowBalance;
                     break;
                 case CreditCardStatement card:
-                    card.StatementBalance = row.StatementBalance;
+                    card.StatementBalance = LiabilityLedgerMigration.ImportedDebtBalance(row.StatementBalance);
                     break;
                 case UtilityStatement utility:
                     utility.StatementBalance = row.StatementBalance;

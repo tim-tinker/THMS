@@ -1,4 +1,6 @@
+using Microsoft.Data.Sqlite;
 using THMS.Data.Stores;
+using THMS.Data.Stores.SQLite;
 using THMS.Domain.Energy;
 using THMS.Domain.Finance;
 using THMS.Domain.Finance.Accounts;
@@ -100,6 +102,115 @@ namespace THMS.Tests.Logic
                 Is.EquivalentTo(thisYear));
             Assert.That(orchestrator.GetElectricContracts("Lifetime").Select(c => c.Name),
                 Is.EquivalentTo(new[] { "Ended this month", "Started this month", "Ended last month", "Next year" }));
+        }
+
+        [Test]
+        public void Save_UpdatesAnExistingContract_AndDeleteRemovesOnlyThatContract()
+        {
+            var store = new InMemoryFinanceDataStore();
+            var orchestrator = new ElectricContractOrchestrator(store);
+            var contract = new ElectricContract
+            {
+                Name = "Plan",
+                StartDate = new DateTime(2026, 1, 1),
+                EndDate = new DateTime(2026, 12, 31),
+                EnergyChargeRate = 0.1m,
+                BaseEnergyCharge = 9.95m
+            };
+            orchestrator.Save(contract);
+
+            contract.Name = "Plan revised";
+            contract.EnergyChargeRate = 0.125m;
+            contract.StartDate = new DateTime(2026, 3, 1, 8, 0, 0);
+            orchestrator.Save(contract);
+
+            var stored = store.GetElectricContract(contract.Id);
+            Assert.That(stored!.Name, Is.EqualTo("Plan revised"));
+            Assert.That(stored.EnergyChargeRate, Is.EqualTo(0.125m));
+            Assert.That(stored.BaseEnergyCharge, Is.EqualTo(9.95m));
+            Assert.That(stored.StartDate, Is.EqualTo(new DateTime(2026, 3, 1)));
+            Assert.That(orchestrator.GetElectricContracts("Lifetime").Count(), Is.EqualTo(1));
+
+            var other = new ElectricContract
+            {
+                Name = "Keep",
+                StartDate = new DateTime(2026, 1, 1),
+                EndDate = new DateTime(2026, 12, 31)
+            };
+            orchestrator.Save(other);
+
+            orchestrator.Delete(Guid.Empty);
+            orchestrator.Delete(Guid.NewGuid());
+            Assert.That(store.GetElectricContract(other.Id), Is.Not.Null);
+            Assert.That(store.GetElectricContract(contract.Id), Is.Not.Null);
+
+            orchestrator.Delete(contract.Id);
+            Assert.That(store.GetElectricContract(contract.Id), Is.Null);
+            Assert.That(orchestrator.GetElectricContracts("Lifetime").Select(c => c.Name),
+                Is.EqualTo(new[] { "Keep" }));
+        }
+
+        [Test]
+        public void DeleteElectricContract_RemovesTheSqliteRowAndLeavesTheOthers()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"thms-contracts-{Guid.NewGuid():N}.db");
+            try
+            {
+                var store = new SQLiteFinanceDataStore(path);
+                var id = Guid.NewGuid();
+                var keepId = Guid.NewGuid();
+                store.UpsertElectricContract(new ElectricContract
+                {
+                    Id = id,
+                    Name = "Plan",
+                    StartDate = new DateTime(2026, 1, 1),
+                    EndDate = new DateTime(2026, 12, 31),
+                    EnergyChargeRate = 0.125m,
+                    BaseEnergyCharge = 12.5m
+                });
+                store.UpsertElectricContract(new ElectricContract
+                {
+                    Id = id,
+                    Name = "Plan revised",
+                    StartDate = new DateTime(2026, 2, 1),
+                    EndDate = new DateTime(2026, 11, 30),
+                    EnergyChargeRate = 0.25m,
+                    BaseDeliveryCharge = 4.5m
+                });
+                store.UpsertElectricContract(new ElectricContract
+                {
+                    Id = keepId,
+                    Name = "Keep",
+                    StartDate = new DateTime(2025, 1, 1),
+                    EndDate = new DateTime(2025, 12, 31)
+                });
+
+                var updated = store.GetElectricContract(id);
+                Assert.That(updated!.Name, Is.EqualTo("Plan revised"));
+                Assert.That(updated.StartDate, Is.EqualTo(new DateTime(2026, 2, 1)));
+                Assert.That(updated.EndDate, Is.EqualTo(new DateTime(2026, 11, 30)));
+                Assert.That(updated.EnergyChargeRate, Is.EqualTo(0.25m));
+                Assert.That(updated.BaseEnergyCharge, Is.EqualTo(0m));
+                Assert.That(updated.BaseDeliveryCharge, Is.EqualTo(4.5m));
+
+                store.DeleteElectricContract(id);
+                Assert.That(store.GetElectricContract(id), Is.Null);
+                Assert.That(store.GetElectricContract(keepId)!.Name, Is.EqualTo("Keep"));
+                Assert.That(store.GetLatestElectricContract()!.Id, Is.EqualTo(keepId));
+
+                store.DeleteElectricContract(id);
+                Assert.That(store.GetElectricContract(keepId), Is.Not.Null);
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                foreach (var suffix in new[] { "", "-wal", "-shm" })
+                {
+                    var file = path + suffix;
+                    if (File.Exists(file))
+                        File.Delete(file);
+                }
+            }
         }
     }
 

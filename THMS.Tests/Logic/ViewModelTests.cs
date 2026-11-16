@@ -196,13 +196,13 @@ namespace THMS.Tests.Logic
             Assert.That(views[8].AccountType, Is.EqualTo("Insurance"));
             Assert.That(views[0].BankCreditAvailable, Is.EqualTo(2));
             Assert.That(views[1].CreditLimit, Is.EqualTo(4));
-            Assert.That(views[1].Balance, Is.EqualTo(-3));
+            Assert.That(views[1].Balance, Is.EqualTo(3));
             Assert.That(views[1].BankCreditAvailable, Is.EqualTo(7));
             Assert.That(views[2].Balance, Is.EqualTo(5));
             Assert.That(views[3].APR, Is.EqualTo(0.05m));
-            Assert.That(views[3].Balance, Is.EqualTo(7));
+            Assert.That(views[3].Balance, Is.EqualTo(-7));
             Assert.That(views[4].APR, Is.EqualTo(0.04m));
-            Assert.That(views[4].Balance, Is.EqualTo(8));
+            Assert.That(views[4].Balance, Is.EqualTo(-8));
             Assert.That(views[5].Balance, Is.Null);
             Assert.That(views[0].WebsiteUrl, Is.EqualTo("https://bank.example"));
             Assert.That(views[1].WebsiteUrl, Is.EqualTo(""));
@@ -247,16 +247,16 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void UnifiedAccountViewBuilder_CreditBalanceIsAmountOwed()
+        public void UnifiedAccountViewBuilder_CreditBalanceIsSignedAmountOwed()
         {
             var owed = UnifiedAccountViewBuilder.Build(
                 [new CreditAccount { Name = "C", PostedBalance = -1500, CreditLimit = 5000 }]);
-            Assert.That(owed[0].Balance, Is.EqualTo(1500m));
+            Assert.That(owed[0].Balance, Is.EqualTo(-1500m));
             Assert.That(owed[0].BankCreditAvailable, Is.EqualTo(3500m));
 
             var creditBalance = UnifiedAccountViewBuilder.Build(
                 [new CreditAccount { Name = "C", PostedBalance = 200, CreditLimit = 5000 }]);
-            Assert.That(creditBalance[0].Balance, Is.EqualTo(-200m));
+            Assert.That(creditBalance[0].Balance, Is.EqualTo(200m));
             Assert.That(creditBalance[0].BankCreditAvailable, Is.EqualTo(5200m));
         }
 
@@ -290,9 +290,9 @@ namespace THMS.Tests.Logic
             {
                 [creditId] = new(
                     StatementDate: new DateTime(2026, 9, 8),
-                    StatementBalance: 17672.62m,
+                    StatementBalance: -17672.62m,
                     AsOf: new DateTime(2026, 9, 18),
-                    Balance: 17800m,
+                    Balance: -17800m,
                     AmountDue: 764.62m,
                     DueDate: new DateTime(2026, 10, 3))
             };
@@ -302,9 +302,9 @@ namespace THMS.Tests.Logic
                 livePostedBalances: live);
 
             Assert.That(views[0].StatementDate, Is.EqualTo(new DateTime(2026, 9, 8)));
-            Assert.That(views[0].StatementBalance, Is.EqualTo(17672.62m));
+            Assert.That(views[0].StatementBalance, Is.EqualTo(-17672.62m));
             Assert.That(views[0].AsOfDate, Is.EqualTo(new DateTime(2026, 9, 18)));
-            Assert.That(views[0].Balance, Is.EqualTo(17800m));
+            Assert.That(views[0].Balance, Is.EqualTo(-17800m));
             Assert.That(views[0].AmountDue, Is.EqualTo(764.62m));
             Assert.That(views[0].DueDate, Is.EqualTo(new DateTime(2026, 10, 3)));
             Assert.That(views[0].APR, Is.EqualTo(19.99m));
@@ -518,12 +518,12 @@ namespace THMS.Tests.Logic
             vm.Initialize();
 
             Assert.That(vm.Snapshot.BankBalance, Is.EqualTo(1200m));
-            Assert.That(vm.Snapshot.CreditOwed, Is.EqualTo(400m));
+            Assert.That(vm.Snapshot.CreditOwed, Is.EqualTo(-400m));
             Assert.That(vm.Snapshot.NetLiquid, Is.EqualTo(800m));
             Assert.That(vm.Snapshot.BankAccounts.Single().Name, Is.EqualTo("Checking"));
             Assert.That(vm.Snapshot.BankAccounts.Single().Balance, Is.EqualTo(1200m));
             Assert.That(vm.Snapshot.CreditAccounts.Single().Name, Is.EqualTo("Visa"));
-            Assert.That(vm.Snapshot.CreditAccounts.Single().Balance, Is.EqualTo(400m));
+            Assert.That(vm.Snapshot.CreditAccounts.Single().Balance, Is.EqualTo(-400m));
             Assert.That(vm.Snapshot.LoanAccounts, Is.Empty);
             Assert.That(vm.Snapshot.InvestmentAccounts, Is.Empty);
             Assert.That(vm.Snapshot.UncategorizedCount, Is.EqualTo(1));
@@ -728,9 +728,9 @@ namespace THMS.Tests.Logic
         public void CreditOwed_UsesNegativePostedBalance()
         {
             var credit = new CreditAccount { PostedBalance = -250, CreditLimit = 1000 };
-            Assert.That(FinanceDashboardComposer.CreditOwed(credit), Is.EqualTo(250m));
+            Assert.That(FinanceDashboardComposer.CreditOwed(credit), Is.EqualTo(-250m));
             Assert.That(FinanceDashboardComposer.Utilization(credit), Is.EqualTo(0.25m));
-            Assert.That(FinanceDashboardComposer.CreditOwed(new CreditAccount { PostedBalance = 50, CreditLimit = 1000 }), Is.EqualTo(0m));
+            Assert.That(FinanceDashboardComposer.CreditOwed(new CreditAccount { PostedBalance = 50, CreditLimit = 1000 }), Is.EqualTo(50m));
         }
     }
 

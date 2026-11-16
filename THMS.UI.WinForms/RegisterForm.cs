@@ -1,6 +1,7 @@
 using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
+using THMS.Logic.Finance.Investments;
 using THMS.Logic.Finance.Model;
 using THMS.Logic.Finance.Planning;
 using THMS.Logic.Orchestrators;
@@ -444,6 +445,7 @@ namespace THMS.UI.WinForms
                 return;
             }
 
+            new InvestmentImportOrchestrator().PublishRegisterRows(account.Id);
             _accountTransactionViews = BuildAccountTransactionViews(account.Id);
             ApplyStatementList(preferStatementId);
         }

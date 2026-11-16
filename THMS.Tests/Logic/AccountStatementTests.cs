@@ -55,7 +55,7 @@ namespace THMS.Tests.Logic
                 DueDate = DateTime.Today.AddDays(-1),
                 AmountDue = 10,
                 StatementBalance = -1
-            }), Has.Some.Contains("Due date").And.Some.Contains("Statement balance"));
+            }), Has.Some.Contains("Due date"));
 
             Assert.That(AccountStatementValidator.Validate(new MortgageStatement
             {
@@ -72,7 +72,7 @@ namespace THMS.Tests.Logic
                 AmountDue = 50,
                 StatementBalance = -1,
                 Promotions = [new() { Amount = 10, Deadline = default }]
-            }), Has.Some.Contains("Statement balance").And.Some.Contains("deadline"));
+            }), Has.Some.Contains("deadline"));
 
             Assert.That(AccountStatementValidator.Validate(new UtilityStatement
             {

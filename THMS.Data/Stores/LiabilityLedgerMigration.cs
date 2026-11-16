@@ -13,6 +13,7 @@ namespace THMS.Data.Stores
         public const string PrincipalId = "LiabilityLedgerPrincipal";
         public const string ActivityId = "LiabilityLedgerActivity";
         public const string CreditPlaidId = "CreditCardPlaidSign";
+        public const string StatementBalanceId = "LiabilityStatementBalance";
 
         private static readonly string[] PrincipalTables = ["LoanAccounts", "MortgageAccounts"];
 
@@ -43,7 +44,8 @@ namespace THMS.Data.Stores
             var flipPrincipal = TablesExist(conn, PrincipalTables) && !AlreadyApplied(conn, PrincipalId);
             var flipActivity = TablesExist(conn, ActivityTables) && !AlreadyApplied(conn, ActivityId);
             var flipCreditPlaid = CreditPlaidRowsNeedFlip(conn);
-            if (!flipPrincipal && !flipActivity && !flipCreditPlaid)
+            var flipStatements = DebtStatementsNeedSign(conn);
+            if (!flipPrincipal && !flipActivity && !flipCreditPlaid && !flipStatements)
                 return;
 
             using var tx = conn.BeginTransaction();
@@ -68,8 +70,22 @@ namespace THMS.Data.Stores
                 MarkApplied(conn, CreditPlaidId);
             }
 
+            if (flipStatements)
+            {
+                NegateDebtStatementBalances(conn);
+                MarkApplied(conn, StatementBalanceId);
+            }
+
             tx.Commit();
         }
+
+        /// <summary>
+        /// Issuer files list a debt balance as a positive amount owed and a charge as a positive amount.
+        /// The ledger stores the opposite: money owed and charges are negative, payments are positive.
+        /// </summary>
+        public static decimal ImportedDebtBalance(decimal issuerBalance) => -issuerBalance;
+
+        public static decimal ImportedDebtPrincipal(decimal amountOwed) => -Math.Abs(amountOwed);
 
         /// <summary>
         /// Plaid reports a credit-card charge as positive and a payment as negative.
@@ -169,6 +185,22 @@ namespace THMS.Data.Stores
                 if (Math.Sign(row.Amount) != Math.Sign(amount))
                     NegateSplits(conn, row.Id);
             }
+        }
+
+        private static bool DebtStatementsNeedSign(SqliteConnection conn) =>
+            TableExists(conn, "AccountStatements")
+            && TableExists(conn, "AccountStatementDetails")
+            && !AlreadyApplied(conn, StatementBalanceId);
+
+        private static void NegateDebtStatementBalances(SqliteConnection conn)
+        {
+            Execute(conn, @"
+                UPDATE AccountStatementDetails
+                SET StatementBalance = -StatementBalance
+                WHERE StatementId IN (
+                    SELECT Id FROM AccountStatements
+                    WHERE StatementType IN ('CreditCard', 'Loan', 'Mortgage')
+                );");
         }
 
         private static bool CreditPlaidRowsNeedFlip(SqliteConnection conn) =>

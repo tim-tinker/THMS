@@ -36,5 +36,8 @@ namespace THMS.Data.Stores.InMemoryStores
 
         public ElectricContract? GetLatest() =>
             _items.OrderByDescending(c => c.StartDate).FirstOrDefault();
+
+        public void Delete(Guid contractId) =>
+            _items.RemoveAll(c => c.Id == contractId);
     }
 }

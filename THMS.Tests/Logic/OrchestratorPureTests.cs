@@ -142,13 +142,13 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void TryGetStatementAnchor_ConvertsCreditStatementBalanceToLedgerSpace()
+        public void TryGetStatementAnchor_UsesCreditStatementBalanceAsTheLedgerBalance()
         {
             var card = new CreditAccount { CreditLimit = 5000 };
             var statement = new CreditCardStatement
             {
                 StatementDate = new DateTime(2026, 8, 15),
-                StatementBalance = 400
+                StatementBalance = -400
             };
 
             Assert.That(PostedBalanceCalculator.TryGetStatementAnchor(card, statement, out var anchor), Is.True);
@@ -157,24 +157,24 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void TryGetStatementAnchor_ConvertsLoanAndMortgageStatementBalanceToLedgerSpace()
+        public void TryGetStatementAnchor_UsesLoanAndMortgageStatementBalanceAsTheLedgerBalance()
         {
             var loan = new LoanAccount();
             var loanStatement = new LoanStatement
             {
                 StatementDate = new DateTime(2026, 10, 8),
-                StatementBalance = 27796.27m
+                StatementBalance = -27796.27m
             };
             Assert.That(PostedBalanceCalculator.TryGetStatementAnchor(loan, loanStatement, out var loanAnchor), Is.True);
             Assert.That(loanAnchor.LedgerBalance, Is.EqualTo(-27796.27m));
             Assert.That(PostedBalanceCalculator.ComputeFromAnchor(loanAnchor, 953.86m), Is.EqualTo(-26842.41m));
-            Assert.That(PostedBalanceCalculator.ToDisplayBalance(loan, -26842.41m), Is.EqualTo(26842.41m));
+            Assert.That(PostedBalanceCalculator.ToDisplayBalance(loan, -26842.41m), Is.EqualTo(-26842.41m));
 
             var mortgage = new MortgageAccount();
             var mortgageStatement = new MortgageStatement
             {
                 StatementDate = new DateTime(2026, 10, 5),
-                StatementBalance = 37884.67m,
+                StatementBalance = -37884.67m,
                 EscrowBalance = 13360.26m
             };
             Assert.That(PostedBalanceCalculator.TryGetStatementAnchor(mortgage, mortgageStatement, out var mortgageAnchor), Is.True);
@@ -214,7 +214,7 @@ namespace THMS.Tests.Logic
                 StatementDate = new DateTime(2026, 9, 8),
                 DueDate = new DateTime(2026, 10, 3),
                 AmountDue = 764.62m,
-                StatementBalance = 17672.62m
+                StatementBalance = -17672.62m
             };
 
             Assert.That(PostedBalanceCalculator.TryCreateDisplay(
@@ -224,9 +224,9 @@ namespace THMS.Tests.Logic
                 latestActivityDate: new DateTime(2026, 9, 18),
                 out var display), Is.True);
             Assert.That(display.StatementDate, Is.EqualTo(new DateTime(2026, 9, 8)));
-            Assert.That(display.StatementBalance, Is.EqualTo(17672.62m));
+            Assert.That(display.StatementBalance, Is.EqualTo(-17672.62m));
             Assert.That(display.AsOf, Is.EqualTo(new DateTime(2026, 9, 18)));
-            Assert.That(display.Balance, Is.EqualTo(17798.12m));
+            Assert.That(display.Balance, Is.EqualTo(-17798.12m));
             Assert.That(display.AmountDue, Is.EqualTo(764.62m));
             Assert.That(display.DueDate, Is.EqualTo(new DateTime(2026, 10, 3)));
         }
@@ -1363,24 +1363,24 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void CreditDisplayBalance_InvertsLedgerSoPositiveIsAmountOwed()
+        public void CreditDisplayBalance_ShowsTheSignedLedgerBalance()
         {
             var credit = new CreditAccount { PostedBalance = -400, StartingBalance = -50, CreditLimit = 1000 };
-            Assert.That(PostedBalanceCalculator.ToDisplayBalance(credit, credit.PostedBalance), Is.EqualTo(400m));
-            Assert.That(PostedBalanceCalculator.ToLedgerBalance(credit, 400m), Is.EqualTo(-400m));
-            Assert.That(PostedBalanceCalculator.ToLedgerPostedDelta(credit, 25m), Is.EqualTo(-25m));
+            Assert.That(PostedBalanceCalculator.ToDisplayBalance(credit, credit.PostedBalance), Is.EqualTo(-400m));
+            Assert.That(PostedBalanceCalculator.ToLedgerBalance(credit, -400m), Is.EqualTo(-400m));
+            Assert.That(PostedBalanceCalculator.ToLedgerPostedDelta(credit, -25m), Is.EqualTo(-25m));
 
             var bank = new BankAccount { PostedBalance = 400 };
             Assert.That(PostedBalanceCalculator.ToDisplayBalance(bank, 400m), Is.EqualTo(400m));
             Assert.That(PostedBalanceCalculator.ToLedgerPostedDelta(bank, 25m), Is.EqualTo(25m));
 
             var loan = new LoanAccount { Principal = -8000 };
-            Assert.That(PostedBalanceCalculator.ToDisplayBalance(loan, loan.Principal), Is.EqualTo(8000m));
-            Assert.That(PostedBalanceCalculator.ToLedgerBalance(loan, 8000m), Is.EqualTo(-8000m));
+            Assert.That(PostedBalanceCalculator.ToDisplayBalance(loan, loan.Principal), Is.EqualTo(-8000m));
+            Assert.That(PostedBalanceCalculator.ToLedgerBalance(loan, -8000m), Is.EqualTo(-8000m));
 
             var mortgage = new MortgageAccount { Principal = -37884.67m };
-            Assert.That(PostedBalanceCalculator.ToDisplayBalance(mortgage, mortgage.Principal), Is.EqualTo(37884.67m));
-            Assert.That(PostedBalanceCalculator.ToLedgerPostedDelta(mortgage, 100m), Is.EqualTo(-100m));
+            Assert.That(PostedBalanceCalculator.ToDisplayBalance(mortgage, mortgage.Principal), Is.EqualTo(-37884.67m));
+            Assert.That(PostedBalanceCalculator.ToLedgerPostedDelta(mortgage, -100m), Is.EqualTo(-100m));
         }
     }
 

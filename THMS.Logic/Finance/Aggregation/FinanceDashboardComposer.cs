@@ -82,8 +82,8 @@ namespace THMS.Logic.Finance.Aggregation
                 CreditOwed = totals.Credit,
                 LoanPrincipal = totals.Loans,
                 InvestmentCash = totals.Investment,
-                NetLiquid = totals.Bank + totals.Investment - totals.Credit,
-                NetPosition = totals.Bank + totals.Investment - totals.Credit - totals.Loans,
+                NetLiquid = totals.Bank + totals.Investment + totals.Credit,
+                NetPosition = totals.Bank + totals.Investment + totals.Credit + totals.Loans,
                 BankAccounts = totals.Banks,
                 CreditAccounts = totals.Credits,
                 LoanAccounts = totals.LoansAccounts,
@@ -167,13 +167,14 @@ namespace THMS.Logic.Finance.Aggregation
         }
 
         public static decimal CreditOwed(CreditAccount credit) =>
-            Math.Max(0m, -credit.PostedBalance);
+            credit.PostedBalance;
 
         public static decimal Utilization(CreditAccount credit)
         {
             if (credit.CreditLimit <= 0)
                 return 0;
-            return CreditOwed(credit) / credit.CreditLimit;
+            var owed = Math.Max(0m, -credit.PostedBalance);
+            return owed / credit.CreditLimit;
         }
 
         private static List<FinanceDashboardBudgetRow> BuildBudgets(

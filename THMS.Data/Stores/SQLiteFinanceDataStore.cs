@@ -100,5 +100,11 @@ namespace THMS.Data.Stores.SQLite
             using var conn = OpenConnection();
             return _electricContracts.GetLatest(conn);
         }
+
+        public void DeleteElectricContract(Guid contractId)
+        {
+            using var conn = OpenConnection();
+            _electricContracts.Delete(conn, contractId);
+        }
     }
 }

@@ -60,5 +60,8 @@ namespace THMS.Data.Stores
         /// </summary>
         ElectricContract? GetLatestElectricContract();
 
+        /// <summary>Delete a contract by its unique identifier. No-op when the id is unknown.</summary>
+        void DeleteElectricContract(Guid contractId);
+
     }
 }

@@ -102,6 +102,14 @@ namespace THMS.Data.Stores.SqlTables
             return list;
         }
 
+        public void Delete(SqliteConnection conn, Guid contractId)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM ElectricContracts WHERE Id = @Id;";
+            cmd.Parameters.AddWithValue("@Id", contractId.ToString());
+            cmd.ExecuteNonQuery();
+        }
+
         public ElectricContract? GetLatest(SqliteConnection conn)
         {
             using var cmd = new SqliteCommand(@"

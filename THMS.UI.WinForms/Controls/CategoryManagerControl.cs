@@ -418,7 +418,9 @@ namespace THMS.UI.WinForms.Controls
 
             _categoryTransactions = CategoryTransactions(row);
             var periods = row.HasBudget
-                ? CategoryBudgetComposer.BuildPeriods(_budgets.GetHistory(row.BudgetRuleId!.Value))
+                ? CategoryBudgetComposer.BuildPeriods(
+                    _budgets.GetHistory(row.BudgetRuleId!.Value),
+                    expenseActualsNegative: string.Equals(row.Role, nameof(CategoryRole.Expense), StringComparison.Ordinal))
                 : [];
             CategoryBudgetComposer.AppendHistoryPeriod(periods, _categoryTransactions.Select(t => t.Date));
             BindPeriods(periods, previous);

@@ -75,7 +75,7 @@ namespace THMS.Tests.Logic
                 var mortgage = (MortgageStatement)statements
                     .GetForAccount(rows.Single(r => r.Account == "Mortgage").AccountId).Single();
                 Assert.That(mortgage.EscrowBalance, Is.EqualTo(4500m));
-                Assert.That(mortgage.StatementBalance, Is.EqualTo(200000m));
+                Assert.That(mortgage.StatementBalance, Is.EqualTo(-200000m));
 
                 var utility = (UtilityStatement)statements
                     .GetForAccount(rows.Single(r => r.Account == "Electric").AccountId).Single();

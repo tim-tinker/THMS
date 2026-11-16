@@ -1,3 +1,4 @@
+using THMS.Data.Stores;
 using THMS.Domain.Finance.Accounts;
 using THMS.Logic.Finance.Model;
 
@@ -71,7 +72,7 @@ namespace THMS.Logic.ViewModels.Finance
                     if (Apr.HasValue)
                         loan.InterestRate = Apr.Value;
                     if (Principal.HasValue)
-                        loan.Principal = PostedBalanceCalculator.ToLedgerBalance(loan, Principal.Value);
+                        loan.Principal = LiabilityLedgerMigration.ImportedDebtPrincipal(Principal.Value);
                     if (TermMonths.HasValue)
                         loan.TermMonths = TermMonths.Value;
                     break;
@@ -79,7 +80,7 @@ namespace THMS.Logic.ViewModels.Finance
                     if (Apr.HasValue)
                         mortgage.InterestRate = Apr.Value;
                     if (Principal.HasValue)
-                        mortgage.Principal = PostedBalanceCalculator.ToLedgerBalance(mortgage, Principal.Value);
+                        mortgage.Principal = LiabilityLedgerMigration.ImportedDebtPrincipal(Principal.Value);
                     if (TermMonths.HasValue)
                         mortgage.TermMonths = TermMonths.Value;
                     break;
