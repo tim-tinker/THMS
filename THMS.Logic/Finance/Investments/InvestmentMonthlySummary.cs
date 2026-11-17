@@ -9,6 +9,7 @@ namespace THMS.Logic.Finance.Investments
         public decimal MarketValue { get; init; }
         public decimal Value => Cash + MarketValue;
         public decimal Income { get; init; }
+        public decimal EstimatedAnnualIncome { get; init; }
         public int Holdings { get; init; }
         public int CarriedForward { get; init; }
         public int Unpriced { get; init; }
@@ -67,6 +68,7 @@ namespace THMS.Logic.Finance.Investments
                 Cash = cash,
                 MarketValue = market,
                 Income = IncomeReceived(state, month, through),
+                EstimatedAnnualIncome = InvestmentBookkeeper.EstimatedAnnualIncomeAsOf(state, through),
                 Holdings = holdings.Count,
                 CarriedForward = carried,
                 Unpriced = unpriced

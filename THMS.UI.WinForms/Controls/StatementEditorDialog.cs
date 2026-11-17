@@ -391,6 +391,7 @@ namespace THMS.UI.WinForms.Controls
                 return;
             RefreshPeriod();
             RefreshPreviousBalance();
+            UpdateValidateButton();
         }
 
         private void OnDueDateChanged(object? sender, EventArgs e)
@@ -418,6 +419,7 @@ namespace THMS.UI.WinForms.Controls
             finally
             {
                 _suppressEditorEvents = false;
+                UpdateValidateButton();
             }
         }
 
@@ -748,18 +750,36 @@ namespace THMS.UI.WinForms.Controls
             lblAvailableCredit.Text = PostedBalanceCalculator.AvailableCredit(limit, numStatementBalance.Value).ToString("C2");
         }
 
-        private AccountStatement? CurrentPreviousStatement()
+        private AccountStatement? CurrentPreviousStatement() =>
+            PreviousStatement(dtStatementDate.Value.Date);
+
+        private AccountStatement? PreviousStatement(DateTime statementDate)
         {
             var account = SelectedAccount() ?? _lockedAccount;
             if (account is null)
                 return null;
 
-            var end = dtStatementDate.Value.Date;
+            var end = statementDate.Date;
             return _statementStore.GetForAccount(account.Id)
-                .Where(statement => statement.Id != _existingStatement?.Id && statement.StatementDate.Date < end)
-                .OrderByDescending(statement => statement.StatementDate.Date)
-                .ThenByDescending(statement => statement.DueDate.Date)
+                .Where(statement => (_existingStatement is null || statement.Id != _existingStatement.Id)
+                    && statement.StatementDate.Date < end)
+                .OrderByDescending(statement => statement.StatementDate)
+                .ThenByDescending(statement => statement.DueDate)
+                .ThenByDescending(statement => statement.Id)
                 .FirstOrDefault();
+        }
+
+        private void UpdateValidateButton() =>
+            btnValidate.Enabled = CanValidateStatement();
+
+        private bool CanValidateStatement()
+        {
+            if (_orchestrator is null || SelectedType() is not StatementType type || type == StatementType.Utility)
+                return false;
+
+            // The date picker text is not available until the form has a handle.
+            var statementDate = IsHandleCreated ? ReadStatementDate() : dtStatementDate.Value.Date;
+            return PreviousStatement(statementDate) is not null;
         }
 
         private static decimal? BalanceOf(AccountStatement statement) => statement switch
@@ -1276,6 +1296,58 @@ namespace THMS.UI.WinForms.Controls
         {
             DialogResult = DialogResult.Cancel;
             Close();
+        }
+
+        private void OnValidate(object? sender, EventArgs e)
+        {
+            gridPromotions?.EndEdit();
+            gridUsage?.EndEdit();
+            gridCharges?.EndEdit();
+
+            if (_orchestrator is null)
+            {
+                UpdateValidateButton();
+                return;
+            }
+
+            if (!TryBuildStatement(out var statement, out var error) || statement is null)
+            {
+                MessageBox.Show(
+                    this,
+                    string.IsNullOrWhiteSpace(error) ? "This statement cannot be validated." : error,
+                    "Statement",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                UpdateValidateButton();
+                return;
+            }
+
+            var account = SelectedAccount() ?? _lockedAccount;
+            var previous = PreviousStatement(statement.StatementDate);
+            if (account is null || statement is UtilityStatement || previous is null)
+            {
+                if (account is not null && statement is not UtilityStatement)
+                {
+                    MessageBox.Show(
+                        this,
+                        "Validation needs an earlier statement for this account.",
+                        "Statement",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+
+                UpdateValidateButton();
+                return;
+            }
+
+            var end = statement.StatementDate.Date;
+            var previousDate = previous.StatementDate.Date;
+            var start = previousDate == DateTime.MinValue ? DateTime.MinValue : previousDate.AddDays(1);
+            var transactions = _orchestrator.GetPostedTransactionViews(account.Id)
+                .Where(view => view.Date.Date >= start && view.Date.Date <= end);
+            var validation = StatementBalanceValidation.Build(account, statement, previous, transactions);
+            using var dialog = new StatementValidationDialog(account.Name, validation);
+            dialog.ShowDialog(this);
         }
 
         private bool TryBuildStatement(out AccountStatement? statement, out string error)

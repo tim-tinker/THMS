@@ -3,6 +3,7 @@ using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
 using THMS.Logic.Finance.Planning;
+using THMS.Logic.Orchestrators;
 using THMS.Logic.ViewModels.Finance;
 
 namespace THMS.Logic.Orchestrators.Finance
@@ -36,6 +37,19 @@ namespace THMS.Logic.Orchestrators.Finance
         public IReadOnlyList<Account> GetAccounts() => _accounts.GetAllAccounts().ToList();
 
         public AccountStatement? GetStatement(Guid id) => _statements.Get(id);
+
+        public List<UnifiedTransactionView> GetPostedTransactionViews(Guid accountId)
+        {
+            var txs = new TransactionOrchestrator(_transactions, _accounts).GetTransactionsForAccount(accountId);
+            return UnifiedTransactionViewBuilder.Build(
+                txs.Posted,
+                txs.PostedTransfers,
+                userFutureSingles: [],
+                userFutureTransfers: [],
+                accountId,
+                txs.IncomingTransferSplitPosted,
+                incomingFutureSplitSources: []);
+        }
 
         public List<AccountStatement> GetAllStatements() =>
             _accounts.GetAllAccounts()

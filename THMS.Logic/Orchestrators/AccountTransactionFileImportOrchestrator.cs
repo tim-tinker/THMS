@@ -1,5 +1,4 @@
 using THMS.Data.Stores;
-using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Transactions;
 using THMS.Ingestion.Importers.Finance;
 using THMS.Logic.Finance.Transfer;
@@ -64,30 +63,35 @@ namespace THMS.Logic.Orchestrators
             if (error is not null)
                 throw new InvalidOperationException(error);
 
-            var seen = new Dictionary<DuplicateKey, bool>();
+            var remaining = new Dictionary<DuplicateKey, Queue<bool>>();
             foreach (var posted in _transactions.GetPostedTransactions(accountId)
                          .Concat<PostedTransaction>(_transactions.GetPostedTransferTransactions(accountId)))
             {
                 var key = Key(posted.Date, posted.Amount, posted.Description);
-                var unreconciled = posted.ImportedStatus == ImportedStatus.Unreconciled;
-                seen[key] = seen.TryGetValue(key, out var already) ? already || unreconciled : unreconciled;
+                if (!remaining.TryGetValue(key, out var matches))
+                {
+                    matches = new Queue<bool>();
+                    remaining[key] = matches;
+                }
+
+                matches.Enqueue(posted.ImportedStatus == ImportedStatus.Unreconciled);
             }
 
-            var account = _accounts.GetAllAccounts().FirstOrDefault(item => item.Id == accountId);
-            var liabilityAmountColumn = IsLiability(account) && !map.UseDebitCredit;
             var rows = new List<TransactionFileImportRow>();
             foreach (var mapped in _reader.Apply(sheet, map))
             {
-                var amount = LedgerAmount(mapped, map, liabilityAmountColumn);
+                var amount = mapped.Amount;
 
                 var duplicate = false;
                 var duplicateIsUnreconciled = false;
                 if (mapped.Problem is null && mapped.Date is DateTime date && amount is decimal postedAmount)
                 {
                     var key = Key(date, postedAmount, mapped.Description);
-                    duplicate = seen.TryGetValue(key, out duplicateIsUnreconciled);
-                    if (!duplicate)
-                        seen[key] = false;
+                    if (remaining.TryGetValue(key, out var matches) && matches.Count > 0)
+                    {
+                        duplicate = true;
+                        duplicateIsUnreconciled = matches.Dequeue();
+                    }
                 }
 
                 rows.Add(new TransactionFileImportRow
@@ -201,21 +205,6 @@ namespace THMS.Logic.Orchestrators
                 return fallback;
 
             return new ExpenseCategory { Id = categoryId, Name = name, IsActive = true };
-        }
-
-        private static bool IsLiability(Account? account) =>
-            account is CreditAccount or LoanAccount or MortgageAccount;
-
-        private static decimal? LedgerAmount(
-            MappedTransactionFileRow mapped,
-            TransactionFileColumnMap map,
-            bool liabilityAmountColumn)
-        {
-            if (!liabilityAmountColumn || mapped.Amount is not decimal amount)
-                return mapped.Amount;
-
-            var native = map.FlipSign ? -amount : amount;
-            return LiabilityLedgerMigration.ToLedgerAmount(native, category: null, mapped.Description);
         }
 
         private static DuplicateKey Key(DateTime date, decimal amount, string? description) =>

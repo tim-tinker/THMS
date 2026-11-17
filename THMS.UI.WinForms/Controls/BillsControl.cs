@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
 using THMS.Domain.Finance.Transactions;
@@ -92,6 +93,9 @@ namespace THMS.UI.WinForms.Controls
             _grid.RowHeadersVisible = false;
             _grid.DataSource = _source;
             _grid.CurrentCellDirtyStateChanged += OnDirtyStateChanged;
+            _grid.CellParsing += OnBillCellParsing;
+            _grid.CellValidating += OnBillCellValidating;
+            _grid.CellEndEdit += OnBillCellEndEdit;
             _grid.CellContentClick += OnOtherAccountClicked;
             _grid.CellFormatting += OnBillCellFormatting;
             _grid.CellBeginEdit += OnPayFromBeginEdit;
@@ -240,8 +244,111 @@ namespace THMS.UI.WinForms.Controls
 
         private void OnDirtyStateChanged(object? sender, EventArgs e)
         {
-            if (_grid.IsCurrentCellDirty)
-                _grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+            if (!_grid.IsCurrentCellDirty)
+                return;
+            if (_grid.CurrentCell?.OwningColumn is not DataGridViewComboBoxColumn)
+                return;
+            _grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+        }
+
+        private void OnBillCellEndEdit(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                return;
+            var column = _grid.Columns[e.ColumnIndex].Name;
+            if (column is not (nameof(BillRow.DueDate) or nameof(BillRow.Notes) or nameof(BillRow.Amount)))
+                return;
+            if (_grid.Rows[e.RowIndex].DataBoundItem is not BillRow row || _accountId is not Guid accountId)
+                return;
+
+            var intentId = row.IntentId;
+            var source = row.Source;
+            var sourceId = row.SourceId;
+            var editedStatement = row.IntentId is null && row.Source == PaymentIntentSource.Statement;
+            try
+            {
+                _orchestrator.UpdateDisplayedBill(row, accountId);
+            }
+            catch (Exception ex)
+            {
+                ExceptionDialog.Show(FindForm(), "Bill", ex, icon: MessageBoxIcon.Information);
+                BeginInvoke(() =>
+                {
+                    if (!IsDisposed)
+                        Reload();
+                });
+                return;
+            }
+
+            DataChanged?.Invoke(this, EventArgs.Empty);
+            if (editedStatement)
+                StatementChanged?.Invoke(this, EventArgs.Empty);
+            BeginInvoke(() => RefreshEditedBill(intentId, source, sourceId));
+        }
+
+        private void RefreshEditedBill(Guid? intentId, PaymentIntentSource source, Guid? sourceId)
+        {
+            if (IsDisposed || _grid.IsCurrentCellInEditMode || FindForm() is { Enabled: false })
+                return;
+            Reload();
+            ReselectBill(intentId, source, sourceId);
+        }
+
+        private void OnBillCellParsing(object? sender, DataGridViewCellParsingEventArgs e)
+        {
+            if (e.ColumnIndex < 0 || _grid.Columns[e.ColumnIndex].Name != nameof(BillRow.Amount))
+                return;
+            if (!TryParseAmount(e.Value, out var amount))
+                return;
+            e.Value = amount;
+            e.ParsingApplied = true;
+        }
+
+        private void OnBillCellValidating(object? sender, DataGridViewCellValidatingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                return;
+            if (_grid.Columns[e.ColumnIndex].Name != nameof(BillRow.Amount))
+                return;
+            if (!_grid.IsCurrentCellDirty)
+                return;
+            if (TryParseAmount(e.FormattedValue, out _))
+                return;
+            e.Cancel = true;
+        }
+
+        private static bool TryParseAmount(object? value, out decimal amount)
+        {
+            if (value is decimal numeric)
+            {
+                amount = numeric;
+                return true;
+            }
+
+            amount = 0;
+            var text = Convert.ToString(value)?.Trim();
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+            return decimal.TryParse(text, NumberStyles.Currency, CultureInfo.CurrentCulture, out amount);
+        }
+
+        private void ReselectBill(Guid? intentId, PaymentIntentSource source, Guid? sourceId)
+        {
+            for (var i = 0; i < _grid.Rows.Count; i++)
+            {
+                if (_grid.Rows[i].DataBoundItem is not BillRow candidate)
+                    continue;
+                var same = intentId is Guid id
+                    ? candidate.IntentId == id
+                    : candidate.Source == source && candidate.SourceId == sourceId;
+                if (!same || _grid.Columns.Count == 0)
+                    continue;
+                var column = _grid.CurrentCell?.ColumnIndex ?? 0;
+                if (column < 0 || column >= _grid.Columns.Count)
+                    column = 0;
+                _grid.CurrentCell = _grid.Rows[i].Cells[column];
+                return;
+            }
         }
 
         private void OnGridMouseDown(object? sender, MouseEventArgs e)
@@ -484,9 +591,9 @@ namespace THMS.UI.WinForms.Controls
 
         private void EditBill(BillRow row)
         {
-            if (row.Kind == BillKinds.Statement || row.Source == PaymentIntentSource.Statement)
+            if (row.IntentId is Guid expectedId)
             {
-                EditStatement(row);
+                EditExpected(expectedId);
                 return;
             }
 
@@ -502,8 +609,8 @@ namespace THMS.UI.WinForms.Controls
                 return;
             }
 
-            if (row.IntentId is Guid expectedId)
-                EditExpected(expectedId);
+            if (row.Kind == BillKinds.Statement || row.Source == PaymentIntentSource.Statement)
+                EditStatement(row);
         }
 
         private static bool CanEdit(BillRow row)

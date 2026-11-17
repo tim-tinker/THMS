@@ -11,6 +11,7 @@ namespace THMS.UI.WinForms.Controls
         private Panel pnlDocument;
         private FlowLayoutPanel pnlButtons;
         private ThmsButton btnSave;
+        private ThmsButton btnValidate;
         private ThmsButton btnCancel;
 
         protected override void Dispose(bool disposing)
@@ -31,6 +32,7 @@ namespace THMS.UI.WinForms.Controls
             pnlButtons = new FlowLayoutPanel();
             btnCancel = new ThmsButton();
             btnSave = new ThmsButton();
+            btnValidate = new ThmsButton();
             layout.SuspendLayout();
             accountBar.SuspendLayout();
             pnlButtons.SuspendLayout();
@@ -134,6 +136,7 @@ namespace THMS.UI.WinForms.Controls
             pnlButtons.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             pnlButtons.Controls.Add(btnCancel);
             pnlButtons.Controls.Add(btnSave);
+            pnlButtons.Controls.Add(btnValidate);
             pnlButtons.Dock = DockStyle.Fill;
             pnlButtons.FlowDirection = FlowDirection.RightToLeft;
             pnlButtons.Location = new Point(18, 1103);
@@ -181,6 +184,26 @@ namespace THMS.UI.WinForms.Controls
             btnSave.Text = "Save";
             btnSave.UseVisualStyleBackColor = false;
             btnSave.Click += OnSave;
+            // 
+            // btnValidate
+            // 
+            btnValidate.AutoSize = true;
+            btnValidate.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            btnValidate.BackColor = Color.FromArgb(39, 137, 71);
+            btnValidate.Enabled = false;
+            btnValidate.FlatStyle = FlatStyle.Flat;
+            btnValidate.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            btnValidate.ForeColor = Color.White;
+            btnValidate.Location = new Point(820, 17);
+            btnValidate.Margin = new Padding(5);
+            btnValidate.MinimumSize = new Size(0, 63);
+            btnValidate.Name = "btnValidate";
+            btnValidate.Padding = new Padding(21, 10, 21, 10);
+            btnValidate.Size = new Size(146, 63);
+            btnValidate.TabIndex = 2;
+            btnValidate.Text = "Validate";
+            btnValidate.UseVisualStyleBackColor = false;
+            btnValidate.Click += OnValidate;
             // 
             // StatementEditorDialog
             // 

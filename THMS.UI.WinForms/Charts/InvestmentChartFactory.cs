@@ -28,6 +28,19 @@ namespace THMS.UI.WinForms.Charts
             return chart;
         }
 
+        public static Chart CreateAnnualIncomeChart(IReadOnlyList<InvestmentDashboardMonthRow> months)
+        {
+            var chart = CreateBaseChart("Estimated annual income");
+            var series = CreateSeries("Estimated annual income", SeriesChartType.Line, Color.DarkOrange);
+            series.BorderWidth = 2;
+            series.MarkerStyle = MarkerStyle.Circle;
+            series.MarkerSize = 6;
+            AddPoints(series, months, row => row.EstimatedAnnualIncome);
+            chart.Series.Add(series);
+            SpaceLabels(chart, months.Count);
+            return chart;
+        }
+
         private static void SpaceLabels(Chart chart, int count)
         {
             if (count > 18)

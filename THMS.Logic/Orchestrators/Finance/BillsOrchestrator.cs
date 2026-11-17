@@ -494,6 +494,127 @@ namespace THMS.Logic.Orchestrators.Finance
             return null;
         }
 
+        public void UpdateDisplayedBill(BillRow row, Guid viewedAccountId)
+        {
+            ArgumentNullException.ThrowIfNull(row);
+            var due = row.DueDate == default ? DateTime.Today : row.DueDate.Date;
+            var notes = string.IsNullOrWhiteSpace(row.Notes) ? "" : row.Notes.Trim();
+
+            if (row.IntentId is Guid expectedId)
+            {
+                if (_transactions.GetFutureSingleTransaction(expectedId) is { } single)
+                {
+                    var displayed = SplitTransactionMath.AmountForAccount(single, viewedAccountId);
+                    if (single.AccountId != viewedAccountId && row.Amount != displayed)
+                        throw new InvalidOperationException(
+                            "Change this amount from the account that owns the transaction.");
+                    ApplyDisplayedAmount(
+                        single.HasSplits,
+                        single.Amount,
+                        displayed,
+                        row.Amount,
+                        storeSignedAmount: true,
+                        value => single.Amount = value);
+                    single.Date = due;
+                    single.Description = notes;
+                    _transactions.UpdateFutureSingleTransaction(single);
+                    return;
+                }
+
+                if (_transactions.GetFutureTransferTransaction(expectedId) is { } transfer)
+                {
+                    ApplyDisplayedAmount(
+                        transfer.HasSplits,
+                        transfer.Amount,
+                        SplitTransactionMath.AmountForAccount(transfer, viewedAccountId),
+                        row.Amount,
+                        storeSignedAmount: false,
+                        value => transfer.Amount = value);
+                    transfer.Date = due;
+                    transfer.Description = notes;
+                    _transactions.UpdateFutureTransferTransaction(transfer);
+                    return;
+                }
+
+                throw new InvalidOperationException("That bill cannot be edited.");
+            }
+
+            if (row.Source == PaymentIntentSource.RecurringSingle && row.SourceId is Guid singleRuleId)
+            {
+                var rule = _transactions.GetRecurringSingleRule(singleRuleId)
+                    ?? throw new InvalidOperationException("The recurring rule was not found.");
+                ApplyDisplayedAmount(
+                    rule.HasSplits,
+                    rule.Amount,
+                    rule.Amount,
+                    row.Amount,
+                    storeSignedAmount: true,
+                    value => rule.Amount = value);
+                rule.NextOccurrence = due;
+                rule.Description = notes;
+                _transactions.UpdateRecurringSingleRule(rule);
+                return;
+            }
+
+            if (row.Source == PaymentIntentSource.RecurringTransfer && row.SourceId is Guid transferRuleId)
+            {
+                var rule = _transactions.GetRecurringTransferRule(transferRuleId)
+                    ?? throw new InvalidOperationException("The recurring rule was not found.");
+                ApplyDisplayedAmount(
+                    rule.HasSplits,
+                    rule.Amount,
+                    SplitTransactionMath.TransferAmountForAccount(
+                        rule.FromAccountId, rule.ToAccountId, rule.Amount, viewedAccountId),
+                    row.Amount,
+                    storeSignedAmount: false,
+                    value => rule.Amount = value);
+                rule.NextOccurrence = due;
+                rule.Description = notes;
+                _transactions.UpdateRecurringTransferRule(rule);
+                return;
+            }
+
+            if ((row.Kind == BillKinds.Statement || row.Source == PaymentIntentSource.Statement)
+                && (row.StatementId ?? row.SourceId) is Guid statementId)
+            {
+                var statement = _statements.Get(statementId)
+                    ?? throw new InvalidOperationException("Statement was not found.");
+                var amount = Math.Abs(row.Amount);
+                if (amount == 0)
+                    throw new InvalidOperationException("Amount cannot be zero.");
+                statement.DueDate = due;
+                statement.AmountDue = amount;
+                statement.Notes = notes.Length == 0 || notes == "Statement due" ? null : notes;
+                AccountStatementValidator.EnsureValid(statement);
+                _statements.Save(statement);
+                return;
+            }
+
+            throw new InvalidOperationException("That bill cannot be edited.");
+        }
+
+        private static void ApplyDisplayedAmount(
+            bool hasSplits,
+            decimal storedAmount,
+            decimal displayedAmount,
+            decimal editedAmount,
+            bool storeSignedAmount,
+            Action<decimal> assign)
+        {
+            if (editedAmount == displayedAmount)
+                return;
+            if (hasSplits)
+                throw new InvalidOperationException(
+                    "This transaction is split. Change the amount from Split Transaction.");
+
+            var stored = storeSignedAmount ? editedAmount : Math.Abs(editedAmount);
+            if (stored == 0 || (!storeSignedAmount && editedAmount == 0))
+                throw new InvalidOperationException("Amount cannot be zero.");
+            if (stored == storedAmount)
+                return;
+            assign(stored);
+        }
+
         public void SaveEditedBill(
             BillDraft existing,
             Guid billAccountId,

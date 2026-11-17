@@ -24,6 +24,9 @@ namespace THMS.Tests.Logic
             state.Actions.Add(Applied(state.AccountId, 6, new DateTime(2026, 11, 10), InvestmentActionKind.Interest, "FDRXX", 0.50m, null));
             state.MarketQuotes.Add(Quote("AGNC", 8.65m, new DateTime(2026, 10, 31)));
             state.MarketQuotes.Add(Quote("OTHER", 4m, new DateTime(2026, 11, 14)));
+            state.Quotes.Add(IncomeQuote(state.AccountId, "AGNC", 1.44m, new DateTime(2026, 10, 31)));
+            state.Quotes.Add(IncomeQuote(state.AccountId, "AGNC", 1.50m, new DateTime(2026, 11, 14)));
+            state.Quotes.Add(IncomeQuote(state.AccountId, "AGNC", 9.99m, new DateTime(2026, 11, 20)));
 
             var months = InvestmentMonthlySummary.Build(state, new DateTime(2026, 11, 15));
 
@@ -38,12 +41,14 @@ namespace THMS.Tests.Logic
             Assert.That(october.Cash, Is.EqualTo(100m));
             Assert.That(october.Value, Is.EqualTo(186.50m));
             Assert.That(october.Income, Is.EqualTo(1.00m));
+            Assert.That(october.EstimatedAnnualIncome, Is.EqualTo(14.40m));
             Assert.That(october.Unpriced, Is.EqualTo(1));
             Assert.That(october.CarriedForward, Is.EqualTo(0));
 
             var november = months[1];
             Assert.That(november.MarketValue, Is.EqualTo(106.50m));
             Assert.That(november.Income, Is.EqualTo(1.70m));
+            Assert.That(november.EstimatedAnnualIncome, Is.EqualTo(15.00m));
             Assert.That(november.Unpriced, Is.EqualTo(0));
             Assert.That(november.CarriedForward, Is.EqualTo(1));
         }
@@ -70,13 +75,16 @@ namespace THMS.Tests.Logic
             books.UpsertAction(Applied(tracked.Id, 1, new DateTime(2026, 11, 1), InvestmentActionKind.Opening, "AGNC", null, 10));
             books.UpsertAction(Applied(tracked.Id, 2, new DateTime(2026, 11, 3), InvestmentActionKind.Dividend, "AGNC", 2m, null));
             books.UpsertMarketQuote(Quote("AGNC", 10m, new DateTime(2026, 11, 1)));
+            books.UpsertQuote(IncomeQuote(tracked.Id, "AGNC", 1.44m, new DateTime(2026, 11, 1)));
 
             var snapshot = new InvestmentDashboardComposer(accounts, books).Compose(new DateTime(2026, 11, 15));
 
             Assert.That(snapshot.TotalValue, Is.EqualTo(202m));
             Assert.That(snapshot.IncomeThisMonth, Is.EqualTo(2m));
             Assert.That(snapshot.IncomeLastTwelveMonths, Is.EqualTo(2m));
+            Assert.That(snapshot.EstimatedAnnualIncome, Is.EqualTo(14.40m));
             Assert.That(snapshot.Months.Single().Value, Is.EqualTo(102m));
+            Assert.That(snapshot.Months.Single().EstimatedAnnualIncome, Is.EqualTo(14.40m));
             Assert.That(snapshot.Months.Single().Prices, Is.EqualTo("Priced this month"));
             Assert.That(snapshot.Note, Does.Contain("no position history"));
         }
@@ -100,6 +108,15 @@ namespace THMS.Tests.Logic
                 Amount = amount,
                 Quantity = quantity,
                 ImportKey = $"{accountId:N}|{sequence}"
+            };
+
+        private static SecurityQuote IncomeQuote(Guid accountId, string symbol, decimal annualPerShare, DateTime date) =>
+            new()
+            {
+                AccountId = accountId,
+                Symbol = symbol,
+                AnnualIncomePerShare = annualPerShare,
+                AsOf = date
             };
 
         private static SecurityMarketQuote Quote(string symbol, decimal price, DateTime date) =>

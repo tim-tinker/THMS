@@ -867,6 +867,92 @@ namespace THMS.Tests.Logic
             };
 
         [Test]
+        public void UpdateDisplayedBill_ChangesTheScheduledStatementPaymentWithoutChangingTheStatement()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var asOf = new DateTime(2026, 10, 17);
+            var statement = new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = new DateTime(2026, 10, 7),
+                DueDate = new DateTime(2026, 11, 3),
+                AmountDue = 200m,
+                StatementBalance = 800m,
+                Notes = "October"
+            };
+            statements.Save(statement);
+            var expected = StatementPayment(checking.Id, card.Id, statement, "AMEX");
+            transactions.AddFutureTransferTransaction(expected);
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            var row = orchestrator.GetBills(checking.Id, asOf).Single(item => item.IntentId == expected.Id);
+            row.Notes = "AMEX payoff";
+            row.DueDate = new DateTime(2026, 11, 5);
+            row.Amount = -180m;
+
+            orchestrator.UpdateDisplayedBill(row, checking.Id);
+
+            var saved = transactions.GetFutureTransferTransaction(expected.Id);
+            Assert.That(saved, Is.Not.Null);
+            Assert.That(saved!.Description, Is.EqualTo("AMEX payoff"));
+            Assert.That(saved.Date, Is.EqualTo(new DateTime(2026, 11, 5)));
+            Assert.That(saved.Amount, Is.EqualTo(180m));
+            Assert.That(saved.StatementId, Is.EqualTo(statement.Id));
+            var storedStatement = statements.Get(statement.Id);
+            Assert.That(storedStatement!.Notes, Is.EqualTo("October"));
+            Assert.That(storedStatement.AmountDue, Is.EqualTo(200m));
+            Assert.That(storedStatement.DueDate, Is.EqualTo(new DateTime(2026, 11, 3)));
+        }
+
+        [Test]
+        public void UpdateDisplayedBill_ChangesDueNotesAndAmountOnTheRepresentedRow()
+        {
+            var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();
+            var asOf = new DateTime(2026, 10, 2);
+            var orchestrator = new BillsOrchestrator(accounts, transactions, statements);
+            transactions.AddRecurringSingleRule(new RecurringSingleTransactionRule
+            {
+                AccountId = checking.Id,
+                Description = "Comcast",
+                Amount = -80m,
+                Frequency = RecurrenceFrequency.Monthly,
+                NextOccurrence = asOf,
+                IsActive = true,
+                IsUserCreated = true,
+                CategoryId = DefaultExpenseCategories.UtilityId
+            });
+            var statement = new CreditCardStatement
+            {
+                AccountId = card.Id,
+                StatementDate = new DateTime(2026, 9, 20),
+                DueDate = new DateTime(2026, 10, 15),
+                AmountDue = 220m,
+                StatementBalance = 220m
+            };
+            statements.Save(statement);
+
+            var ruleRow = orchestrator.GetBills(checking.Id, asOf).Single(item => item.Notes == "Comcast");
+            ruleRow.Notes = "Xfinity";
+            ruleRow.DueDate = new DateTime(2026, 10, 9);
+            ruleRow.Amount = -90m;
+            orchestrator.UpdateDisplayedBill(ruleRow, checking.Id);
+
+            var statementRow = orchestrator.GetBills(card.Id, asOf).Single();
+            statementRow.Notes = "Card minimum";
+            statementRow.DueDate = new DateTime(2026, 10, 20);
+            statementRow.Amount = 180m;
+            orchestrator.UpdateDisplayedBill(statementRow, card.Id);
+
+            var rule = transactions.GetAllRecurringSingleRules().Single();
+            Assert.That(rule.Description, Is.EqualTo("Xfinity"));
+            Assert.That(rule.NextOccurrence, Is.EqualTo(new DateTime(2026, 10, 9)));
+            Assert.That(rule.Amount, Is.EqualTo(-90m));
+            var savedStatement = statements.Get(statement.Id);
+            Assert.That(savedStatement!.Notes, Is.EqualTo("Card minimum"));
+            Assert.That(savedStatement.DueDate, Is.EqualTo(new DateTime(2026, 10, 20)));
+            Assert.That(savedStatement.AmountDue, Is.EqualTo(180m));
+        }
+
+        [Test]
         public void DeleteEnteredBill_RemovesOneTimeTransactionAndTransfer()
         {
             var (accounts, transactions, statements, checking, card) = SeedCheckingAndCard();

@@ -24,6 +24,7 @@ namespace THMS.UI.WinForms
         };
         private readonly Panel _valueChart = new() { Dock = DockStyle.Fill };
         private readonly Panel _incomeChart = new() { Dock = DockStyle.Fill };
+        private readonly Panel _annualChart = new() { Dock = DockStyle.Fill };
         private readonly DataGridView _months = new()
         {
             Dock = DockStyle.Fill,
@@ -105,6 +106,7 @@ namespace THMS.UI.WinForms
             _monthsSource.DataSource = snapshot.Months.Reverse().ToList();
             ReplaceChart(_valueChart, InvestmentChartFactory.CreateValueChart(snapshot.Months));
             ReplaceChart(_incomeChart, InvestmentChartFactory.CreateIncomeChart(snapshot.Months));
+            ReplaceChart(_annualChart, InvestmentChartFactory.CreateAnnualIncomeChart(snapshot.Months));
         }
 
         private void BuildLayout()
@@ -115,6 +117,7 @@ namespace THMS.UI.WinForms
                 MoneyColumn(nameof(InvestmentDashboardMonthRow.Value), "Value"),
                 MoneyColumn(nameof(InvestmentDashboardMonthRow.Change), "Change"),
                 MoneyColumn(nameof(InvestmentDashboardMonthRow.Income), "Income"),
+                MoneyColumn(nameof(InvestmentDashboardMonthRow.EstimatedAnnualIncome), "Est. annual income"),
                 TextColumn(nameof(InvestmentDashboardMonthRow.Prices), "Prices", DataGridViewAutoSizeColumnMode.Fill));
             DataGridViewUtil.EnableDoubleBuffering(_months);
 
@@ -126,7 +129,7 @@ namespace THMS.UI.WinForms
                 Padding = new Padding(8)
             };
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 88));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 55));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
 
@@ -136,13 +139,15 @@ namespace THMS.UI.WinForms
             var charts = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                ColumnCount = 2,
+                ColumnCount = 3,
                 RowCount = 1
             };
-            charts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            charts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            charts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34));
+            charts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
+            charts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
             charts.Controls.Add(_valueChart, 0, 0);
             charts.Controls.Add(_incomeChart, 1, 0);
+            charts.Controls.Add(_annualChart, 2, 0);
             root.Controls.Add(charts, 0, 2);
             root.Controls.Add(_months, 0, 3);
             Controls.Add(root);

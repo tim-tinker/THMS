@@ -193,6 +193,12 @@ namespace THMS.Logic.Finance.Investments
             return (book.Cash, held);
         }
 
+        public static decimal EstimatedAnnualIncomeAsOf(InvestmentBookState state, DateTime asOf)
+        {
+            var book = BookAsOf(state, asOf);
+            return Income(book.Lots, state, asOf.Date);
+        }
+
         public static SecurityValuation PriceAsOf(InvestmentBookState state, string symbol, DateTime asOf)
         {
             DateTime? latest = null;

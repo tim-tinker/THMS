@@ -97,7 +97,29 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
-        public void BuildPreview_MarksLedgerAndFileDuplicates_AndImportKeepsCheckedDuplicates()
+        public void BuildPreview_CreditCardKeepsFileSignUnlessFlipIsChecked()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var transactions = new InMemoryTransactionDataStore();
+            var account = new CreditAccount { Name = "Wells Fargo", Institution = "Wells Fargo", AccountNumber = "1" };
+            accounts.UpsertAccount(account);
+
+            var sheet = Sheet(
+                ["Date", "Description", "Amount"],
+                Row(2, "10/28/2026", "GOOGLE *March of Empir g.co/helppay#CA", "-5.40"),
+                Row(3, "10/27/2026", "INTEREST CHARGE ON PURCHASES", "-42.16"),
+                Row(4, "10/23/2026", "ONLINE PAYMENT THANK YOU", "700.00"));
+
+            var orchestrator = new AccountTransactionFileImportOrchestrator(accounts, transactions);
+            var preview = orchestrator.BuildPreview(account.Id, sheet, Map(flip: false));
+            Assert.That(preview.Select(row => row.Amount), Is.EqualTo(new decimal?[] { -5.40m, -42.16m, 700m }));
+
+            var flipped = orchestrator.BuildPreview(account.Id, sheet, Map(flip: true));
+            Assert.That(flipped.Select(row => row.Amount), Is.EqualTo(new decimal?[] { 5.40m, 42.16m, -700m }));
+        }
+
+        [Test]
+        public void BuildPreview_MarksOnlyStoredDuplicates_AndImportKeepsCheckedDuplicates()
         {
             var accounts = new InMemoryAccountDataStore();
             var transactions = new InMemoryTransactionDataStore();
@@ -126,22 +148,52 @@ namespace THMS.Tests.Logic
             Assert.That(preview[0].Amount, Is.EqualTo(-953.86m));
             Assert.That(preview[1].IsDuplicate, Is.True);
             Assert.That(preview[1].Import, Is.False);
-            Assert.That(preview[2].IsDuplicate, Is.True);
-            Assert.That(preview[2].Import, Is.False);
+            Assert.That(preview[2].IsDuplicate, Is.False);
+            Assert.That(preview[2].Import, Is.True);
+            Assert.That(preview[2].Amount, Is.EqualTo(-953.86m));
             Assert.That(preview[3].Problem, Does.Contain("Date"));
             Assert.That(preview[3].Import, Is.False);
 
             preview[1].Import = true;
             var result = orchestrator.Import(account.Id, preview);
-            Assert.That(result.Count, Is.EqualTo(2));
+            Assert.That(result.Count, Is.EqualTo(3));
 
             var posted = transactions.GetPostedTransactions(account.Id).ToList();
-            Assert.That(posted, Has.Count.EqualTo(3));
+            Assert.That(posted, Has.Count.EqualTo(4));
             Assert.That(posted.Count(tx => tx.Amount == 219.30m), Is.EqualTo(2));
-            Assert.That(
-                posted.Where(tx => tx.Description == "AUTOPAY PAYMENT - THANK YOU"),
-                Has.All.Matches<PostedTransaction>(tx => tx.ImportedStatus == ImportedStatus.Unreconciled));
-            Assert.That(posted.Single(tx => tx.Amount == -953.86m).ImportedStatus, Is.EqualTo(ImportedStatus.Unreconciled));
+            var autopays = posted.Where(tx => tx.Description == "AUTOPAY PAYMENT - THANK YOU").ToList();
+            Assert.That(autopays, Has.Count.EqualTo(2));
+            Assert.That(autopays, Has.All.Matches<PostedTransaction>(tx => tx.ImportedStatus == ImportedStatus.Unreconciled));
+        }
+
+        [Test]
+        public void BuildPreview_MatchesEachStoredTransactionOnlyOnce()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var transactions = new InMemoryTransactionDataStore();
+            var account = new BankAccount { Name = "Checking", Institution = "Bank", AccountNumber = "1" };
+            accounts.UpsertAccount(account);
+            transactions.AddPostedTransaction(new PostedTransaction
+            {
+                AccountId = account.Id,
+                Date = new DateTime(2026, 9, 7),
+                Amount = 12.34m,
+                Description = "COFFEE"
+            });
+
+            var sheet = Sheet(
+                ["Date", "Description", "Amount"],
+                Row(2, "09/07/2026", "Coffee", "12.34"),
+                Row(3, "09/07/2026", "Coffee", "12.34"),
+                Row(4, "09/07/2026", "Coffee", "12.34"));
+
+            var preview = new AccountTransactionFileImportOrchestrator(accounts, transactions)
+                .BuildPreview(account.Id, sheet, Map(flip: false));
+
+            Assert.That(preview.Select(row => row.IsDuplicate), Is.EqualTo(new[] { true, false, false }));
+            Assert.That(preview[0].DuplicateIsUnreconciled, Is.True);
+            Assert.That(preview[0].Import, Is.False);
+            Assert.That(preview.Skip(1).Select(row => row.Import), Is.All.True);
         }
 
         [Test]

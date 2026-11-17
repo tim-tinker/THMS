@@ -69,6 +69,7 @@ namespace THMS.Logic.Finance.Investments
 
                     total.Value += month.Value;
                     total.Income += month.Income;
+                    total.EstimatedAnnualIncome += month.EstimatedAnnualIncome;
                     total.Holdings += month.Holdings;
                     total.CarriedForward += month.CarriedForward;
                     total.Unpriced += month.Unpriced;
@@ -88,6 +89,7 @@ namespace THMS.Logic.Finance.Investments
                     Value = total.Value,
                     Change = change,
                     Income = total.Income,
+                    EstimatedAnnualIncome = total.EstimatedAnnualIncome,
                     Prices = PriceText(total)
                 });
             }
@@ -151,6 +153,7 @@ namespace THMS.Logic.Finance.Investments
         {
             public decimal Value { get; set; }
             public decimal Income { get; set; }
+            public decimal EstimatedAnnualIncome { get; set; }
             public int Holdings { get; set; }
             public int CarriedForward { get; set; }
             public int Unpriced { get; set; }
