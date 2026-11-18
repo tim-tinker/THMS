@@ -11,6 +11,7 @@ namespace THMS.Data.Stores.SqliteStores
         private readonly PromotionalBalancesTable _promotions = new();
         private readonly UtilityUsageRecordsTable _usage = new();
         private readonly StatementChargeLinesTable _charges = new();
+        private readonly PropertyTaxStatementsTable _propertyTax = new();
 
         public void InitializeSchema(SqliteConnection conn)
         {
@@ -19,6 +20,7 @@ namespace THMS.Data.Stores.SqliteStores
             _promotions.InitializeSchema(conn);
             _usage.InitializeSchema(conn);
             _charges.InitializeSchema(conn);
+            _propertyTax.InitializeSchema(conn);
         }
 
         public void Save(SqliteConnection conn, AccountStatement statement)
@@ -44,11 +46,27 @@ namespace THMS.Data.Stores.SqliteStores
         public List<AccountStatement> GetUpcoming(SqliteConnection conn, DateTime asOf) =>
             HydrateAll(conn, _statements.GetUpcoming(conn, asOf));
 
+        public List<AccountStatement> GetForAsset(SqliteConnection conn, Guid assetId)
+        {
+            var list = new List<AccountStatement>();
+            foreach (var id in _propertyTax.GetStatementIds(conn, assetId))
+            {
+                var statement = Get(conn, id);
+                if (statement is not null)
+                    list.Add(statement);
+            }
+
+            return list
+                .OrderByDescending(statement => statement is PropertyTaxStatement tax ? tax.TaxYear : 0)
+                .ToList();
+        }
+
         public void Delete(SqliteConnection conn, Guid id)
         {
             _promotions.DeleteByStatement(conn, id);
             _usage.DeleteByStatement(conn, id);
             _charges.DeleteByStatement(conn, id);
+            _propertyTax.Delete(conn, id);
             _details.Delete(conn, id);
             _statements.Delete(conn, id);
         }
@@ -58,6 +76,7 @@ namespace THMS.Data.Stores.SqliteStores
             _promotions.DeleteByStatement(conn, statement.Id);
             _usage.DeleteByStatement(conn, statement.Id);
             _charges.DeleteByStatement(conn, statement.Id);
+            _propertyTax.Delete(conn, statement.Id);
 
             switch (statement)
             {
@@ -70,6 +89,9 @@ namespace THMS.Data.Stores.SqliteStores
                     break;
                 case ServiceStatement service:
                     _charges.ReplaceService(conn, statement.Id, service.Charges);
+                    break;
+                case PropertyTaxStatement tax:
+                    _propertyTax.Upsert(conn, tax);
                     break;
             }
         }
@@ -128,6 +150,7 @@ namespace THMS.Data.Stores.SqliteStores
                     Charges = _charges.GetService(conn, row.Id)
                 },
                 StatementType.Insurance => new InsuranceStatement(),
+                StatementType.PropertyTax => _propertyTax.Load(conn, row.Id),
                 _ => null
             };
 

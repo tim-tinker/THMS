@@ -14,6 +14,7 @@ namespace THMS.Domain.Finance.Planning
             StatementType.Utility => IsUntracked(account, AccountType.Utility),
             StatementType.Service => IsUntracked(account, AccountType.Service),
             StatementType.Insurance => IsUntracked(account, AccountType.Insurance),
+            StatementType.PropertyTax => IsUntracked(account, AccountType.Tax),
             _ => false
         };
 
@@ -36,6 +37,7 @@ namespace THMS.Domain.Finance.Planning
             StatementType.Utility => new UntrackedAccount { Type = AccountType.Utility },
             StatementType.Service => new UntrackedAccount { Type = AccountType.Service },
             StatementType.Insurance => new UntrackedAccount { Type = AccountType.Insurance },
+            StatementType.PropertyTax => new UntrackedAccount { Type = AccountType.Tax },
             _ => new UntrackedAccount { Type = AccountType.Utility }
         };
 
@@ -49,6 +51,7 @@ namespace THMS.Domain.Finance.Planning
             UntrackedAccount when account.Type == AccountType.Utility => StatementType.Utility,
             UntrackedAccount when account.Type == AccountType.Service => StatementType.Service,
             UntrackedAccount when account.Type == AccountType.Insurance => StatementType.Insurance,
+            UntrackedAccount when account.Type == AccountType.Tax => StatementType.PropertyTax,
             _ => null
         };
 
@@ -62,6 +65,7 @@ namespace THMS.Domain.Finance.Planning
             StatementType.Utility => new UtilityStatement(),
             StatementType.Service => new ServiceStatement(),
             StatementType.Insurance => new InsuranceStatement(),
+            StatementType.PropertyTax => new PropertyTaxStatement(),
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported statement type.")
         };
 

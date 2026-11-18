@@ -6,5 +6,6 @@
         public decimal InterestRate { get; set; }
         public int TermMonths { get; set; }
         public DateTime NextPaymentDate { get; set; }
+        public Guid? SecuredAssetId { get; set; }
     }
 }

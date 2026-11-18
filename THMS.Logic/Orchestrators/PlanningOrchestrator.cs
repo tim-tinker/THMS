@@ -13,23 +13,27 @@ namespace THMS.Logic.Orchestrators.Finance
         private readonly IAccountDataStore _accounts;
         private readonly ITransactionDataStore _transactions;
         private readonly IAccountStatementDataStore _statements;
+        private readonly IAssetDataStore? _assets;
 
         public PlanningOrchestrator()
             : this(
                 new DataStoreFactory().GetAccountStore(),
                 new DataStoreFactory().GetTransactionStore(),
-                new DataStoreFactory().GetAccountStatementStore())
+                new DataStoreFactory().GetAccountStatementStore(),
+                new DataStoreFactory().GetAssetStore())
         {
         }
 
         public PlanningOrchestrator(
             IAccountDataStore accounts,
             ITransactionDataStore transactions,
-            IAccountStatementDataStore statements)
+            IAccountStatementDataStore statements,
+            IAssetDataStore? assets = null)
         {
             _accounts = accounts;
             _transactions = transactions;
             _statements = statements;
+            _assets = assets;
         }
 
         public IAccountStatementDataStore GetStatementStore() => _statements;
@@ -69,7 +73,7 @@ namespace THMS.Logic.Orchestrators.Finance
 
         public void DeleteStatement(Guid id)
         {
-            if (_statements.Get(id) is null)
+            if (_statements.Get(id) is not AccountStatement statement)
                 throw new InvalidOperationException("Statement was not found.");
 
             foreach (var expected in _transactions.GetAllFutureTransferTransactions()
@@ -82,6 +86,8 @@ namespace THMS.Logic.Orchestrators.Finance
             }
 
             _statements.Delete(id);
+            if (statement is PropertyTaxStatement)
+                _assets?.DeleteValuationsForStatement(id);
         }
 
         public void SaveStatement(AccountStatement statement)

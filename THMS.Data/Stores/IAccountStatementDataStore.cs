@@ -7,6 +7,7 @@ namespace THMS.Data.Stores
         void Save(AccountStatement statement);
         AccountStatement? Get(Guid id);
         List<AccountStatement> GetForAccount(Guid accountId);
+        List<AccountStatement> GetForAsset(Guid assetId);
         List<AccountStatement> GetUpcoming(DateTime asOf);
         void Delete(Guid id);
     }

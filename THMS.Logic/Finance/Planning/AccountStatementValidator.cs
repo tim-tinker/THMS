@@ -31,6 +31,9 @@ namespace THMS.Logic.Finance.Planning
                 case ServiceStatement service:
                     ValidateService(service, findings);
                     break;
+                case PropertyTaxStatement tax:
+                    ValidatePropertyTax(tax, findings);
+                    break;
             }
 
             return findings;
@@ -102,6 +105,45 @@ namespace THMS.Logic.Finance.Planning
             var chargeSum = service.Charges.Sum(c => c.Amount);
             if (!AmountsEqual(chargeSum, service.AmountDue))
                 findings.Add($"Service charges ({chargeSum:c2}) must equal amount due ({service.AmountDue:c2}).");
+        }
+
+        private static void ValidatePropertyTax(PropertyTaxStatement tax, List<string> findings)
+        {
+            if (tax.AssetId == Guid.Empty)
+                findings.Add("Choose the property this statement bills.");
+            if (tax.AccountId == Guid.Empty)
+                findings.Add("Choose the tax collector.");
+            if (tax.TaxYear < 1900 || tax.TaxYear > 2200)
+                findings.Add("Enter the tax year.");
+            if (!AmountsEqual(tax.LandMarketValue + tax.ImprovementMarketValue, tax.TotalMarketValue))
+                findings.Add("Land market plus improvement market must equal total market.");
+            if (!AmountsEqual(tax.TotalMarketValue - tax.HomesteadCap, tax.AssessedValue))
+                findings.Add("Assessed value must equal total market minus the homestead cap.");
+
+            if (tax.Jurisdictions.Count == 0)
+            {
+                findings.Add("Add at least one taxing jurisdiction.");
+                return;
+            }
+
+            foreach (var line in tax.Jurisdictions)
+            {
+                var name = string.IsNullOrWhiteSpace(line.Name) ? "Jurisdiction" : line.Name.Trim();
+                if (string.IsNullOrWhiteSpace(line.Name))
+                    findings.Add("Each taxing jurisdiction needs a name.");
+                if (line.ExemptionAmount < 0 || line.TaxableValue < 0 || line.RatePerHundred < 0 || line.TaxAmount < 0)
+                    findings.Add($"{name} amounts cannot be negative.");
+                var expected = decimal.Round(
+                    line.TaxableValue * line.RatePerHundred / 100m,
+                    2,
+                    MidpointRounding.AwayFromZero);
+                if (Math.Abs(expected - line.TaxAmount) > SumTolerance)
+                    findings.Add($"{name}: tax {line.TaxAmount:c2} does not match taxable value times the rate ({expected:c2}).");
+            }
+
+            var total = tax.Jurisdictions.Sum(line => line.TaxAmount);
+            if (!AmountsEqual(total, tax.AmountDue))
+                findings.Add($"Jurisdiction taxes ({total:c2}) must equal the total due ({tax.AmountDue:c2}).");
         }
 
         private static bool AmountsEqual(decimal left, decimal right) =>

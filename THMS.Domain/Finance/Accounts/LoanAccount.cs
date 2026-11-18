@@ -7,6 +7,7 @@
         public int TermMonths { get; set; }
         public DateTime StartDate { get; set; }
         public PaymentScheduleType ScheduleType { get; set; }
+        public Guid? SecuredAssetId { get; set; }
     }
 
     public enum PaymentScheduleType

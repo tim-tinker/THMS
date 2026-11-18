@@ -74,6 +74,10 @@ namespace THMS.Logic.ViewModels.Finance
                 {
                     Charges = CountItems(service.Charges)
                 },
+                PropertyTaxStatement tax => ObligationRow(tax) with
+                {
+                    Charges = CountItems(tax.Jurisdictions)
+                },
                 _ => ObligationRow(statement)
             };
 
@@ -98,6 +102,7 @@ namespace THMS.Logic.ViewModels.Finance
             StatementType.Utility => "Utility",
             StatementType.Service => "Service",
             StatementType.Insurance => "Insurance",
+            StatementType.PropertyTax => "Property Tax",
             _ => type.ToString()
         };
 

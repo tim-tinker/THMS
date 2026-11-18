@@ -121,6 +121,7 @@ namespace THMS.Ingestion.Importers.Finance
                 "Utility" => new UntrackedAccount { Type = AccountType.Utility },
                 "Service" => new UntrackedAccount { Type = AccountType.Service },
                 "Insurance" => new UntrackedAccount { Type = AccountType.Insurance },
+                "Tax" => new UntrackedAccount { Type = AccountType.Tax },
                 _ => throw new InvalidOperationException(
                     $"Unknown account type '{type}' at row {rowIndex}.")
             };

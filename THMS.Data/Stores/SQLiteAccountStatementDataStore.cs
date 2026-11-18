@@ -36,6 +36,12 @@ namespace THMS.Data.Stores.SQLite
             return _store.GetForAccount(conn, accountId);
         }
 
+        public List<AccountStatement> GetForAsset(Guid assetId)
+        {
+            using var conn = OpenConnection();
+            return _store.GetForAsset(conn, assetId);
+        }
+
         public List<AccountStatement> GetUpcoming(DateTime asOf)
         {
             using var conn = OpenConnection();

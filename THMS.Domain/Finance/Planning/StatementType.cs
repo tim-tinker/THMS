@@ -9,6 +9,7 @@ namespace THMS.Domain.Finance.Planning
         Service,
         Insurance,
         Bank,
-        Investment
+        Investment,
+        PropertyTax
     }
 }

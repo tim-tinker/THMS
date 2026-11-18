@@ -110,6 +110,7 @@ namespace THMS.Logic.ViewModels.Finance
             UntrackedAccount when account.Type == AccountType.Utility => AccountKinds.Utility,
             UntrackedAccount when account.Type == AccountType.Service => AccountKinds.Service,
             UntrackedAccount when account.Type == AccountType.Insurance => AccountKinds.Insurance,
+            UntrackedAccount when account.Type == AccountType.Tax => AccountKinds.Tax,
             _ => account.Type.ToString()
         };
 
@@ -126,6 +127,7 @@ namespace THMS.Logic.ViewModels.Finance
                 AccountKinds.Utility => new UntrackedAccount { Type = AccountType.Utility },
                 AccountKinds.Service => new UntrackedAccount { Type = AccountType.Service },
                 AccountKinds.Insurance => new UntrackedAccount { Type = AccountType.Insurance },
+                AccountKinds.Tax => new UntrackedAccount { Type = AccountType.Tax },
                 _ => throw new InvalidOperationException($"Unknown account type '{kind}'.")
             };
 

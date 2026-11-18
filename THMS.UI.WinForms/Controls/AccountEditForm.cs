@@ -52,6 +52,7 @@ namespace THMS.UI.WinForms.Controls
             cmbAccountType.Items.Add("Utility");
             cmbAccountType.Items.Add("Service");
             cmbAccountType.Items.Add("Insurance");
+            cmbAccountType.Items.Add("Tax");
             cmbAccountType.SelectedItem = ComboLabel(Account);
             cmbAccountType.SelectedIndexChanged += OnAccountTypeChanged;
         }
@@ -67,6 +68,7 @@ namespace THMS.UI.WinForms.Controls
             AccountKinds.Utility => "Utility",
             AccountKinds.Service => "Service",
             AccountKinds.Insurance => "Insurance",
+            AccountKinds.Tax => "Tax",
             _ => "Bank"
         };
 
@@ -314,6 +316,7 @@ namespace THMS.UI.WinForms.Controls
                     "Utility" => new UntrackedAccount { Type = AccountType.Utility },
                     "Service" => new UntrackedAccount { Type = AccountType.Service },
                     "Insurance" => new UntrackedAccount { Type = AccountType.Insurance },
+                    "Tax" => new UntrackedAccount { Type = AccountType.Tax },
                     _ => Account
                 };
                 Account.Id = _opened.Id;

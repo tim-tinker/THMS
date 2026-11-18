@@ -13,36 +13,42 @@ namespace THMS.Data.Stores.SqlTables
                     AccountId TEXT PRIMARY KEY,
                     Principal REAL NOT NULL,
                     InterestRate REAL NOT NULL,
-                    TermMonths INTEGER NOT NULL
+                    TermMonths INTEGER NOT NULL,
+                    SecuredAssetId TEXT
                 );";
             cmd.ExecuteNonQuery();
 
             EnsureColumn(conn, "TermMonths", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn(conn, "SecuredAssetId", "TEXT");
         }
 
         public void Upsert(SqliteConnection conn, LoanAccount account)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO LoanAccounts (AccountId, Principal, InterestRate, TermMonths)
-                VALUES (@AccountId, @Principal, @InterestRate, @TermMonths)
+                INSERT INTO LoanAccounts (AccountId, Principal, InterestRate, TermMonths, SecuredAssetId)
+                VALUES (@AccountId, @Principal, @InterestRate, @TermMonths, @SecuredAssetId)
                 ON CONFLICT(AccountId) DO UPDATE SET
                     Principal = excluded.Principal,
                     InterestRate = excluded.InterestRate,
-                    TermMonths = excluded.TermMonths;";
+                    TermMonths = excluded.TermMonths,
+                    SecuredAssetId = excluded.SecuredAssetId;";
 
             cmd.Parameters.AddWithValue("@AccountId", account.Id.ToString());
             cmd.Parameters.AddWithValue("@Principal", account.Principal);
             cmd.Parameters.AddWithValue("@InterestRate", account.InterestRate);
             cmd.Parameters.AddWithValue("@TermMonths", account.TermMonths);
+            cmd.Parameters.AddWithValue("@SecuredAssetId", GuidText(account.SecuredAssetId));
             cmd.ExecuteNonQuery();
         }
 
-        public (decimal Principal, decimal InterestRate, int TermMonths)? Get(SqliteConnection conn, Guid id)
+        public (decimal Principal, decimal InterestRate, int TermMonths, Guid? SecuredAssetId)? Get(
+            SqliteConnection conn,
+            Guid id)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT Principal, InterestRate, TermMonths
+                SELECT Principal, InterestRate, TermMonths, SecuredAssetId
                 FROM LoanAccounts
                 WHERE AccountId = @AccountId;";
             cmd.Parameters.AddWithValue("@AccountId", id.ToString());
@@ -54,7 +60,8 @@ namespace THMS.Data.Stores.SqlTables
             return (
                 (decimal)(double)reader.GetDouble(0),
                 (decimal)(double)reader.GetDouble(1),
-                reader.GetInt32(2)
+                reader.GetInt32(2),
+                ReadGuid(reader, 3)
             );
         }
 
@@ -89,5 +96,11 @@ namespace THMS.Data.Stores.SqlTables
 
             return false;
         }
+
+        private static object GuidText(Guid? id) =>
+            id is Guid value && value != Guid.Empty ? value.ToString() : DBNull.Value;
+
+        private static Guid? ReadGuid(SqliteDataReader reader, int ordinal) =>
+            reader.IsDBNull(ordinal) ? null : Guid.Parse(reader.GetString(ordinal));
     }
 }

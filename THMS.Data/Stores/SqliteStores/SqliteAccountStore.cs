@@ -208,7 +208,8 @@ namespace THMS.Data.Stores.SqliteStores
             {
                 Principal = details.Value.Principal,
                 InterestRate = details.Value.InterestRate,
-                TermMonths = details.Value.TermMonths
+                TermMonths = details.Value.TermMonths,
+                SecuredAssetId = details.Value.SecuredAssetId
             };
         }
 
@@ -223,7 +224,8 @@ namespace THMS.Data.Stores.SqliteStores
                 Principal = details.Value.Principal,
                 InterestRate = details.Value.InterestRate,
                 TermMonths = details.Value.TermMonths,
-                NextPaymentDate = details.Value.NextPaymentDate
+                NextPaymentDate = details.Value.NextPaymentDate,
+                SecuredAssetId = details.Value.SecuredAssetId
             };
         }
 

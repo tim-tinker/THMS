@@ -36,6 +36,14 @@ namespace THMS.Data.Stores
         public List<AccountStatement> GetForAccount(Guid accountId) =>
             _statements.Where(s => s.AccountId == accountId).OrderBy(s => s.DueDate).ToList();
 
+        public List<AccountStatement> GetForAsset(Guid assetId) =>
+            _statements
+                .OfType<PropertyTaxStatement>()
+                .Where(s => s.AssetId == assetId)
+                .OrderByDescending(s => s.TaxYear)
+                .Cast<AccountStatement>()
+                .ToList();
+
         public List<AccountStatement> GetUpcoming(DateTime asOf) =>
             _statements.Where(s => s.DueDate.Date >= asOf.Date).OrderBy(s => s.DueDate).ToList();
 

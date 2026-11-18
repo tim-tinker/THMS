@@ -1074,10 +1074,34 @@ namespace THMS.UI.WinForms
                 return;
             }
 
+            if (existing is PropertyTaxStatement || StatementAccountMatch.ForAccount(account) == StatementType.PropertyTax)
+            {
+                OpenPropertyTaxStatement(existing as PropertyTaxStatement, account);
+                return;
+            }
+
             try
             {
                 using var dlg = new StatementEditorDialog(_planningOrchestrator, existing, account);
                 if (dlg.ShowDialog(this) != DialogResult.OK)
+                    return;
+
+                LoadStatementsForSelectedAccount(keepSelection: existing is not null);
+                billsControl.Reload();
+                accountUpdater.RefreshAccounts();
+            }
+            catch (Exception ex)
+            {
+                ExceptionDialog.Show(this, existing is null ? "Add Statement" : "Edit Statement", ex);
+            }
+        }
+
+        private void OpenPropertyTaxStatement(PropertyTaxStatement? existing, Account account)
+        {
+            try
+            {
+                using var dialog = new PropertyTaxStatementDialog(new AssetOrchestrator(), existing, account, property: null);
+                if (dialog.ShowDialog(this) != DialogResult.OK)
                     return;
 
                 LoadStatementsForSelectedAccount(keepSelection: existing is not null);

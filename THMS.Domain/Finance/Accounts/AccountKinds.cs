@@ -11,6 +11,7 @@ namespace THMS.Domain.Finance.Accounts
         public const string Utility = "Utility";
         public const string Service = "Service";
         public const string Insurance = "Insurance";
+        public const string Tax = "Tax";
 
         public static string Of(Account account) => account switch
         {
@@ -23,6 +24,7 @@ namespace THMS.Domain.Finance.Accounts
             UntrackedAccount when account.Type == AccountType.Utility => Utility,
             UntrackedAccount when account.Type == AccountType.Service => Service,
             UntrackedAccount when account.Type == AccountType.Insurance => Insurance,
+            UntrackedAccount when account.Type == AccountType.Tax => Tax,
             UntrackedAccount => "Untracked",
             _ => account.Type.ToString()
         };

@@ -64,6 +64,7 @@ namespace THMS.UI
 
             AddSectionLabel("Data Management");
             AddEmbeddedForm("Register", new RegisterForm());
+            AddEmbeddedForm("Assets", new AssetsForm());
             AddEmbeddedForm("Portfolios", new PortfoliosForm());
             AddEmbeddedForm("Energy", new DataCenterForm());
         }

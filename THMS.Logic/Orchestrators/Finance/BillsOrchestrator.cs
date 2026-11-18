@@ -53,31 +53,27 @@ namespace THMS.Logic.Orchestrators.Finance
 
             var latest = PayableStatements.Latest(_statements.GetForAccount(accountId));
             ClearPaidStatementBill(latest);
+            var openStatements = new List<AccountStatement>();
             if (latest is not null
                 && !latest.BillCleared
                 && !IsCovered(PaymentIntentSource.Statement, latest.Id, latest.AccountId, latest.DueDate.Date, asOfDate))
             {
-                rows.Add(new BillRow
-                {
-                    Source = PaymentIntentSource.Statement,
-                    SourceId = latest.Id,
-                    StatementId = latest.Id,
-                    DestinationAccountId = accountId,
-                    DestinationName = NameOf(byId, accountId),
-                    WebsiteUrl = UrlOf(byId, accountId),
-                    FundingAccountId = Guid.Empty,
-                    FundingName = "",
-                    OtherAccountId = null,
-                    OtherAccountName = "",
-                    OtherWebsiteUrl = "",
-                    CanChoosePayFrom = true,
-                    Kind = BillKinds.Statement,
-                    DueDate = latest.DueDate.Date,
-                    Amount = Math.Abs(latest.AmountDue),
-                    Status = BillStatuses.Due,
-                    Notes = string.IsNullOrWhiteSpace(latest.Notes) ? "Statement due" : latest.Notes
-                });
+                openStatements.Add(latest);
             }
+
+            foreach (var tax in _statements.GetForAccount(accountId).OfType<PropertyTaxStatement>())
+            {
+                if (tax.BillCleared || tax.AmountDue <= 0)
+                    continue;
+                if (openStatements.Any(item => item.Id == tax.Id))
+                    continue;
+                if (IsCovered(PaymentIntentSource.Statement, tax.Id, tax.AccountId, tax.DueDate.Date, asOfDate))
+                    continue;
+                openStatements.Add(tax);
+            }
+
+            foreach (var statement in openStatements)
+                rows.Add(StatementDueRow(statement, byId));
 
             foreach (var rule in _transactions.GetAllRecurringSingleRules()
                          .Where(r => r.IsActive && r.AccountId == accountId))
@@ -1087,6 +1083,28 @@ namespace THMS.Logic.Orchestrators.Finance
                 ExpectedOrigin.RecurringSingle => PaymentIntentSource.RecurringSingle,
                 ExpectedOrigin.RecurringTransfer => PaymentIntentSource.RecurringTransfer,
                 _ => PaymentIntentSource.Manual
+            };
+
+        private static BillRow StatementDueRow(AccountStatement statement, IReadOnlyDictionary<Guid, Account> accounts) =>
+            new()
+            {
+                Source = PaymentIntentSource.Statement,
+                SourceId = statement.Id,
+                StatementId = statement.Id,
+                DestinationAccountId = statement.AccountId,
+                DestinationName = NameOf(accounts, statement.AccountId),
+                WebsiteUrl = UrlOf(accounts, statement.AccountId),
+                FundingAccountId = Guid.Empty,
+                FundingName = "",
+                OtherAccountId = null,
+                OtherAccountName = "",
+                OtherWebsiteUrl = "",
+                CanChoosePayFrom = true,
+                Kind = BillKinds.Statement,
+                DueDate = statement.DueDate.Date,
+                Amount = Math.Abs(statement.AmountDue),
+                Status = BillStatuses.Due,
+                Notes = string.IsNullOrWhiteSpace(statement.Notes) ? "Statement due" : statement.Notes
             };
 
         private static string NameOf(IReadOnlyDictionary<Guid, Account> accounts, Guid id) =>

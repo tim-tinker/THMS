@@ -14,6 +14,7 @@
         Internal,
         Utility,
         Service,
-        Insurance
+        Insurance,
+        Tax
     }
 }
