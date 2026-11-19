@@ -28,13 +28,17 @@ namespace THMS.Data.Stores.SqlTables
                     TaxAccountNumber TEXT NOT NULL,
                     LegalDescription TEXT NOT NULL,
                     LegalAcres REAL NOT NULL,
-                    RollCode TEXT NOT NULL
+                    RollCode TEXT NOT NULL,
+                    AssessmentMethod TEXT NOT NULL DEFAULT 'ApplyHomesteadCap',
+                    LevyMethod TEXT NOT NULL DEFAULT 'RatePerHundred'
                 );
                 CREATE TABLE IF NOT EXISTS VehicleAssets (
                     AssetId TEXT PRIMARY KEY,
                     VehicleId TEXT NOT NULL
                 );";
             cmd.ExecuteNonQuery();
+            SqliteSchema.EnsureColumn(conn, "PropertyAssets", "AssessmentMethod", "TEXT NOT NULL DEFAULT 'ApplyHomesteadCap'");
+            SqliteSchema.EnsureColumn(conn, "PropertyAssets", "LevyMethod", "TEXT NOT NULL DEFAULT 'RatePerHundred'");
         }
 
         public void Upsert(SqliteConnection conn, Asset asset)
@@ -178,13 +182,20 @@ namespace THMS.Data.Stores.SqlTables
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT ParcelAddress, CadNumber, TaxAccountNumber, LegalDescription, LegalAcres, RollCode
+                SELECT ParcelAddress, CadNumber, TaxAccountNumber, LegalDescription, LegalAcres, RollCode, AssessmentMethod, LevyMethod
                 FROM PropertyAssets
                 WHERE AssetId = @Id;";
             cmd.Parameters.AddWithValue("@Id", id.ToString());
             using var reader = cmd.ExecuteReader();
             if (!reader.Read())
                 return new PropertyAsset();
+
+            var method = reader.FieldCount > 6 && !reader.IsDBNull(6) && Enum.TryParse<AssessmentMethod>(reader.GetString(6), out var parsed)
+                ? parsed
+                : AssessmentMethod.ApplyHomesteadCap;
+            var levy = reader.FieldCount > 7 && !reader.IsDBNull(7) && Enum.TryParse<LevyMethod>(reader.GetString(7), out var parsedLevy)
+                ? parsedLevy
+                : LevyMethod.RatePerHundred;
 
             return new PropertyAsset
             {
@@ -193,7 +204,9 @@ namespace THMS.Data.Stores.SqlTables
                 TaxAccountNumber = reader.GetString(2),
                 LegalDescription = reader.GetString(3),
                 LegalAcres = (decimal)(double)reader.GetDouble(4),
-                RollCode = reader.GetString(5)
+                RollCode = reader.GetString(5),
+                AssessmentMethod = method,
+                LevyMethod = levy
             };
         }
 
@@ -214,16 +227,18 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO PropertyAssets
-                    (AssetId, ParcelAddress, CadNumber, TaxAccountNumber, LegalDescription, LegalAcres, RollCode)
+                    (AssetId, ParcelAddress, CadNumber, TaxAccountNumber, LegalDescription, LegalAcres, RollCode, AssessmentMethod, LevyMethod)
                 VALUES
-                    (@Id, @Address, @Cad, @TaxAccount, @Description, @Acres, @Roll)
+                    (@Id, @Address, @Cad, @TaxAccount, @Description, @Acres, @Roll, @AssessmentMethod, @LevyMethod)
                 ON CONFLICT(AssetId) DO UPDATE SET
                     ParcelAddress = excluded.ParcelAddress,
                     CadNumber = excluded.CadNumber,
                     TaxAccountNumber = excluded.TaxAccountNumber,
                     LegalDescription = excluded.LegalDescription,
                     LegalAcres = excluded.LegalAcres,
-                    RollCode = excluded.RollCode;";
+                    RollCode = excluded.RollCode,
+                    AssessmentMethod = excluded.AssessmentMethod,
+                    LevyMethod = excluded.LevyMethod;";
             cmd.Parameters.AddWithValue("@Id", property.Id.ToString());
             cmd.Parameters.AddWithValue("@Address", property.ParcelAddress ?? "");
             cmd.Parameters.AddWithValue("@Cad", property.CadNumber ?? "");
@@ -231,6 +246,8 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@Description", property.LegalDescription ?? "");
             cmd.Parameters.AddWithValue("@Acres", property.LegalAcres);
             cmd.Parameters.AddWithValue("@Roll", property.RollCode ?? "");
+            cmd.Parameters.AddWithValue("@AssessmentMethod", property.AssessmentMethod.ToString());
+            cmd.Parameters.AddWithValue("@LevyMethod", property.LevyMethod.ToString());
             cmd.ExecuteNonQuery();
         }
 

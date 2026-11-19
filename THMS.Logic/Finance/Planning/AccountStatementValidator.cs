@@ -1,3 +1,4 @@
+using THMS.Domain.Assets;
 using THMS.Domain.Finance.Planning;
 
 namespace THMS.Logic.Finance.Planning
@@ -115,10 +116,33 @@ namespace THMS.Logic.Finance.Planning
                 findings.Add("Choose the tax collector.");
             if (tax.TaxYear < 1900 || tax.TaxYear > 2200)
                 findings.Add("Enter the tax year.");
-            if (!AmountsEqual(tax.LandMarketValue + tax.ImprovementMarketValue, tax.TotalMarketValue))
+            if (tax.AssessmentMethod != AssessmentMethod.Manual
+                && !AmountsEqual(
+                    PropertyAssessment.TotalMarket(tax.LandMarketValue, tax.ImprovementMarketValue),
+                    tax.TotalMarketValue))
                 findings.Add("Land market plus improvement market must equal total market.");
-            if (!AmountsEqual(tax.TotalMarketValue - tax.HomesteadCap, tax.AssessedValue))
-                findings.Add("Assessed value must equal total market minus the homestead cap.");
+
+            switch (tax.AssessmentMethod)
+            {
+                case AssessmentMethod.ApplyHomesteadCap:
+                    if (!AmountsEqual(ExpectedAssessed(tax), tax.AssessedValue))
+                        findings.Add("Assessed value must equal total market minus the homestead cap.");
+                    break;
+                case AssessmentMethod.EqualMarketValue:
+                    if (!AmountsEqual(ExpectedAssessed(tax), tax.AssessedValue))
+                        findings.Add("Assessed value must equal total market.");
+                    break;
+                case AssessmentMethod.AssessmentRatio:
+                    if (tax.AssessmentRatioPercent <= 0m || tax.AssessmentRatioPercent > 100m)
+                        findings.Add("Assessment ratio must be greater than 0 and at most 100 percent.");
+                    else if (!AmountsEqual(ExpectedAssessed(tax), tax.AssessedValue))
+                        findings.Add("Assessed value must equal total market times the assessment ratio.");
+                    break;
+                case AssessmentMethod.Manual:
+                    if (tax.AssessedValue < 0)
+                        findings.Add("Assessed value cannot be negative.");
+                    break;
+            }
 
             if (tax.Jurisdictions.Count == 0)
             {
@@ -133,18 +157,31 @@ namespace THMS.Logic.Finance.Planning
                     findings.Add("Each taxing jurisdiction needs a name.");
                 if (line.ExemptionAmount < 0 || line.TaxableValue < 0 || line.RatePerHundred < 0 || line.TaxAmount < 0)
                     findings.Add($"{name} amounts cannot be negative.");
-                var expected = decimal.Round(
-                    line.TaxableValue * line.RatePerHundred / 100m,
-                    2,
-                    MidpointRounding.AwayFromZero);
+                if (tax.LevyMethod == LevyMethod.Manual)
+                    continue;
+
+                var taxable = PropertyLevy.TaxableValue(tax.AssessedValue, line.ExemptionAmount);
+                if (!AmountsEqual(taxable, line.TaxableValue))
+                    findings.Add($"{name}: taxable value must equal assessed value minus exemptions.");
+                var expected = PropertyLevy.Tax(tax.LevyMethod, line.TaxableValue, line.RatePerHundred);
                 if (Math.Abs(expected - line.TaxAmount) > SumTolerance)
-                    findings.Add($"{name}: tax {line.TaxAmount:c2} does not match taxable value times the rate ({expected:c2}).");
+                {
+                    var rateName = tax.LevyMethod == LevyMethod.Millage ? "millage" : "rate";
+                    findings.Add($"{name}: tax {line.TaxAmount:c2} does not match taxable value times the {rateName} ({expected:c2}).");
+                }
             }
 
             var total = tax.Jurisdictions.Sum(line => line.TaxAmount);
             if (!AmountsEqual(total, tax.AmountDue))
                 findings.Add($"Jurisdiction taxes ({total:c2}) must equal the total due ({tax.AmountDue:c2}).");
         }
+
+        private static decimal ExpectedAssessed(PropertyTaxStatement tax) =>
+            PropertyAssessment.AssessedValue(
+                tax.AssessmentMethod,
+                tax.TotalMarketValue,
+                tax.HomesteadCap,
+                tax.AssessmentRatioPercent);
 
         private static bool AmountsEqual(decimal left, decimal right) =>
             Math.Abs(left - right) <= SumTolerance;

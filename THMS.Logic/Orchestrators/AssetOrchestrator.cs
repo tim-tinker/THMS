@@ -222,6 +222,8 @@ namespace THMS.Logic.Orchestrators
             if (property.Id == Guid.Empty)
                 property.Id = Guid.NewGuid();
             statement.AssetId = property.Id;
+            statement.AssessmentMethod = property.AssessmentMethod;
+            statement.LevyMethod = property.LevyMethod;
             if (statement.Id == Guid.Empty)
                 statement.Id = Guid.NewGuid();
             statement.AmountDue = decimal.Round(

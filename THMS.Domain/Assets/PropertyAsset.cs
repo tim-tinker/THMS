@@ -8,5 +8,7 @@ namespace THMS.Domain.Assets
         public string LegalDescription { get; set; } = "";
         public decimal LegalAcres { get; set; }
         public string RollCode { get; set; } = "";
+        public AssessmentMethod AssessmentMethod { get; set; } = AssessmentMethod.ApplyHomesteadCap;
+        public LevyMethod LevyMethod { get; set; } = LevyMethod.RatePerHundred;
     }
 }

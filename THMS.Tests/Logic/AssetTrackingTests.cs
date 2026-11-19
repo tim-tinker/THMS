@@ -49,6 +49,7 @@ namespace THMS.Tests.Logic
             statement.LandMarketValue = 85000m;
             statement.TotalMarketValue = 627600m;
             statement.AssessedValue = 627600m;
+            MatchLevy(statement);
             orchestrator.SavePropertyTaxStatement(property, statement);
 
             values = orchestrator.GetValuations(property.Id);
@@ -86,6 +87,118 @@ namespace THMS.Tests.Logic
             var findings = AccountStatementValidator.Validate(statement);
 
             Assert.That(findings, Has.Some.Contains("Lamar CISD"));
+        }
+
+        [Test]
+        public void PropertyTax_ApplyHomesteadCap_SubtractsTheCapFromMarket()
+        {
+            var statement = Bill(AssessmentMethod.ApplyHomesteadCap);
+            statement.LandMarketValue = 84500m;
+            statement.ImprovementMarketValue = 542600m;
+            statement.TotalMarketValue = 627100m;
+            statement.HomesteadCap = 27000m;
+            statement.AssessedValue = 600100m;
+
+            Assert.That(AccountStatementValidator.Validate(statement), Is.Empty);
+
+            statement.HomesteadCap = 700000m;
+            statement.AssessedValue = 0m;
+            Assert.That(AccountStatementValidator.Validate(statement), Is.Empty);
+
+            statement.AssessedValue = 1m;
+            Assert.That(AccountStatementValidator.Validate(statement), Has.Some.Contains("homestead cap"));
+        }
+
+        [Test]
+        public void PropertyTax_EqualMarketValue_RequiresAssessedToMatchTotal()
+        {
+            var statement = Bill(AssessmentMethod.EqualMarketValue);
+            statement.HomesteadCap = 27000m;
+            statement.AssessedValue = statement.TotalMarketValue;
+
+            Assert.That(AccountStatementValidator.Validate(statement), Is.Empty);
+
+            statement.AssessedValue = statement.TotalMarketValue - 1m;
+            Assert.That(AccountStatementValidator.Validate(statement), Has.Some.Contains("total market"));
+        }
+
+        [Test]
+        public void PropertyTax_AssessmentRatio_MultipliesTotalByTheRatio()
+        {
+            var statement = Bill(AssessmentMethod.AssessmentRatio);
+            statement.AssessmentRatioPercent = 40m;
+            statement.AssessedValue = 250840m;
+            Assert.That(AccountStatementValidator.Validate(statement), Is.Empty);
+
+            statement.TotalMarketValue = 100m;
+            statement.LandMarketValue = 40m;
+            statement.ImprovementMarketValue = 60m;
+            statement.AssessmentRatioPercent = 33.3333m;
+            statement.AssessedValue = 33.33m;
+            Assert.That(AccountStatementValidator.Validate(statement), Is.Empty);
+
+            statement.AssessedValue = 33.30m;
+            Assert.That(AccountStatementValidator.Validate(statement), Has.Some.Contains("assessment ratio"));
+
+            statement.AssessmentRatioPercent = 0m;
+            statement.AssessedValue = 0m;
+            Assert.That(AccountStatementValidator.Validate(statement), Has.Some.Contains("Assessment ratio"));
+        }
+
+        [Test]
+        public void PropertyTax_RatePerHundred_SubtractsExemptionsAndAppliesTheRate()
+        {
+            var statement = CrestingKnollsStatement(Guid.NewGuid());
+            statement.AssetId = Guid.NewGuid();
+            statement.AmountDue = 8135.25m;
+            Assert.That(AccountStatementValidator.Validate(statement), Is.Empty);
+
+            statement.Jurisdictions[0].ExemptionAmount = 700000m;
+            statement.Jurisdictions[0].TaxableValue = 0m;
+            statement.Jurisdictions[0].TaxAmount = 0m;
+            statement.AmountDue = 8135.25m - 5491.12m;
+            Assert.That(AccountStatementValidator.Validate(statement), Is.Empty);
+
+            statement.Jurisdictions[0].TaxableValue = 1m;
+            Assert.That(AccountStatementValidator.Validate(statement), Has.Some.Contains("taxable value"));
+        }
+
+        [Test]
+        public void PropertyTax_Millage_DividesByOneThousand()
+        {
+            var statement = CrestingKnollsStatement(Guid.NewGuid());
+            statement.AssetId = Guid.NewGuid();
+            statement.LevyMethod = LevyMethod.Millage;
+            MatchLevy(statement);
+            statement.AmountDue = statement.Jurisdictions.Sum(line => line.TaxAmount);
+
+            Assert.That(statement.Jurisdictions[0].TaxAmount, Is.EqualTo(549.11m));
+            Assert.That(AccountStatementValidator.Validate(statement), Is.Empty);
+        }
+
+        [Test]
+        public void PropertyTax_ManualLevy_AllowsValuesThatDoNotFollowTheRate()
+        {
+            var statement = CrestingKnollsStatement(Guid.NewGuid());
+            statement.AssetId = Guid.NewGuid();
+            statement.LevyMethod = LevyMethod.Manual;
+            statement.AmountDue = 8135.25m;
+            statement.Jurisdictions[0].TaxableValue = 10m;
+            statement.Jurisdictions[0].TaxAmount = 3m;
+            statement.AmountDue = statement.Jurisdictions.Sum(line => line.TaxAmount);
+
+            Assert.That(AccountStatementValidator.Validate(statement), Is.Empty);
+        }
+
+        [Test]
+        public void PropertyTax_Manual_AllowsValuesThatDoNotFollowAFormula()
+        {
+            var statement = Bill(AssessmentMethod.Manual);
+            statement.TotalMarketValue = 500000m;
+            statement.HomesteadCap = 1000m;
+            statement.AssessedValue = 123456m;
+
+            Assert.That(AccountStatementValidator.Validate(statement), Is.Empty);
         }
 
         [Test]
@@ -168,7 +281,50 @@ namespace THMS.Tests.Logic
                 var tax = (PropertyTaxStatement)reloadedStatements.Get(statement.Id)!;
                 Assert.That(tax.Jurisdictions, Has.Count.EqualTo(4));
                 Assert.That(tax.TaxYear, Is.EqualTo(2026));
+                Assert.That(tax.AssessmentMethod, Is.EqualTo(AssessmentMethod.ApplyHomesteadCap));
+                Assert.That(tax.AssessmentRatioPercent, Is.EqualTo(100m));
+                Assert.That(tax.LevyMethod, Is.EqualTo(LevyMethod.RatePerHundred));
+                Assert.That(property.LevyMethod, Is.EqualTo(LevyMethod.RatePerHundred));
                 Assert.That(reloadedAssets.GetValuations(property.Id), Has.Count.EqualTo(5));
+            }
+            finally
+            {
+                TryDelete(path);
+            }
+        }
+
+        [Test]
+        public void Sqlite_RoundTripsAssessmentRatio()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"thms-ratio-{Guid.NewGuid():N}.db");
+            try
+            {
+                var orchestrator = new AssetOrchestrator(
+                    new SQLiteAssetDataStore(path),
+                    new SQLiteAccountDataStore(path),
+                    new SQLiteAccountStatementDataStore(path),
+                    new InMemoryTransactionDataStore(),
+                    new InMemoryVehicleDataStore());
+                var property = new PropertyAsset
+                {
+                    Name = "Ratio house",
+                    Category = "Real estate",
+                    AssessmentMethod = AssessmentMethod.AssessmentRatio
+                };
+                var collector = orchestrator.EnsureTaxCollector("County");
+                var statement = CrestingKnollsStatement(collector.Id);
+                statement.AssessmentRatioPercent = 40m;
+                statement.AssessedValue = 250840m;
+                MatchLevy(statement);
+                orchestrator.SavePropertyTaxStatement(property, statement);
+
+                var savedProperty = new SQLiteAssetDataStore(path).GetAll().OfType<PropertyAsset>().Single();
+                var saved = (PropertyTaxStatement)new SQLiteAccountStatementDataStore(path).Get(statement.Id)!;
+                Assert.That(savedProperty.AssessmentMethod, Is.EqualTo(AssessmentMethod.AssessmentRatio));
+                Assert.That(saved.AssessmentMethod, Is.EqualTo(AssessmentMethod.AssessmentRatio));
+                Assert.That(saved.AssessmentRatioPercent, Is.EqualTo(40m));
+                Assert.That(saved.AssessedValue, Is.EqualTo(250840m));
+                Assert.That(saved.HomesteadCap, Is.EqualTo(0m));
             }
             finally
             {
@@ -215,6 +371,25 @@ namespace THMS.Tests.Logic
                 new() { Name = "Fort Bend Cc", ExemptionAmount = 130420m, TaxableValue = 496680m, RatePerHundred = 0.407m, TaxAmount = 2021.49m }
             ]
         };
+
+        private static PropertyTaxStatement Bill(AssessmentMethod method)
+        {
+            var statement = CrestingKnollsStatement(Guid.NewGuid());
+            statement.AssetId = Guid.NewGuid();
+            statement.AmountDue = 8135.25m;
+            statement.AssessmentMethod = method;
+            statement.LevyMethod = LevyMethod.Manual;
+            return statement;
+        }
+
+        private static void MatchLevy(PropertyTaxStatement statement)
+        {
+            foreach (var line in statement.Jurisdictions)
+            {
+                line.TaxableValue = PropertyLevy.TaxableValue(statement.AssessedValue, line.ExemptionAmount);
+                line.TaxAmount = PropertyLevy.Tax(statement.LevyMethod, line.TaxableValue, line.RatePerHundred);
+            }
+        }
 
         private static PropertyTaxStatement TaxBill(Guid collectorId, DateTime process, DateTime due, decimal amount) => new()
         {

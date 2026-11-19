@@ -23,6 +23,8 @@ namespace THMS.UI.WinForms.Controls
         private readonly NumericUpDown _acres = new() { DecimalPlaces = 4, Maximum = 100000m, Width = 120 };
         private readonly TextBox _roll = new();
         private readonly TextBox _legal = new() { Multiline = true, Height = 44 };
+        private readonly ComboBox _assessmentMethod = new() { DropDownStyle = ComboBoxStyle.DropDownList };
+        private readonly ComboBox _levyMethod = new() { DropDownStyle = ComboBoxStyle.DropDownList };
         private readonly ComboBox _vehicles = new() { DropDownStyle = ComboBoxStyle.DropDownList };
         private readonly NumericUpDown _year = new() { Minimum = 1900, Maximum = 2100, Width = 80 };
         private readonly TextBox _make = new();
@@ -55,6 +57,19 @@ namespace THMS.UI.WinForms.Controls
 
             _kind.Items.AddRange([AssetKinds.Property, AssetKinds.Vehicle, AssetKinds.Personal]);
             _howAcquired.Items.AddRange(["Purchase", "Gift", "Inheritance", "Transfer"]);
+            _assessmentMethod.Items.AddRange([
+                AssessmentMethods.ApplyHomesteadCap,
+                AssessmentMethods.EqualMarketValue,
+                AssessmentMethods.AssessmentRatio,
+                AssessmentMethods.Manual
+            ]);
+            _assessmentMethod.SelectedIndex = 0;
+            _levyMethod.Items.AddRange([
+                LevyMethods.RatePerHundred,
+                LevyMethods.Millage,
+                LevyMethods.Manual
+            ]);
+            _levyMethod.SelectedIndex = 0;
             _powertrain.Items.AddRange(["ICE", "EV"]);
             _powertrain.SelectedIndex = 0;
             _year.Value = DateTime.Today.Year;
@@ -81,6 +96,8 @@ namespace THMS.UI.WinForms.Controls
             AddKindRow("Legal acres", _acres, 0, _propertyRows);
             AddKindRow("Roll code", _roll, 0, _propertyRows);
             AddKindRow("Legal description", _legal, 64, _propertyRows);
+            AddKindRow("Assessment method", _assessmentMethod, 0, _propertyRows);
+            AddKindRow("Tax calculation", _levyMethod, 0, _propertyRows);
             AddKindRow("Vehicle", _vehicles, 0, _vehicleRows);
             AddKindRow("Year", _year, 0, _vehicleRows);
             AddKindRow("Make", _make, 0, _vehicleRows);
@@ -150,6 +167,8 @@ namespace THMS.UI.WinForms.Controls
                 _acres.Value = Clamp(_acres, property.LegalAcres);
                 _roll.Text = property.RollCode;
                 _legal.Text = property.LegalDescription;
+                _assessmentMethod.SelectedItem = AssessmentMethods.Description(property.AssessmentMethod);
+                _levyMethod.SelectedItem = LevyMethods.Description(property.LevyMethod);
             }
 
             VehicleBase? vehicle = null;
@@ -257,7 +276,9 @@ namespace THMS.UI.WinForms.Controls
                     TaxAccountNumber = _taxAccount.Text.Trim(),
                     LegalAcres = _acres.Value,
                     RollCode = _roll.Text.Trim(),
-                    LegalDescription = _legal.Text.Trim()
+                    LegalDescription = _legal.Text.Trim(),
+                    AssessmentMethod = AssessmentMethods.Parse(_assessmentMethod.SelectedItem as string),
+                    LevyMethod = LevyMethods.Parse(_levyMethod.SelectedItem as string)
                 },
                 AssetKinds.Vehicle => new VehicleAsset(),
                 _ => new PersonalAsset()
@@ -354,7 +375,7 @@ namespace THMS.UI.WinForms.Controls
         {
             var labelWidth = new[]
             {
-                "How acquired", "Tax account no.", "Legal description", "Loan or mortgage"
+                "How acquired", "Tax account no.", "Legal description", "Loan or mortgage", "Assessment method", "Tax calculation"
             }.Max(text => TextRenderer.MeasureText(text, Font).Width) + 8;
 
             var row = new Panel

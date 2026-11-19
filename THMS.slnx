@@ -10,7 +10,6 @@
   <Project Path="THMS.External/THMS.External.csproj" Id="0f2e9772-a396-4acb-841a-4b9fd4be2e8e" />
   <Project Path="THMS.Ingestion/THMS.Ingestion.csproj" />
   <Project Path="THMS.Logic/THMS.Logic.csproj" />
-  <Project Path="THMS.Reporting.Excel/THMS.Reporting.Excel.csproj" />
   <Project Path="THMS.SecretWriter/THMS.SecretWriter.csproj" Id="28d9bd58-442f-495f-9758-540febb9b544" />
   <Project Path="THMS.Tests/THMS.Tests.csproj" />
   <Project Path="THMS.UI.Common/THMS.UI.Common.csproj" />

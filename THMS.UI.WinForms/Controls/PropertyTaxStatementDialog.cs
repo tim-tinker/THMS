@@ -21,6 +21,8 @@ namespace THMS.UI.WinForms.Controls
         private readonly DateTimePicker _process = new() { Format = DateTimePickerFormat.Short };
         private readonly DateTimePicker _due = new() { Format = DateTimePickerFormat.Short };
         private readonly TextBox _notes = new() { Width = 220 };
+        private readonly ComboBox _assessmentMethod = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
+        private readonly ComboBox _levyMethod = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
         private readonly TextBox _accountNo = new() { Width = 180 };
         private readonly TextBox _cad = new() { Width = 140 };
         private readonly TextBox _address = new() { Width = 260 };
@@ -32,10 +34,21 @@ namespace THMS.UI.WinForms.Controls
         private readonly NumericUpDown _improvement = Money();
         private readonly NumericUpDown _total = Money();
         private readonly NumericUpDown _cap = Money();
+        private readonly NumericUpDown _ratio = Percent();
         private readonly NumericUpDown _assessed = Money();
+        private readonly Panel _adjustHost = new() { BackColor = Color.White, Margin = Padding.Empty };
+        private Label _capCaption = null!;
+        private Control _capRow = null!;
+        private TableLayoutPanel _valuesSection = null!;
+        private int _adjustRowIndex = -1;
+        private bool _calculating;
         private readonly DataGridView _lines = new();
         private readonly BindingList<JurisdictionRow> _rows = [];
         private readonly Label _totalDue = new() { AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+        private DataGridViewTextBoxColumn _taxableColumn = null!;
+        private DataGridViewTextBoxColumn _rateColumn = null!;
+        private DataGridViewTextBoxColumn _taxColumn = null!;
+        private bool _calculatingLines;
         private readonly List<Account> _collectors;
         private readonly List<PropertyAsset> _properties;
         private bool _loading = true;
@@ -67,6 +80,19 @@ namespace THMS.UI.WinForms.Controls
 
             _collector.FormattingEnabled = true;
             _property.FormattingEnabled = true;
+            _assessmentMethod.Items.AddRange([
+                AssessmentMethods.ApplyHomesteadCap,
+                AssessmentMethods.EqualMarketValue,
+                AssessmentMethods.AssessmentRatio,
+                AssessmentMethods.Manual
+            ]);
+            _assessmentMethod.SelectedIndex = 0;
+            _levyMethod.Items.AddRange([
+                LevyMethods.RatePerHundred,
+                LevyMethods.Millage,
+                LevyMethods.Manual
+            ]);
+            _levyMethod.SelectedIndex = 0;
             _totalDue.Text = 0m.ToString("C2");
             _totalDue.AutoSize = false;
             _totalDue.Font = new Font(Font, FontStyle.Bold);
@@ -91,14 +117,22 @@ namespace THMS.UI.WinForms.Controls
                 FieldRow("Roll code", _roll),
                 FieldRow("Address", _address),
                 FieldRow("Legal description", _legal),
+                FieldRow("Assessment method", _assessmentMethod),
+                FieldRow("Tax calculation", _levyMethod),
                 FieldRow("Exemptions", _exemptions)
             };
+            _cap.Dock = DockStyle.Fill;
+            _ratio.Dock = DockStyle.Fill;
+            _ratio.Visible = false;
+            _ratio.Value = 100m;
+            _adjustHost.Controls.Add(_ratio);
+            _adjustHost.Controls.Add(_cap);
             var valueRows = new Control[]
             {
                 FieldRow("Land market", _land),
                 FieldRow("Improvement market", _improvement),
                 FieldRow("Total market", _total, bold: true),
-                FieldRow("Less homestead", _cap),
+                FieldRow("Less homestead", _adjustHost),
                 FieldRow("Assessed", _assessed, bold: true)
             };
 
@@ -128,6 +162,10 @@ namespace THMS.UI.WinForms.Controls
             values.Dock = DockStyle.Top;
             values.Height = SectionHeight(valueRows.Length);
             values.Margin = Padding.Empty;
+            _valuesSection = (TableLayoutPanel)values;
+            _capRow = valueRows[3];
+            _capCaption = _capRow.Controls.OfType<Label>().First();
+            _adjustRowIndex = _valuesSection.GetRow(_capRow);
 
             var jurisdictions = Jurisdictions();
             jurisdictions.Dock = DockStyle.Fill;
@@ -181,7 +219,25 @@ namespace THMS.UI.WinForms.Controls
 
             _collector.SelectedIndexChanged += (_, _) => _collectorName.Enabled = IsNew(_collector);
             _property.SelectedIndexChanged += (_, _) => LoadPropertyFields();
-            _rows.ListChanged += (_, _) => RefreshTotal();
+            _assessmentMethod.SelectedIndexChanged += (_, _) => RecalculateAppraisal();
+            _levyMethod.SelectedIndexChanged += (_, _) => RecalculateLines();
+            _land.ValueChanged += (_, _) => RecalculateAppraisal();
+            _land.Leave += (_, _) => RecalculateAppraisal();
+            _improvement.ValueChanged += (_, _) => RecalculateAppraisal();
+            _improvement.Leave += (_, _) => RecalculateAppraisal();
+            _cap.ValueChanged += (_, _) => RecalculateAppraisal();
+            _cap.Leave += (_, _) => RecalculateAppraisal();
+            _ratio.ValueChanged += (_, _) => RecalculateAppraisal();
+            _ratio.Leave += (_, _) => RecalculateAppraisal();
+            _rows.ListChanged += (_, e) =>
+            {
+                if (_loading || _calculatingLines)
+                    return;
+                if (e.ListChangedType is ListChangedType.ItemAdded or ListChangedType.ItemChanged)
+                    RecalculateLines();
+                else
+                    RefreshTotal();
+            };
             _lines.CellEndEdit += (_, _) => RefreshTotal();
 
             BindChoices(collector, property);
@@ -198,6 +254,7 @@ namespace THMS.UI.WinForms.Controls
             _loading = false;
             _collectorName.Enabled = IsNew(_collector);
             _propertyName.Enabled = IsNew(_property);
+            RecalculateAppraisal();
             RefreshTotal();
             ApplyInitialSize(facts, values, buttons, layout);
             Load += (_, _) => ApplyInitialSize(facts, values, buttons, layout);
@@ -223,6 +280,8 @@ namespace THMS.UI.WinForms.Controls
             try
             {
                 _lines.EndEdit();
+                RecalculateAppraisal();
+                RecalculateLines();
                 var collector = ResolveCollector();
                 var property = ResolveProperty();
                 var statement = _existing ?? new PropertyTaxStatement();
@@ -231,14 +290,21 @@ namespace THMS.UI.WinForms.Controls
                 statement.StatementDate = _process.Value.Date;
                 statement.DueDate = _due.Value.Date;
                 statement.Notes = _notes.Text.Trim();
+                var method = SelectedAssessmentMethod();
+                statement.AssessmentMethod = method;
                 statement.LandMarketValue = _land.Value;
                 statement.ImprovementMarketValue = _improvement.Value;
                 statement.TotalMarketValue = _total.Value;
-                statement.HomesteadCap = _cap.Value;
+                statement.HomesteadCap = method is AssessmentMethod.ApplyHomesteadCap or AssessmentMethod.Manual
+                    ? _cap.Value
+                    : 0m;
+                statement.AssessmentRatioPercent = _ratio.Value;
                 statement.AssessedValue = _assessed.Value;
+                statement.LevyMethod = SelectedLevyMethod();
                 statement.Exemptions = _exemptions.Text.Trim();
+                var levy = SelectedLevyMethod();
                 statement.Jurisdictions = _rows
-                    .Where(row => !row.IsBlank)
+                    .Where(row => !row.IsBlank(levy))
                     .Select(row => new PropertyTaxJurisdictionLine
                     {
                         Name = row.Name.Trim(),
@@ -279,6 +345,8 @@ namespace THMS.UI.WinForms.Controls
             property.LegalAcres = _acres.Value;
             property.RollCode = _roll.Text.Trim();
             property.LegalDescription = _legal.Text.Trim();
+            property.AssessmentMethod = SelectedAssessmentMethod();
+            property.LevyMethod = SelectedLevyMethod();
             if (string.IsNullOrWhiteSpace(property.Category))
                 property.Category = "Real estate";
             return property;
@@ -339,10 +407,13 @@ namespace THMS.UI.WinForms.Controls
             _process.Value = statement.StatementDate;
             _due.Value = statement.DueDate;
             _notes.Text = statement.Notes ?? "";
+            _assessmentMethod.SelectedItem = AssessmentMethods.Description(statement.AssessmentMethod);
+            _levyMethod.SelectedItem = LevyMethods.Description(statement.LevyMethod);
             _land.Value = Clamp(_land, statement.LandMarketValue);
             _improvement.Value = Clamp(_improvement, statement.ImprovementMarketValue);
             _total.Value = Clamp(_total, statement.TotalMarketValue);
             _cap.Value = Clamp(_cap, statement.HomesteadCap);
+            _ratio.Value = Clamp(_ratio, statement.AssessmentRatioPercent);
             _assessed.Value = Clamp(_assessed, statement.AssessedValue);
             _exemptions.Text = statement.Exemptions;
             foreach (var line in statement.Jurisdictions)
@@ -377,6 +448,8 @@ namespace THMS.UI.WinForms.Controls
                 _acres.Value = 0;
                 _roll.Text = "";
                 _legal.Text = "";
+                _assessmentMethod.SelectedItem = AssessmentMethods.ApplyHomesteadCap;
+                _levyMethod.SelectedItem = LevyMethods.RatePerHundred;
             }
         }
 
@@ -389,6 +462,129 @@ namespace THMS.UI.WinForms.Controls
             _acres.Value = Clamp(_acres, asset.LegalAcres);
             _roll.Text = asset.RollCode;
             _legal.Text = asset.LegalDescription;
+            _assessmentMethod.SelectedItem = AssessmentMethods.Description(asset.AssessmentMethod);
+            _levyMethod.SelectedItem = LevyMethods.Description(asset.LevyMethod);
+        }
+
+        private AssessmentMethod SelectedAssessmentMethod() =>
+            AssessmentMethods.Parse(_assessmentMethod.SelectedItem as string);
+
+        private LevyMethod SelectedLevyMethod() =>
+            LevyMethods.Parse(_levyMethod.SelectedItem as string);
+
+        private void RecalculateAppraisal()
+        {
+            if (_loading || _calculating)
+                return;
+
+            _calculating = true;
+            try
+            {
+                var method = SelectedAssessmentMethod();
+                var manual = method == AssessmentMethod.Manual;
+                SetLocked(_total, !manual);
+                SetLocked(_assessed, !manual);
+
+                var showRatio = method == AssessmentMethod.AssessmentRatio;
+                var showCap = method is AssessmentMethod.ApplyHomesteadCap or AssessmentMethod.Manual;
+                _capCaption.Text = showRatio ? "Assessment ratio %" : "Less homestead";
+                _cap.Visible = showCap;
+                _ratio.Visible = showRatio;
+                _cap.Enabled = showCap;
+                if (showRatio)
+                    _ratio.BringToFront();
+                if (showCap)
+                    _cap.BringToFront();
+                SetAdjustRowVisible(showCap || showRatio);
+
+                if (manual)
+                    return;
+
+                var total = PropertyAssessment.TotalMarket(_land.Value, _improvement.Value);
+                _total.Value = Clamp(_total, total);
+                var assessed = PropertyAssessment.AssessedValue(
+                    method,
+                    total,
+                    method == AssessmentMethod.ApplyHomesteadCap ? _cap.Value : 0m,
+                    showRatio ? _ratio.Value : 0m);
+                _assessed.Value = Clamp(_assessed, assessed);
+            }
+            finally
+            {
+                _calculating = false;
+            }
+
+            RecalculateLines();
+        }
+
+        private void RecalculateLines()
+        {
+            if (_loading || _calculatingLines)
+                return;
+
+            _calculatingLines = true;
+            try
+            {
+                ApplyLevyColumns();
+                var method = SelectedLevyMethod();
+                if (method == LevyMethod.Manual)
+                    return;
+
+                var assessed = _assessed.Value;
+                foreach (var row in _rows)
+                {
+                    row.TaxableValue = PropertyLevy.TaxableValue(assessed, row.ExemptionAmount);
+                    row.TaxAmount = PropertyLevy.Tax(method, row.TaxableValue, row.RatePerHundred);
+                }
+            }
+            finally
+            {
+                _calculatingLines = false;
+                RefreshTotal();
+            }
+        }
+
+        private void ApplyLevyColumns()
+        {
+            if (_taxableColumn is null || _rateColumn is null || _taxColumn is null)
+                return;
+
+            var method = SelectedLevyMethod();
+            var locked = method != LevyMethod.Manual;
+            _rateColumn.HeaderText = method == LevyMethod.Millage ? "Mills" : "Rate per $100";
+            LockColumn(_taxableColumn, locked);
+            LockColumn(_taxColumn, locked);
+        }
+
+        private static void LockColumn(DataGridViewColumn column, bool locked)
+        {
+            column.ReadOnly = locked;
+            column.DefaultCellStyle.BackColor = locked ? SystemColors.Control : Color.White;
+        }
+
+        private void SetAdjustRowVisible(bool visible)
+        {
+            if (_adjustRowIndex < 0 || _valuesSection.RowStyles.Count <= _adjustRowIndex)
+                return;
+
+            _valuesSection.RowStyles[_adjustRowIndex].Height = visible ? RowHeight : 0;
+            _capRow.Visible = visible;
+            var height = 0;
+            for (var i = 0; i < _valuesSection.RowStyles.Count; i++)
+                height += (int)Math.Round(_valuesSection.RowStyles[i].Height);
+            var growth = height - _valuesSection.Height;
+            _valuesSection.Height = height;
+            if (growth > 0 && IsHandleCreated && WindowState == FormWindowState.Normal)
+                ClientSize = new Size(ClientSize.Width, ClientSize.Height + growth);
+        }
+
+        private static void SetLocked(NumericUpDown box, bool locked)
+        {
+            box.ReadOnly = locked;
+            box.InterceptArrowKeys = !locked;
+            box.Increment = locked ? 0 : 100;
+            box.TabStop = !locked;
+            box.BackColor = locked ? SystemColors.Control : SystemColors.Window;
         }
 
         private void RemoveLine()
@@ -417,15 +613,20 @@ namespace THMS.UI.WinForms.Controls
             _lines.DataSource = _rows;
             _lines.Columns.Add(TextColumn(nameof(JurisdictionRow.Name), "Tax jurisdiction", 160));
             _lines.Columns.Add(MoneyColumn(nameof(JurisdictionRow.ExemptionAmount), "Exemptions"));
-            _lines.Columns.Add(MoneyColumn(nameof(JurisdictionRow.TaxableValue), "Taxable value"));
-            _lines.Columns.Add(RateColumn());
-            _lines.Columns.Add(MoneyColumn(nameof(JurisdictionRow.TaxAmount), "Taxes"));
+            _taxableColumn = MoneyColumn(nameof(JurisdictionRow.TaxableValue), "Taxable value");
+            _rateColumn = RateColumn();
+            _taxColumn = MoneyColumn(nameof(JurisdictionRow.TaxAmount), "Taxes");
+            _lines.Columns.Add(_taxableColumn);
+            _lines.Columns.Add(_rateColumn);
+            _lines.Columns.Add(_taxColumn);
+            ApplyLevyColumns();
             DataGridViewUtil.EnableDoubleBuffering(_lines);
         }
 
         private static DataGridViewTextBoxColumn TextColumn(string property, string header, int weight) =>
             new()
             {
+                Name = property,
                 DataPropertyName = property,
                 HeaderText = header,
                 FillWeight = weight
@@ -434,6 +635,7 @@ namespace THMS.UI.WinForms.Controls
         private static DataGridViewTextBoxColumn MoneyColumn(string property, string header) =>
             new()
             {
+                Name = property,
                 DataPropertyName = property,
                 HeaderText = header,
                 DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight }
@@ -442,6 +644,7 @@ namespace THMS.UI.WinForms.Controls
         private static DataGridViewTextBoxColumn RateColumn() =>
             new()
             {
+                Name = nameof(JurisdictionRow.RatePerHundred),
                 DataPropertyName = nameof(JurisdictionRow.RatePerHundred),
                 HeaderText = "Rate per $100",
                 DefaultCellStyle = new DataGridViewCellStyle
@@ -617,6 +820,14 @@ namespace THMS.UI.WinForms.Controls
             TextAlign = HorizontalAlignment.Right
         };
 
+        private static NumericUpDown Percent() => new()
+        {
+            DecimalPlaces = 4,
+            Maximum = 100m,
+            Increment = 0.01m,
+            TextAlign = HorizontalAlignment.Right
+        };
+
         private static decimal Clamp(NumericUpDown box, decimal value)
         {
             if (value < box.Minimum)
@@ -628,20 +839,59 @@ namespace THMS.UI.WinForms.Controls
 
         private static bool IsNew(ComboBox box) => box.SelectedItem is string;
 
-        private sealed class JurisdictionRow
+        private sealed class JurisdictionRow : INotifyPropertyChanged
         {
-            public string Name { get; set; } = "";
-            public decimal ExemptionAmount { get; set; }
-            public decimal TaxableValue { get; set; }
-            public decimal RatePerHundred { get; set; }
-            public decimal TaxAmount { get; set; }
+            private string _name = "";
+            private decimal _exemption;
+            private decimal _taxable;
+            private decimal _rate;
+            private decimal _tax;
 
-            public bool IsBlank =>
+            public event PropertyChangedEventHandler? PropertyChanged;
+
+            public string Name
+            {
+                get => _name;
+                set => Set(ref _name, value, nameof(Name));
+            }
+
+            public decimal ExemptionAmount
+            {
+                get => _exemption;
+                set => Set(ref _exemption, value, nameof(ExemptionAmount));
+            }
+
+            public decimal TaxableValue
+            {
+                get => _taxable;
+                set => Set(ref _taxable, value, nameof(TaxableValue));
+            }
+
+            public decimal RatePerHundred
+            {
+                get => _rate;
+                set => Set(ref _rate, value, nameof(RatePerHundred));
+            }
+
+            public decimal TaxAmount
+            {
+                get => _tax;
+                set => Set(ref _tax, value, nameof(TaxAmount));
+            }
+
+            public bool IsBlank(LevyMethod method) =>
                 string.IsNullOrWhiteSpace(Name)
                 && ExemptionAmount == 0
-                && TaxableValue == 0
                 && RatePerHundred == 0
-                && TaxAmount == 0;
+                && (method != LevyMethod.Manual || (TaxableValue == 0 && TaxAmount == 0));
+
+            private void Set<T>(ref T field, T value, string property)
+            {
+                if (EqualityComparer<T>.Default.Equals(field, value))
+                    return;
+                field = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
+            }
         }
     }
 }
