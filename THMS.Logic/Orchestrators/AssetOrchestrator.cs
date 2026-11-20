@@ -83,6 +83,9 @@ namespace THMS.Logic.Orchestrators
         public PropertyTaxStatement? GetPropertyTaxStatement(Guid id) =>
             _statements.Get(id) as PropertyTaxStatement;
 
+        public IReadOnlyList<PropertyTaxStatement> GetPropertyTaxStatements(Guid assetId) =>
+            _statements.GetForAsset(assetId).OfType<PropertyTaxStatement>().ToList();
+
         public IReadOnlyList<Account> GetTaxCollectors() =>
             _accounts.GetAllAccounts()
                 .Where(account => account is UntrackedAccount && account.Type == AccountType.Tax)
@@ -165,6 +168,76 @@ namespace THMS.Logic.Orchestrators
             _assets.SaveValuation(valuation);
         }
 
+        public IReadOnlyList<PropertyAppraisal> GetPropertyAppraisals(Guid assetId) =>
+            PropertyAppraisal.Group(GetValuations(assetId));
+
+        public void SavePropertyAppraisal(PropertyAsset property, PropertyAppraisal appraisal)
+        {
+            ArgumentNullException.ThrowIfNull(property);
+            ArgumentNullException.ThrowIfNull(appraisal);
+            if (property.Id == Guid.Empty)
+                throw new InvalidOperationException("Save the property before adding a valuation.");
+            if (appraisal.AsOf == default)
+                throw new InvalidOperationException("Enter the valuation date.");
+
+            appraisal.AssetId = property.Id;
+            appraisal.Source = appraisal.Source?.Trim() ?? "";
+            if (appraisal.Id == Guid.Empty)
+                appraisal.Id = Guid.NewGuid();
+
+            var method = property.AssessmentMethod;
+            if (method == AssessmentMethod.EqualMarketValue || method == AssessmentMethod.AssessmentRatio)
+                appraisal.HomesteadCap = 0m;
+            if (method == AssessmentMethod.AssessmentRatio
+                && (appraisal.AssessmentRatioPercent <= 0m || appraisal.AssessmentRatioPercent > 100m))
+                throw new InvalidOperationException("Enter an assessment ratio greater than 0 and at most 100 percent.");
+            if (method != AssessmentMethod.Manual)
+            {
+                appraisal.TotalMarketValue = PropertyAssessment.TotalMarket(
+                    appraisal.LandMarketValue,
+                    appraisal.ImprovementMarketValue);
+                var ratio = method == AssessmentMethod.AssessmentRatio ? appraisal.AssessmentRatioPercent : 0m;
+                appraisal.AssessedValue = PropertyAssessment.AssessedValue(
+                    method,
+                    appraisal.TotalMarketValue,
+                    appraisal.HomesteadCap,
+                    ratio);
+            }
+
+            var existing = GetValuations(property.Id);
+            var group = existing.Where(row => BelongsToAppraisal(row, appraisal)).ToList();
+            foreach (var (type, amount) in AppraisalComponents(appraisal))
+            {
+                var row = group.FirstOrDefault(item => item.ValueType == type) ?? new AssetValuation();
+                row.AssetId = property.Id;
+                row.AppraisalId = appraisal.Id;
+                row.ValueType = type;
+                row.Amount = amount;
+                row.AsOf = appraisal.AsOf.Date;
+                row.Source = appraisal.Source;
+                row.AssessmentRatioPercent = appraisal.AssessmentRatioPercent;
+                row.SourceStatementId = appraisal.SourceStatementId;
+                SaveValuation(row);
+                appraisal.ComponentIds[type] = row.Id;
+            }
+        }
+
+        private static bool BelongsToAppraisal(AssetValuation row, PropertyAppraisal appraisal) =>
+            (appraisal.Id != Guid.Empty && row.AppraisalId == appraisal.Id)
+            || appraisal.ComponentIds.Values.Contains(row.Id)
+            || (appraisal.SourceStatementId is Guid source
+                && source != Guid.Empty
+                && row.SourceStatementId == source);
+
+        private static (string Type, decimal Amount)[] AppraisalComponents(PropertyAppraisal appraisal) =>
+        [
+            (ValuationTypes.LandMarket, appraisal.LandMarketValue),
+            (ValuationTypes.ImprovementMarket, appraisal.ImprovementMarketValue),
+            (ValuationTypes.TotalMarket, appraisal.TotalMarketValue),
+            (ValuationTypes.HomesteadCap, appraisal.HomesteadCap),
+            (ValuationTypes.Assessed, appraisal.AssessedValue)
+        ];
+
         public void DeleteValuation(Guid id)
         {
             var valuation = _assets.GetAll()
@@ -236,7 +309,6 @@ namespace THMS.Logic.Orchestrators
             AccountStatementValidator.EnsureValid(statement);
             SaveAsset(property, GetSecuredAccount(property.Id)?.Id, vehicle: null);
             _planning.SaveStatement(statement);
-            _assets.ReplaceValuationsForStatement(property.Id, statement.Id, ValuationsFrom(statement));
         }
 
         public void DeletePropertyTaxStatement(Guid id) => _planning.DeleteStatement(id);
@@ -307,25 +379,6 @@ namespace THMS.Logic.Orchestrators
             }
 
             return "";
-        }
-
-        private static List<AssetValuation> ValuationsFrom(PropertyTaxStatement statement)
-        {
-            (string Type, decimal Amount)[] rows =
-            [
-                (ValuationTypes.LandMarket, statement.LandMarketValue),
-                (ValuationTypes.ImprovementMarket, statement.ImprovementMarketValue),
-                (ValuationTypes.TotalMarket, statement.TotalMarketValue),
-                (ValuationTypes.HomesteadCap, statement.HomesteadCap),
-                (ValuationTypes.Assessed, statement.AssessedValue)
-            ];
-            return rows.Select(row => new AssetValuation
-            {
-                ValueType = row.Type,
-                Amount = row.Amount,
-                AsOf = statement.StatementDate.Date,
-                Source = ValuationTypes.TaxStatementSource
-            }).ToList();
         }
     }
 }

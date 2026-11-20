@@ -21,7 +21,8 @@ namespace THMS.Data.Stores.SqlTables
                     Exemptions TEXT NOT NULL,
                     AssessmentMethod TEXT NOT NULL DEFAULT 'ApplyHomesteadCap',
                     AssessmentRatioPercent REAL NOT NULL DEFAULT 100,
-                    LevyMethod TEXT NOT NULL DEFAULT 'RatePerHundred'
+                    LevyMethod TEXT NOT NULL DEFAULT 'RatePerHundred',
+                    ValuationId TEXT
                 );
                 CREATE INDEX IF NOT EXISTS IX_PropertyTaxStatements_AssetId
                     ON PropertyTaxStatements (AssetId);
@@ -39,6 +40,7 @@ namespace THMS.Data.Stores.SqlTables
             SqliteSchema.EnsureColumn(conn, "PropertyTaxStatements", "AssessmentMethod", "TEXT NOT NULL DEFAULT 'ApplyHomesteadCap'");
             SqliteSchema.EnsureColumn(conn, "PropertyTaxStatements", "AssessmentRatioPercent", "REAL NOT NULL DEFAULT 100");
             SqliteSchema.EnsureColumn(conn, "PropertyTaxStatements", "LevyMethod", "TEXT NOT NULL DEFAULT 'RatePerHundred'");
+            SqliteSchema.EnsureColumn(conn, "PropertyTaxStatements", "ValuationId", "TEXT");
         }
 
         public void Upsert(SqliteConnection conn, PropertyTaxStatement statement)
@@ -48,9 +50,9 @@ namespace THMS.Data.Stores.SqlTables
                 cmd.CommandText = @"
                     INSERT INTO PropertyTaxStatements
                         (StatementId, AssetId, TaxYear, LandMarketValue, ImprovementMarketValue,
-                         TotalMarketValue, HomesteadCap, AssessedValue, Exemptions, AssessmentMethod, AssessmentRatioPercent, LevyMethod)
+                         TotalMarketValue, HomesteadCap, AssessedValue, Exemptions, AssessmentMethod, AssessmentRatioPercent, LevyMethod, ValuationId)
                     VALUES
-                        (@Id, @AssetId, @TaxYear, @Land, @Improvement, @Total, @Cap, @Assessed, @Exemptions, @AssessmentMethod, @Ratio, @LevyMethod)
+                        (@Id, @AssetId, @TaxYear, @Land, @Improvement, @Total, @Cap, @Assessed, @Exemptions, @AssessmentMethod, @Ratio, @LevyMethod, @ValuationId)
                     ON CONFLICT(StatementId) DO UPDATE SET
                         AssetId = excluded.AssetId,
                         TaxYear = excluded.TaxYear,
@@ -62,7 +64,8 @@ namespace THMS.Data.Stores.SqlTables
                         Exemptions = excluded.Exemptions,
                         AssessmentMethod = excluded.AssessmentMethod,
                         AssessmentRatioPercent = excluded.AssessmentRatioPercent,
-                        LevyMethod = excluded.LevyMethod;";
+                        LevyMethod = excluded.LevyMethod,
+                        ValuationId = excluded.ValuationId;";
                 cmd.Parameters.AddWithValue("@Id", statement.Id.ToString());
                 cmd.Parameters.AddWithValue("@AssetId", statement.AssetId.ToString());
                 cmd.Parameters.AddWithValue("@TaxYear", statement.TaxYear);
@@ -75,6 +78,9 @@ namespace THMS.Data.Stores.SqlTables
                 cmd.Parameters.AddWithValue("@AssessmentMethod", statement.AssessmentMethod.ToString());
                 cmd.Parameters.AddWithValue("@Ratio", statement.AssessmentRatioPercent);
                 cmd.Parameters.AddWithValue("@LevyMethod", statement.LevyMethod.ToString());
+                cmd.Parameters.AddWithValue(
+                    "@ValuationId",
+                    statement.ValuationId != Guid.Empty ? statement.ValuationId.ToString() : DBNull.Value);
                 cmd.ExecuteNonQuery();
             }
 
@@ -106,7 +112,7 @@ namespace THMS.Data.Stores.SqlTables
             {
                 cmd.CommandText = @"
                     SELECT AssetId, TaxYear, LandMarketValue, ImprovementMarketValue, TotalMarketValue,
-                           HomesteadCap, AssessedValue, Exemptions, AssessmentMethod, AssessmentRatioPercent, LevyMethod
+                           HomesteadCap, AssessedValue, Exemptions, AssessmentMethod, AssessmentRatioPercent, LevyMethod, ValuationId
                     FROM PropertyTaxStatements
                     WHERE StatementId = @Id;";
                 cmd.Parameters.AddWithValue("@Id", statementId.ToString());
@@ -127,6 +133,8 @@ namespace THMS.Data.Stores.SqlTables
                         statement.AssessmentRatioPercent = Money(reader, 9);
                     if (reader.FieldCount > 10 && !reader.IsDBNull(10) && Enum.TryParse<THMS.Domain.Assets.LevyMethod>(reader.GetString(10), out var levy))
                         statement.LevyMethod = levy;
+                    if (reader.FieldCount > 11 && !reader.IsDBNull(11) && Guid.TryParse(reader.GetString(11), out var valuationId))
+                        statement.ValuationId = valuationId;
                 }
             }
 

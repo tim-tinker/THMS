@@ -17,6 +17,8 @@ namespace THMS.Data.Stores.SqlTables
                     AsOf TEXT NOT NULL,
                     Source TEXT NOT NULL,
                     SourceStatementId TEXT,
+                    AppraisalId TEXT,
+                    AssessmentRatioPercent REAL NOT NULL DEFAULT 100,
                     CreatedOn TEXT NOT NULL,
                     ModifiedOn TEXT NOT NULL
                 );
@@ -25,6 +27,8 @@ namespace THMS.Data.Stores.SqlTables
                 CREATE INDEX IF NOT EXISTS IX_AssetValuations_SourceStatementId
                     ON AssetValuations (SourceStatementId);";
             cmd.ExecuteNonQuery();
+            SqliteSchema.EnsureColumn(conn, "AssetValuations", "AppraisalId", "TEXT");
+            SqliteSchema.EnsureColumn(conn, "AssetValuations", "AssessmentRatioPercent", "REAL NOT NULL DEFAULT 100");
         }
 
         public void Upsert(SqliteConnection conn, AssetValuation valuation)
@@ -32,9 +36,9 @@ namespace THMS.Data.Stores.SqlTables
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO AssetValuations
-                    (Id, AssetId, ValueType, Amount, AsOf, Source, SourceStatementId, CreatedOn, ModifiedOn)
+                    (Id, AssetId, ValueType, Amount, AsOf, Source, SourceStatementId, AppraisalId, AssessmentRatioPercent, CreatedOn, ModifiedOn)
                 VALUES
-                    (@Id, @AssetId, @ValueType, @Amount, @AsOf, @Source, @SourceStatementId, @CreatedOn, @ModifiedOn)
+                    (@Id, @AssetId, @ValueType, @Amount, @AsOf, @Source, @SourceStatementId, @AppraisalId, @Ratio, @CreatedOn, @ModifiedOn)
                 ON CONFLICT(Id) DO UPDATE SET
                     AssetId = excluded.AssetId,
                     ValueType = excluded.ValueType,
@@ -42,6 +46,8 @@ namespace THMS.Data.Stores.SqlTables
                     AsOf = excluded.AsOf,
                     Source = excluded.Source,
                     SourceStatementId = excluded.SourceStatementId,
+                    AppraisalId = excluded.AppraisalId,
+                    AssessmentRatioPercent = excluded.AssessmentRatioPercent,
                     ModifiedOn = excluded.ModifiedOn;";
             Bind(cmd, valuation);
             cmd.ExecuteNonQuery();
@@ -82,7 +88,8 @@ namespace THMS.Data.Stores.SqlTables
         }
 
         private const string Select = @"
-            SELECT Id, AssetId, ValueType, Amount, AsOf, Source, SourceStatementId, CreatedOn, ModifiedOn
+            SELECT Id, AssetId, ValueType, Amount, AsOf, Source, SourceStatementId, CreatedOn, ModifiedOn,
+                   AppraisalId, AssessmentRatioPercent
             FROM AssetValuations";
 
         private static void Bind(SqliteCommand cmd, AssetValuation valuation)
@@ -98,6 +105,10 @@ namespace THMS.Data.Stores.SqlTables
                 valuation.SourceStatementId is Guid source && source != Guid.Empty
                     ? source.ToString()
                     : DBNull.Value);
+            cmd.Parameters.AddWithValue(
+                "@AppraisalId",
+                valuation.AppraisalId != Guid.Empty ? valuation.AppraisalId.ToString() : DBNull.Value);
+            cmd.Parameters.AddWithValue("@Ratio", valuation.AssessmentRatioPercent);
             cmd.Parameters.AddWithValue("@CreatedOn", valuation.CreatedOn);
             cmd.Parameters.AddWithValue("@ModifiedOn", valuation.ModifiedOn);
         }
@@ -118,7 +129,13 @@ namespace THMS.Data.Stores.SqlTables
                     Source = reader.GetString(5),
                     SourceStatementId = reader.IsDBNull(6) ? null : Guid.Parse(reader.GetString(6)),
                     CreatedOn = reader.GetDateTime(7),
-                    ModifiedOn = reader.GetDateTime(8)
+                    ModifiedOn = reader.GetDateTime(8),
+                    AppraisalId = reader.FieldCount > 9 && !reader.IsDBNull(9) && Guid.TryParse(reader.GetString(9), out var appraisal)
+                        ? appraisal
+                        : Guid.Empty,
+                    AssessmentRatioPercent = reader.FieldCount > 10 && !reader.IsDBNull(10)
+                        ? (decimal)(double)reader.GetDouble(10)
+                        : 100m
                 });
             }
 

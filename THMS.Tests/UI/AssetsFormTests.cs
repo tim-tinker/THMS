@@ -1,3 +1,7 @@
+using THMS.Data.Stores;
+using THMS.Domain.Assets;
+using THMS.Logic.Orchestrators;
+using THMS.Logic.ViewModels.Assets;
 using THMS.UI.WinForms;
 using THMS.UI.WinForms.Controls;
 
@@ -52,14 +56,89 @@ namespace THMS.Tests.UI
                 }
 
                 AssertMenu(GridWithColumn(form, "Name"), "Edit", "Delete");
-                AssertMenu(GridWithColumn(form, "Value"), "Edit");
+                AssertMenu(GridUnder(form, "Valuations"), "Edit");
                 AssertMenu(GridWithColumn(form, "Tax year"), "Edit", "Delete");
+                var valuationsWidth = GridUnder(form, "Valuations").Parent!.Width;
+                var expected = (int)Math.Round(form.ClientSize.Width * 0.6);
+                Assert.That(valuationsWidth, Is.EqualTo(expected).Within(8));
                 Assert.That(problems, Is.Empty);
             }
             finally
             {
                 form.Close();
             }
+        }
+
+        [Test]
+        [Apartment(ApartmentState.STA)]
+        public void PropertyValuations_AreOneRowPerDate()
+        {
+            var orchestrator = new AssetOrchestrator(
+                new InMemoryAssetDataStore(),
+                new InMemoryAccountDataStore(),
+                new InMemoryAccountStatementDataStore(),
+                new InMemoryTransactionDataStore(),
+                new InMemoryVehicleDataStore());
+            var property = new PropertyAsset { Name = "Casa Tinker", Category = "Real estate" };
+            orchestrator.SaveAsset(property, null, null);
+            orchestrator.SavePropertyAppraisal(property, new PropertyAppraisal
+            {
+                AsOf = new DateTime(2026, 5, 1),
+                Source = "Fort Bend CAD",
+                LandMarketValue = 84500m,
+                ImprovementMarketValue = 542600m
+            });
+            orchestrator.SavePropertyAppraisal(property, new PropertyAppraisal
+            {
+                AsOf = new DateTime(2025, 5, 1),
+                Source = "Fort Bend CAD",
+                LandMarketValue = 84500m,
+                ImprovementMarketValue = 546900m
+            });
+
+            using var form = new AssetsForm(orchestrator);
+            form.ClientSize = new Size(1400, 760);
+            form.Show();
+            try
+            {
+                var assets = GridWithColumn(form, "Name");
+                var assetRow = assets.Rows.Cast<DataGridViewRow>()
+                    .Single(row => row.DataBoundItem is AssetListRow item && item.Name == "Casa Tinker");
+                assets.CurrentCell = assetRow.Cells[0];
+
+                var grid = GridUnder(form, "Valuations");
+                Assert.That(grid.Columns.Cast<DataGridViewColumn>().Select(column => column.HeaderText).ToArray(),
+                    Is.EqualTo(new[]
+                    {
+                        "As of", "Land market", "Impr market", "Total market", "Homestead cap", "Assessed", "Source"
+                    }));
+                Assert.That(grid.Rows.Count, Is.EqualTo(2));
+
+                var latest = (PropertyAppraisal)grid.Rows[0].DataBoundItem!;
+                Assert.That(latest.AsOf, Is.EqualTo(new DateTime(2026, 5, 1)));
+                Assert.That(latest.LandMarketValue, Is.EqualTo(84500m));
+                Assert.That(latest.ImprovementMarketValue, Is.EqualTo(542600m));
+                Assert.That(latest.TotalMarketValue, Is.EqualTo(627100m));
+                Assert.That(latest.HomesteadCap, Is.EqualTo(0m));
+                Assert.That(latest.AssessedValue, Is.EqualTo(627100m));
+                Assert.That(latest.Source, Is.EqualTo("Fort Bend CAD"));
+                Assert.That(grid.Rows[0].Cells[nameof(PropertyAppraisal.LandMarketValue)].FormattedValue,
+                    Is.EqualTo(84500m.ToString("c2")));
+
+                var prior = (PropertyAppraisal)grid.Rows[1].DataBoundItem!;
+                Assert.That(prior.AsOf, Is.EqualTo(new DateTime(2025, 5, 1)));
+                Assert.That(prior.TotalMarketValue, Is.EqualTo(631400m));
+            }
+            finally
+            {
+                form.Close();
+            }
+        }
+
+        private static DataGridView GridUnder(Form form, string title)
+        {
+            var label = All(form).OfType<Label>().Single(item => item.Text == title);
+            return label.Parent!.Controls.OfType<DataGridView>().Single();
         }
 
         private static void AssertMenu(DataGridView grid, params string[] items)

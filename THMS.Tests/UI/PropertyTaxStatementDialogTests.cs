@@ -1,5 +1,6 @@
 using THMS.Data.Stores;
 using THMS.Domain.Assets;
+using THMS.Domain.Finance.Planning;
 using THMS.Logic.Orchestrators;
 using THMS.UI.WinForms.Controls;
 
@@ -64,6 +65,8 @@ namespace THMS.Tests.UI
                 var legal = All(dialog).OfType<TextBox>().Single(box => box.Text == property.LegalDescription);
                 var addressWidth = TextRenderer.MeasureText(property.ParcelAddress, address.Font).Width + 8;
                 var legalWidth = TextRenderer.MeasureText(property.LegalDescription, legal.Font).Width + 8;
+                Assert.That(address.ReadOnly, Is.True);
+                Assert.That(legal.ReadOnly, Is.True);
                 if (address.ClientSize.Width < addressWidth)
                     problems.Add("Address does not fit.");
                 if (legal.ClientSize.Width < legalWidth)
@@ -108,22 +111,24 @@ namespace THMS.Tests.UI
         [Apartment(ApartmentState.STA)]
         public void AppraisedValues_FollowTheAssessmentMethod()
         {
-            var orchestrator = new AssetOrchestrator(
-                new InMemoryAssetDataStore(),
-                new InMemoryAccountDataStore(),
-                new InMemoryAccountStatementDataStore(),
-                new InMemoryTransactionDataStore(),
-                new InMemoryVehicleDataStore());
-            var property = new PropertyAsset { Name = "Casa Tinker", Category = "Real estate" };
-            orchestrator.SaveAsset(property, null, null);
-
-            using var dialog = new PropertyTaxStatementDialog(orchestrator, null, null, property);
-            dialog.Show();
-            try
+            var orchestrator = Orchestrator();
+            var homestead = new PropertyAsset
             {
+                Name = "Casa Tinker",
+                Category = "Real estate",
+                ParcelAddress = "6219 Cresting Knolls Cir, Richmond, TX 77407"
+            };
+            orchestrator.SaveAsset(homestead, null, null);
+            using (var dialog = new PropertyValuationDialog(orchestrator, homestead, null))
+            {
+                dialog.Show();
+                Assert.That(dialog.Text, Is.EqualTo("Add Real Estate Valuation"));
+                var propertyHeading = Label(dialog, "Real Estate Property");
+                var valuesHeading = Label(dialog, "Appraised values");
+                Assert.That(propertyHeading.ClientSize.Height, Is.GreaterThanOrEqualTo(TextRenderer.MeasureText(propertyHeading.Text, propertyHeading.Font).Height));
+                Assert.That(valuesHeading.ClientSize.Height, Is.GreaterThanOrEqualTo(TextRenderer.MeasureText(valuesHeading.Text, valuesHeading.Font).Height));
                 Editor(dialog, "Land market").Value = 84500m;
                 Editor(dialog, "Improvement market").Value = 542600m;
-
                 var total = Editor(dialog, "Total market");
                 var assessed = Editor(dialog, "Assessed");
                 Assert.That(total.ReadOnly, Is.True);
@@ -131,25 +136,49 @@ namespace THMS.Tests.UI
                 Assert.That(Editor(dialog, "Land market").ReadOnly, Is.False);
                 Assert.That(total.Value, Is.EqualTo(627100m));
                 Assert.That(assessed.Value, Is.EqualTo(627100m));
+                AssertFullyInside(dialog, assessed);
+                Assert.That(TextBox(dialog, homestead.Name).ReadOnly, Is.True);
+                Assert.That(TextBox(dialog, homestead.ParcelAddress).ReadOnly, Is.True);
 
                 Editor(dialog, "Less homestead").Value = 27000m;
                 Assert.That(assessed.Value, Is.EqualTo(600100m));
-                Assert.That(total.ReadOnly, Is.True);
+                dialog.Close();
+            }
 
-                Method(dialog).SelectedItem = AssessmentMethods.EqualMarketValue;
+            var equal = homestead;
+            equal.AssessmentMethod = AssessmentMethod.EqualMarketValue;
+            using (var dialog = new PropertyValuationDialog(orchestrator, equal, null))
+            {
+                dialog.Show();
+                Editor(dialog, "Land market").Value = 84500m;
+                Editor(dialog, "Improvement market").Value = 542600m;
                 Assert.That(Label(dialog, "Less homestead").Visible, Is.False);
-                Assert.That(assessed.Value, Is.EqualTo(627100m));
-                Assert.That(assessed.ReadOnly, Is.True);
+                Assert.That(Editor(dialog, "Assessed").Value, Is.EqualTo(627100m));
+                Assert.That(Editor(dialog, "Assessed").ReadOnly, Is.True);
+                dialog.Close();
+            }
 
-                Method(dialog).SelectedItem = AssessmentMethods.AssessmentRatio;
+            homestead.AssessmentMethod = AssessmentMethod.AssessmentRatio;
+            using (var dialog = new PropertyValuationDialog(orchestrator, homestead, null))
+            {
+                dialog.Show();
+                Editor(dialog, "Land market").Value = 84500m;
+                Editor(dialog, "Improvement market").Value = 542600m;
                 var ratio = Editor(dialog, "Assessment ratio %");
                 Assert.That(ratio.Visible, Is.True);
                 ratio.Value = 40m;
-                Assert.That(assessed.Value, Is.EqualTo(250840m));
-                Assert.That(total.ReadOnly, Is.True);
-                Assert.That(assessed.ReadOnly, Is.True);
+                Assert.That(Editor(dialog, "Assessed").Value, Is.EqualTo(250840m));
+                Assert.That(Editor(dialog, "Total market").ReadOnly, Is.True);
+                Assert.That(Editor(dialog, "Assessed").ReadOnly, Is.True);
+                dialog.Close();
+            }
 
-                Method(dialog).SelectedItem = AssessmentMethods.Manual;
+            homestead.AssessmentMethod = AssessmentMethod.Manual;
+            using (var dialog = new PropertyValuationDialog(orchestrator, homestead, null))
+            {
+                dialog.Show();
+                var total = Editor(dialog, "Total market");
+                var assessed = Editor(dialog, "Assessed");
                 Assert.That(total.ReadOnly, Is.False);
                 Assert.That(assessed.ReadOnly, Is.False);
                 Assert.That(Label(dialog, "Less homestead").Visible, Is.True);
@@ -157,10 +186,77 @@ namespace THMS.Tests.UI
                 assessed.Value = 800m;
                 Assert.That(total.Value, Is.EqualTo(1000m));
                 Assert.That(assessed.Value, Is.EqualTo(800m));
+                dialog.Close();
+            }
+        }
+
+        [Test]
+        [Apartment(ApartmentState.STA)]
+        public void NewValuation_StartsFromTheLatestAppraisal()
+        {
+            var orchestrator = Orchestrator();
+            var property = new PropertyAsset { Name = "Casa Tinker", Category = "Real estate" };
+            orchestrator.SaveAsset(property, null, null);
+            orchestrator.SavePropertyAppraisal(property, new PropertyAppraisal
+            {
+                AsOf = new DateTime(2024, 5, 1),
+                Source = "Old notice",
+                LandMarketValue = 10000m,
+                ImprovementMarketValue = 20000m
+            });
+            orchestrator.SavePropertyAppraisal(property, new PropertyAppraisal
+            {
+                AsOf = new DateTime(2026, 5, 1),
+                Source = "Fort Bend CAD",
+                LandMarketValue = 84500m,
+                ImprovementMarketValue = 542600m,
+                HomesteadCap = 27000m
+            });
+
+            using var dialog = new PropertyValuationDialog(orchestrator, property, null);
+            dialog.Show();
+            try
+            {
+                var anniversary = new DateTime(2027, 5, 1);
+                var expected = anniversary < DateTime.Today ? anniversary : DateTime.Today;
+                Assert.That(dialog.Text, Is.EqualTo("Add Real Estate Valuation"));
+                Assert.That(All(dialog).OfType<DateTimePicker>().Single().Value.Date, Is.EqualTo(expected));
+                Assert.That(TextBox(dialog, "Fort Bend CAD").Text, Is.EqualTo("Fort Bend CAD"));
+                Assert.That(Editor(dialog, "Land market").Value, Is.EqualTo(84500m));
+                Assert.That(Editor(dialog, "Improvement market").Value, Is.EqualTo(542600m));
+                Assert.That(Editor(dialog, "Less homestead").Value, Is.EqualTo(27000m));
+                Assert.That(Editor(dialog, "Assessed").Value, Is.EqualTo(600100m));
+
+                ((Button)dialog.AcceptButton!).PerformClick();
+                var saved = orchestrator.GetPropertyAppraisals(property.Id);
+                Assert.That(saved, Has.Count.EqualTo(3));
+                Assert.That(saved.Single(item => item.AsOf == expected && item.LandMarketValue == 84500m).Source, Is.EqualTo("Fort Bend CAD"));
+                Assert.That(saved.Single(item => item.AsOf == new DateTime(2026, 5, 1)).LandMarketValue, Is.EqualTo(84500m));
+                Assert.That(saved.Single(item => item.AsOf == new DateTime(2024, 5, 1)).LandMarketValue, Is.EqualTo(10000m));
             }
             finally
             {
                 dialog.Close();
+            }
+
+            var older = new PropertyAsset { Name = "Older house", Category = "Real estate" };
+            orchestrator.SaveAsset(older, null, null);
+            orchestrator.SavePropertyAppraisal(older, new PropertyAppraisal
+            {
+                AsOf = new DateTime(2020, 3, 15),
+                LandMarketValue = 50000m,
+                ImprovementMarketValue = 150000m
+            });
+            using var prior = new PropertyValuationDialog(orchestrator, older, null);
+            prior.Show();
+            try
+            {
+                Assert.That(All(prior).OfType<DateTimePicker>().Single().Value.Date, Is.EqualTo(new DateTime(2021, 3, 15)));
+                Assert.That(Editor(prior, "Land market").Value, Is.EqualTo(50000m));
+            }
+            finally
+            {
+                prior.Close();
             }
         }
 
@@ -168,21 +264,23 @@ namespace THMS.Tests.UI
         [Apartment(ApartmentState.STA)]
         public void JurisdictionLines_CalculateTaxableValueAndTaxes()
         {
-            var orchestrator = new AssetOrchestrator(
-                new InMemoryAssetDataStore(),
-                new InMemoryAccountDataStore(),
-                new InMemoryAccountStatementDataStore(),
-                new InMemoryTransactionDataStore(),
-                new InMemoryVehicleDataStore());
+            var orchestrator = Orchestrator();
             var property = new PropertyAsset { Name = "Casa Tinker", Category = "Real estate" };
             orchestrator.SaveAsset(property, null, null);
+            orchestrator.SavePropertyAppraisal(property, new PropertyAppraisal
+            {
+                AsOf = new DateTime(2026, 10, 26),
+                LandMarketValue = 84500m,
+                ImprovementMarketValue = 542600m
+            });
 
             using var dialog = new PropertyTaxStatementDialog(orchestrator, null, null, property);
             dialog.Show();
             try
             {
-                Editor(dialog, "Land market").Value = 84500m;
-                Editor(dialog, "Improvement market").Value = 542600m;
+                Assert.That(Editor(dialog, "Land market").ReadOnly, Is.True);
+                Assert.That(Editor(dialog, "Assessed").Value, Is.EqualTo(627100m));
+                Assert.That(Levy(dialog).Enabled, Is.False);
 
                 var grid = All(dialog).OfType<DataGridView>().Single();
                 SetLine(grid, "ExemptionAmount", 145000m);
@@ -195,6 +293,13 @@ namespace THMS.Tests.UI
                 Assert.That(Line(grid, "TaxableValue"), Is.EqualTo(482100m));
                 Assert.That(Cell(grid, "TaxableValue"), Is.EqualTo(482100m));
                 Assert.That(Cell(grid, "TaxAmount"), Is.EqualTo(5491.12m));
+
+                All(dialog).OfType<ThmsButton>().Single(button => button.Text == "Add").PerformClick();
+                Application.DoEvents();
+                Assert.That(grid.Rows.Count, Is.EqualTo(2));
+                Assert.That(Cell(grid, "TaxableValue"), Is.EqualTo(482100m));
+                Assert.That(Convert.ToDecimal(grid.Rows[1].Cells["TaxableValue"].Value), Is.EqualTo(627100m));
+                Assert.That(Convert.ToDecimal(grid.Rows[1].Cells["TaxAmount"].Value), Is.EqualTo(0m));
 
                 Levy(dialog).SelectedItem = LevyMethods.Millage;
                 Assert.That(grid.Columns["RatePerHundred"]!.HeaderText, Is.EqualTo("Mills"));
@@ -215,6 +320,97 @@ namespace THMS.Tests.UI
             }
         }
 
+        [Test]
+        [Apartment(ApartmentState.STA)]
+        public void NewStatement_StartsFromThePreviousYear()
+        {
+            var orchestrator = Orchestrator();
+            var collector = orchestrator.EnsureTaxCollector("Fort Bend Tax Office");
+            var property = new PropertyAsset { Name = "Casa Tinker", Category = "Real estate" };
+            orchestrator.SaveAsset(property, null, null);
+            orchestrator.SavePropertyAppraisal(property, new PropertyAppraisal
+            {
+                AsOf = new DateTime(DateTime.Today.Year, 5, 1),
+                LandMarketValue = 84500m,
+                ImprovementMarketValue = 542600m
+            });
+            var older = Statement(collector.Id, property.Id, DateTime.Today.Year - 2, "Old District", 1000m, 1m);
+            var previous = Statement(collector.Id, property.Id, DateTime.Today.Year - 1, "Lamar CISD", 145000m, 1.139m);
+            previous.Exemptions = "Homestead, Veteran";
+            previous.Jurisdictions.Add(new PropertyTaxJurisdictionLine
+            {
+                Name = "Fort Bend County",
+                ExemptionAmount = 5000m,
+                TaxableValue = 575000m,
+                RatePerHundred = 0.407m,
+                TaxAmount = 2340.25m
+            });
+            orchestrator.SavePropertyTaxStatement(property, older);
+            orchestrator.SavePropertyTaxStatement(property, previous);
+
+            using var dialog = new PropertyTaxStatementDialog(orchestrator, null, null, property);
+            dialog.Show();
+            try
+            {
+                var grid = All(dialog).OfType<DataGridView>().Single();
+                Assert.That(grid.Rows.Count, Is.EqualTo(2));
+                Assert.That(grid.Rows[0].Cells["Name"].Value, Is.EqualTo("Lamar CISD"));
+                Assert.That(grid.Rows[1].Cells["Name"].Value, Is.EqualTo("Fort Bend County"));
+                Assert.That(Line(grid, "ExemptionAmount"), Is.EqualTo(145000m));
+                Assert.That(Line(grid, "RatePerHundred"), Is.EqualTo(1.139m));
+                Assert.That(Line(grid, "TaxableValue"), Is.EqualTo(482100m));
+                Assert.That(Line(grid, "TaxAmount"), Is.EqualTo(5491.12m));
+                Assert.That(Convert.ToDecimal(grid.Rows[1].Cells["ExemptionAmount"].Value), Is.EqualTo(5000m));
+                Assert.That(Convert.ToDecimal(grid.Rows[1].Cells["TaxableValue"].Value), Is.EqualTo(622100m));
+                Assert.That(Convert.ToDecimal(grid.Rows[1].Cells["TaxAmount"].Value), Is.EqualTo(2531.95m));
+                Assert.That(TextBox(dialog, "Homestead, Veteran").Text, Is.EqualTo("Homestead, Veteran"));
+                var collectors = All(dialog).OfType<ComboBox>().Single(combo =>
+                    combo.Items.Cast<object>().Any(item => item is string text && text == "(new collector)"));
+                Assert.That(collectors.GetItemText(collectors.SelectedItem), Is.EqualTo("Fort Bend Tax Office"));
+            }
+            finally
+            {
+                dialog.Close();
+            }
+        }
+
+        private static PropertyTaxStatement Statement(
+            Guid collectorId,
+            Guid assetId,
+            int year,
+            string jurisdiction,
+            decimal exemption,
+            decimal rate)
+        {
+            var assessed = 580000m;
+            var taxable = assessed - exemption;
+            var tax = decimal.Round(taxable * rate / 100m, 2, MidpointRounding.AwayFromZero);
+            return new PropertyTaxStatement
+            {
+                AssetId = assetId,
+                AccountId = collectorId,
+                TaxYear = year,
+                StatementDate = new DateTime(year, 10, 26),
+                DueDate = new DateTime(year + 1, 1, 31),
+                LandMarketValue = 80000m,
+                ImprovementMarketValue = 500000m,
+                TotalMarketValue = assessed,
+                AssessedValue = assessed,
+                Exemptions = "Prior",
+                Jurisdictions =
+                [
+                    new PropertyTaxJurisdictionLine
+                    {
+                        Name = jurisdiction,
+                        ExemptionAmount = exemption,
+                        TaxableValue = taxable,
+                        RatePerHundred = rate,
+                        TaxAmount = tax
+                    }
+                ]
+            };
+        }
+
         private static void AssertFullyInside(Form dialog, Control control)
         {
             var origin = dialog.PointToClient(control.PointToScreen(Point.Empty));
@@ -222,6 +418,16 @@ namespace THMS.Tests.UI
             Assert.That(Rectangle.Inflate(dialog.ClientRectangle, -4, -4).Contains(bounds), Is.True,
                 $"{control.Text} is cropped by the dialog.");
         }
+
+        private static AssetOrchestrator Orchestrator() => new(
+            new InMemoryAssetDataStore(),
+            new InMemoryAccountDataStore(),
+            new InMemoryAccountStatementDataStore(),
+            new InMemoryTransactionDataStore(),
+            new InMemoryVehicleDataStore());
+
+        private static TextBox TextBox(Control dialog, string text) =>
+            All(dialog).OfType<TextBox>().Single(box => box.Text == text);
 
         private static Label Label(Control dialog, string caption) =>
             All(dialog).OfType<Label>().Single(label => label.Text == caption);

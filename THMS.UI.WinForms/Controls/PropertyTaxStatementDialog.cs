@@ -9,7 +9,7 @@ namespace THMS.UI.WinForms.Controls
     internal sealed class PropertyTaxStatementDialog : Form
     {
         private const string NewCollector = "(new collector)";
-        private const string NewProperty = "(new property)";
+        private const string ChooseValuation = "(choose a valuation)";
 
         private readonly AssetOrchestrator _orchestrator;
         private readonly PropertyTaxStatement? _existing;
@@ -23,6 +23,7 @@ namespace THMS.UI.WinForms.Controls
         private readonly TextBox _notes = new() { Width = 220 };
         private readonly ComboBox _assessmentMethod = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
         private readonly ComboBox _levyMethod = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
+        private readonly ComboBox _valuation = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         private readonly TextBox _accountNo = new() { Width = 180 };
         private readonly TextBox _cad = new() { Width = 140 };
         private readonly TextBox _address = new() { Width = 260 };
@@ -49,9 +50,11 @@ namespace THMS.UI.WinForms.Controls
         private DataGridViewTextBoxColumn _rateColumn = null!;
         private DataGridViewTextBoxColumn _taxColumn = null!;
         private bool _calculatingLines;
+        private bool _filling;
         private readonly List<Account> _collectors;
         private readonly List<PropertyAsset> _properties;
         private bool _loading = true;
+        private bool _seeding;
 
         public PropertyTaxStatementDialog(
             AssetOrchestrator orchestrator,
@@ -93,6 +96,18 @@ namespace THMS.UI.WinForms.Controls
                 LevyMethods.Manual
             ]);
             _levyMethod.SelectedIndex = 0;
+            _valuation.Items.Add(ChooseValuation);
+            _valuation.SelectedIndex = 0;
+            _valuation.FormattingEnabled = true;
+            _valuation.Format += (_, args) =>
+            {
+                args.Value = args.ListItem switch
+                {
+                    PropertyAppraisal appraisal => appraisal.Label,
+                    string text => text,
+                    _ => ""
+                };
+            };
             _totalDue.Text = 0m.ToString("C2");
             _totalDue.AutoSize = false;
             _totalDue.Font = new Font(Font, FontStyle.Bold);
@@ -129,6 +144,7 @@ namespace THMS.UI.WinForms.Controls
             _adjustHost.Controls.Add(_cap);
             var valueRows = new Control[]
             {
+                FieldRow("Valuation", _valuation),
                 FieldRow("Land market", _land),
                 FieldRow("Improvement market", _improvement),
                 FieldRow("Total market", _total, bold: true),
@@ -163,7 +179,7 @@ namespace THMS.UI.WinForms.Controls
             values.Height = SectionHeight(valueRows.Length);
             values.Margin = Padding.Empty;
             _valuesSection = (TableLayoutPanel)values;
-            _capRow = valueRows[3];
+            _capRow = valueRows[4];
             _capCaption = _capRow.Controls.OfType<Label>().First();
             _adjustRowIndex = _valuesSection.GetRow(_capRow);
 
@@ -231,9 +247,11 @@ namespace THMS.UI.WinForms.Controls
             _ratio.Leave += (_, _) => RecalculateAppraisal();
             _rows.ListChanged += (_, e) =>
             {
-                if (_loading || _calculatingLines)
+                if (_loading || _calculatingLines || _seeding)
                     return;
-                if (e.ListChangedType is ListChangedType.ItemAdded or ListChangedType.ItemChanged)
+                if (e.ListChangedType == ListChangedType.ItemAdded)
+                    ScheduleLineRecalculation();
+                else if (e.ListChangedType == ListChangedType.ItemChanged)
                     RecalculateLines();
                 else
                     RefreshTotal();
@@ -248,12 +266,18 @@ namespace THMS.UI.WinForms.Controls
                 _taxYear.Value = DateTime.Today.Year;
                 _process.Value = DateTime.Today;
                 _due.Value = DateTime.Today;
-                _rows.Add(new JurisdictionRow());
+                if (_property.SelectedItem is PropertyAsset selected)
+                    SeedFromPreviousStatement(selected);
+                else
+                    _rows.Add(new JurisdictionRow());
             }
 
             _loading = false;
             _collectorName.Enabled = IsNew(_collector);
-            _propertyName.Enabled = IsNew(_property);
+            LockCopiedFields();
+            ReloadAppraisals(_existing?.ValuationId is Guid valuationId && valuationId != Guid.Empty
+                ? valuationId
+                : _existing?.Id);
             RecalculateAppraisal();
             RefreshTotal();
             ApplyInitialSize(facts, values, buttons, layout);
@@ -284,23 +308,25 @@ namespace THMS.UI.WinForms.Controls
                 RecalculateLines();
                 var collector = ResolveCollector();
                 var property = ResolveProperty();
+                if (_valuation.SelectedItem is not PropertyAppraisal appraisal)
+                    throw new InvalidOperationException("Choose the valuation for this statement.");
                 var statement = _existing ?? new PropertyTaxStatement();
                 statement.AccountId = collector.Id;
                 statement.TaxYear = (int)_taxYear.Value;
                 statement.StatementDate = _process.Value.Date;
                 statement.DueDate = _due.Value.Date;
                 statement.Notes = _notes.Text.Trim();
-                var method = SelectedAssessmentMethod();
-                statement.AssessmentMethod = method;
+                statement.AssessmentMethod = property.AssessmentMethod;
+                statement.LevyMethod = property.LevyMethod;
+                statement.ValuationId = appraisal.Id;
                 statement.LandMarketValue = _land.Value;
                 statement.ImprovementMarketValue = _improvement.Value;
                 statement.TotalMarketValue = _total.Value;
-                statement.HomesteadCap = method is AssessmentMethod.ApplyHomesteadCap or AssessmentMethod.Manual
+                statement.HomesteadCap = property.AssessmentMethod is AssessmentMethod.ApplyHomesteadCap or AssessmentMethod.Manual
                     ? _cap.Value
                     : 0m;
                 statement.AssessmentRatioPercent = _ratio.Value;
                 statement.AssessedValue = _assessed.Value;
-                statement.LevyMethod = SelectedLevyMethod();
                 statement.Exemptions = _exemptions.Text.Trim();
                 var levy = SelectedLevyMethod();
                 statement.Jurisdictions = _rows
@@ -332,23 +358,8 @@ namespace THMS.UI.WinForms.Controls
 
         private PropertyAsset ResolveProperty()
         {
-            var name = _propertyName.Text.Trim();
-            if (name.Length == 0)
-                throw new InvalidOperationException("Enter the property name.");
-
-            var selected = _property.SelectedItem as PropertyAsset;
-            var property = selected ?? new PropertyAsset();
-            property.Name = name;
-            property.ParcelAddress = _address.Text.Trim();
-            property.CadNumber = _cad.Text.Trim();
-            property.TaxAccountNumber = _accountNo.Text.Trim();
-            property.LegalAcres = _acres.Value;
-            property.RollCode = _roll.Text.Trim();
-            property.LegalDescription = _legal.Text.Trim();
-            property.AssessmentMethod = SelectedAssessmentMethod();
-            property.LevyMethod = SelectedLevyMethod();
-            if (string.IsNullOrWhiteSpace(property.Category))
-                property.Category = "Real estate";
+            if (_property.SelectedItem is not PropertyAsset property)
+                throw new InvalidOperationException("Choose the property.");
             return property;
         }
 
@@ -369,7 +380,6 @@ namespace THMS.UI.WinForms.Controls
             };
 
             _property.Items.Clear();
-            _property.Items.Add(NewProperty);
             foreach (var item in _properties)
                 _property.Items.Add(item);
             _property.Format += (_, args) =>
@@ -396,7 +406,7 @@ namespace THMS.UI.WinForms.Controls
                 : _properties.FirstOrDefault(item => item.Id == property.Id);
             if (_existing is not null)
                 propertyMatch ??= _properties.FirstOrDefault(item => item.Id == _existing.AssetId);
-            _property.SelectedItem = propertyMatch ?? (object)NewProperty;
+            _property.SelectedItem = propertyMatch;
             if (propertyMatch is not null)
                 LoadProperty(propertyMatch);
         }
@@ -434,7 +444,6 @@ namespace THMS.UI.WinForms.Controls
 
         private void LoadPropertyFields()
         {
-            _propertyName.Enabled = IsNew(_property);
             if (_loading)
                 return;
             if (_property.SelectedItem is PropertyAsset asset)
@@ -450,6 +459,7 @@ namespace THMS.UI.WinForms.Controls
                 _legal.Text = "";
                 _assessmentMethod.SelectedItem = AssessmentMethods.ApplyHomesteadCap;
                 _levyMethod.SelectedItem = LevyMethods.RatePerHundred;
+                ReloadAppraisals(null);
             }
         }
 
@@ -464,6 +474,64 @@ namespace THMS.UI.WinForms.Controls
             _legal.Text = asset.LegalDescription;
             _assessmentMethod.SelectedItem = AssessmentMethods.Description(asset.AssessmentMethod);
             _levyMethod.SelectedItem = LevyMethods.Description(asset.LevyMethod);
+            if (_loading)
+                return;
+            ReloadAppraisals(null);
+            if (_existing is null)
+                SeedFromPreviousStatement(asset);
+        }
+
+        private void SeedFromPreviousStatement(PropertyAsset asset)
+        {
+            var year = (int)_taxYear.Value;
+            var prior = _orchestrator.GetPropertyTaxStatements(asset.Id)
+                .Where(statement => statement.TaxYear < year)
+                .OrderByDescending(statement => statement.TaxYear)
+                .ThenByDescending(statement => statement.StatementDate)
+                .FirstOrDefault();
+
+            _seeding = true;
+            try
+            {
+                _rows.Clear();
+                if (prior is null)
+                    _rows.Add(new JurisdictionRow());
+                else
+                {
+                    _exemptions.Text = prior.Exemptions ?? "";
+                    if (_collector.SelectedItem is not Account)
+                    {
+                        var collector = _collectors.FirstOrDefault(account => account.Id == prior.AccountId);
+                        if (collector is not null)
+                        {
+                            _collector.SelectedItem = collector;
+                            _collectorName.Text = collector.Name;
+                        }
+                    }
+
+                    foreach (var line in prior.Jurisdictions)
+                    {
+                        _rows.Add(new JurisdictionRow
+                        {
+                            Name = line.Name,
+                            ExemptionAmount = line.ExemptionAmount,
+                            TaxableValue = line.TaxableValue,
+                            RatePerHundred = line.RatePerHundred,
+                            TaxAmount = line.TaxAmount
+                        });
+                    }
+
+                    if (_rows.Count == 0)
+                        _rows.Add(new JurisdictionRow());
+                }
+            }
+            finally
+            {
+                _seeding = false;
+            }
+
+            if (!_loading)
+                RecalculateLines();
         }
 
         private AssessmentMethod SelectedAssessmentMethod() =>
@@ -474,40 +542,31 @@ namespace THMS.UI.WinForms.Controls
 
         private void RecalculateAppraisal()
         {
-            if (_loading || _calculating)
+            if (_loading || _calculating || _filling)
                 return;
 
             _calculating = true;
             try
             {
                 var method = SelectedAssessmentMethod();
-                var manual = method == AssessmentMethod.Manual;
-                SetLocked(_total, !manual);
-                SetLocked(_assessed, !manual);
+                SetLocked(_land, true);
+                SetLocked(_improvement, true);
+                SetLocked(_total, true);
+                SetLocked(_cap, true);
+                SetLocked(_ratio, true);
+                SetLocked(_assessed, true);
 
                 var showRatio = method == AssessmentMethod.AssessmentRatio;
                 var showCap = method is AssessmentMethod.ApplyHomesteadCap or AssessmentMethod.Manual;
                 _capCaption.Text = showRatio ? "Assessment ratio %" : "Less homestead";
                 _cap.Visible = showCap;
                 _ratio.Visible = showRatio;
-                _cap.Enabled = showCap;
+                _cap.Enabled = true;
                 if (showRatio)
                     _ratio.BringToFront();
                 if (showCap)
                     _cap.BringToFront();
                 SetAdjustRowVisible(showCap || showRatio);
-
-                if (manual)
-                    return;
-
-                var total = PropertyAssessment.TotalMarket(_land.Value, _improvement.Value);
-                _total.Value = Clamp(_total, total);
-                var assessed = PropertyAssessment.AssessedValue(
-                    method,
-                    total,
-                    method == AssessmentMethod.ApplyHomesteadCap ? _cap.Value : 0m,
-                    showRatio ? _ratio.Value : 0m);
-                _assessed.Value = Clamp(_assessed, assessed);
             }
             finally
             {
@@ -517,9 +576,84 @@ namespace THMS.UI.WinForms.Controls
             RecalculateLines();
         }
 
+        private void ReloadAppraisals(Guid? preferredId)
+        {
+            var property = _property.SelectedItem as PropertyAsset;
+            var appraisals = property is null
+                ? []
+                : _orchestrator.GetPropertyAppraisals(property.Id);
+            PropertyAppraisal? match = null;
+            if (preferredId is Guid id && id != Guid.Empty)
+                match = appraisals.FirstOrDefault(item => item.Id == id || item.SourceStatementId == id);
+            match ??= appraisals.Count == 1 ? appraisals[0] : null;
+
+            _valuation.SelectedIndexChanged -= OnValuationChanged;
+            _valuation.Items.Clear();
+            _valuation.Items.Add(ChooseValuation);
+            foreach (var appraisal in appraisals)
+                _valuation.Items.Add(appraisal);
+            _valuation.SelectedItem = match ?? (object)ChooseValuation;
+            _valuation.SelectedIndexChanged += OnValuationChanged;
+            ApplySelectedAppraisal();
+        }
+
+        private void OnValuationChanged(object? sender, EventArgs e) => ApplySelectedAppraisal();
+
+        private void ApplySelectedAppraisal()
+        {
+            if (_loading || _filling || _valuation.SelectedItem is not PropertyAppraisal appraisal)
+                return;
+
+            _filling = true;
+            try
+            {
+                _land.Value = Clamp(_land, appraisal.LandMarketValue);
+                _improvement.Value = Clamp(_improvement, appraisal.ImprovementMarketValue);
+                _total.Value = Clamp(_total, appraisal.TotalMarketValue);
+                _cap.Value = Clamp(_cap, appraisal.HomesteadCap);
+                _ratio.Value = Clamp(_ratio, appraisal.AssessmentRatioPercent);
+                _assessed.Value = Clamp(_assessed, appraisal.AssessedValue);
+            }
+            finally
+            {
+                _filling = false;
+            }
+
+            RecalculateAppraisal();
+        }
+
+        private void LockCopiedFields()
+        {
+            foreach (var box in new[] { _propertyName, _accountNo, _cad, _address, _roll, _legal })
+            {
+                box.ReadOnly = true;
+                box.BackColor = SystemColors.Control;
+                box.TabStop = false;
+            }
+
+            SetLocked(_acres, true);
+            _assessmentMethod.Enabled = false;
+            _levyMethod.Enabled = false;
+        }
+
+        private void ScheduleLineRecalculation()
+        {
+            if (!IsHandleCreated)
+            {
+                RecalculateLines();
+                return;
+            }
+
+            BeginInvoke(() =>
+            {
+                if (!IsDisposed)
+                    RecalculateLines();
+            });
+        }
+
         private void RecalculateLines()
         {
-            if (_loading || _calculatingLines)
+            if (_loading || _calculatingLines || IsDisposed)
                 return;
 
             _calculatingLines = true;

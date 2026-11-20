@@ -8,7 +8,7 @@ namespace THMS.UI.WinForms
 {
     public class AssetsForm : BaseEmbeddedForm
     {
-        private readonly AssetOrchestrator _orchestrator = new();
+        private readonly AssetOrchestrator _orchestrator;
         private readonly DataGridView _assets = Grid();
         private readonly DataGridView _valuations = Grid();
         private readonly DataGridView _taxes = Grid();
@@ -16,9 +16,16 @@ namespace THMS.UI.WinForms
         private readonly BindingSource _valuationSource = new();
         private readonly BindingSource _taxSource = new();
         private bool _binding;
+        private bool _valuationBreakdown;
 
         public AssetsForm()
+            : this(new AssetOrchestrator())
         {
+        }
+
+        internal AssetsForm(AssetOrchestrator orchestrator)
+        {
+            _orchestrator = orchestrator;
             Text = "Assets";
             AutoScaleMode = AutoScaleMode.Dpi;
             BackColor = Color.White;
@@ -66,14 +73,23 @@ namespace THMS.UI.WinForms
             split.Panel2.Controls.Add(lower);
 
             Controls.Add(split);
-            Load += (_, _) =>
+            void LayoutSplits()
             {
                 if (split.Height > 240)
                     split.SplitterDistance = split.Height / 2;
-                if (lower.Width > 320)
-                    lower.SplitterDistance = lower.Width / 2;
+                var limit = lower.Panel1MinSize + lower.Panel2MinSize + lower.SplitterWidth;
+                if (lower.Width <= limit)
+                    return;
+                var distance = (int)Math.Round(ClientSize.Width * 0.6);
+                var max = lower.Width - lower.Panel2MinSize - lower.SplitterWidth;
+                lower.SplitterDistance = Math.Clamp(distance, lower.Panel1MinSize, max);
+            }
+            Load += (_, _) =>
+            {
+                LayoutSplits();
                 Reload();
             };
+            Resize += (_, _) => LayoutSplits();
         }
 
         private void Reload(Guid? keepAssetId = null)
@@ -91,9 +107,21 @@ namespace THMS.UI.WinForms
             if (_binding)
                 return;
             var asset = SelectedAsset();
-            _valuationSource.DataSource = asset is null
-                ? []
-                : _orchestrator.GetValuations(asset.Id).ToList();
+            var breakdown = asset is PropertyAsset;
+            if (breakdown != _valuationBreakdown)
+            {
+                _valuationBreakdown = breakdown;
+                _valuationSource.DataSource = null;
+                _valuations.Columns.Clear();
+                _valuations.Columns.AddRange(breakdown ? PropertyValuationColumns() : GenericValuationColumns());
+            }
+
+            if (asset is null)
+                _valuationSource.DataSource = Array.Empty<object>();
+            else if (breakdown)
+                _valuationSource.DataSource = _orchestrator.GetPropertyAppraisals(asset.Id).ToList();
+            else
+                _valuationSource.DataSource = _orchestrator.GetValuations(asset.Id).ToList();
             _taxSource.DataSource = asset is PropertyAsset
                 ? _orchestrator.GetPropertyTaxRows(asset.Id).ToList()
                 : [];
@@ -125,7 +153,7 @@ namespace THMS.UI.WinForms
             }
         }
 
-        private void EditValuation(AssetValuation? existing)
+        private void EditValuation(object? existing)
         {
             var asset = SelectedAsset();
             if (asset is null)
@@ -134,7 +162,9 @@ namespace THMS.UI.WinForms
                 return;
             }
 
-            using var dialog = new ValuationEditorDialog(_orchestrator, asset.Id, existing);
+            using var dialog = asset is PropertyAsset property
+                ? new PropertyValuationDialog(_orchestrator, property, existing as PropertyAppraisal)
+                : (Form)new ValuationEditorDialog(_orchestrator, asset.Id, existing as AssetValuation);
             if (dialog.ShowDialog(this) == DialogResult.OK)
                 Reload(asset.Id);
         }
@@ -176,8 +206,7 @@ namespace THMS.UI.WinForms
             return _orchestrator.GetAsset(row.Id);
         }
 
-        private AssetValuation? SelectedValuation() =>
-            _valuations.CurrentRow?.DataBoundItem as AssetValuation;
+        private object? SelectedValuation() => _valuations.CurrentRow?.DataBoundItem;
 
         private PropertyTaxStatement? SelectedTax()
         {
@@ -287,6 +316,25 @@ namespace THMS.UI.WinForms
             DataGridViewUtil.EnableDoubleBuffering(grid);
             return grid;
         }
+
+        private static DataGridViewTextBoxColumn[] GenericValuationColumns() =>
+        [
+            Fill(nameof(AssetValuation.ValueType), "Value"),
+            Money(nameof(AssetValuation.Amount), "Amount"),
+            Date(nameof(AssetValuation.AsOf), "As of"),
+            Fill(nameof(AssetValuation.Source), "Source")
+        ];
+
+        private static DataGridViewTextBoxColumn[] PropertyValuationColumns() =>
+        [
+            Date(nameof(PropertyAppraisal.AsOf), "As of"),
+            Money(nameof(PropertyAppraisal.LandMarketValue), "Land market"),
+            Money(nameof(PropertyAppraisal.ImprovementMarketValue), "Impr market"),
+            Money(nameof(PropertyAppraisal.TotalMarketValue), "Total market"),
+            Money(nameof(PropertyAppraisal.HomesteadCap), "Homestead cap"),
+            Money(nameof(PropertyAppraisal.AssessedValue), "Assessed"),
+            Fill(nameof(PropertyAppraisal.Source), "Source")
+        ];
 
         private static DataGridViewTextBoxColumn Column(string property, string header) =>
             new() { DataPropertyName = property, HeaderText = header, Name = property, ReadOnly = true };

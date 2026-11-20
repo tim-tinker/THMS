@@ -115,6 +115,9 @@
     <Compile Update="Controls\PropertyTaxStatementDialog.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Controls\PropertyValuationDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Controls\RecurringRuleEditor.cs">
       <SubType>Form</SubType>
     </Compile>

@@ -14,6 +14,7 @@ namespace THMS.Domain.Finance.Planning
         public decimal HomesteadCap { get; set; }
         public decimal AssessmentRatioPercent { get; set; } = 100m;
         public decimal AssessedValue { get; set; }
+        public Guid ValuationId { get; set; }
         public string Exemptions { get; set; } = "";
         public List<PropertyTaxJurisdictionLine> Jurisdictions { get; set; } = [];
 

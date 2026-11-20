@@ -32,6 +32,16 @@ namespace THMS.Tests.Logic
                 RollCode = "Real Property"
             };
             var statement = CrestingKnollsStatement(collector.Id);
+            orchestrator.SaveAsset(property, null, null);
+            var appraisal = new PropertyAppraisal
+            {
+                AsOf = statement.StatementDate,
+                Source = "CAD notice",
+                LandMarketValue = statement.LandMarketValue,
+                ImprovementMarketValue = statement.ImprovementMarketValue
+            };
+            orchestrator.SavePropertyAppraisal(property, appraisal);
+            statement.ValuationId = appraisal.Id;
             orchestrator.SavePropertyTaxStatement(property, statement);
 
             var saved = orchestrator.GetPropertyTaxStatement(statement.Id);
@@ -40,11 +50,13 @@ namespace THMS.Tests.Logic
             Assert.That(saved.Jurisdictions, Has.Count.EqualTo(4));
             Assert.That(saved.AssessedValue, Is.EqualTo(627100m));
             Assert.That(saved.Exemptions, Is.EqualTo("Homestead, Veteran"));
+            Assert.That(saved.ValuationId, Is.EqualTo(appraisal.Id));
 
             var values = orchestrator.GetValuations(property.Id);
             Assert.That(values, Has.Count.EqualTo(5));
             Assert.That(values.Single(item => item.ValueType == ValuationTypes.TotalMarket).Amount, Is.EqualTo(627100m));
             Assert.That(values.Single(item => item.ValueType == ValuationTypes.LandMarket).AsOf, Is.EqualTo(new DateTime(2026, 10, 26)));
+            Assert.That(values.All(item => item.AppraisalId == appraisal.Id), Is.True);
 
             statement.LandMarketValue = 85000m;
             statement.TotalMarketValue = 627600m;
@@ -53,27 +65,40 @@ namespace THMS.Tests.Logic
             orchestrator.SavePropertyTaxStatement(property, statement);
 
             values = orchestrator.GetValuations(property.Id);
-            Assert.That(values, Has.Count.EqualTo(5));
-            Assert.That(values.Single(item => item.ValueType == ValuationTypes.LandMarket).Amount, Is.EqualTo(85000m));
+            Assert.That(values.Single(item => item.ValueType == ValuationTypes.LandMarket).Amount, Is.EqualTo(84500m));
+            Assert.That(orchestrator.GetPropertyTaxStatement(statement.Id)!.LandMarketValue, Is.EqualTo(85000m));
+
+            appraisal.LandMarketValue = 85000m;
+            orchestrator.SavePropertyAppraisal(property, appraisal);
+            var corrected = orchestrator.GetPropertyAppraisals(property.Id).Single();
+            Assert.That(corrected.LandMarketValue, Is.EqualTo(85000m));
+            Assert.That(corrected.TotalMarketValue, Is.EqualTo(627600m));
+            Assert.That(orchestrator.GetPropertyTaxStatement(statement.Id)!.LandMarketValue, Is.EqualTo(85000m));
         }
 
         [Test]
         public void RecordedValuation_CanBeCorrected()
         {
             var orchestrator = Orchestrator();
-            var collector = orchestrator.EnsureTaxCollector("Fort Bend Tax Office");
             var property = new PropertyAsset { Name = "Casa Tinker", Category = "Real estate" };
-            var statement = CrestingKnollsStatement(collector.Id);
-            orchestrator.SavePropertyTaxStatement(property, statement);
+            orchestrator.SaveAsset(property, null, null);
+            var appraisal = new PropertyAppraisal
+            {
+                AsOf = new DateTime(2026, 10, 26),
+                LandMarketValue = 84500m,
+                ImprovementMarketValue = 542600m
+            };
+            orchestrator.SavePropertyAppraisal(property, appraisal);
 
-            var valuation = orchestrator.GetValuations(property.Id)
-                .Single(item => item.ValueType == ValuationTypes.LandMarket);
-            valuation.Amount = 90000m;
-            orchestrator.SaveValuation(valuation);
+            appraisal.LandMarketValue = 90000m;
+            orchestrator.SavePropertyAppraisal(property, appraisal);
 
-            var saved = orchestrator.GetValuations(property.Id).Single(item => item.Id == valuation.Id);
-            Assert.That(saved.Amount, Is.EqualTo(90000m));
-            Assert.That(saved.SourceStatementId, Is.EqualTo(statement.Id));
+            var saved = orchestrator.GetPropertyAppraisals(property.Id).Single();
+            Assert.That(saved.LandMarketValue, Is.EqualTo(90000m));
+            Assert.That(saved.TotalMarketValue, Is.EqualTo(632600m));
+            Assert.That(saved.AssessedValue, Is.EqualTo(632600m));
+            Assert.That(orchestrator.GetValuations(property.Id), Has.Count.EqualTo(5));
+            Assert.That(orchestrator.GetValuations(property.Id).All(item => item.SourceStatementId is null), Is.True);
         }
 
         [Test]
@@ -276,6 +301,14 @@ namespace THMS.Tests.Logic
 
                 var collector = orchestrator.EnsureTaxCollector("County Tax");
                 var statement = CrestingKnollsStatement(collector.Id);
+                var appraisal = new PropertyAppraisal
+                {
+                    AsOf = statement.StatementDate,
+                    LandMarketValue = statement.LandMarketValue,
+                    ImprovementMarketValue = statement.ImprovementMarketValue
+                };
+                orchestrator.SavePropertyAppraisal(property, appraisal);
+                statement.ValuationId = appraisal.Id;
                 orchestrator.SavePropertyTaxStatement(property, statement);
                 var reloadedStatements = new SQLiteAccountStatementDataStore(path);
                 var tax = (PropertyTaxStatement)reloadedStatements.Get(statement.Id)!;
@@ -284,8 +317,11 @@ namespace THMS.Tests.Logic
                 Assert.That(tax.AssessmentMethod, Is.EqualTo(AssessmentMethod.ApplyHomesteadCap));
                 Assert.That(tax.AssessmentRatioPercent, Is.EqualTo(100m));
                 Assert.That(tax.LevyMethod, Is.EqualTo(LevyMethod.RatePerHundred));
+                Assert.That(tax.ValuationId, Is.EqualTo(appraisal.Id));
                 Assert.That(property.LevyMethod, Is.EqualTo(LevyMethod.RatePerHundred));
-                Assert.That(reloadedAssets.GetValuations(property.Id), Has.Count.EqualTo(5));
+                var values = reloadedAssets.GetValuations(property.Id);
+                Assert.That(values, Has.Count.EqualTo(5));
+                Assert.That(values.All(item => item.AppraisalId == appraisal.Id), Is.True);
             }
             finally
             {
