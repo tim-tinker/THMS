@@ -45,7 +45,7 @@ namespace THMS.Logic.ViewModels.Finance
             var parts = new List<string>();
             if (promo.DateAcquired.Year > 1)
                 parts.Add($"Acquired {promo.DateAcquired:d}");
-            if (promo.InitialAmount > 0)
+            if (promo.InitialAmount != 0)
                 parts.Add($"Initial {Money(promo.InitialAmount)}");
             if (promo.Deadline.Year > 1)
                 parts.Add($"Deadline {promo.Deadline:d}");

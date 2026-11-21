@@ -26,13 +26,13 @@ namespace THMS.Tests.Logic
             var deadline = asOf.AddMonths(6);
             var lump = new PromotionalBalance
             {
-                CurrentBalance = 1000m,
+                CurrentBalance = -1000m,
                 Deadline = deadline,
                 Type = PromoType.LumpSum
             };
             var equal = new PromotionalBalance
             {
-                CurrentBalance = 1000m,
+                CurrentBalance = -1000m,
                 Deadline = deadline,
                 Type = PromoType.EqualPayments
             };
@@ -59,13 +59,13 @@ namespace THMS.Tests.Logic
                 [
                     new PromotionalBalance
                     {
-                        CurrentBalance = 1000m,
+                        CurrentBalance = -1000m,
                         Deadline = asOf.AddMonths(6),
                         Type = PromoType.LumpSum
                     },
                     new PromotionalBalance
                     {
-                        CurrentBalance = 600m,
+                        CurrentBalance = -600m,
                         Deadline = asOf.AddMonths(6),
                         Type = PromoType.EqualPayments
                     }
@@ -85,11 +85,13 @@ namespace THMS.Tests.Logic
         {
             var promotions = new[]
             {
-                new PromotionalBalance { CurrentBalance = 400m },
-                new PromotionalBalance { CurrentBalance = 150m }
+                new PromotionalBalance { CurrentBalance = -400m },
+                new PromotionalBalance { CurrentBalance = -150m }
             };
 
-            Assert.That(PromotionPaymentPlanner.NonPromotionBalance(1000m, promotions), Is.EqualTo(450m));
+            Assert.That(PromotionPaymentPlanner.NonPromotionBalance(-1000m, promotions), Is.EqualTo(-450m));
+            Assert.That(PromotionPaymentPlanner.AmountOwed(-3472.82m), Is.EqualTo(3472.82m));
+            Assert.That(PromotionPaymentPlanner.AmountOwed(0m), Is.EqualTo(0m));
             Assert.That(PromotionPaymentPlanner.StatementBalanceOf(new CreditCardStatement { StatementBalance = 17672.62m }), Is.EqualTo(17672.62m));
             Assert.That(PromotionPaymentPlanner.StatementBalanceOf(new LoanStatement { StatementBalance = 5000m }), Is.EqualTo(5000m));
             Assert.That(PromotionPaymentPlanner.StatementBalanceOf(null), Is.Null);

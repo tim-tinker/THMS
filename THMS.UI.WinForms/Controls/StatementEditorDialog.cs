@@ -1107,7 +1107,7 @@ namespace THMS.UI.WinForms.Controls
                             DateAcquired = promo.DateAcquired.Year > 1
                                 ? promo.DateAcquired.Date
                                 : SafeDate(card.StatementDate),
-                            InitialAmount = promo.InitialAmount > 0 ? promo.InitialAmount : promo.CurrentBalance,
+                            InitialAmount = promo.InitialAmount != 0 ? promo.InitialAmount : promo.CurrentBalance,
                             CurrentBalance = promo.CurrentBalance,
                             Deadline = SafeDate(promo.Deadline),
                             Type = promo.Type
@@ -1153,7 +1153,7 @@ namespace THMS.UI.WinForms.Controls
             {
                 Id = promo.Id,
                 DateAcquired = promo.DateAcquired.Year > 1 ? promo.DateAcquired.Date : fallbackAcquired,
-                InitialAmount = promo.InitialAmount > 0 ? promo.InitialAmount : promo.CurrentBalance,
+                InitialAmount = promo.InitialAmount != 0 ? promo.InitialAmount : promo.CurrentBalance,
                 CurrentBalance = promo.CurrentBalance,
                 Deadline = SafeDate(promo.Deadline),
                 Type = promo.Type
@@ -1395,7 +1395,7 @@ namespace THMS.UI.WinForms.Controls
                         Id = p.Id == Guid.Empty ? Guid.NewGuid() : p.Id,
                         AccountId = account.Id,
                         DateAcquired = p.DateAcquired.Date,
-                        InitialAmount = p.InitialAmount > 0 ? p.InitialAmount : p.CurrentBalance,
+                        InitialAmount = p.InitialAmount != 0 ? p.InitialAmount : p.CurrentBalance,
                         CurrentBalance = p.CurrentBalance,
                         Deadline = p.Deadline.Date,
                         Type = p.Type

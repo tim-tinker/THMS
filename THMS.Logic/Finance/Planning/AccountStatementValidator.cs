@@ -71,15 +71,23 @@ namespace THMS.Logic.Finance.Planning
         {
             foreach (var promo in card.Promotions)
             {
-                if (promo.CurrentBalance < 0)
-                    findings.Add("Promotional current balance cannot be negative.");
-                if (promo.InitialAmount < 0)
-                    findings.Add("Promotional initial amount cannot be negative.");
+                if (promo.CurrentBalance > 0)
+                    findings.Add("Promotional current balance cannot be positive.");
+                if (promo.InitialAmount > 0)
+                    findings.Add("Promotional initial amount cannot be positive.");
                 if (promo.Deadline == default)
                     findings.Add("Promotional balance is missing a deadline.");
                 else if (promo.Deadline.Date < card.StatementDate.Date)
                     findings.Add($"Promotional deadline {promo.Deadline:d} is before the statement date.");
             }
+
+            if (card.Promotions.Count == 0)
+                return;
+
+            var promotionalTotal = card.Promotions.Sum(promo => promo.CurrentBalance);
+            if (card.StatementBalance - promotionalTotal > SumTolerance)
+                findings.Add(
+                    $"Statement balance ({card.StatementBalance:c2}) cannot be greater than the promotional total ({promotionalTotal:c2}).");
         }
 
         private static void ValidateUtility(UtilityStatement utility, List<string> findings)

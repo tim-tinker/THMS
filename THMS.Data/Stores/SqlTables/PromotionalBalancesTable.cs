@@ -89,7 +89,7 @@ namespace THMS.Data.Stores.SqlTables
         private static void Insert(SqliteConnection conn, Guid statementId, PromotionalBalance promo, int sortOrder)
         {
             var currentBalance = promo.CurrentBalance;
-            var initialAmount = promo.InitialAmount > 0 ? promo.InitialAmount : currentBalance;
+            var initialAmount = promo.InitialAmount != 0 ? promo.InitialAmount : currentBalance;
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO PromotionalBalances

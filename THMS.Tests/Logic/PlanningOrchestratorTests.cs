@@ -354,13 +354,13 @@ namespace THMS.Tests.Logic
                 StatementDate = DateTime.Today.AddDays(-15),
                 DueDate = DateTime.Today.AddDays(7),
                 AmountDue = 220,
-                StatementBalance = 220,
+                StatementBalance = -220,
                 Promotions =
                 [
                     new()
                     {
                         AccountId = card.Id,
-                        Amount = 80,
+                        Amount = -80,
                         Deadline = DateTime.Today.AddDays(5),
                         Type = PromoType.LumpSum
                     }

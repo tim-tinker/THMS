@@ -610,7 +610,7 @@ namespace THMS.UI.WinForms.Controls
             }
 
             var promotions = latest is CreditCardStatement card
-                ? card.Promotions.Where(promo => promo.CurrentBalance > 0).ToList()
+                ? card.Promotions.Where(promo => promo.CurrentBalance < 0).ToList()
                 : [];
             var existing = _billsOrchestrator.GetPaymentPlan(account.Id);
             using var dlg = new PaymentPlanDialog(
@@ -649,7 +649,7 @@ namespace THMS.UI.WinForms.Controls
             }
 
             var promotions = latest is CreditCardStatement card
-                ? card.Promotions.Where(promo => promo.CurrentBalance > 0).ToList()
+                ? card.Promotions.Where(promo => promo.CurrentBalance < 0).ToList()
                 : [];
             using var dlg = new PayAccountDialog(
                 account,

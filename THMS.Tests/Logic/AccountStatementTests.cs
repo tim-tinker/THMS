@@ -71,7 +71,7 @@ namespace THMS.Tests.Logic
                 DueDate = DateTime.Today,
                 AmountDue = 50,
                 StatementBalance = -1,
-                Promotions = [new() { Amount = 10, Deadline = default }]
+                Promotions = [new() { Amount = -1, Deadline = default }]
             }), Has.Some.Contains("deadline"));
 
             Assert.That(AccountStatementValidator.Validate(new UtilityStatement
@@ -104,6 +104,37 @@ namespace THMS.Tests.Logic
                 DueDate = DateTime.Today,
                 AmountDue = 100
             }), Is.Empty);
+
+            var deadline = DateTime.Today.AddMonths(6);
+            var bestBuy = new CreditCardStatement
+            {
+                StatementDate = DateTime.Today,
+                DueDate = DateTime.Today,
+                AmountDue = 50,
+                StatementBalance = -5348.62m,
+                Promotions =
+                [
+                    new() { CurrentBalance = -3472.82m, InitialAmount = -4000m, Deadline = deadline },
+                    new() { CurrentBalance = -1875.80m, InitialAmount = -1875.80m, Deadline = deadline }
+                ]
+            };
+            Assert.That(AccountStatementValidator.Validate(bestBuy), Is.Empty);
+
+            bestBuy.StatementBalance = -6000m;
+            Assert.That(AccountStatementValidator.Validate(bestBuy), Is.Empty);
+
+            bestBuy.StatementBalance = -5000m;
+            Assert.That(
+                AccountStatementValidator.Validate(bestBuy),
+                Has.Some.Contains("cannot be greater than the promotional total"));
+
+            bestBuy.StatementBalance = -5348.62m;
+            bestBuy.Promotions[0].CurrentBalance = 3472.82m;
+            bestBuy.Promotions[0].InitialAmount = 4000m;
+            Assert.That(
+                AccountStatementValidator.Validate(bestBuy),
+                Has.Some.Contains("current balance cannot be positive")
+                    .And.Some.Contains("initial amount cannot be positive"));
 
             Assert.That(AccountStatementValidator.Validate(ValidUtility()), Is.Empty);
             Assert.That(AccountStatementValidator.Validate(new BankStatement
@@ -218,13 +249,13 @@ namespace THMS.Tests.Logic
                     DueDate = DateTime.Today.AddDays(10),
                     AmountDue = 300,
                     BillCleared = true,
-                    StatementBalance = 300,
+                    StatementBalance = -80,
                     Promotions = [new()
                     {
                         AccountId = accountId,
                         DateAcquired = DateTime.Today.AddDays(-40),
-                        InitialAmount = 120,
-                        Amount = 50,
+                        InitialAmount = -120,
+                        Amount = -50,
                         Deadline = DateTime.Today.AddDays(8),
                         Type = PromoType.LumpSum
                     }]
@@ -277,9 +308,9 @@ namespace THMS.Tests.Logic
             var card = (CreditCardStatement)store.Get(statements[3].Id)!;
             Assert.That(card.BillCleared, Is.True);
             Assert.That(card.Promotions, Has.Count.EqualTo(1));
-            Assert.That(card.Promotions[0].Amount, Is.EqualTo(50m));
-            Assert.That(card.Promotions[0].CurrentBalance, Is.EqualTo(50m));
-            Assert.That(card.Promotions[0].InitialAmount, Is.EqualTo(120m));
+            Assert.That(card.Promotions[0].Amount, Is.EqualTo(-50m));
+            Assert.That(card.Promotions[0].CurrentBalance, Is.EqualTo(-50m));
+            Assert.That(card.Promotions[0].InitialAmount, Is.EqualTo(-120m));
             Assert.That(card.Promotions[0].DateAcquired.Date, Is.EqualTo(DateTime.Today.AddDays(-40).Date));
             Assert.That(card.Promotions[0].Type, Is.EqualTo(PromoType.LumpSum));
             var utility = (UtilityStatement)store.Get(statements[4].Id)!;
@@ -380,7 +411,7 @@ namespace THMS.Tests.Logic
                 StatementDate = new DateTime(2026, 7, 17),
                 DueDate = new DateTime(2026, 8, 11),
                 AmountDue = 40,
-                StatementBalance = 4000,
+                StatementBalance = -4000,
                 Promotions =
                 [
                     new()
@@ -388,8 +419,8 @@ namespace THMS.Tests.Logic
                         Id = Guid.NewGuid(),
                         AccountId = accountId,
                         DateAcquired = new DateTime(2026, 1, 11),
-                        InitialAmount = 100,
-                        Amount = 20,
+                        InitialAmount = -100,
+                        Amount = -20,
                         Deadline = new DateTime(2026, 12, 11),
                         Type = PromoType.EqualPayments
                     }
@@ -401,7 +432,7 @@ namespace THMS.Tests.Logic
                 StatementDate = new DateTime(2026, 8, 17),
                 DueDate = new DateTime(2026, 9, 11),
                 AmountDue = 53,
-                StatementBalance = 5224.55m,
+                StatementBalance = -5224.55m,
                 Promotions =
                 [
                     new()
@@ -409,8 +440,8 @@ namespace THMS.Tests.Logic
                         Id = olderPromoId,
                         AccountId = accountId,
                         DateAcquired = new DateTime(2026, 7, 11),
-                        InitialAmount = 734.39m,
-                        Amount = 314.39m,
+                        InitialAmount = -734.39m,
+                        Amount = -314.39m,
                         Deadline = new DateTime(2027, 8, 11),
                         Type = PromoType.LumpSum
                     },
@@ -418,8 +449,8 @@ namespace THMS.Tests.Logic
                     {
                         AccountId = accountId,
                         DateAcquired = new DateTime(2026, 8, 26),
-                        InitialAmount = 1875.80m,
-                        Amount = 1875.80m,
+                        InitialAmount = -1875.80m,
+                        Amount = -1875.80m,
                         Deadline = new DateTime(2028, 3, 11),
                         Type = PromoType.LumpSum
                     }
@@ -431,12 +462,12 @@ namespace THMS.Tests.Logic
             Assert.That(copied, Has.Count.EqualTo(2));
             Assert.That(copied.Select(p => p.Id), Does.Not.Contain(olderPromoId));
             Assert.That(copied[0].DateAcquired.Date, Is.EqualTo(new DateTime(2026, 7, 11)));
-            Assert.That(copied[0].InitialAmount, Is.EqualTo(734.39m));
-            Assert.That(copied[0].CurrentBalance, Is.EqualTo(314.39m));
+            Assert.That(copied[0].InitialAmount, Is.EqualTo(-734.39m));
+            Assert.That(copied[0].CurrentBalance, Is.EqualTo(-314.39m));
             Assert.That(copied[0].Deadline.Date, Is.EqualTo(new DateTime(2027, 8, 11)));
             Assert.That(copied[0].Type, Is.EqualTo(PromoType.LumpSum));
             Assert.That(copied[1].DateAcquired.Date, Is.EqualTo(new DateTime(2026, 8, 26)));
-            Assert.That(copied[1].CurrentBalance, Is.EqualTo(1875.80m));
+            Assert.That(copied[1].CurrentBalance, Is.EqualTo(-1875.80m));
         }
 
         [Test]
@@ -465,11 +496,11 @@ namespace THMS.Tests.Logic
                 StatementDate = new DateTime(2026, 8, 15),
                 DueDate = new DateTime(2026, 9, 10),
                 AmountDue = 220.50m,
-                StatementBalance = 400,
+                StatementBalance = -400,
                 Notes = "August",
                 Promotions =
                 [
-                    new() { Amount = 50, Deadline = new DateTime(2026, 9, 1), Type = PromoType.LumpSum }
+                    new() { Amount = -50, Deadline = new DateTime(2026, 9, 1), Type = PromoType.LumpSum }
                 ]
             };
 
@@ -479,7 +510,7 @@ namespace THMS.Tests.Logic
             Assert.That(row.StatementDate, Is.EqualTo(card.StatementDate.ToString("d")));
             Assert.That(row.DueDate, Is.EqualTo(card.DueDate.ToString("d")));
             Assert.That(row.AmountDue, Is.EqualTo(220.50m.ToString("c2")));
-            Assert.That(row.StatementBalance, Is.EqualTo(400m.ToString("c2")));
+            Assert.That(row.StatementBalance, Is.EqualTo((-400m).ToString("c2")));
             Assert.That(row.Promotions, Is.EqualTo("1"));
             Assert.That(row.Usage, Is.EqualTo(AccountStatementListRow.NotApplicable));
             Assert.That(row.Notes, Is.EqualTo("August"));
@@ -805,8 +836,8 @@ namespace THMS.Tests.Logic
                     {
                         Type = PromoType.LumpSum,
                         DateAcquired = new DateTime(2026, 7, 11),
-                        InitialAmount = 734.39m,
-                        Amount = 314.39m,
+                        InitialAmount = -734.39m,
+                        Amount = -314.39m,
                         Deadline = new DateTime(2026, 10, 1)
                     }
                 ]
@@ -814,9 +845,9 @@ namespace THMS.Tests.Logic
             Assert.That(card, Has.Count.EqualTo(1));
             Assert.That(card[0].Kind, Is.EqualTo("Promotion"));
             Assert.That(card[0].Description, Is.EqualTo("Lump sum"));
-            Assert.That(card[0].Amount, Is.EqualTo(314.39m.ToString("c2")));
+            Assert.That(card[0].Amount, Is.EqualTo((-314.39m).ToString("c2")));
             Assert.That(card[0].Details, Does.Contain(new DateTime(2026, 7, 11).ToString("d")));
-            Assert.That(card[0].Details, Does.Contain(734.39m.ToString("c2")));
+            Assert.That(card[0].Details, Does.Contain((-734.39m).ToString("c2")));
             Assert.That(card[0].Details, Does.Contain(new DateTime(2026, 10, 1).ToString("d")));
 
             var utility = StatementChildRow.From(new UtilityStatement

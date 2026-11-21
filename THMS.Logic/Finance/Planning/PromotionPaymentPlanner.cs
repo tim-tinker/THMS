@@ -42,6 +42,13 @@ namespace THMS.Logic.Finance.Planning
             return statementBalance - promotions.Sum(promo => promo.CurrentBalance);
         }
 
+        /// <summary>
+        /// Positive amount still owed on a promotional balance. The balance uses the statement sign,
+        /// so money owed is negative and a credit or paid-off balance is not an amount to pay.
+        /// </summary>
+        public static decimal AmountOwed(decimal signedBalance) =>
+            signedBalance < 0m ? -signedBalance : 0m;
+
         public static string FrequencyName(RecurrenceFrequency frequency) => frequency switch
         {
             RecurrenceFrequency.Weekly => "Weekly",
@@ -75,9 +82,10 @@ namespace THMS.Logic.Finance.Planning
             DateTime deadline,
             RecurrenceFrequency frequency)
         {
-            balance = Math.Max(0m, balance);
-            if (balance == 0)
+            var owed = AmountOwed(balance);
+            if (owed == 0)
                 return 0;
+            balance = owed;
 
             if (type == PromoType.EqualPayments)
                 return EqualPayment(balance, asOf, deadline, frequency);
@@ -142,7 +150,7 @@ namespace THMS.Logic.Finance.Planning
                         Frequency = frequency,
                         FrequencyEditable = promo.Type == PromoType.LumpSum,
                         RequiredAmount = RequiredThisPayment(promo, asOf, frequency),
-                        CurrentBalance = Math.Max(0m, promo.CurrentBalance)
+                        CurrentBalance = promo.CurrentBalance
                     };
                 })
                 .ToList();

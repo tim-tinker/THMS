@@ -373,7 +373,7 @@ namespace THMS.UI.WinForms.Controls
                 get => _selectedAmount;
                 set
                 {
-                    var clamped = Math.Clamp(value, 0m, Math.Max(0m, CurrentBalance));
+                    var clamped = Math.Clamp(value, 0m, PromotionPaymentPlanner.AmountOwed(CurrentBalance));
                     _selectedAmount = clamped;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedAmount)));
                 }
@@ -397,7 +397,7 @@ namespace THMS.UI.WinForms.Controls
             private void ApplyRequired(decimal required)
             {
                 RequiredAmount = required;
-                SelectedAmount = Math.Min(required, CurrentBalance);
+                SelectedAmount = Math.Min(required, PromotionPaymentPlanner.AmountOwed(CurrentBalance));
             }
         }
     }
