@@ -148,6 +148,12 @@ namespace THMS.Data.Stores.SQLite
             _baseEvStore.Delete(conn, sessionId);
         }
 
+        public void UpsertEvBatteryCharge(Guid sessionId, EvBatteryCharge charge)
+        {
+            using var conn = OpenConnection();
+            _baseEvStore.UpsertCharge(conn, sessionId, charge);
+        }
+
         // ---------------------------------------------------------
         // COMMERCIAL EV CHARGE SESSIONS
         // ---------------------------------------------------------
@@ -275,6 +281,7 @@ namespace THMS.Data.Stores.SQLite
             target.StartSoc = source.StartSoc;
             target.EndSoc = source.EndSoc;
             target.KwhAdded = source.KwhAdded;
+            target.KwhAddedIsCalculated = source.KwhAddedIsCalculated;
         }
     }
 }

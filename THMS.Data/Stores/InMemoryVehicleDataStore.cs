@@ -10,6 +10,7 @@ namespace THMS.Data.Stores
 
         // New EV session stores
         private readonly InMemoryBaseEvChargeSessionStore _baseEvStore;
+        private readonly Dictionary<Guid, EvBatteryCharge> _batteryCharges = new();
         private readonly InMemoryCommercialEvChargeSessionStore _commercialEvStore;
         private readonly InMemoryHomeEvChargeSessionStore _homeEvStore;
         private readonly InMemoryHomeEvChargeAttributionStore _attribStore;
@@ -87,8 +88,11 @@ namespace THMS.Data.Stores
         // BASE EV CHARGE SESSIONS
         // ---------------------------------------------------------
 
-        public void UpsertBaseEvChargeSession(BaseEvChargeSession session) =>
+        public void UpsertBaseEvChargeSession(BaseEvChargeSession session)
+        {
             _baseEvStore.Upsert(session);
+            ShareBatteryCharge(session.Id, session.BatteryCharge);
+        }
 
         public BaseEvChargeSession? GetBaseEvChargeSession(Guid sessionId) =>
             _baseEvStore.Get(sessionId);
@@ -102,8 +106,14 @@ namespace THMS.Data.Stores
         public BaseEvChargeSession? GetLatestBaseEvChargeSession(Guid vehicleId) =>
             _baseEvStore.GetLatest(vehicleId);
 
-        public void DeleteBaseEvChargeSession(Guid sessionId) =>
+        public void DeleteBaseEvChargeSession(Guid sessionId)
+        {
             _baseEvStore.Delete(sessionId);
+            _batteryCharges.Remove(sessionId);
+        }
+
+        public void UpsertEvBatteryCharge(Guid sessionId, EvBatteryCharge charge) =>
+            ShareBatteryCharge(sessionId, charge);
 
         // ---------------------------------------------------------
         // COMMERCIAL EV CHARGE SESSIONS
@@ -167,5 +177,16 @@ namespace THMS.Data.Stores
 
         public decimal GetMaintenanceCostInPeriod(Guid vehicleId, DateTime start, DateTime end) =>
             _maintenanceStore.GetTotalCost(vehicleId, start, end);
+
+        private void ShareBatteryCharge(Guid sessionId, EvBatteryCharge charge)
+        {
+            _batteryCharges[sessionId] = charge;
+            if (_baseEvStore.Get(sessionId) is { } stored && !ReferenceEquals(stored.BatteryCharge, charge))
+                stored.BatteryCharge = charge;
+            if (_commercialEvStore.Get(sessionId) is { } commercial && !ReferenceEquals(commercial.BatteryCharge, charge))
+                commercial.BatteryCharge = charge;
+            if (_homeEvStore.Get(sessionId) is { } home && !ReferenceEquals(home.BatteryCharge, charge))
+                home.BatteryCharge = charge;
+        }
     }
 }

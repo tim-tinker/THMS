@@ -54,6 +54,7 @@ namespace THMS.UI.WinForms
             _numLastSoc = new NumericUpDown();
             _numBatteryKwhAdded = new NumericUpDown();
             label1 = new Label();
+            _checkKwhCalculated = new CheckBox();
             _btnCancel = new ThmsButton();
             _btnSave = new ThmsButton();
             label11 = new Label();
@@ -108,6 +109,8 @@ namespace THMS.UI.WinForms
             _numStartSoc.Name = "_numStartSoc";
             _numStartSoc.Size = new Size(183, 35);
             _numStartSoc.TabIndex = 7;
+            _numStartSoc.Maximum = new decimal(new int[] { 100, 0, 0, 0 });
+            _numStartSoc.ValueChanged += OnSocChanged;
             // 
             // _timeStart
             // 
@@ -159,6 +162,8 @@ namespace THMS.UI.WinForms
             _numEndSoc.Name = "_numEndSoc";
             _numEndSoc.Size = new Size(183, 35);
             _numEndSoc.TabIndex = 8;
+            _numEndSoc.Maximum = new decimal(new int[] { 100, 0, 0, 0 });
+            _numEndSoc.ValueChanged += OnSocChanged;
             // 
             // _timeEnd
             // 
@@ -270,10 +275,13 @@ namespace THMS.UI.WinForms
             // 
             // _numBatteryKwhAdded
             // 
+            _numBatteryKwhAdded.DecimalPlaces = 3;
             _numBatteryKwhAdded.Location = new Point(226, 383);
+            _numBatteryKwhAdded.Maximum = new decimal(new int[] { 1000, 0, 0, 0 });
             _numBatteryKwhAdded.Name = "_numBatteryKwhAdded";
             _numBatteryKwhAdded.Size = new Size(183, 35);
             _numBatteryKwhAdded.TabIndex = 9;
+            _numBatteryKwhAdded.ValueChanged += OnBatteryKwhChanged;
             // 
             // label1
             // 
@@ -283,6 +291,17 @@ namespace THMS.UI.WinForms
             label1.Size = new Size(193, 30);
             label1.TabIndex = 44;
             label1.Text = "Battery kWh Added";
+            // 
+            // _checkKwhCalculated
+            // 
+            _checkKwhCalculated.AutoSize = true;
+            _checkKwhCalculated.Location = new Point(420, 386);
+            _checkKwhCalculated.Name = "_checkKwhCalculated";
+            _checkKwhCalculated.Size = new Size(118, 34);
+            _checkKwhCalculated.TabIndex = 10;
+            _checkKwhCalculated.Text = "Calculated";
+            _checkKwhCalculated.UseVisualStyleBackColor = true;
+            _checkKwhCalculated.CheckedChanged += OnKwhCalculatedChanged;
             // 
             // _btnCancel
             // 
@@ -347,6 +366,7 @@ namespace THMS.UI.WinForms
             ClientSize = new Size(549, 642);
             Controls.Add(_btnSave);
             Controls.Add(_btnCancel);
+            Controls.Add(_checkKwhCalculated);
             Controls.Add(label1);
             Controls.Add(_numBatteryKwhAdded);
             Controls.Add(_numLastSoc);
@@ -416,6 +436,7 @@ namespace THMS.UI.WinForms
         private NumericUpDown _numLastSoc;
         private NumericUpDown _numBatteryKwhAdded;
         private Label label1;
+        private CheckBox _checkKwhCalculated;
         private ThmsButton _btnCancel;
         private ThmsButton _btnSave;
         private Label label11;

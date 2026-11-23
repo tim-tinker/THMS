@@ -35,6 +35,8 @@ namespace THMS.Data.Stores
         BaseEvChargeSession? GetLatestBaseEvChargeSession();
         BaseEvChargeSession? GetLatestBaseEvChargeSession(Guid vehicleId);
         void DeleteBaseEvChargeSession(Guid sessionId);
+        /// <summary>Writes only the battery-kWh row for a session.</summary>
+        void UpsertEvBatteryCharge(Guid sessionId, EvBatteryCharge charge);
 
         // ---------------------------------------------------------
         // COMMERCIAL EV CHARGE SESSIONS (complete at creation)

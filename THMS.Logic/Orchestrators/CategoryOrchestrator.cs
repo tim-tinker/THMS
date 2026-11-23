@@ -132,57 +132,40 @@ namespace THMS.Logic.Orchestrators
             _budgets.RefreshAllActive();
         }
 
-        public void AssignToPosted(Guid transactionId, Guid categoryId, bool learn = true, Guid? splitRowId = null)
+        public void AssignToPosted(Guid transactionId, Guid categoryId, bool learn = true, Guid? splitRowId = null) =>
+            AssignToPosted([new PostedCategoryAssignment(transactionId, splitRowId)], categoryId, learn);
+
+        public void AssignToPosted(IReadOnlyList<PostedCategoryAssignment> assignments, Guid categoryId, bool learn = true)
         {
+            if (assignments.Count == 0)
+                return;
+
             var category = _categories.GetCategory(categoryId)
                 ?? throw new InvalidOperationException($"Category {categoryId} was not found.");
             if (!category.IsActive)
                 throw new InvalidOperationException($"Category '{category.Name}' is inactive and cannot be assigned.");
 
-            var posted = _transactions.GetPostedTransaction(transactionId);
-            if (posted is not null)
-            {
-                if (splitRowId is Guid splitId && posted.HasSplits)
-                {
-                    var split = posted.Splits.FirstOrDefault(s => s.Id == splitId)
-                        ?? throw new InvalidOperationException($"Split {splitId} was not found.");
-                    split.CategoryId = category.Id;
-                    split.Category = category.Name;
-                    _transactions.SaveSplits(posted.Id, posted.Splits);
-                }
-                else
-                {
-                    posted.ApplyCategory(category);
-                    _transactions.UpdatePostedTransaction(posted);
-                }
-
-                if (learn)
-                    _categorizer.Learn(posted.Description, category.Id);
-                _budgets.RefreshAllActive();
-                return;
-            }
-
-            var transfer = _transactions.GetPostedTransferTransaction(transactionId);
-            if (transfer is null)
-                return;
-
-            if (splitRowId is Guid transferSplitId && transfer.HasSplits)
-            {
-                var split = transfer.Splits.FirstOrDefault(s => s.Id == transferSplitId)
-                    ?? throw new InvalidOperationException($"Split {transferSplitId} was not found.");
-                split.CategoryId = category.Id;
-                split.Category = category.Name;
-                _transactions.SaveSplits(transfer.Id, transfer.Splits);
-            }
-            else
-            {
-                transfer.ApplyCategory(category);
-                _transactions.UpdatePostedTransferTransaction(transfer);
-            }
-
+            var writes = _transactions.AssignPostedCategories(assignments, category.Id, category.Name);
             if (learn)
-                _categorizer.Learn(transfer.Description, category.Id);
-            _budgets.RefreshAllActive();
+                LearnDistinct(writes, category.Id);
+            if (writes.Any(write => write.Updated))
+                _budgets.RefreshAllActive();
+        }
+
+        private void LearnDistinct(IReadOnlyList<PostedCategoryWrite> writes, Guid categoryId)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var write in writes)
+            {
+                if (!write.Updated)
+                    continue;
+
+                var key = Categorizer.Normalize(write.Description);
+                if (key.Length == 0 || !seen.Add(key))
+                    continue;
+
+                _categorizer.Learn(write.Description, categoryId);
+            }
         }
 
         public ExpenseCategory GetOrCreate(string name, Guid? parentId = null) =>

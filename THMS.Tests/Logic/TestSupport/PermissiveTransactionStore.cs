@@ -47,6 +47,11 @@ namespace THMS.Tests.Logic.TestSupport
 
         public void AddPostedTransferTransaction(PostedTransferTransaction transaction) => _inner.AddPostedTransferTransaction(transaction);
         public void UpdatePostedTransferTransaction(PostedTransferTransaction transaction) => _inner.UpdatePostedTransferTransaction(transaction);
+        public IReadOnlyList<PostedCategoryWrite> AssignPostedCategories(
+            IReadOnlyList<PostedCategoryAssignment> assignments,
+            Guid categoryId,
+            string categoryName) =>
+            _inner.AssignPostedCategories(assignments, categoryId, categoryName);
         public void DeletePostedTransferTransaction(Guid id) => _inner.DeletePostedTransferTransaction(id);
         public PostedTransferTransaction? GetPostedTransferTransaction(Guid id) => _inner.GetPostedTransferTransaction(id);
         public IEnumerable<PostedTransferTransaction> GetPostedTransferTransactions(Guid accountId) => _inner.GetPostedTransferTransactions(accountId);

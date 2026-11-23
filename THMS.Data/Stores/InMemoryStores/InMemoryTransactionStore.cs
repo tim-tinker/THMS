@@ -153,6 +153,51 @@ namespace THMS.Data.Stores.InMemoryStores
         }
 
         public void UpdatePostedTransfer(PostedTransferTransaction transaction) => Update(_postedTransfers, transaction);
+
+        public IReadOnlyList<PostedCategoryWrite> AssignPostedCategories(
+            IReadOnlyList<PostedCategoryAssignment> assignments,
+            Guid categoryId,
+            string categoryName)
+        {
+            var results = new PostedCategoryWrite[assignments.Count];
+            var pending = new List<(int Index, BaseTransaction Parent, SplitTransactionRow? Split)>();
+            for (var i = 0; i < assignments.Count; i++)
+            {
+                var assignment = assignments[i];
+                var parent = (BaseTransaction?)_posted.FirstOrDefault(t => t.Id == assignment.TransactionId)
+                    ?? _postedTransfers.FirstOrDefault(t => t.Id == assignment.TransactionId);
+                if (parent is null)
+                    continue;
+
+                SplitTransactionRow? split = null;
+                if (assignment.SplitRowId is Guid splitId)
+                {
+                    split = _splits.FirstOrDefault(row => row.Id == splitId && row.ParentTransactionId == parent.Id);
+                    if (split is null && _splits.Any(row => row.ParentTransactionId == parent.Id))
+                        throw new InvalidOperationException($"Split {splitId} was not found.");
+                }
+
+                pending.Add((i, parent, split));
+            }
+
+            foreach (var (index, parent, split) in pending)
+            {
+                if (split is null)
+                {
+                    parent.CategoryId = categoryId;
+                    parent.Category = categoryName;
+                }
+                else
+                {
+                    split.CategoryId = categoryId;
+                    split.Category = categoryName;
+                }
+
+                results[index] = new PostedCategoryWrite(true, parent.Description);
+            }
+
+            return results;
+        }
         public void DeletePostedTransfer(Guid id)
         {
             _postedTransfers.RemoveAll(t => t.Id == id);

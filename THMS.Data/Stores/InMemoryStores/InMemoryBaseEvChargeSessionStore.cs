@@ -41,6 +41,7 @@ namespace THMS.Data.Stores.InMemoryStores
             existing.LastSoc = session.LastSoc;
             existing.OdometerMiles = session.OdometerMiles;
             existing.KwhAdded = session.KwhAdded;
+            existing.KwhAddedIsCalculated = session.KwhAddedIsCalculated;
             existing.KwhDrawn = session.KwhDrawn;
             existing.SessionCost = session.SessionCost;
 

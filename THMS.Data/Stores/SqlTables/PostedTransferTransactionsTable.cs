@@ -72,6 +72,20 @@ namespace THMS.Data.Stores.SqlTables
             cmd.ExecuteNonQuery();
         }
 
+        public int UpdateCategory(SqliteConnection conn, Guid id, Guid categoryId, string categoryName)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                UPDATE PostedTransferTransactions SET
+                    Category = @Category,
+                    CategoryId = @CategoryId
+                WHERE Id = @Id;";
+            cmd.Parameters.AddWithValue("@Category", categoryName);
+            cmd.Parameters.AddWithValue("@CategoryId", categoryId.ToString());
+            cmd.Parameters.AddWithValue("@Id", id.ToString());
+            return cmd.ExecuteNonQuery();
+        }
+
         public void Delete(SqliteConnection conn, Guid id)
         {
             using var cmd = conn.CreateCommand();

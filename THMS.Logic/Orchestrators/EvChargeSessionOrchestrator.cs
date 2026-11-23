@@ -1,6 +1,7 @@
 ﻿using THMS.Data.Stores;
 using THMS.Domain.Transportation;
 using THMS.Logic.Energy;
+using THMS.Logic.Transportation;
 
 namespace THMS.Logic.Orchestrators
 {
@@ -75,6 +76,86 @@ namespace THMS.Logic.Orchestrators
         public void Update(BaseEvChargeSession session)
         {
             Save(session);
+        }
+
+        public void Delete(Guid sessionId)
+        {
+            _vehicleStore.DeleteCommercialEvChargeSession(sessionId);
+            _vehicleStore.DeleteHomeEvChargeSession(sessionId);
+            _vehicleStore.DeleteBaseEvChargeSession(sessionId);
+        }
+
+        /// <summary>
+        /// Fits E(s) = a1·s + a2·s² + a3·s³ from sessions whose battery kWh was measured.
+        /// Calculated and zero kWh values are ignored. Returns null and leaves the stored
+        /// coefficients unchanged when no measured session has a SOC change.
+        /// </summary>
+        public SocEnergyFit? RecalculateChargeEnergy(Guid vehicleId)
+        {
+            if (_vehicleStore.GetVehicle(vehicleId) is not VehicleEv vehicle)
+                return null;
+
+            var sessions = _vehicleStore.GetBaseEvChargeSessions(vehicleId, DateTime.MinValue, DateTime.MaxValue);
+            var fit = BatterySocEnergy.Fit(sessions);
+            if (fit is not SocEnergyFit value)
+                return null;
+
+            vehicle.ChargeEnergy = value.Coefficients;
+            _vehicleStore.UpsertVehicle(vehicle);
+            var (refreshed, unchanged) = RefreshCalculatedBatteryCharges(sessions, value.Coefficients);
+            return value with
+            {
+                RefreshedCalculatedSessions = refreshed,
+                UnchangedCalculatedSessions = unchanged
+            };
+        }
+
+        private (int Refreshed, int Unchanged) RefreshCalculatedBatteryCharges(
+            IEnumerable<BaseEvChargeSession> sessions,
+            SocEnergyCoefficients coefficients)
+        {
+            var refreshed = 0;
+            var unchanged = 0;
+            foreach (var session in sessions)
+            {
+                if (!session.KwhAddedIsCalculated)
+                    continue;
+
+                var estimate = BatterySocEnergy.EstimateKwh(session.StartSoc, session.EndSoc, coefficients);
+                if (estimate is null)
+                {
+                    unchanged++;
+                    continue;
+                }
+
+                if (estimate.Value == session.KwhAdded)
+                    continue;
+
+                _vehicleStore.UpsertEvBatteryCharge(session.Id, new EvBatteryCharge
+                {
+                    KwhAdded = estimate.Value,
+                    IsCalculated = true
+                });
+                refreshed++;
+            }
+
+            return (refreshed, unchanged);
+        }
+
+        public IReadOnlyList<(VehicleEv Vehicle, SocEnergyFit Fit)> RecalculateChargeEnergy()
+        {
+            var results = new List<(VehicleEv Vehicle, SocEnergyFit Fit)>();
+            foreach (var vehicle in GetEvVehicles())
+            {
+                var fit = RecalculateChargeEnergy(vehicle.Id);
+                if (fit is not SocEnergyFit value)
+                    continue;
+
+                if (_vehicleStore.GetVehicle(vehicle.Id) is VehicleEv stored)
+                    results.Add((stored, value));
+            }
+
+            return results;
         }
 
         // ---------------------------------------------------------

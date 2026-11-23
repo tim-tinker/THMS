@@ -93,6 +93,17 @@ namespace THMS.Data.Stores
             FinanceDataRevision.NoteChanged();
         }
 
+        public IReadOnlyList<PostedCategoryWrite> AssignPostedCategories(
+            IReadOnlyList<PostedCategoryAssignment> assignments,
+            Guid categoryId,
+            string categoryName)
+        {
+            var results = _store.AssignPostedCategories(assignments, categoryId, categoryName);
+            if (results.Any(result => result.Updated))
+                FinanceDataRevision.NoteChanged();
+            return results;
+        }
+
         public void DeletePostedTransferTransaction(Guid id)
         {
             _store.DeletePostedTransfer(id);

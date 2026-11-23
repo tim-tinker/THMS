@@ -87,6 +87,25 @@ namespace THMS.Logic.ViewModels
             Vehicles.Add(CreateListItem(vehicle));
         }
 
+        public VehicleBase? GetVehicle(Guid id) => _vehicleStore.GetVehicle(id);
+
+        public void UpdateVehicle(VehicleBase vehicle)
+        {
+            ArgumentNullException.ThrowIfNull(vehicle);
+            _vehicleStore.UpsertVehicle(vehicle);
+            var updated = CreateListItem(vehicle);
+            for (var i = 0; i < Vehicles.Count; i++)
+            {
+                if (Vehicles[i].VehicleId != vehicle.Id)
+                    continue;
+
+                Vehicles[i] = updated;
+                return;
+            }
+
+            Vehicles.Add(updated);
+        }
+
         private VehicleListItemViewModel CreateListItem(VehicleBase vehicle)
         {
             var item = new VehicleListItemViewModel(

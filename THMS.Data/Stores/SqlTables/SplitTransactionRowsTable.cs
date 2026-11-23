@@ -46,6 +46,26 @@ namespace THMS.Data.Stores.SqlTables
             }
         }
 
+        public int UpdateCategory(
+            SqliteConnection conn,
+            Guid splitId,
+            Guid parentId,
+            Guid categoryId,
+            string categoryName)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                UPDATE SplitTransactionRows SET
+                    Category = @Category,
+                    CategoryId = @CategoryId
+                WHERE Id = @Id AND ParentTransactionId = @ParentId;";
+            cmd.Parameters.AddWithValue("@Category", categoryName);
+            cmd.Parameters.AddWithValue("@CategoryId", categoryId.ToString());
+            cmd.Parameters.AddWithValue("@Id", splitId.ToString());
+            cmd.Parameters.AddWithValue("@ParentId", parentId.ToString());
+            return cmd.ExecuteNonQuery();
+        }
+
         public void DeleteByParent(SqliteConnection conn, Guid parentId)
         {
             using var cmd = conn.CreateCommand();

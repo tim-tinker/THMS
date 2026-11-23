@@ -853,8 +853,9 @@ namespace THMS.UI.WinForms.Controls
 
         private void AssignTransactionCategory(IReadOnlyList<UnifiedTransactionView> views, Guid categoryId)
         {
-            foreach (var view in views)
-                Orchestrator.AssignToPosted(view.LookupId, categoryId, splitRowId: view.SplitRowId);
+            Orchestrator.AssignToPosted(
+                views.Select(view => new PostedCategoryAssignment(view.LookupId, view.SplitRowId)).ToList(),
+                categoryId);
             NoteCatalogChanged();
             Reload(_selectedCategoryId);
         }

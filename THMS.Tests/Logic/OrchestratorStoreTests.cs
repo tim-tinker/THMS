@@ -320,6 +320,56 @@ namespace THMS.Tests.Logic
     public class EvChargeSessionOrchestratorTests
     {
         [Test]
+        public void Delete_RemovesTheSessionAndItsChargeDetails()
+        {
+            var vehicles = new InMemoryVehicleDataStore();
+            var ev = vehicles.GetAllVehicles().OfType<VehicleEv>().First();
+            var orchestrator = new EvChargeSessionOrchestrator(
+                vehicles,
+                new InMemoryEnergyDataStore(),
+                new InMemoryFinanceDataStore());
+
+            var commercial = new CommercialEvChargeSession
+            {
+                Id = Guid.NewGuid(),
+                VehicleId = ev.Id,
+                VehicleName = ev.Name,
+                StartTime = new DateTime(2026, 4, 1, 10, 0, 0),
+                EndTime = new DateTime(2026, 4, 1, 12, 0, 0),
+                KwhAdded = 10,
+                KwhDrawn = 12,
+                SessionCost = 4
+            };
+            orchestrator.Save(commercial);
+
+            var home = new HomeEvChargeSession
+            {
+                Id = Guid.NewGuid(),
+                VehicleId = ev.Id,
+                VehicleName = ev.Name,
+                StartTime = new DateTime(2026, 4, 2, 18, 0, 0),
+                EndTime = new DateTime(2026, 4, 2, 22, 0, 0),
+                KwhAdded = 20
+            };
+            orchestrator.Save(home);
+            vehicles.UpsertHomeEvChargeAttribution(home.Id, new HomeEvChargeAttribution { GridKwh = 1 });
+            vehicles.UpsertHomeEvChargeBilling(home.Id, new HomeEvChargeBilling { SessionCost = 2 });
+
+            orchestrator.Delete(commercial.Id);
+
+            Assert.That(vehicles.GetBaseEvChargeSession(commercial.Id), Is.Null);
+            Assert.That(vehicles.GetCommercialEvChargeSession(commercial.Id), Is.Null);
+            Assert.That(vehicles.GetBaseEvChargeSession(home.Id), Is.Not.Null);
+
+            orchestrator.Delete(home.Id);
+
+            Assert.That(vehicles.GetBaseEvChargeSession(home.Id), Is.Null);
+            Assert.That(vehicles.GetHomeEvChargeSession(home.Id), Is.Null);
+            Assert.That(vehicles.GetHomeEvChargeAttribution(home.Id), Is.Null);
+            Assert.That(vehicles.GetHomeEvChargeBilling(home.Id), Is.Null);
+        }
+
+        [Test]
         public void SaveUpdateGetAndCompleteHomeSessions()
         {
             var vehicles = new InMemoryVehicleDataStore();
@@ -2807,6 +2857,167 @@ namespace THMS.Tests.Logic
 
             parent.ParentCategoryId = child.Id;
             Assert.That(() => orchestrator.UpdateCategory(parent), Throws.InvalidOperationException);
+        }
+
+        [Test]
+        public void AssignToPosted_UpdatesTheSelectionOnceAndLeavesOtherFields()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new CategoryOrchestrator(store, store);
+            var groceries = orchestrator.CreateCategory("Groceries");
+            var accountId = Guid.NewGuid();
+            var otherAccountId = Guid.NewGuid();
+
+            var first = new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = new DateTime(2026, 4, 1),
+                Description = "Coffee Shop",
+                Amount = -4.5m,
+                ExternalTransactionId = "ext-1"
+            };
+            var second = new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = new DateTime(2026, 4, 2),
+                Description = "coffee shop",
+                Amount = -6m,
+                ExternalTransactionId = "ext-2"
+            };
+            var transfer = new PostedTransferTransaction
+            {
+                AccountId = accountId,
+                FromAccountId = accountId,
+                ToAccountId = otherAccountId,
+                Date = new DateTime(2026, 4, 3),
+                Description = "Rent",
+                Amount = -900m,
+                ExternalTransactionId = "ext-3"
+            };
+            var splitParent = new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = new DateTime(2026, 4, 4),
+                Description = "Market",
+                Amount = -30m,
+                CategoryId = DefaultExpenseCategories.UncategorizedId,
+                Category = DefaultExpenseCategories.Uncategorized
+            };
+            store.AddPostedTransaction(first);
+            store.AddPostedTransaction(second);
+            store.AddPostedTransferTransaction(transfer);
+            store.AddPostedTransaction(splitParent);
+            var split = new SplitTransactionRow
+            {
+                Id = Guid.NewGuid(),
+                Amount = -10m,
+                Notes = "produce",
+                Type = SplitType.Expense,
+                CategoryId = DefaultExpenseCategories.UncategorizedId,
+                Category = DefaultExpenseCategories.Uncategorized
+            };
+            store.SaveSplits(splitParent.Id, [split]);
+
+            orchestrator.AssignToPosted(
+            [
+                new PostedCategoryAssignment(first.Id),
+                new PostedCategoryAssignment(second.Id),
+                new PostedCategoryAssignment(transfer.Id),
+                new PostedCategoryAssignment(splitParent.Id, split.Id),
+                new PostedCategoryAssignment(Guid.NewGuid())
+            ],
+            groceries.Id);
+
+            var storedFirst = store.GetPostedTransaction(first.Id);
+            Assert.That(storedFirst!.CategoryId, Is.EqualTo(groceries.Id));
+            Assert.That(storedFirst.Category, Is.EqualTo("Groceries"));
+            Assert.That(storedFirst.Amount, Is.EqualTo(-4.5m));
+            Assert.That(storedFirst.ExternalTransactionId, Is.EqualTo("ext-1"));
+            Assert.That(storedFirst.Description, Is.EqualTo("Coffee Shop"));
+
+            var storedSecond = store.GetPostedTransaction(second.Id);
+            Assert.That(storedSecond!.CategoryId, Is.EqualTo(groceries.Id));
+            Assert.That(storedSecond.Amount, Is.EqualTo(-6m));
+
+            var storedTransfer = store.GetPostedTransferTransaction(transfer.Id);
+            Assert.That(storedTransfer!.CategoryId, Is.EqualTo(groceries.Id));
+            Assert.That(storedTransfer.Amount, Is.EqualTo(-900m));
+            Assert.That(storedTransfer.FromAccountId, Is.EqualTo(accountId));
+            Assert.That(storedTransfer.ToAccountId, Is.EqualTo(otherAccountId));
+            Assert.That(storedTransfer.ExternalTransactionId, Is.EqualTo("ext-3"));
+
+            var storedParent = store.GetPostedTransaction(splitParent.Id);
+            Assert.That(storedParent!.CategoryId, Is.EqualTo(DefaultExpenseCategories.UncategorizedId));
+            Assert.That(storedParent.Amount, Is.EqualTo(-30m));
+            var storedSplit = storedParent.Splits.Single();
+            Assert.That(storedSplit.CategoryId, Is.EqualTo(groceries.Id));
+            Assert.That(storedSplit.Category, Is.EqualTo("Groceries"));
+            Assert.That(storedSplit.Amount, Is.EqualTo(-10m));
+            Assert.That(storedSplit.Notes, Is.EqualTo("produce"));
+
+            Assert.That(store.GetAssignment(Categorizer.Normalize("Coffee Shop"))!.CategoryId, Is.EqualTo(groceries.Id));
+            Assert.That(store.GetAssignment(Categorizer.Normalize("Rent"))!.CategoryId, Is.EqualTo(groceries.Id));
+            Assert.That(store.GetAssignment(Categorizer.Normalize("Market"))!.CategoryId, Is.EqualTo(groceries.Id));
+
+            var untouched = new PostedTransaction
+            {
+                AccountId = accountId,
+                Date = new DateTime(2026, 4, 5),
+                Description = "Keep",
+                Amount = -1m
+            };
+            store.AddPostedTransaction(untouched);
+            Assert.That(
+                () => orchestrator.AssignToPosted(
+                    [
+                        new PostedCategoryAssignment(untouched.Id),
+                        new PostedCategoryAssignment(splitParent.Id, Guid.NewGuid())
+                    ],
+                    groceries.Id),
+                Throws.InvalidOperationException);
+            Assert.That(store.GetPostedTransaction(untouched.Id)!.CategoryId, Is.Null);
+        }
+
+        [Test]
+        public void Sqlite_AssignToPosted_UpdatesCategoryColumnsOnly()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"thms-category-{Guid.NewGuid():N}.db");
+            try
+            {
+                var store = new SQLiteTransactionDataStore(path);
+                var orchestrator = new CategoryOrchestrator(store, store);
+                var groceries = orchestrator.CreateCategory("Groceries");
+                var posted = new PostedTransaction
+                {
+                    AccountId = Guid.NewGuid(),
+                    Date = new DateTime(2026, 4, 1),
+                    Description = "Coffee Shop",
+                    Amount = -4.5m,
+                    ExternalTransactionId = "ext-1"
+                };
+                store.AddPostedTransaction(posted);
+
+                orchestrator.AssignToPosted([new PostedCategoryAssignment(posted.Id)], groceries.Id);
+
+                var again = new SQLiteTransactionDataStore(path);
+                var stored = again.GetPostedTransaction(posted.Id);
+                Assert.That(stored!.CategoryId, Is.EqualTo(groceries.Id));
+                Assert.That(stored.Category, Is.EqualTo("Groceries"));
+                Assert.That(stored.Amount, Is.EqualTo(-4.5m));
+                Assert.That(stored.Description, Is.EqualTo("Coffee Shop"));
+                Assert.That(stored.ExternalTransactionId, Is.EqualTo("ext-1"));
+                Assert.That(again.GetAssignment(Categorizer.Normalize("Coffee Shop"))!.CategoryId, Is.EqualTo(groceries.Id));
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                foreach (var suffix in new[] { "", "-wal", "-shm" })
+                {
+                    var file = path + suffix;
+                    if (File.Exists(file))
+                        File.Delete(file);
+                }
+            }
         }
     }
 

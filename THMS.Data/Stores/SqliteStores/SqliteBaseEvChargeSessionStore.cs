@@ -21,7 +21,11 @@ namespace THMS.Data.Stores.SqliteStores
         {
             _mileageStore.Upsert(conn, session, "Ev");
             _table.Upsert(conn, session);
+            _table.UpsertCharge(conn, session.Id, session.BatteryCharge);
         }
+
+        public void UpsertCharge(SqliteConnection conn, Guid sessionId, EvBatteryCharge charge) =>
+            _table.UpsertCharge(conn, sessionId, charge);
 
         public BaseEvChargeSession? Get(SqliteConnection conn, Guid sessionId)
         {
@@ -72,6 +76,7 @@ namespace THMS.Data.Stores.SqliteStores
 
         public void Delete(SqliteConnection conn, Guid sessionId)
         {
+            _table.DeleteCharge(conn, sessionId);
             _table.Delete(conn, sessionId);
             _mileageStore.Delete(conn, sessionId);
         }

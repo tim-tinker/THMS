@@ -11,8 +11,21 @@
         public decimal StartSoc { get; set; }
         public decimal EndSoc { get; set; }
 
-        // Source-dependent data (manual for commercial, computed for home)
-        public decimal KwhAdded { get; set; }
+        // Battery energy is stored on its own row so a refit can replace calculated kWh
+        // without rewriting the session.
+        public EvBatteryCharge BatteryCharge { get; set; } = new();
+
+        public decimal KwhAdded
+        {
+            get => BatteryCharge.KwhAdded;
+            set => BatteryCharge.KwhAdded = value;
+        }
+
+        public bool KwhAddedIsCalculated
+        {
+            get => BatteryCharge.IsCalculated;
+            set => BatteryCharge.IsCalculated = value;
+        }
 
         public decimal? KwhDrawn
         {

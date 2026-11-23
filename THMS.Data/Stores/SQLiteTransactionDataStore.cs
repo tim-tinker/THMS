@@ -178,6 +178,50 @@ namespace THMS.Data.Stores.SQLite
             FinanceDataRevision.NoteChanged();
         }
 
+        public IReadOnlyList<PostedCategoryWrite> AssignPostedCategories(
+            IReadOnlyList<PostedCategoryAssignment> assignments,
+            Guid categoryId,
+            string categoryName)
+        {
+            var results = new PostedCategoryWrite[assignments.Count];
+            if (assignments.Count == 0)
+                return results;
+
+            using var conn = OpenConnection();
+            using var tx = conn.BeginTransaction();
+            var updated = false;
+            for (var i = 0; i < assignments.Count; i++)
+            {
+                var assignment = assignments[i];
+                var parent = ReadParentDescription(conn, assignment.TransactionId);
+                if (!parent.Found)
+                    continue;
+
+                var updatedSplit = false;
+                if (assignment.SplitRowId is Guid splitId)
+                {
+                    updatedSplit = _store.Splits.UpdateCategory(
+                        conn, splitId, assignment.TransactionId, categoryId, categoryName) > 0;
+                    if (!updatedSplit && ParentHasSplits(conn, assignment.TransactionId))
+                        throw new InvalidOperationException($"Split {splitId} was not found.");
+                }
+
+                if (!updatedSplit
+                    && _store.Posted.UpdateCategory(conn, assignment.TransactionId, categoryId, categoryName) == 0)
+                {
+                    _store.PostedTransfers.UpdateCategory(conn, assignment.TransactionId, categoryId, categoryName);
+                }
+
+                results[i] = new PostedCategoryWrite(true, parent.Description);
+                updated = true;
+            }
+
+            tx.Commit();
+            if (updated)
+                FinanceDataRevision.NoteChanged();
+            return results;
+        }
+
         public void DeletePostedTransferTransaction(Guid id)
         {
             using var conn = OpenConnection();
@@ -912,6 +956,33 @@ namespace THMS.Data.Stores.SQLite
         {
             if (item.Splits.Count > 0)
                 _store.Splits.ReplaceAll(conn, item.Id, item.Splits);
+        }
+
+        private static bool ParentHasSplits(SqliteConnection conn, Guid parentId)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT 1 FROM SplitTransactionRows WHERE ParentTransactionId = @ParentId LIMIT 1;";
+            cmd.Parameters.AddWithValue("@ParentId", parentId.ToString());
+            return cmd.ExecuteScalar() is not null;
+        }
+
+        private readonly record struct ParentDescription(bool Found, string? Description);
+
+        private static ParentDescription ReadParentDescription(SqliteConnection conn, Guid id)
+        {
+            var posted = ReadDescription(conn, "PostedTransactions", id);
+            return posted.Found ? posted : ReadDescription(conn, "PostedTransferTransactions", id);
+        }
+
+        private static ParentDescription ReadDescription(SqliteConnection conn, string tableName, Guid id)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"SELECT Description FROM {tableName} WHERE Id = @Id;";
+            cmd.Parameters.AddWithValue("@Id", id.ToString());
+            var value = cmd.ExecuteScalar();
+            if (value is null)
+                return new ParentDescription(false, null);
+            return new ParentDescription(true, value is DBNull ? null : Convert.ToString(value));
         }
 
         private T? AttachOne<T>(SqliteConnection conn, T? item) where T : BaseTransaction

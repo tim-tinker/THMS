@@ -32,6 +32,14 @@ namespace THMS.Data.Stores
         // ------------------------------------------------------------
         void AddPostedTransferTransaction(PostedTransferTransaction transaction);
         void UpdatePostedTransferTransaction(PostedTransferTransaction transaction);
+        /// <summary>
+        /// Sets only the category columns for each posted transaction, transfer, or split.
+        /// A missing transaction is left unchanged. A missing split throws, and no assignment in the batch is kept.
+        /// </summary>
+        IReadOnlyList<PostedCategoryWrite> AssignPostedCategories(
+            IReadOnlyList<PostedCategoryAssignment> assignments,
+            Guid categoryId,
+            string categoryName);
         void DeletePostedTransferTransaction(Guid id);
 
         PostedTransferTransaction? GetPostedTransferTransaction(Guid id);

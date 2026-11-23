@@ -60,7 +60,7 @@ namespace THMS.Data.Stores.SqliteStores
                 var evInfo = _vehicleEvTable.Get(conn, id);
                 if (evInfo == null) return null;
 
-                var (batteryCapacityKwh, chargingPortType) = evInfo.Value;
+                var (batteryCapacityKwh, chargingPortType, chargeEnergy) = evInfo.Value;
 
                 return new VehicleEv
                 {
@@ -71,7 +71,8 @@ namespace THMS.Data.Stores.SqliteStores
                     Year = year,
                     Vin = vin,
                     BatteryCapacityKwh = batteryCapacityKwh,
-                    ChargePortType = chargingPortType
+                    ChargePortType = chargingPortType,
+                    ChargeEnergy = chargeEnergy
                 };
             }
 

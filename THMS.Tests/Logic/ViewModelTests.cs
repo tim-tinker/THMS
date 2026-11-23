@@ -929,6 +929,26 @@ namespace THMS.Tests.Logic
             var extra = new VehicleIce { Id = Guid.NewGuid(), Name = "Spare" };
             vm.AddVehicle(extra);
             Assert.That(vm.Vehicles.Any(v => v.VehicleId == extra.Id), Is.True);
+
+            var edited = new VehicleIce
+            {
+                Id = extra.Id,
+                Name = "Spare Tire",
+                Make = "Honda",
+                Model = "Fit",
+                Year = 2016,
+                Vin = "VIN-1",
+                FuelTankCapacityGallons = 10.5m,
+                FuelType = "Gasoline"
+            };
+            vm.UpdateVehicle(edited);
+            Assert.That(vm.Vehicles.Count(v => v.VehicleId == extra.Id), Is.EqualTo(1));
+            Assert.That(vm.Vehicles.Single(v => v.VehicleId == extra.Id).Name, Is.EqualTo("Spare Tire"));
+            var stored = vehicles.GetVehicle(extra.Id) as VehicleIce;
+            Assert.That(stored, Is.Not.Null);
+            Assert.That(stored!.Make, Is.EqualTo("Honda"));
+            Assert.That(stored.FuelTankCapacityGallons, Is.EqualTo(10.5m));
+            Assert.That(stored.Vin, Is.EqualTo("VIN-1"));
             Assert.That(vm.HistoryPeriod, Is.EqualTo("Month"));
             Assert.That(vm.PeriodStart, Is.EqualTo(DateTime.Today.AddMonths(-1)));
 
