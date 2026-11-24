@@ -10,6 +10,7 @@ namespace THMS.Logic.ViewModels
     {
         private readonly IVehicleDataStore _vehicleStore;
         private readonly IFinanceDataStore _financeStore;
+        private readonly IAssetDataStore? _assets;
         private readonly TransportationCostAggregator _aggregator;
         private string _historyPeriod = "Month";
 
@@ -36,14 +37,19 @@ namespace THMS.Logic.ViewModels
         public VehicleListViewModel()
             : this(
                 new DataStoreFactory().GetVehicleStore(),
-                new DataStoreFactory().GetFinanceStore())
+                new DataStoreFactory().GetFinanceStore(),
+                new DataStoreFactory().GetAssetStore())
         {
         }
 
-        public VehicleListViewModel(IVehicleDataStore vehicleStore, IFinanceDataStore financeStore)
+        public VehicleListViewModel(
+            IVehicleDataStore vehicleStore,
+            IFinanceDataStore financeStore,
+            IAssetDataStore? assets = null)
         {
             _vehicleStore = vehicleStore;
             _financeStore = financeStore;
+            _assets = assets;
             _aggregator = new TransportationCostAggregator(_vehicleStore, _financeStore);
         }
 
@@ -92,6 +98,8 @@ namespace THMS.Logic.ViewModels
         public void UpdateVehicle(VehicleBase vehicle)
         {
             ArgumentNullException.ThrowIfNull(vehicle);
+            if (_assets is not null)
+                AssetOrchestrator.RenameLinkedVehicle(_assets, vehicle.Id, vehicle.Name);
             _vehicleStore.UpsertVehicle(vehicle);
             var updated = CreateListItem(vehicle);
             for (var i = 0; i < Vehicles.Count; i++)

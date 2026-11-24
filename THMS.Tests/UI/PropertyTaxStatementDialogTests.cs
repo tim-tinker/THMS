@@ -1,5 +1,6 @@
 using THMS.Data.Stores;
 using THMS.Domain.Assets;
+using THMS.Domain.Finance.Accounts;
 using THMS.Domain.Finance.Planning;
 using THMS.Logic.Orchestrators;
 using THMS.UI.WinForms.Controls;
@@ -283,6 +284,8 @@ namespace THMS.Tests.UI
                 Assert.That(Levy(dialog).Enabled, Is.False);
 
                 var grid = All(dialog).OfType<DataGridView>().Single();
+                Assert.That(grid.Rows.Count, Is.EqualTo(0));
+                All(dialog).OfType<ThmsButton>().Single(button => button.Text == "Add").PerformClick();
                 SetLine(grid, "ExemptionAmount", 145000m);
                 SetLine(grid, "RatePerHundred", 1.139m);
 
@@ -353,6 +356,16 @@ namespace THMS.Tests.UI
             try
             {
                 var grid = All(dialog).OfType<DataGridView>().Single();
+                var collectorLabel = All(dialog).OfType<Label>().Single(label => label.Text == "Collector");
+                var collectors = All(collectorLabel.Parent!).OfType<ComboBox>().Single();
+                Assert.That(collectors.DropDownStyle, Is.EqualTo(ComboBoxStyle.DropDown));
+                Assert.That(collectors.Text, Is.Empty);
+                Assert.That(collectors.SelectedIndex, Is.EqualTo(-1));
+                Assert.That(grid.Rows.Count, Is.EqualTo(0));
+                Assert.That(All(dialog).OfType<Label>().Any(label => label.Text == "Collector name"), Is.False);
+
+                collectors.SelectedItem = collectors.Items.Cast<object>().OfType<Account>()
+                    .Single(account => account.Name == "Fort Bend Tax Office");
                 Assert.That(grid.Rows.Count, Is.EqualTo(2));
                 Assert.That(grid.Rows[0].Cells["Name"].Value, Is.EqualTo("Lamar CISD"));
                 Assert.That(grid.Rows[1].Cells["Name"].Value, Is.EqualTo("Fort Bend County"));
@@ -363,10 +376,25 @@ namespace THMS.Tests.UI
                 Assert.That(Convert.ToDecimal(grid.Rows[1].Cells["ExemptionAmount"].Value), Is.EqualTo(5000m));
                 Assert.That(Convert.ToDecimal(grid.Rows[1].Cells["TaxableValue"].Value), Is.EqualTo(622100m));
                 Assert.That(Convert.ToDecimal(grid.Rows[1].Cells["TaxAmount"].Value), Is.EqualTo(2531.95m));
-                Assert.That(TextBox(dialog, "Homestead, Veteran").Text, Is.EqualTo("Homestead, Veteran"));
-                var collectors = All(dialog).OfType<ComboBox>().Single(combo =>
-                    combo.Items.Cast<object>().Any(item => item is string text && text == "(new collector)"));
-                Assert.That(collectors.GetItemText(collectors.SelectedItem), Is.EqualTo("Fort Bend Tax Office"));
+
+                var mud = orchestrator.EnsureTaxCollector("Fort Bend County M.U.D. #194");
+                var mudBill = Statement(mud.Id, property.Id, DateTime.Today.Year - 1, "MUD Debt Service", 0m, 0.25m);
+                orchestrator.SavePropertyTaxStatement(property, mudBill);
+                collectors.Items.Add(mud);
+                collectors.SelectedItem = mud;
+                Assert.That(grid.Rows.Count, Is.EqualTo(1));
+                Assert.That(grid.Rows[0].Cells["Name"].Value, Is.EqualTo("MUD Debt Service"));
+
+                collectors.Text = "Harris County Tax Office";
+                Assert.That(collectors.SelectedIndex, Is.EqualTo(-1));
+                Assert.That(grid.Rows.Count, Is.EqualTo(0));
+
+                collectors.Focus();
+                collectors.Text = "Fort Bend Tax Office";
+                dialog.SelectNextControl(collectors, true, true, true, true);
+                Assert.That(collectors.SelectedItem, Is.InstanceOf<Account>());
+                Assert.That(((Account)collectors.SelectedItem!).Name, Is.EqualTo("Fort Bend Tax Office"));
+                Assert.That(grid.Rows.Count, Is.EqualTo(2));
             }
             finally
             {

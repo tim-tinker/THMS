@@ -13,8 +13,6 @@ namespace THMS.UI.WinForms
         private int _loadGeneration;
         private Guid? _shownVehicleId;
         private DateTime? _shownMonth;
-        private readonly ContextMenuStrip _vehicleMenu = new();
-        private readonly ToolStripMenuItem _editVehicleItem = new("Edit");
 
         protected VehicleListItemViewModel? SelectedVehicle =>
             vehicleGrid.CurrentRow?.DataBoundItem as VehicleListItemViewModel;
@@ -31,13 +29,6 @@ namespace THMS.UI.WinForms
             DataGridViewUtil.EnableDoubleBuffering(monthlyGrid);
             DataGridViewUtil.EnableDoubleBuffering(contributionGrid);
             vehicleGrid.SelectionChanged += (_, _) => ShowSelectedVehicle();
-            vehicleGrid.CellDoubleClick += OnVehicleCellDoubleClick;
-            vehicleGrid.MouseDown += OnVehicleGridMouseDown;
-            _editVehicleItem.Click += (_, _) => EditSelectedVehicle();
-            _vehicleMenu.Items.Add(_editVehicleItem);
-            _vehicleMenu.Opening += (_, _) => _editVehicleItem.Enabled = SelectedVehicle is not null;
-            vehicleGrid.ContextMenuStrip = _vehicleMenu;
-            Disposed += (_, _) => _vehicleMenu.Dispose();
             monthlyGrid.SelectionChanged += (_, _) => ShowSelectedMonth();
             monthlyGrid.DataBindingComplete += (_, _) => ConfigureMonthColumns();
             contributionGrid.DataBindingComplete += (_, _) => ConfigureContributionColumns();
@@ -315,84 +306,6 @@ namespace THMS.UI.WinForms
                 BindMonths(index, selectedMonth, force: true);
                 DataGridViewUtil.SelectCellWhenReady(vehicleGrid, index, 0);
             }
-        }
-
-        private void btnAddVehicle_Click(object sender, EventArgs e)
-        {
-            var count = ViewModel.Vehicles.Count;
-            using var form = new AddVehicleForm(ViewModel);
-            form.ShowDialog(this);
-            if (ViewModel.Vehicles.Count > count)
-            {
-                var index = ViewModel.Vehicles.Count - 1;
-                BindMonths(index, preferredMonth: null, force: true);
-                DataGridViewUtil.SelectCellWhenReady(vehicleGrid, index, 0);
-            }
-        }
-
-        private void OnVehicleCellDoubleClick(object? sender, DataGridViewCellEventArgs e)
-        {
-            if (e.RowIndex >= 0)
-                EditVehicleAt(e.RowIndex);
-        }
-
-        private void OnVehicleGridMouseDown(object? sender, MouseEventArgs e)
-        {
-            if (e.Button != MouseButtons.Right)
-                return;
-
-            var hit = vehicleGrid.HitTest(e.X, e.Y);
-            if (hit.RowIndex < 0 || hit.RowIndex >= vehicleGrid.Rows.Count)
-                return;
-
-            var column = hit.ColumnIndex;
-            if (column < 0 || column >= vehicleGrid.Columns.Count || !vehicleGrid.Columns[column].Visible)
-                column = FirstVisibleColumn();
-            if (column < 0)
-                return;
-
-            vehicleGrid.CurrentCell = vehicleGrid.Rows[hit.RowIndex].Cells[column];
-        }
-
-        private void EditSelectedVehicle()
-        {
-            if (vehicleGrid.CurrentRow is { Index: >= 0 } row)
-                EditVehicleAt(row.Index);
-        }
-
-        private void EditVehicleAt(int rowIndex)
-        {
-            if (ViewModel is null || rowIndex < 0 || rowIndex >= vehicleGrid.Rows.Count)
-                return;
-            if (vehicleGrid.Rows[rowIndex].DataBoundItem is not VehicleListItemViewModel selected)
-                return;
-
-            var vehicle = ViewModel.GetVehicle(selected.VehicleId);
-            if (vehicle is null)
-            {
-                MessageBox.Show(this, "That vehicle could not be loaded.", "Vehicles");
-                return;
-            }
-
-            var month = SelectedMonth?.Month;
-            using var form = new AddVehicleForm(ViewModel, vehicle);
-            if (form.ShowDialog(this) != DialogResult.OK)
-                return;
-
-            var index = IndexOf(selected.VehicleId);
-            BindMonths(index, month, force: true);
-            DataGridViewUtil.SelectCellWhenReady(vehicleGrid, index, 0);
-        }
-
-        private int FirstVisibleColumn()
-        {
-            foreach (DataGridViewColumn column in vehicleGrid.Columns)
-            {
-                if (column.Visible)
-                    return column.Index;
-            }
-
-            return -1;
         }
 
         private void btnDetails_Click(object sender, EventArgs e)

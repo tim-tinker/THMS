@@ -29,7 +29,6 @@ namespace THMS.UI.WinForms
             splitMonthly = new SplitContainer();
             monthlyGrid = new DataGridView();
             contributionGrid = new DataGridView();
-            btnAddVehicle = new ThmsButton();
             btnDetails = new ThmsButton();
             ((System.ComponentModel.ISupportInitialize)splitVehicles).BeginInit();
             splitVehicles.Panel1.SuspendLayout();
@@ -118,18 +117,6 @@ namespace THMS.UI.WinForms
             contributionGrid.Size = new Size(944, 180);
             contributionGrid.TabIndex = 0;
             // 
-            // btnAddVehicle
-            // 
-            btnAddVehicle.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-            btnAddVehicle.Location = new Point(18, 582);
-            btnAddVehicle.Margin = new Padding(4);
-            btnAddVehicle.Name = "btnAddVehicle";
-            btnAddVehicle.Size = new Size(180, 52);
-            btnAddVehicle.TabIndex = 1;
-            btnAddVehicle.Text = "Add Vehicle";
-            btnAddVehicle.UseVisualStyleBackColor = true;
-            btnAddVehicle.Click += btnAddVehicle_Click;
-            // 
             // btnDetails
             // 
             btnDetails.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
@@ -148,7 +135,6 @@ namespace THMS.UI.WinForms
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(980, 668);
             Controls.Add(btnDetails);
-            Controls.Add(btnAddVehicle);
             Controls.Add(splitVehicles);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             Margin = new Padding(4);
@@ -176,7 +162,6 @@ namespace THMS.UI.WinForms
         private System.Windows.Forms.DataGridView vehicleGrid;
         private System.Windows.Forms.DataGridView monthlyGrid;
         private System.Windows.Forms.DataGridView contributionGrid;
-        private ThmsButton btnAddVehicle;
         private ThmsButton btnDetails;
     }
 }

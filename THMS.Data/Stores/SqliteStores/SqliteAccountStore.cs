@@ -92,6 +92,7 @@ namespace THMS.Data.Stores.SqliteStores
                 nameof(BankAccount) => LoadBank(conn, id),
                 nameof(CreditAccount) => LoadCredit(conn, id),
                 nameof(LoanAccount) => LoadLoan(conn, id),
+                nameof(LeaseAccount) => LoadLease(conn, id),
                 nameof(MortgageAccount) => LoadMortgage(conn, id),
                 nameof(InvestmentAccount) => LoadInvestment(conn, id),
                 nameof(InternalAccount) => LoadInternal(conn, id),
@@ -210,6 +211,23 @@ namespace THMS.Data.Stores.SqliteStores
                 InterestRate = details.Value.InterestRate,
                 TermMonths = details.Value.TermMonths,
                 SecuredAssetId = details.Value.SecuredAssetId
+            };
+        }
+
+        private LeaseAccount? LoadLease(SqliteConnection conn, Guid id)
+        {
+            var details = _loanAccountTable.Get(conn, id);
+            if (details == null)
+                return null;
+
+            return new LeaseAccount
+            {
+                Principal = details.Value.Principal,
+                InterestRate = details.Value.InterestRate,
+                TermMonths = details.Value.TermMonths,
+                SecuredAssetId = details.Value.SecuredAssetId,
+                LeaseAmount = details.Value.LeaseAmount,
+                Residual = details.Value.Residual
             };
         }
 

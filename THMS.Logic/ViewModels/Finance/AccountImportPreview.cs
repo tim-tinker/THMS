@@ -103,6 +103,7 @@ namespace THMS.Logic.ViewModels.Finance
         {
             BankAccount => AccountKinds.Bank,
             CreditAccount => AccountKinds.Credit,
+            LeaseAccount => AccountKinds.Lease,
             LoanAccount => AccountKinds.Loan,
             MortgageAccount => AccountKinds.Mortgage,
             InvestmentAccount => AccountKinds.Investment,
@@ -121,6 +122,7 @@ namespace THMS.Logic.ViewModels.Finance
                 AccountKinds.Bank => new BankAccount { Type = AccountType.Checking },
                 AccountKinds.Credit => new CreditAccount { Type = AccountType.CreditCard },
                 AccountKinds.Loan => new LoanAccount { Type = AccountType.Loan },
+                AccountKinds.Lease => new LeaseAccount { Type = AccountType.Lease },
                 AccountKinds.Mortgage => new MortgageAccount { Type = AccountType.Mortgage },
                 AccountKinds.Investment => new InvestmentAccount { Type = AccountType.Investment },
                 AccountKinds.Internal => new InternalAccount { Type = AccountType.Internal },

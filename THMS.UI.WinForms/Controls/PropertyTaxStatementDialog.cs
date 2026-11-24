@@ -8,13 +8,11 @@ namespace THMS.UI.WinForms.Controls
 {
     internal sealed class PropertyTaxStatementDialog : Form
     {
-        private const string NewCollector = "(new collector)";
         private const string ChooseValuation = "(choose a valuation)";
 
         private readonly AssetOrchestrator _orchestrator;
         private readonly PropertyTaxStatement? _existing;
-        private readonly ComboBox _collector = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
-        private readonly TextBox _collectorName = new() { Width = 220 };
+        private readonly ComboBox _collector = new() { DropDownStyle = ComboBoxStyle.DropDown, Width = 220 };
         private readonly ComboBox _property = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
         private readonly TextBox _propertyName = new() { Width = 220 };
         private readonly NumericUpDown _taxYear = new() { Minimum = 1900, Maximum = 2200, Width = 80 };
@@ -116,7 +114,6 @@ namespace THMS.UI.WinForms.Controls
             var statementRows = new Control[]
             {
                 FieldRow("Collector", _collector),
-                FieldRow("Collector name", _collectorName),
                 FieldRow("Property", _property),
                 FieldRow("Name", _propertyName),
                 FieldRow("Tax year", _taxYear),
@@ -159,8 +156,7 @@ namespace THMS.UI.WinForms.Controls
                 RowCount = 1,
                 BackColor = Color.White,
                 Margin = Padding.Empty,
-                Padding = Padding.Empty,
-                Height = Math.Max(SectionHeight(statementRows.Length), SectionHeight(propertyRows.Length))
+                Padding = Padding.Empty
             };
             facts.ColumnStyles.Clear();
             facts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
@@ -173,10 +169,10 @@ namespace THMS.UI.WinForms.Controls
             identity.Margin = new Padding(8, 0, 0, 0);
             facts.Controls.Add(statement, 0, 0);
             facts.Controls.Add(identity, 1, 0);
+            facts.Height = Math.Max(statement.Height, identity.Height);
 
             var values = Section("Appraised values", valueRows);
             values.Dock = DockStyle.Top;
-            values.Height = SectionHeight(valueRows.Length);
             values.Margin = Padding.Empty;
             _valuesSection = (TableLayoutPanel)values;
             _capRow = valueRows[4];
@@ -233,7 +229,9 @@ namespace THMS.UI.WinForms.Controls
             layout.Controls.Add(buttons, 0, 1);
             Controls.Add(layout);
 
-            _collector.SelectedIndexChanged += (_, _) => _collectorName.Enabled = IsNew(_collector);
+            _collector.SelectedIndexChanged += (_, _) => OnCollectorChanged();
+            _collector.TextChanged += (_, _) => OnCollectorTextChanged();
+            _collector.Leave += (_, _) => MatchTypedCollector();
             _property.SelectedIndexChanged += (_, _) => LoadPropertyFields();
             _assessmentMethod.SelectedIndexChanged += (_, _) => RecalculateAppraisal();
             _levyMethod.SelectedIndexChanged += (_, _) => RecalculateLines();
@@ -266,14 +264,9 @@ namespace THMS.UI.WinForms.Controls
                 _taxYear.Value = DateTime.Today.Year;
                 _process.Value = DateTime.Today;
                 _due.Value = DateTime.Today;
-                if (_property.SelectedItem is PropertyAsset selected)
-                    SeedFromPreviousStatement(selected);
-                else
-                    _rows.Add(new JurisdictionRow());
             }
 
             _loading = false;
-            _collectorName.Enabled = IsNew(_collector);
             LockCopiedFields();
             ReloadAppraisals(_existing?.ValuationId is Guid valuationId && valuationId != Guid.Empty
                 ? valuationId
@@ -286,6 +279,7 @@ namespace THMS.UI.WinForms.Controls
 
         private void ApplyInitialSize(Control facts, Control values, Control buttons, Control layout)
         {
+            GrowSectionBars(facts, values);
             var commandHeight = Math.Max(buttons.Controls.Cast<Control>().Select(control => control.PreferredSize.Height).DefaultIfEmpty(36).Max(), 36) + 16;
             var jurisdiction = 8 + BarHeight + RowHeight * 4 + commandHeight + RowHeight;
             var needed = facts.Height + values.Height + jurisdiction + buttons.Height + layout.Padding.Vertical;
@@ -351,9 +345,10 @@ namespace THMS.UI.WinForms.Controls
 
         private Account ResolveCollector()
         {
+            MatchTypedCollector();
             if (_collector.SelectedItem is Account account)
                 return account;
-            return _orchestrator.EnsureTaxCollector(_collectorName.Text);
+            return _orchestrator.EnsureTaxCollector(_collector.Text);
         }
 
         private PropertyAsset ResolveProperty()
@@ -365,19 +360,12 @@ namespace THMS.UI.WinForms.Controls
 
         private void BindChoices(Account? collector, PropertyAsset? property)
         {
+            _collector.DisplayMember = nameof(Account.Name);
+            _collector.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+            _collector.AutoCompleteSource = AutoCompleteSource.ListItems;
             _collector.Items.Clear();
-            _collector.Items.Add(NewCollector);
             foreach (var account in _collectors)
                 _collector.Items.Add(account);
-            _collector.Format += (_, args) =>
-            {
-                args.Value = args.ListItem switch
-                {
-                    Account account => account.Name,
-                    string text => text,
-                    _ => ""
-                };
-            };
 
             _property.Items.Clear();
             foreach (var item in _properties)
@@ -397,9 +385,13 @@ namespace THMS.UI.WinForms.Controls
                 : _collectors.FirstOrDefault(account => account.Id == collector.Id);
             if (_existing is not null)
                 collectorMatch ??= _collectors.FirstOrDefault(account => account.Id == _existing.AccountId);
-            _collector.SelectedItem = collectorMatch ?? (object)NewCollector;
             if (collectorMatch is not null)
-                _collectorName.Text = collectorMatch.Name;
+                _collector.SelectedItem = collectorMatch;
+            else
+            {
+                _collector.SelectedIndex = -1;
+                _collector.Text = "";
+            }
 
             var propertyMatch = property is null
                 ? null
@@ -477,52 +469,81 @@ namespace THMS.UI.WinForms.Controls
             if (_loading)
                 return;
             ReloadAppraisals(null);
-            if (_existing is null)
-                SeedFromPreviousStatement(asset);
+            if (_collector.SelectedItem is Account)
+                LoadJurisdictionsForCollector();
         }
 
-        private void SeedFromPreviousStatement(PropertyAsset asset)
+        private void OnCollectorChanged()
         {
-            var year = (int)_taxYear.Value;
-            var prior = _orchestrator.GetPropertyTaxStatements(asset.Id)
-                .Where(statement => statement.TaxYear < year)
-                .OrderByDescending(statement => statement.TaxYear)
-                .ThenByDescending(statement => statement.StatementDate)
-                .FirstOrDefault();
+            if (_loading || _seeding)
+                return;
+            LoadJurisdictionsForCollector();
+        }
 
+        private void OnCollectorTextChanged()
+        {
+            if (_loading || _seeding)
+                return;
+            if (_collector.SelectedIndex == -1)
+                return;
+            if (_collector.SelectedItem is Account account &&
+                string.Equals(account.Name, _collector.Text.Trim(), StringComparison.OrdinalIgnoreCase))
+                return;
+
+            _seeding = true;
+            var text = _collector.Text;
+            var start = _collector.SelectionStart;
+            var length = _collector.SelectionLength;
+            _collector.SelectedIndex = -1;
+            _collector.Text = text;
+            _collector.SelectionStart = start;
+            _collector.SelectionLength = length;
+            _seeding = false;
+            LoadJurisdictionsForCollector();
+        }
+
+        private void MatchTypedCollector()
+        {
+            if (_loading || _collector.SelectedItem is Account)
+                return;
+
+            var typed = _collector.Text.Trim();
+            if (typed.Length == 0)
+                return;
+
+            var match = _collectors.FirstOrDefault(account =>
+                string.Equals(account.Name, typed, StringComparison.OrdinalIgnoreCase));
+            if (match is not null)
+                _collector.SelectedItem = match;
+        }
+
+        private void LoadJurisdictionsForCollector()
+        {
             _seeding = true;
             try
             {
                 _rows.Clear();
+                if (_collector.SelectedItem is not Account collector || _property.SelectedItem is not PropertyAsset asset)
+                    return;
+
+                var prior = _orchestrator.GetPropertyTaxStatements(asset.Id)
+                    .Where(statement => statement.AccountId == collector.Id)
+                    .OrderByDescending(statement => statement.TaxYear)
+                    .ThenByDescending(statement => statement.StatementDate)
+                    .FirstOrDefault();
                 if (prior is null)
-                    _rows.Add(new JurisdictionRow());
-                else
+                    return;
+
+                foreach (var line in prior.Jurisdictions)
                 {
-                    _exemptions.Text = prior.Exemptions ?? "";
-                    if (_collector.SelectedItem is not Account)
+                    _rows.Add(new JurisdictionRow
                     {
-                        var collector = _collectors.FirstOrDefault(account => account.Id == prior.AccountId);
-                        if (collector is not null)
-                        {
-                            _collector.SelectedItem = collector;
-                            _collectorName.Text = collector.Name;
-                        }
-                    }
-
-                    foreach (var line in prior.Jurisdictions)
-                    {
-                        _rows.Add(new JurisdictionRow
-                        {
-                            Name = line.Name,
-                            ExemptionAmount = line.ExemptionAmount,
-                            TaxableValue = line.TaxableValue,
-                            RatePerHundred = line.RatePerHundred,
-                            TaxAmount = line.TaxAmount
-                        });
-                    }
-
-                    if (_rows.Count == 0)
-                        _rows.Add(new JurisdictionRow());
+                        Name = line.Name,
+                        ExemptionAmount = line.ExemptionAmount,
+                        TaxableValue = line.TaxableValue,
+                        RatePerHundred = line.RatePerHundred,
+                        TaxAmount = line.TaxAmount
+                    });
                 }
             }
             finally
@@ -789,7 +810,7 @@ namespace THMS.UI.WinForms.Controls
             };
 
         private static readonly int RowHeight = MeasuredRowHeight();
-        private static readonly int BarHeight = TextRenderer.MeasureText("Property on the bill", SectionFont).Height + 16;
+        private static readonly int BarHeight = TextRenderer.MeasureText("Property on the bill", SectionFont).Height + 28;
         private const int ValueColumnWidth = 340;
 
         private static readonly Font SectionFont = new("Segoe UI", 11F, FontStyle.Bold);
@@ -799,7 +820,7 @@ namespace THMS.UI.WinForms.Controls
         {
             var heading = SectionBar("Jurisdictions");
             heading.Dock = DockStyle.Top;
-            heading.Height = BarHeight;
+            heading.Height = HeadingHeight(heading);
 
             var total = FieldRow("Total taxes due", _totalDue, bold: true);
             total.Dock = DockStyle.Bottom;
@@ -858,30 +879,91 @@ namespace THMS.UI.WinForms.Controls
             stack.RowStyles.Clear();
             stack.RowStyles.Add(new RowStyle(SizeType.Absolute, 8));
             stack.Controls.Add(new Panel { Margin = Padding.Empty, BackColor = Color.White }, 0, 0);
-            stack.RowStyles.Add(new RowStyle(SizeType.Absolute, BarHeight));
-            stack.Controls.Add(SectionBar(title), 0, 1);
+            var heading = SectionBar(title);
+            stack.RowStyles.Add(new RowStyle(SizeType.Absolute, HeadingHeight(heading)));
+            stack.Controls.Add(heading, 0, 1);
             for (var i = 0; i < rows.Count; i++)
             {
                 stack.RowStyles.Add(new RowStyle(SizeType.Absolute, RowHeight));
                 stack.Controls.Add(rows[i], 0, i + 2);
             }
 
+            stack.Height = stack.RowStyles.Cast<RowStyle>().Sum(style => (int)Math.Round(style.Height));
             return stack;
         }
 
-        private static int SectionHeight(int dataRows) => 8 + BarHeight + RowHeight * dataRows;
-
-        private static Label SectionBar(string title) => new()
+        private static Control SectionBar(string title)
         {
-            Text = title,
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Font = SectionFont,
-            BackColor = SectionBarColor,
-            ForeColor = Color.Black,
-            Padding = new Padding(10, 4, 8, 4),
-            Margin = Padding.Empty
-        };
+            var caption = new Label
+            {
+                Text = title,
+                Dock = DockStyle.Fill,
+                AutoSize = false,
+                UseCompatibleTextRendering = true,
+                UseMnemonic = false,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = SectionFont,
+                BackColor = SectionBarColor,
+                ForeColor = Color.Black,
+                Padding = new Padding(14, 6, 10, 6),
+                Margin = Padding.Empty
+            };
+            // The table cell clips the first pixels of a docked label, so the caption sits inside a padded bar.
+            return new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = SectionBarColor,
+                Margin = Padding.Empty,
+                Padding = new Padding(2, 2, 2, 2),
+                Controls = { caption }
+            };
+        }
+
+        private static int HeadingHeight(Control heading)
+        {
+            var caption = heading.Controls.OfType<Label>().FirstOrDefault();
+            var text = caption?.Text ?? "";
+            var font = caption?.Font ?? SectionFont;
+            var padding = (caption?.Padding.Vertical ?? 0) + heading.Padding.Vertical;
+            return TextRenderer.MeasureText(text, font).Height + padding + 8;
+        }
+
+        private static void GrowSectionBars(Control facts, Control values)
+        {
+            var tallest = 0;
+            foreach (var section in facts.Controls.Cast<Control>())
+            {
+                GrowHeader(section);
+                tallest = Math.Max(tallest, ContentHeight(section));
+            }
+
+            if (tallest > 0)
+                facts.Height = tallest;
+            GrowHeader(values);
+        }
+
+        private static int ContentHeight(Control section) =>
+            section is TableLayoutPanel stack
+                ? stack.RowStyles.Cast<RowStyle>().Sum(style => (int)Math.Round(style.Height))
+                : section.Height;
+
+        private static void GrowHeader(Control section)
+        {
+            if (section is not TableLayoutPanel stack)
+                return;
+            var bar = stack.Controls.OfType<Panel>().FirstOrDefault(panel => panel.BackColor == SectionBarColor);
+            if (bar is null)
+                return;
+            var row = stack.GetRow(bar);
+            if (row < 0 || stack.RowStyles.Count <= row)
+                return;
+            var needed = HeadingHeight(bar);
+            var current = (int)Math.Round(stack.RowStyles[row].Height);
+            if (needed <= current)
+                return;
+            stack.RowStyles[row].Height = needed;
+            stack.Height += needed - current;
+        }
 
         private static Control FieldRow(string caption, Control value, bool bold = false)
         {
@@ -971,7 +1053,6 @@ namespace THMS.UI.WinForms.Controls
             return value;
         }
 
-        private static bool IsNew(ComboBox box) => box.SelectedItem is string;
 
         private sealed class JurisdictionRow : INotifyPropertyChanged
         {

@@ -66,6 +66,11 @@ namespace THMS.UI.WinForms.Controls
 
         private Label lblLoanTerm;
         private NumericUpDown numLoanTerm;
+        private Label lblLeaseAmount;
+        private NumericUpDown numLeaseAmount;
+        private Label lblLeaseResidual;
+        private NumericUpDown numLeaseResidual;
+        private Label lblLeaseHint;
 
         private Label lblMortPrincipal;
         private NumericUpDown numMortPrincipal;
@@ -263,10 +268,31 @@ namespace THMS.UI.WinForms.Controls
                 Maximum = 480
             };
 
+            lblLeaseAmount = FieldLabel("Lease amount:", 10, 116, 150);
+            numLeaseAmount = MoneyBox(panelFieldLeft, 116);
+            numLeaseAmount.Minimum = 0;
+            numLeaseAmount.Maximum = 1000000;
+
+            lblLeaseResidual = FieldLabel("Residual:", 10, 152, 150);
+            numLeaseResidual = MoneyBox(panelFieldLeft, 152);
+            numLeaseResidual.Minimum = 0;
+            numLeaseResidual.Maximum = 1000000;
+
+            lblLeaseHint = HintLabel(
+                "Balance is the remaining payments. Lease amount is the total of the payments over the term and is not part of net worth. " +
+                "Residual is the buyout. Net worth assumes you keep the vehicle: its value, minus the balance, minus the residual. " +
+                "A negative result is a liability.",
+                188,
+                380,
+                100);
+
             pnlLoan.Controls.AddRange(new Control[] {
                 lblLoanPrincipal, numLoanPrincipal,
                 lblLoanRate, numLoanRate,
-                lblLoanTerm, numLoanTerm
+                lblLoanTerm, numLoanTerm,
+                lblLeaseAmount, numLeaseAmount,
+                lblLeaseResidual, numLeaseResidual,
+                lblLeaseHint
             });
 
             lblMortPrincipal = FieldLabel("Principal:", 10, 8, 150);

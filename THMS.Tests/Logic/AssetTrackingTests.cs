@@ -369,12 +369,132 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void EnsureVehicleAssets_LinksTheExistingVehicleWithoutMovingFueling()
+        {
+            var vehicles = new InMemoryVehicleDataStore();
+            var ice = vehicles.GetAllVehicles().OfType<VehicleIce>().Single();
+            var fillUp = new IceMileageRecord
+            {
+                VehicleId = ice.Id,
+                VehicleName = ice.Name,
+                EndTime = new DateTime(2026, 3, 1),
+                OdometerMiles = 12000,
+                GallonsAdded = 11,
+                IsFullFillUp = true,
+                FuelCost = 40
+            };
+            vehicles.UpsertIceMileageRecord(fillUp);
+            vehicles.UpsertVehicle(new VehicleIce
+            {
+                Id = Guid.NewGuid(),
+                Year = 2014,
+                Make = "Honda",
+                Model = "Fit"
+            });
+
+            var assets = new InMemoryAssetDataStore();
+            assets.Save(new PersonalAsset { Name = ice.Name, Category = "Personal" });
+            var orchestrator = new AssetOrchestrator(
+                assets,
+                new InMemoryAccountDataStore(),
+                new InMemoryAccountStatementDataStore(),
+                new InMemoryTransactionDataStore(),
+                vehicles);
+
+            var rows = orchestrator.GetAssetRows();
+            orchestrator.EnsureVehicleAssets();
+
+            Assert.That(rows.Select(row => row.Name), Is.EquivalentTo(new[]
+            {
+                ice.Name, "Julie's (2)", "Tim's", "2014 Honda Fit"
+            }));
+            var linked = assets.GetAll().OfType<VehicleAsset>().Single(asset => asset.Name == "Julie's (2)");
+            Assert.That(linked.VehicleId, Is.EqualTo(ice.Id));
+            Assert.That(vehicles.GetVehicle(ice.Id)!.Id, Is.EqualTo(ice.Id));
+            Assert.That(vehicles.GetEarliestIceMileageRecord(ice.Id)!.VehicleId, Is.EqualTo(ice.Id));
+            Assert.That(assets.GetAll().OfType<VehicleAsset>().Count(asset => asset.VehicleId == ice.Id), Is.EqualTo(1));
+
+            AssetOrchestrator.RenameLinkedVehicle(assets, ice.Id, "Julie's Escape");
+            Assert.That(assets.GetAll().OfType<VehicleAsset>().Single(asset => asset.VehicleId == ice.Id).Name,
+                Is.EqualTo("Julie's Escape"));
+        }
+
+        [Test]
         public void StatementAccountMatch_TreatsATaxCollectorAsAPropertyTaxAccount()
         {
             var collector = new UntrackedAccount { Type = AccountType.Tax };
             Assert.That(StatementAccountMatch.ForAccount(collector), Is.EqualTo(StatementType.PropertyTax));
             Assert.That(StatementAccountMatch.CreateStatement(StatementType.PropertyTax), Is.TypeOf<PropertyTaxStatement>());
             Assert.That(StatementAccountMatch.CreateAccount(StatementType.PropertyTax).Type, Is.EqualTo(AccountType.Tax));
+        }
+
+        [Test]
+        public void Lease_LinksToAVehicleAndRoundTripsAsALease()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"thms-lease-{Guid.NewGuid():N}.db");
+            try
+            {
+                var assets = new SQLiteAssetDataStore(path);
+                var accounts = new SQLiteAccountDataStore(path);
+                var orchestrator = new AssetOrchestrator(
+                    assets,
+                    accounts,
+                    new SQLiteAccountStatementDataStore(path),
+                    new InMemoryTransactionDataStore(),
+                    new InMemoryVehicleDataStore());
+
+                var lease = new LeaseAccount
+                {
+                    Name = "Car lease",
+                    Institution = "Ford",
+                    AccountNumber = "3",
+                    WebsiteUrl = "",
+                    Type = AccountType.Lease,
+                    Principal = -12000m,
+                    InterestRate = 0.039m,
+                    TermMonths = 36,
+                    LeaseAmount = 18000m,
+                    Residual = 15000m
+                };
+                accounts.UpsertAccount(lease);
+                accounts.UpsertAccount(new MortgageAccount
+                {
+                    Name = "Mortgage",
+                    Institution = "Bank",
+                    AccountNumber = "9",
+                    WebsiteUrl = "",
+                    Type = AccountType.Mortgage
+                });
+                var car = new VehicleEv { Year = 2023, Make = "Ford", Model = "Mustang Mach-E", Vin = "LEASEVIN" };
+                var vehicle = new VehicleAsset { Name = "Mach-E", Category = "Vehicle" };
+                orchestrator.SaveAsset(vehicle, lease.Id, car);
+
+                Assert.That(AccountKinds.Of(lease), Is.EqualTo(AccountKinds.Lease));
+                Assert.That(StatementAccountMatch.ForAccount(lease), Is.EqualTo(StatementType.Loan));
+                Assert.That(orchestrator.GetSecurableAccounts(vehicle).Single(), Is.TypeOf<LeaseAccount>());
+                Assert.That(orchestrator.GetSecuredAccount(vehicle.Id), Is.TypeOf<LeaseAccount>());
+
+                var house = new PropertyAsset { Name = "House" };
+                orchestrator.SaveAsset(house, null, null);
+                Assert.That(orchestrator.GetSecurableAccounts(house).Single(), Is.TypeOf<MortgageAccount>());
+
+                var reloaded = new SQLiteAccountDataStore(path).GetAccount("Car lease");
+                Assert.That(reloaded, Is.TypeOf<LeaseAccount>());
+                var saved = (LeaseAccount)reloaded!;
+                Assert.That(saved.Type, Is.EqualTo(AccountType.Lease));
+                Assert.That(saved.Principal, Is.EqualTo(-12000m));
+                Assert.That(saved.InterestRate, Is.EqualTo(0.039m).Within(0.0000001m));
+                Assert.That(saved.TermMonths, Is.EqualTo(36));
+                Assert.That(saved.LeaseAmount, Is.EqualTo(18000m));
+                Assert.That(saved.Residual, Is.EqualTo(15000m));
+                Assert.That(saved.SecuredAssetId, Is.EqualTo(vehicle.Id));
+                Assert.That(LeaseEquity.IfKept(30000m, saved.Principal, saved.Residual), Is.EqualTo(3000m).Within(0.01m));
+                Assert.That(AccountKinds.Of(saved), Is.EqualTo(AccountKinds.Lease));
+            }
+            finally
+            {
+                TryDelete(path);
+            }
         }
 
         private static AssetOrchestrator Orchestrator()

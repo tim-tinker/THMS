@@ -5,6 +5,7 @@ namespace THMS.Domain.Finance.Accounts
         public const string Bank = "Bank";
         public const string Credit = "Credit";
         public const string Loan = "Loan";
+        public const string Lease = "Lease";
         public const string Mortgage = "Mortgage";
         public const string Investment = "Investment";
         public const string Internal = "Internal";
@@ -17,6 +18,7 @@ namespace THMS.Domain.Finance.Accounts
         {
             BankAccount => Bank,
             CreditAccount => Credit,
+            LeaseAccount => Lease,
             LoanAccount => Loan,
             MortgageAccount => Mortgage,
             InvestmentAccount => Investment,

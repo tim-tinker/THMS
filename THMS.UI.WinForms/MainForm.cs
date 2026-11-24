@@ -1,3 +1,4 @@
+using THMS.Logic.Orchestrators;
 using THMS.Logic.Orchestrators.Finance;
 using THMS.UI.WinForms;
 using THMS.UI.WinForms.Controls;
@@ -58,6 +59,7 @@ namespace THMS.UI
         {
             AddSectionLabel("Dashboards");
             AddDashboard("Finance", new FinanceDashboardForm());
+            AddDashboard("Net Worth", new NetWorthDashboardForm());
             AddDashboard("Investments", new InvestmentsDashboardForm());
             AddDashboard("Vehicles", new VehicleListDashboardForm());
             AddDashboard("Energy", new EnergyDashboardForm());
@@ -71,6 +73,7 @@ namespace THMS.UI
 
         private void OnLoad(object sender, EventArgs e)
         {
+            new AssetOrchestrator().EnsureVehicleAssets();
             ShowDashboard("Finance");
         }
 

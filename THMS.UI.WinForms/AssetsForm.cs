@@ -40,7 +40,7 @@ namespace THMS.UI.WinForms
                 Column(nameof(AssetListRow.AcquiredOn), "Acquired"),
                 Money(nameof(AssetListRow.CostBasis), "Cost basis"),
                 Fill(nameof(AssetListRow.LatestValue), "Latest value"),
-                Fill(nameof(AssetListRow.SecuredAccount), "Loan or mortgage"));
+                Fill(nameof(AssetListRow.SecuredAccount), "Loan, lease, or mortgage"));
             _valuations.Columns.AddRange(
                 Fill(nameof(AssetValuation.ValueType), "Value"),
                 Money(nameof(AssetValuation.Amount), "Amount"),
@@ -162,9 +162,13 @@ namespace THMS.UI.WinForms
                 return;
             }
 
-            using var dialog = asset is PropertyAsset property
-                ? new PropertyValuationDialog(_orchestrator, property, existing as PropertyAppraisal)
-                : (Form)new ValuationEditorDialog(_orchestrator, asset.Id, existing as AssetValuation);
+            using var dialog = asset switch
+            {
+                PropertyAsset property => (Form)new PropertyValuationDialog(_orchestrator, property, existing as PropertyAppraisal),
+                VehicleAsset vehicle => new VehicleValuationDialog(_orchestrator, vehicle, existing as AssetValuation),
+                PersonalAsset personal => new PersonalValuationDialog(_orchestrator, personal, existing as AssetValuation),
+                _ => throw new InvalidOperationException($"No valuation editor for {asset.Name}.")
+            };
             if (dialog.ShowDialog(this) == DialogResult.OK)
                 Reload(asset.Id);
         }

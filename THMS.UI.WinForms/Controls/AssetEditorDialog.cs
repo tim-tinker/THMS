@@ -17,6 +17,13 @@ namespace THMS.UI.WinForms.Controls
         private readonly DateTimePicker _acquired = new() { Format = DateTimePickerFormat.Short, ShowCheckBox = true };
         private readonly NumericUpDown _cost = MoneyBox();
         private readonly ComboBox _secured = new() { DropDownStyle = ComboBoxStyle.DropDownList };
+        private readonly Label _keepIt = new()
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        private readonly Dictionary<Guid, Account> _securableById = [];
+        private Control? _keepItRow;
         private readonly TextBox _address = new();
         private readonly TextBox _cad = new();
         private readonly TextBox _taxAccount = new();
@@ -31,6 +38,22 @@ namespace THMS.UI.WinForms.Controls
         private readonly TextBox _model = new();
         private readonly TextBox _vin = new();
         private readonly ComboBox _powertrain = new() { DropDownStyle = ComboBoxStyle.DropDownList };
+        private readonly NumericUpDown _capacity = new()
+        {
+            DecimalPlaces = 1,
+            Increment = 0.1m,
+            Maximum = 10000m,
+            Width = 120,
+            TextAlign = HorizontalAlignment.Right
+        };
+        private readonly Label _capacityUnit = new()
+        {
+            Text = "gallons",
+            AutoSize = false,
+            Width = 48,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        private readonly Panel _capacityField = new() { Height = 28 };
         private readonly FlowLayoutPanel _fields = new();
         private readonly FlowLayoutPanel _buttons = new();
         private readonly Panel _scroll = new() { AutoScroll = true };
@@ -56,7 +79,7 @@ namespace THMS.UI.WinForms.Controls
             MinimumSize = new Size(720, 480);
 
             _kind.Items.AddRange([AssetKinds.Property, AssetKinds.Vehicle, AssetKinds.Personal]);
-            _howAcquired.Items.AddRange(["Purchase", "Gift", "Inheritance", "Transfer"]);
+            _howAcquired.Items.AddRange(["Purchase", "Lease", "Gift", "Inheritance", "Transfer"]);
             _assessmentMethod.Items.AddRange([
                 AssessmentMethods.ApplyHomesteadCap,
                 AssessmentMethods.EqualMarketValue,
@@ -72,6 +95,12 @@ namespace THMS.UI.WinForms.Controls
             _levyMethod.SelectedIndex = 0;
             _powertrain.Items.AddRange(["ICE", "EV"]);
             _powertrain.SelectedIndex = 0;
+            _capacity.Dock = DockStyle.Left;
+            _capacityUnit.Dock = DockStyle.Left;
+            _capacityUnit.Width = 72;
+            // The last control added is docked first, so the number stays left of the unit.
+            _capacityField.Controls.Add(_capacityUnit);
+            _capacityField.Controls.Add(_capacity);
             _year.Value = DateTime.Today.Year;
             _notes.MinimumSize = new Size(0, 72);
             _legal.MinimumSize = new Size(0, 64);
@@ -104,7 +133,10 @@ namespace THMS.UI.WinForms.Controls
             AddKindRow("Model", _model, 0, _vehicleRows);
             AddKindRow("VIN", _vin, 0, _vehicleRows);
             AddKindRow("Powertrain", _powertrain, 0, _vehicleRows);
-            AddRow("Loan or mortgage", _secured, 0);
+            AddKindRow("Fuel capacity", _capacityField, 0, _vehicleRows);
+            AddRow("Loan, lease, or mortgage", _secured, 0);
+            _keepItRow = AddRow("If you keep it", _keepIt, 48);
+            _keepItRow.Visible = false;
 
             _scroll.Controls.Add(_fields);
 
@@ -124,7 +156,9 @@ namespace THMS.UI.WinForms.Controls
             Controls.Add(_buttons);
 
             _kind.SelectedIndexChanged += (_, _) => ShowKind();
+            _secured.SelectedIndexChanged += (_, _) => ShowKeepIt();
             _vehicles.SelectedIndexChanged += (_, _) => LoadSelectedVehicle();
+            _powertrain.SelectedIndexChanged += (_, _) => OnPowertrainChanged();
             Load += (_, _) => FitToContent();
             Resize += (_, _) => Arrange();
             LoadExisting();
@@ -312,13 +346,23 @@ namespace THMS.UI.WinForms.Controls
             vehicle.Make = _make.Text.Trim();
             vehicle.Model = _model.Text.Trim();
             vehicle.Vin = _vin.Text.Trim();
+            switch (vehicle)
+            {
+                case VehicleEv ev:
+                    ev.BatteryCapacityKwh = _capacity.Value;
+                    break;
+                case VehicleIce ice:
+                    ice.FuelTankCapacityGallons = _capacity.Value;
+                    break;
+            }
+
             return vehicle;
         }
 
         private void BindVehicles(VehicleBase? selected)
         {
             var choices = new List<VehicleChoice> { new(null, "(new vehicle)") };
-            choices.AddRange(_orchestrator.GetVehicles().Select(vehicle =>
+            choices.AddRange(_orchestrator.GetVehiclesAvailableTo(_existing?.Id ?? Guid.Empty).Select(vehicle =>
                 new VehicleChoice(vehicle, $"{vehicle.Year} {vehicle.Make} {vehicle.Model}".Trim())));
             _vehicles.DataSource = choices;
             _vehicles.DisplayMember = nameof(VehicleChoice.Label);
@@ -341,23 +385,81 @@ namespace THMS.UI.WinForms.Controls
             _model.Text = vehicle.Model;
             _vin.Text = vehicle.Vin;
             _powertrain.SelectedItem = vehicle is VehicleEv ? "EV" : "ICE";
+            _capacity.Value = Clamp(_capacity, vehicle switch
+            {
+                VehicleEv ev => ev.BatteryCapacityKwh,
+                VehicleIce ice => ice.FuelTankCapacityGallons,
+                _ => 0m
+            });
+            ShowCapacityUnit();
             if (string.IsNullOrWhiteSpace(_name.Text))
                 _name.Text = vehicle.Name;
         }
+
+        private void OnPowertrainChanged()
+        {
+            ShowCapacityUnit();
+            if (_loading)
+                return;
+
+            _capacity.Value = Clamp(_capacity, (_powertrain.SelectedItem as string == "EV", SelectedVehicle()) switch
+            {
+                (true, VehicleEv ev) => ev.BatteryCapacityKwh,
+                (false, VehicleIce ice) => ice.FuelTankCapacityGallons,
+                _ => 0m
+            });
+        }
+
+        private void ShowCapacityUnit() =>
+            _capacityUnit.Text = _powertrain.SelectedItem as string == "EV" ? "kWh" : "gallons";
+
+        private VehicleBase? SelectedVehicle() =>
+            _vehicles.SelectedItem is VehicleChoice choice ? choice.Vehicle : null;
 
         private void BindSecured(Guid? selectedId)
         {
             var asset = BuildPreview();
             if (asset is null)
                 return;
+            var accounts = _orchestrator.GetSecurableAccounts(asset);
+            _securableById.Clear();
+            foreach (var account in accounts)
+                _securableById[account.Id] = account;
             var choices = new List<AccountChoice> { new(Guid.Empty, "(none)") };
-            choices.AddRange(_orchestrator.GetSecurableAccounts(asset)
-                .Select(account => new AccountChoice(account.Id, account.Name)));
+            choices.AddRange(accounts.Select(account => new AccountChoice(account.Id, account.Name)));
 
             _secured.DataSource = null;
             _secured.DataSource = choices;
             _secured.DisplayMember = nameof(AccountChoice.Name);
             _secured.SelectedItem = choices.FirstOrDefault(choice => choice.Id == selectedId) ?? choices[0];
+            ShowKeepIt();
+        }
+
+        private void ShowKeepIt()
+        {
+            if (_keepItRow is null)
+                return;
+
+            var id = _secured.SelectedItem is AccountChoice choice ? choice.Id : Guid.Empty;
+            if (id == Guid.Empty || !_securableById.TryGetValue(id, out var account) || account is not LeaseAccount lease)
+            {
+                _keepItRow.Visible = false;
+                return;
+            }
+
+            _keepItRow.Visible = true;
+            var amount = _existing is null || _existing.Id == Guid.Empty
+                ? null
+                : _orchestrator.LatestAmount(_existing.Id);
+            if (amount is not decimal value)
+            {
+                _keepIt.Text = "Record a value for this vehicle. Net worth of keeping it is that value, minus the remaining payments, minus the residual.";
+                return;
+            }
+
+            var equity = LeaseEquity.IfKept(value, lease.Principal, lease.Residual);
+            var role = equity < 0 ? " That is a liability." : "";
+            _keepIt.Text = $"{equity:c2}. Net worth of keeping it is the latest value of {value:c2}, minus the remaining payments, minus the residual of {lease.Residual:c2}.{role}";
         }
 
         private Asset? BuildPreview() => (_kind.SelectedItem as string) switch
@@ -375,7 +477,7 @@ namespace THMS.UI.WinForms.Controls
         {
             var labelWidth = new[]
             {
-                "How acquired", "Tax account no.", "Legal description", "Loan or mortgage", "Assessment method", "Tax calculation"
+                "How acquired", "Tax account no.", "Legal description", "Loan, lease, or mortgage", "Assessment method", "Tax calculation", "Fuel capacity"
             }.Max(text => TextRenderer.MeasureText(text, Font).Width) + 8;
 
             var row = new Panel
@@ -414,11 +516,12 @@ namespace THMS.UI.WinForms.Controls
 
         private static decimal Clamp(NumericUpDown box, decimal value)
         {
-            if (value < box.Minimum)
+            var rounded = decimal.Round(value, box.DecimalPlaces, MidpointRounding.AwayFromZero);
+            if (rounded < box.Minimum)
                 return box.Minimum;
-            if (value > box.Maximum)
+            if (rounded > box.Maximum)
                 return box.Maximum;
-            return value;
+            return rounded;
         }
 
         private sealed record VehicleChoice(VehicleBase? Vehicle, string Label);

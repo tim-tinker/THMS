@@ -83,6 +83,8 @@ namespace THMS.UI.WinForms.Controls
             toolbar.Controls.Add(_delete);
 
             DataGridViewUtil.EnableDoubleBuffering(_grid);
+            _grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            _grid.MultiSelect = true;
             _grid.AllowUserToAddRows = false;
             _grid.AllowUserToDeleteRows = false;
             _grid.AllowUserToResizeRows = false;
@@ -101,6 +103,7 @@ namespace THMS.UI.WinForms.Controls
             _grid.CellBeginEdit += OnPayFromBeginEdit;
             _grid.DataError += (_, e) => e.ThrowException = false;
             _grid.SelectionChanged += (_, _) => UpdateDelete();
+            _grid.KeyDown += OnGridKeyDown;
             _grid.CellDoubleClick += OnBillDoubleClick;
             _grid.MouseDown += OnGridMouseDown;
             _grid.ContextMenuStrip = _menu;
@@ -360,10 +363,8 @@ namespace THMS.UI.WinForms.Controls
             if (hit.RowIndex < 0)
                 return;
 
-            var alreadyCurrent = _grid.CurrentCell?.RowIndex == hit.RowIndex
-                && (hit.ColumnIndex < 0 || _grid.CurrentCell?.ColumnIndex == hit.ColumnIndex)
-                && DataGridViewUtil.CellIsSelected(_grid, hit.RowIndex, hit.ColumnIndex);
-            if (!alreadyCurrent && !DataGridViewUtil.SelectOnlyCell(_grid, hit.RowIndex, hit.ColumnIndex))
+            if (!RowIsSelected(hit.RowIndex)
+                && !DataGridViewUtil.SelectOnlyCell(_grid, hit.RowIndex, hit.ColumnIndex))
                 return;
 
             var location = e.Location;
@@ -385,7 +386,30 @@ namespace THMS.UI.WinForms.Controls
             }
 
             _menu.Items.Clear();
-            if (_grid.CurrentRow?.DataBoundItem is not BillRow row || row.DestinationAccountId == Guid.Empty)
+            var selected = SelectedBills();
+            if (selected.Count == 0)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            if (selected.Count > 1)
+            {
+                var deletable = selected.Where(CanDelete).ToList();
+                if (deletable.Count == 0)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+
+                var deleteSelected = new ToolStripMenuItem($"Delete {deletable.Count} bills");
+                deleteSelected.Click += (_, _) => DeleteBills(deletable);
+                _menu.Items.Add(deleteSelected);
+                return;
+            }
+
+            var row = selected[0];
+            if (row.DestinationAccountId == Guid.Empty)
             {
                 e.Cancel = true;
                 return;
@@ -798,12 +822,22 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
-        private void OnDelete(object? sender, EventArgs e)
+        private void OnGridKeyDown(object? sender, KeyEventArgs e)
         {
-            if (SelectedDeletable() is not BillRow row)
+            if (e.KeyCode != Keys.Delete || _grid.IsCurrentCellInEditMode)
                 return;
 
-            DeleteBill(row);
+            OnDelete(sender, e);
+            e.Handled = true;
+        }
+
+        private void OnDelete(object? sender, EventArgs e)
+        {
+            var rows = SelectedBills().Where(CanDelete).ToList();
+            if (rows.Count == 0)
+                return;
+
+            DeleteBills(rows);
         }
 
         private void DeleteBill(BillRow row)
@@ -812,29 +846,15 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             var name = string.IsNullOrWhiteSpace(row.Notes) ? row.Kind : row.Notes;
-            var statement = row.Kind == BillKinds.Statement || row.Source == PaymentIntentSource.Statement;
-            var prompt = statement
+            var prompt = IsStatementBill(row)
                 ? $"Remove '{name}' from Bills? The statement stays on the account."
                 : $"Delete '{name}'?";
-            if (MessageBox.Show(
-                    FindForm(),
-                    prompt,
-                    "Delete",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning) != DialogResult.Yes)
+            if (!ConfirmDelete(prompt))
                 return;
 
             try
             {
-                if (statement && (row.StatementId ?? row.SourceId) is Guid statementId)
-                    _orchestrator.RemoveStatementBill(statementId);
-                else if (row.Source == PaymentIntentSource.RecurringSingle && row.SourceId is Guid singleId)
-                    _rules.DeleteSingleRule(singleId);
-                else if (row.Source == PaymentIntentSource.RecurringTransfer && row.SourceId is Guid transferRuleId)
-                    _rules.DeleteTransferRule(transferRuleId);
-                else if (row.IntentId is Guid expectedId)
-                    _orchestrator.DeleteEnteredBill(expectedId);
-
+                RemoveBill(row);
                 Reload();
                 DataChanged?.Invoke(this, EventArgs.Empty);
             }
@@ -844,18 +864,87 @@ namespace THMS.UI.WinForms.Controls
             }
         }
 
-        private BillRow? SelectedDeletable() =>
-            _grid.CurrentRow?.DataBoundItem is BillRow row && CanDelete(row) ? row : null;
+        private void DeleteBills(IReadOnlyList<BillRow> rows)
+        {
+            var targets = rows.Where(CanDelete).Distinct().ToList();
+            if (targets.Count == 0)
+                return;
+            if (targets.Count == 1)
+            {
+                DeleteBill(targets[0]);
+                return;
+            }
+
+            var statements = targets.Count(IsStatementBill);
+            var prompt = statements == targets.Count
+                ? $"Remove {targets.Count} bills from Bills? The statements stay on the account."
+                : statements > 0
+                    ? $"Delete {targets.Count} bills? Statements stay on the account."
+                    : $"Delete {targets.Count} bills?";
+            if (!ConfirmDelete(prompt))
+                return;
+
+            try
+            {
+                foreach (var row in targets)
+                    RemoveBill(row);
+                Reload();
+                DataChanged?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                Reload();
+                DataChanged?.Invoke(this, EventArgs.Empty);
+                ExceptionDialog.Show(FindForm(), "Delete", ex);
+            }
+        }
+
+        private bool ConfirmDelete(string prompt) =>
+            MessageBox.Show(
+                FindForm(),
+                prompt,
+                "Delete",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning) == DialogResult.Yes;
+
+        private void RemoveBill(BillRow row)
+        {
+            if (IsStatementBill(row) && (row.StatementId ?? row.SourceId) is Guid statementId)
+                _orchestrator.RemoveStatementBill(statementId);
+            else if (row.Source == PaymentIntentSource.RecurringSingle && row.SourceId is Guid singleId)
+                _rules.DeleteSingleRule(singleId);
+            else if (row.Source == PaymentIntentSource.RecurringTransfer && row.SourceId is Guid transferRuleId)
+                _rules.DeleteTransferRule(transferRuleId);
+            else if (row.IntentId is Guid expectedId)
+                _orchestrator.DeleteEnteredBill(expectedId);
+        }
+
+        private List<BillRow> SelectedBills() =>
+            DataGridViewUtil.SelectedDataRows(_grid)
+                .Select(row => row.DataBoundItem)
+                .OfType<BillRow>()
+                .ToList();
+
+        private bool RowIsSelected(int rowIndex)
+        {
+            if (rowIndex < 0 || rowIndex >= _grid.RowCount)
+                return false;
+            if (_grid.Rows[rowIndex].Selected)
+                return true;
+            return _grid.Rows[rowIndex].Cells.Cast<DataGridViewCell>().Any(cell => cell.Selected);
+        }
+
+        private static bool IsStatementBill(BillRow row) =>
+            row.Kind == BillKinds.Statement || row.Source == PaymentIntentSource.Statement;
 
         private static bool CanDelete(BillRow row) =>
-            ((row.Kind == BillKinds.Statement || row.Source == PaymentIntentSource.Statement)
-                && (row.StatementId is Guid || row.SourceId is Guid))
+            (IsStatementBill(row) && (row.StatementId is Guid || row.SourceId is Guid))
             || (row.Source is PaymentIntentSource.RecurringSingle or PaymentIntentSource.RecurringTransfer
                 && row.SourceId is Guid)
             || (row.Source == PaymentIntentSource.Manual && row.IntentId is Guid);
 
         private void UpdateDelete() =>
-            _delete.Enabled = SelectedDeletable() is not null;
+            _delete.Enabled = SelectedBills().Any(CanDelete);
 
         private void EndEdit()
         {

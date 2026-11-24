@@ -43,6 +43,7 @@ namespace THMS.Logic.Orchestrators
 
         public IReadOnlyList<AssetListRow> GetAssetRows()
         {
+            EnsureVehicleAssets();
             var accounts = _accounts.GetAllAccounts().ToList();
             return _assets.GetAll()
                 .Select(asset => new AssetListRow
@@ -105,10 +106,99 @@ namespace THMS.Logic.Orchestrators
         public Account? GetSecuredAccount(Guid assetId) =>
             SecuredAccount(_accounts.GetAllAccounts(), _assets.Get(assetId));
 
+        /// <summary>
+        /// A transportation vehicle is also an asset. Fueling, mileage, and charging keep the
+        /// vehicle id; this only adds the asset row when one is missing.
+        /// </summary>
+        public void EnsureVehicleAssets()
+        {
+            var assets = _assets.GetAll();
+            var linked = assets.OfType<VehicleAsset>()
+                .Where(asset => asset.VehicleId != Guid.Empty)
+                .Select(asset => asset.VehicleId)
+                .ToHashSet();
+            var names = new HashSet<string>(
+                assets.Select(asset => asset.Name),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var vehicle in _vehicles.GetAllVehicles())
+            {
+                if (vehicle.Id == Guid.Empty || !linked.Add(vehicle.Id))
+                    continue;
+
+                var name = UniqueName(VehicleAssetName(vehicle), names);
+                names.Add(name);
+                _assets.Save(new VehicleAsset
+                {
+                    Name = name,
+                    Category = "Vehicle",
+                    VehicleId = vehicle.Id
+                });
+            }
+        }
+
+        public static void RenameLinkedVehicle(IAssetDataStore assets, Guid vehicleId, string name)
+        {
+            ArgumentNullException.ThrowIfNull(assets);
+            if (vehicleId == Guid.Empty || string.IsNullOrWhiteSpace(name))
+                return;
+
+            var asset = assets.GetAll()
+                .OfType<VehicleAsset>()
+                .FirstOrDefault(item => item.VehicleId == vehicleId);
+            if (asset is null)
+                return;
+
+            name = name.Trim();
+            if (string.Equals(asset.Name, name, StringComparison.Ordinal))
+                return;
+
+            var taken = assets.GetAll().Any(item =>
+                item.Id != asset.Id
+                && string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (taken)
+                throw new InvalidOperationException($"An asset named {name} already exists.");
+
+            asset.Name = name;
+            assets.Save(asset);
+        }
+
         public IReadOnlyList<VehicleBase> GetVehicles() =>
             _vehicles.GetAllVehicles()
                 .OrderBy(vehicle => vehicle.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+        public IReadOnlyList<VehicleBase> GetVehiclesAvailableTo(Guid assetId) 
+        {
+            var taken = _assets.GetAll()
+                .OfType<VehicleAsset>()
+                .Where(asset => asset.Id != assetId && asset.VehicleId != Guid.Empty)
+                .Select(asset => asset.VehicleId)
+                .ToHashSet();
+            return GetVehicles().Where(vehicle => !taken.Contains(vehicle.Id)).ToList();
+        }
+
+        private static string VehicleAssetName(VehicleBase vehicle)
+        {
+            if (!string.IsNullOrWhiteSpace(vehicle.Name))
+                return vehicle.Name.Trim();
+
+            var described = $"{vehicle.Year} {vehicle.Make} {vehicle.Model}".Trim();
+            return described.Length == 0 ? "Vehicle" : described;
+        }
+
+        private static string UniqueName(string name, HashSet<string> names)
+        {
+            if (!names.Contains(name))
+                return name;
+
+            for (var suffix = 2; ; suffix++)
+            {
+                var candidate = $"{name} ({suffix})";
+                if (!names.Contains(candidate))
+                    return candidate;
+            }
+        }
 
         public VehicleBase? GetVehicle(Guid id) => _vehicles.GetVehicle(id);
 
@@ -337,7 +427,7 @@ namespace THMS.Logic.Orchestrators
                 return;
 
             var chosen = _accounts.GetAllAccounts().FirstOrDefault(account => account.Id == id)
-                ?? throw new InvalidOperationException("The selected loan or mortgage was not found.");
+                ?? throw new InvalidOperationException("The selected loan, lease, or mortgage was not found.");
             switch (asset)
             {
                 case PropertyAsset when chosen is MortgageAccount mortgage:
@@ -351,7 +441,7 @@ namespace THMS.Logic.Orchestrators
                 case PropertyAsset:
                     throw new InvalidOperationException("Link a property to a mortgage.");
                 default:
-                    throw new InvalidOperationException("Link this asset to a loan.");
+                    throw new InvalidOperationException("Link this asset to a loan or lease.");
             }
         }
 
@@ -364,6 +454,21 @@ namespace THMS.Logic.Orchestrators
                 PropertyAsset => accounts.OfType<MortgageAccount>().FirstOrDefault(item => item.SecuredAssetId == asset.Id),
                 _ => accounts.OfType<LoanAccount>().FirstOrDefault(item => item.SecuredAssetId == asset.Id)
             };
+        }
+
+        public decimal? LatestAmount(Guid assetId)
+        {
+            foreach (var type in new[] { ValuationTypes.TotalMarket, ValuationTypes.Assessed, ValuationTypes.Market })
+            {
+                var row = GetValuations(assetId)
+                    .Where(item => item.ValueType == type)
+                    .OrderByDescending(item => item.AsOf)
+                    .FirstOrDefault();
+                if (row is not null)
+                    return row.Amount;
+            }
+
+            return null;
         }
 
         private static string LatestValue(IReadOnlyList<AssetValuation> values)

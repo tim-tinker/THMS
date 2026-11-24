@@ -115,6 +115,7 @@ namespace THMS.Ingestion.Importers.Finance
                 "Bank" => new BankAccount { Type = AccountType.Checking },
                 "Credit" => new CreditAccount { Type = AccountType.CreditCard },
                 "Loan" => new LoanAccount { Type = AccountType.Loan },
+                "Lease" => new LeaseAccount { Type = AccountType.Lease },
                 "Mortgage" => new MortgageAccount { Type = AccountType.Mortgage },
                 "Investment" => new InvestmentAccount { Type = AccountType.Investment },
                 "Internal" => new InternalAccount { Type = AccountType.Internal },

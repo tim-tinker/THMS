@@ -46,6 +46,7 @@ namespace THMS.UI.WinForms.Controls
             cmbAccountType.Items.Add("Bank");
             cmbAccountType.Items.Add("Credit");
             cmbAccountType.Items.Add("Loan");
+            cmbAccountType.Items.Add("Lease");
             cmbAccountType.Items.Add("Mortgage");
             cmbAccountType.Items.Add("Investment");
             cmbAccountType.Items.Add("Internal");
@@ -62,6 +63,7 @@ namespace THMS.UI.WinForms.Controls
             AccountKinds.Bank => "Bank",
             AccountKinds.Credit => "Credit",
             AccountKinds.Loan => "Loan",
+            AccountKinds.Lease => "Lease",
             AccountKinds.Mortgage => "Mortgage",
             AccountKinds.Investment => "Investment",
             AccountKinds.Internal => "Internal",
@@ -105,6 +107,11 @@ namespace THMS.UI.WinForms.Controls
                     numLoanPrincipal.Value = Clamp(numLoanPrincipal, PostedBalanceCalculator.ToDisplayBalance(loan, loan.Principal));
                     numLoanRate.Value = loan.InterestRate;
                     numLoanTerm.Value = loan.TermMonths;
+                    if (loan is LeaseAccount lease)
+                    {
+                        numLeaseAmount.Value = Clamp(numLeaseAmount, lease.LeaseAmount);
+                        numLeaseResidual.Value = Clamp(numLeaseResidual, lease.Residual);
+                    }
                     break;
 
                 case MortgageAccount mortgage:
@@ -152,6 +159,14 @@ namespace THMS.UI.WinForms.Controls
                     var openingOwed = PostedBalanceCalculator.ToLedgerBalance(credit, numCreditStarting.Value);
                     ShiftStartingBalance(credit, openingOwed);
                     credit.BalanceAsOf = dtCreditOpeningAsOf.Value;
+                    break;
+
+                case LeaseAccount lease:
+                    lease.Principal = PostedBalanceCalculator.ToLedgerBalance(lease, numLoanPrincipal.Value);
+                    lease.InterestRate = numLoanRate.Value;
+                    lease.TermMonths = (int)numLoanTerm.Value;
+                    lease.LeaseAmount = numLeaseAmount.Value;
+                    lease.Residual = numLeaseResidual.Value;
                     break;
 
                 case LoanAccount loan:
@@ -210,11 +225,25 @@ namespace THMS.UI.WinForms.Controls
                 return;
 
             panel.Visible = true;
+            if (panel == pnlLoan)
+                ShowLeaseFields();
             LayoutAutoPay(panel);
 
             // Sizing before the handle exists (and AutoScale runs) clips the button bar.
             if (IsHandleCreated)
                 ResizeFormForPanel(panel);
+        }
+
+        private void ShowLeaseFields()
+        {
+            var lease = Account is LeaseAccount;
+            lblLoanPrincipal.Text = lease ? "Balance:" : "Principal:";
+            lblLeaseAmount.Visible = lease;
+            numLeaseAmount.Visible = lease;
+            lblLeaseResidual.Visible = lease;
+            numLeaseResidual.Visible = lease;
+            lblLeaseHint.Visible = lease;
+            pnlLoan.Height = lease ? 296 : 120;
         }
 
         private void LayoutAutoPay(Panel subtypePanel)
@@ -290,6 +319,11 @@ namespace THMS.UI.WinForms.Controls
                 ? choice.Id
                 : (Guid?)null;
 
+            var carriedLoan = Account is LoanAccount currentLoan
+                && selected is "Loan" or "Lease"
+                ? currentLoan
+                : null;
+
             if (selected == ComboLabel(_opened))
             {
                 Account = _opened;
@@ -306,6 +340,7 @@ namespace THMS.UI.WinForms.Controls
                         DueDate = DateTime.Today
                     },
                     "Loan" => new LoanAccount { Type = AccountType.Loan },
+                    "Lease" => new LeaseAccount { Type = AccountType.Lease },
                     "Mortgage" => new MortgageAccount
                     {
                         Type = AccountType.Mortgage,
@@ -324,6 +359,20 @@ namespace THMS.UI.WinForms.Controls
                 Account.ModifiedOn = _opened.ModifiedOn;
                 Account.ExternalLink = _opened.ExternalLink;
                 Account.BalanceAsOf = _opened.BalanceAsOf;
+                if (carriedLoan is not null && Account is LoanAccount loan)
+                {
+                    loan.Principal = PostedBalanceCalculator.ToLedgerBalance(loan, numLoanPrincipal.Value);
+                    loan.InterestRate = numLoanRate.Value;
+                    loan.TermMonths = (int)numLoanTerm.Value;
+                    loan.SecuredAssetId = carriedLoan.SecuredAssetId;
+                    loan.StartDate = carriedLoan.StartDate;
+                    loan.ScheduleType = carriedLoan.ScheduleType;
+                    if (loan is LeaseAccount nextLease)
+                    {
+                        nextLease.LeaseAmount = numLeaseAmount.Value;
+                        nextLease.Residual = numLeaseResidual.Value;
+                    }
+                }
             }
 
             Account.Name = name;

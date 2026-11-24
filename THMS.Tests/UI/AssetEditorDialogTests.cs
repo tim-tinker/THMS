@@ -1,6 +1,7 @@
 using THMS.Data.Stores;
 using THMS.Domain.Assets;
 using THMS.Domain.Finance.Accounts;
+using THMS.Domain.Transportation;
 using THMS.Logic.Orchestrators;
 using THMS.UI.WinForms.Controls;
 
@@ -62,6 +63,53 @@ namespace THMS.Tests.UI
             }
         }
 
+        [Test]
+        [Apartment(ApartmentState.STA)]
+        public void VehicleFuelCapacity_SavesGallonsOrKilowattHoursOnTheSameVehicle()
+        {
+            var vehicles = new InMemoryVehicleDataStore();
+            var ice = vehicles.GetAllVehicles().OfType<VehicleIce>().Single();
+            ice.FuelTankCapacityGallons = 14.5m;
+            ice.FuelType = "Gasoline";
+            vehicles.UpsertVehicle(ice);
+            var orchestrator = new AssetOrchestrator(
+                new InMemoryAssetDataStore(),
+                new InMemoryAccountDataStore(),
+                new InMemoryAccountStatementDataStore(),
+                new InMemoryTransactionDataStore(),
+                vehicles);
+            var asset = new VehicleAsset { Name = ice.Name, Category = "Vehicle" };
+            orchestrator.SaveAsset(asset, null, ice);
+
+            using var dialog = new AssetEditorDialog(orchestrator, orchestrator.GetAsset(asset.Id));
+            dialog.Show();
+            try
+            {
+                Assert.That(Unit(dialog).Text, Is.EqualTo("gallons"));
+                Assert.That(Capacity(dialog).Value, Is.EqualTo(14.5m));
+                Assert.That(Unit(dialog).Left, Is.GreaterThan(Capacity(dialog).Right - 2));
+
+                Capacity(dialog).Value = 16;
+                Powertrain(dialog).SelectedItem = "EV";
+                Assert.That(Unit(dialog).Text, Is.EqualTo("kWh"));
+                Capacity(dialog).Value = 88;
+                AllControls(dialog).OfType<ThmsButton>().Single(button => button.Text == "Save").PerformClick();
+            }
+            finally
+            {
+                if (!dialog.IsDisposed)
+                    dialog.Close();
+            }
+
+            var stored = vehicles.GetVehicle(ice.Id);
+            Assert.That(stored, Is.InstanceOf<VehicleEv>());
+            var ev = (VehicleEv)stored!;
+            Assert.That(ev.Id, Is.EqualTo(ice.Id));
+            Assert.That(ev.BatteryCapacityKwh, Is.EqualTo(88m));
+            Assert.That(ev.Vin, Is.EqualTo(ice.Vin));
+            Assert.That(ev.ChargePortType, Is.EqualTo("J1772"));
+        }
+
         private static void AssertLayout(Form dialog, string kind)
         {
             Assert.That(dialog.AcceptButton, Is.InstanceOf<ThmsButton>());
@@ -111,6 +159,17 @@ namespace THMS.Tests.UI
             Assert.That(control.Parent!.ClientRectangle.Contains(control.Bounds), Is.True,
                 $"{control.Text} is cropped by its parent.");
         }
+
+        private static NumericUpDown Capacity(Form dialog) =>
+            AllControls(AllControls(dialog).OfType<Label>().Single(label => label.Text == "Fuel capacity").Parent!)
+                .OfType<NumericUpDown>().Single();
+
+        private static Label Unit(Form dialog) =>
+            Capacity(dialog).Parent!.Controls.OfType<Label>().Single();
+
+        private static ComboBox Powertrain(Form dialog) =>
+            AllControls(dialog).OfType<Label>().Single(label => label.Text == "Powertrain")
+                .Parent!.Controls.OfType<ComboBox>().Single();
 
         private static TextBox Field(Form dialog, string caption)
         {

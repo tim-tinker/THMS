@@ -8,6 +8,7 @@
         CreditCard,
         LineOfCredit,
         Loan,
+        Lease,
         Mortgage,
         Investment,
         Retirement,
