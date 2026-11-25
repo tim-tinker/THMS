@@ -54,7 +54,7 @@ namespace THMS.Logic.Orchestrators
                     Category = asset.Category,
                     AcquiredOn = asset.AcquiredOn?.ToString("d") ?? "",
                     CostBasis = asset.CostBasis,
-                    LatestValue = LatestValue(_assets.GetValuations(asset.Id)),
+                    LatestValue = LatestValue(asset, _assets.GetValuations(asset.Id)),
                     SecuredAccount = SecuredAccount(accounts, asset)?.Name ?? ""
                 })
                 .ToList();
@@ -63,6 +63,34 @@ namespace THMS.Logic.Orchestrators
         public Asset? GetAsset(Guid id) => _assets.Get(id);
 
         public IReadOnlyList<AssetValuation> GetValuations(Guid assetId) => _assets.GetValuations(assetId);
+
+        public IReadOnlyList<ValuationSource> GetValuationSources() => _assets.GetSources();
+
+        public IReadOnlyList<ValuationSource> GetValuationSources(AppraisedAssetKind kind) =>
+            GetValuationSources().Where(source => source.Appraises(kind)).ToList();
+
+        public ValuationSource? GetValuationSource(Guid id) =>
+            GetValuationSources().FirstOrDefault(source => source.Id == id);
+
+        public void SaveValuationSource(ValuationSource source)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            source.Name = source.Name?.Trim() ?? "";
+            if (source.Name.Length == 0)
+                throw new InvalidOperationException("Name is required.");
+            if (source.Kinds == AppraisedAssetKind.None)
+                throw new InvalidOperationException("Choose the assets this source can appraise.");
+            if (!ValuationSource.TryNormalizeWebsite(source.WebsiteUrl, out var website))
+                throw new InvalidOperationException("Website must be an http or https address.");
+            source.WebsiteUrl = website;
+            var duplicate = GetValuationSources().FirstOrDefault(item =>
+                item.Id != source.Id && string.Equals(item.Name, source.Name, StringComparison.OrdinalIgnoreCase));
+            if (duplicate is not null)
+                throw new InvalidOperationException($"A source named {source.Name} already exists.");
+            _assets.SaveSource(source);
+        }
+
+        public void DeleteValuationSource(Guid id) => _assets.DeleteSource(id);
 
         public IReadOnlyList<PropertyTaxListRow> GetPropertyTaxRows(Guid assetId)
         {
@@ -458,32 +486,22 @@ namespace THMS.Logic.Orchestrators
 
         public decimal? LatestAmount(Guid assetId)
         {
-            foreach (var type in new[] { ValuationTypes.TotalMarket, ValuationTypes.Assessed, ValuationTypes.Market })
-            {
-                var row = GetValuations(assetId)
-                    .Where(item => item.ValueType == type)
-                    .OrderByDescending(item => item.AsOf)
-                    .FirstOrDefault();
-                if (row is not null)
-                    return row.Amount;
-            }
-
-            return null;
+            var asset = GetAsset(assetId);
+            if (asset is null)
+                return null;
+            return ValuationPolicy.Choose(asset, GetValuations(assetId), DateTime.Today)?.Amount;
         }
 
-        private static string LatestValue(IReadOnlyList<AssetValuation> values)
+        private static string LatestValue(Asset asset, IReadOnlyList<AssetValuation> values)
         {
-            foreach (var type in new[] { ValuationTypes.TotalMarket, ValuationTypes.Assessed, ValuationTypes.Market })
-            {
-                var row = values
-                    .Where(item => item.ValueType == type)
-                    .OrderByDescending(item => item.AsOf)
-                    .FirstOrDefault();
-                if (row is not null)
-                    return $"{row.Amount:c2} {type.ToLowerInvariant()} as of {row.AsOf:d}";
-            }
-
-            return "";
+            var chosen = ValuationPolicy.Choose(asset, values, DateTime.Today);
+            if (chosen is null)
+                return "";
+            var kind = chosen.ValueType.ToLowerInvariant();
+            var asOf = chosen.AsOf.ToString("d");
+            return chosen.Figures.Count == 1
+                ? $"{chosen.Amount:c2} {kind} as of {asOf}"
+                : $"{chosen.Amount:c2} {kind} median of {chosen.Figures.Count} as of {asOf}";
         }
     }
 }

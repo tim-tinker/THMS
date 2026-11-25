@@ -16,7 +16,12 @@ namespace THMS.Data.Stores.SqlTables
                     TermMonths INTEGER NOT NULL,
                     SecuredAssetId TEXT,
                     LeaseAmount REAL NOT NULL DEFAULT 0,
-                    Residual REAL NOT NULL DEFAULT 0
+                    Residual REAL NOT NULL DEFAULT 0,
+                    MoneyFactor REAL NOT NULL DEFAULT 0,
+                    GrossCapitalizedCost REAL NOT NULL DEFAULT 0,
+                    CapitalizedCostReduction REAL NOT NULL DEFAULT 0,
+                    AdjustedCapitalizedCost REAL NOT NULL DEFAULT 0,
+                    RentCharge REAL NOT NULL DEFAULT 0
                 );";
             cmd.ExecuteNonQuery();
 
@@ -24,21 +29,35 @@ namespace THMS.Data.Stores.SqlTables
             EnsureColumn(conn, "SecuredAssetId", "TEXT");
             EnsureColumn(conn, "LeaseAmount", "REAL NOT NULL DEFAULT 0");
             EnsureColumn(conn, "Residual", "REAL NOT NULL DEFAULT 0");
+            EnsureColumn(conn, "MoneyFactor", "REAL NOT NULL DEFAULT 0");
+            EnsureColumn(conn, "GrossCapitalizedCost", "REAL NOT NULL DEFAULT 0");
+            EnsureColumn(conn, "CapitalizedCostReduction", "REAL NOT NULL DEFAULT 0");
+            EnsureColumn(conn, "AdjustedCapitalizedCost", "REAL NOT NULL DEFAULT 0");
+            EnsureColumn(conn, "RentCharge", "REAL NOT NULL DEFAULT 0");
         }
 
         public void Upsert(SqliteConnection conn, LoanAccount account)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO LoanAccounts (AccountId, Principal, InterestRate, TermMonths, SecuredAssetId, LeaseAmount, Residual)
-                VALUES (@AccountId, @Principal, @InterestRate, @TermMonths, @SecuredAssetId, @LeaseAmount, @Residual)
+                INSERT INTO LoanAccounts (
+                    AccountId, Principal, InterestRate, TermMonths, SecuredAssetId, LeaseAmount, Residual, MoneyFactor,
+                    GrossCapitalizedCost, CapitalizedCostReduction, AdjustedCapitalizedCost, RentCharge)
+                VALUES (
+                    @AccountId, @Principal, @InterestRate, @TermMonths, @SecuredAssetId, @LeaseAmount, @Residual, @MoneyFactor,
+                    @GrossCapitalizedCost, @CapitalizedCostReduction, @AdjustedCapitalizedCost, @RentCharge)
                 ON CONFLICT(AccountId) DO UPDATE SET
                     Principal = excluded.Principal,
                     InterestRate = excluded.InterestRate,
                     TermMonths = excluded.TermMonths,
                     SecuredAssetId = excluded.SecuredAssetId,
                     LeaseAmount = excluded.LeaseAmount,
-                    Residual = excluded.Residual;";
+                    Residual = excluded.Residual,
+                    MoneyFactor = excluded.MoneyFactor,
+                    GrossCapitalizedCost = excluded.GrossCapitalizedCost,
+                    CapitalizedCostReduction = excluded.CapitalizedCostReduction,
+                    AdjustedCapitalizedCost = excluded.AdjustedCapitalizedCost,
+                    RentCharge = excluded.RentCharge;";
 
             var lease = account as LeaseAccount;
             cmd.Parameters.AddWithValue("@AccountId", account.Id.ToString());
@@ -48,16 +67,22 @@ namespace THMS.Data.Stores.SqlTables
             cmd.Parameters.AddWithValue("@SecuredAssetId", GuidText(account.SecuredAssetId));
             cmd.Parameters.AddWithValue("@LeaseAmount", lease?.LeaseAmount ?? 0m);
             cmd.Parameters.AddWithValue("@Residual", lease?.Residual ?? 0m);
+            cmd.Parameters.AddWithValue("@MoneyFactor", lease?.MoneyFactor ?? 0m);
+            cmd.Parameters.AddWithValue("@GrossCapitalizedCost", lease?.GrossCapitalizedCost ?? 0m);
+            cmd.Parameters.AddWithValue("@CapitalizedCostReduction", lease?.CapitalizedCostReduction ?? 0m);
+            cmd.Parameters.AddWithValue("@AdjustedCapitalizedCost", lease?.AdjustedCapitalizedCost ?? 0m);
+            cmd.Parameters.AddWithValue("@RentCharge", lease?.RentCharge ?? 0m);
             cmd.ExecuteNonQuery();
         }
 
-        public (decimal Principal, decimal InterestRate, int TermMonths, Guid? SecuredAssetId, decimal LeaseAmount, decimal Residual)? Get(
+        public (decimal Principal, decimal InterestRate, int TermMonths, Guid? SecuredAssetId, decimal LeaseAmount, decimal Residual, decimal MoneyFactor, decimal GrossCapitalizedCost, decimal CapitalizedCostReduction, decimal AdjustedCapitalizedCost, decimal RentCharge)? Get(
             SqliteConnection conn,
             Guid id)
         {
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT Principal, InterestRate, TermMonths, SecuredAssetId, LeaseAmount, Residual
+                SELECT Principal, InterestRate, TermMonths, SecuredAssetId, LeaseAmount, Residual, MoneyFactor,
+                       GrossCapitalizedCost, CapitalizedCostReduction, AdjustedCapitalizedCost, RentCharge
                 FROM LoanAccounts
                 WHERE AccountId = @AccountId;";
             cmd.Parameters.AddWithValue("@AccountId", id.ToString());
@@ -72,7 +97,12 @@ namespace THMS.Data.Stores.SqlTables
                 reader.GetInt32(2),
                 ReadGuid(reader, 3),
                 reader.IsDBNull(4) ? 0m : (decimal)(double)reader.GetDouble(4),
-                reader.IsDBNull(5) ? 0m : (decimal)(double)reader.GetDouble(5)
+                reader.IsDBNull(5) ? 0m : (decimal)(double)reader.GetDouble(5),
+                reader.IsDBNull(6) ? 0m : (decimal)(double)reader.GetDouble(6),
+                reader.IsDBNull(7) ? 0m : (decimal)(double)reader.GetDouble(7),
+                reader.IsDBNull(8) ? 0m : (decimal)(double)reader.GetDouble(8),
+                reader.IsDBNull(9) ? 0m : (decimal)(double)reader.GetDouble(9),
+                reader.IsDBNull(10) ? 0m : (decimal)(double)reader.GetDouble(10)
             );
         }
 

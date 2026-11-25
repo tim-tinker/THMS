@@ -9,7 +9,7 @@ namespace THMS.UI.WinForms.Controls
         private readonly PropertyAsset _property;
         private readonly PropertyAppraisal _appraisal;
         private readonly DateTimePicker _asOf = new() { Format = DateTimePickerFormat.Short };
-        private readonly TextBox _source = new() { Width = 260 };
+        private readonly ValuationSourceField _source;
         private readonly NumericUpDown _land = Money();
         private readonly NumericUpDown _improvement = Money();
         private readonly NumericUpDown _total = Money();
@@ -39,6 +39,10 @@ namespace THMS.UI.WinForms.Controls
             BackColor = SystemColors.Control;
             Font = new Font("Segoe UI", 9F);
             ClientSize = new Size(760, 760);
+
+            _source = new ValuationSourceField(
+                _orchestrator.GetValuationSources(AppraisedAssetKind.Property),
+                _appraisal.Source);
 
             _cap.Dock = DockStyle.Fill;
             _ratio.Dock = DockStyle.Fill;
@@ -125,7 +129,6 @@ namespace THMS.UI.WinForms.Controls
             _ratio.ValueChanged += (_, _) => Recalculate();
 
             _asOf.Value = _appraisal.AsOf == default ? DateTime.Today : _appraisal.AsOf;
-            _source.Text = _appraisal.Source;
             _land.Value = Clamp(_land, _appraisal.LandMarketValue);
             _improvement.Value = Clamp(_improvement, _appraisal.ImprovementMarketValue);
             _total.Value = Clamp(_total, _appraisal.TotalMarketValue);
@@ -180,7 +183,7 @@ namespace THMS.UI.WinForms.Controls
             {
                 Recalculate();
                 _appraisal.AsOf = _asOf.Value.Date;
-                _appraisal.Source = _source.Text.Trim();
+                _appraisal.Source = _source.SourceName;
                 _appraisal.LandMarketValue = _land.Value;
                 _appraisal.ImprovementMarketValue = _improvement.Value;
                 _appraisal.TotalMarketValue = _total.Value;

@@ -451,10 +451,14 @@ namespace THMS.Tests.Logic
                     WebsiteUrl = "",
                     Type = AccountType.Lease,
                     Principal = -12000m,
-                    InterestRate = 0.039m,
+                    MoneyFactor = 0.00125m,
                     TermMonths = 36,
                     LeaseAmount = 18000m,
-                    Residual = 15000m
+                    Residual = 15000m,
+                    GrossCapitalizedCost = 68272.33m,
+                    CapitalizedCostReduction = 19750m,
+                    AdjustedCapitalizedCost = 48522.33m,
+                    RentCharge = 3678.72m
                 };
                 accounts.UpsertAccount(lease);
                 accounts.UpsertAccount(new MortgageAccount
@@ -483,10 +487,15 @@ namespace THMS.Tests.Logic
                 var saved = (LeaseAccount)reloaded!;
                 Assert.That(saved.Type, Is.EqualTo(AccountType.Lease));
                 Assert.That(saved.Principal, Is.EqualTo(-12000m));
-                Assert.That(saved.InterestRate, Is.EqualTo(0.039m).Within(0.0000001m));
+                Assert.That(saved.MoneyFactor, Is.EqualTo(0.00125m).Within(0.0000001m));
+                Assert.That(saved.ApproximateAprPercent, Is.EqualTo(3m));
                 Assert.That(saved.TermMonths, Is.EqualTo(36));
                 Assert.That(saved.LeaseAmount, Is.EqualTo(18000m));
                 Assert.That(saved.Residual, Is.EqualTo(15000m));
+                Assert.That(saved.GrossCapitalizedCost, Is.EqualTo(68272.33m));
+                Assert.That(saved.CapitalizedCostReduction, Is.EqualTo(19750m));
+                Assert.That(saved.AdjustedCapitalizedCost, Is.EqualTo(48522.33m));
+                Assert.That(saved.RentCharge, Is.EqualTo(3678.72m));
                 Assert.That(saved.SecuredAssetId, Is.EqualTo(vehicle.Id));
                 Assert.That(LeaseEquity.IfKept(30000m, saved.Principal, saved.Residual), Is.EqualTo(3000m).Within(0.01m));
                 Assert.That(AccountKinds.Of(saved), Is.EqualTo(AccountKinds.Lease));

@@ -51,6 +51,7 @@ namespace THMS.UI.WinForms.Controls
         private bool _filling;
         private readonly List<Account> _collectors;
         private readonly List<PropertyAsset> _properties;
+        private readonly PropertyAppraisal? _selectedValuation;
         private bool _loading = true;
         private bool _seeding;
 
@@ -58,10 +59,12 @@ namespace THMS.UI.WinForms.Controls
             AssetOrchestrator orchestrator,
             PropertyTaxStatement? existing,
             Account? collector,
-            PropertyAsset? property)
+            PropertyAsset? property,
+            PropertyAppraisal? valuation = null)
         {
             _orchestrator = orchestrator;
             _existing = existing;
+            _selectedValuation = valuation;
             _collectors = orchestrator.GetTaxCollectors().ToList();
             _properties = orchestrator.GetAssetRows()
                 .Select(row => orchestrator.GetAsset(row.Id))
@@ -268,9 +271,7 @@ namespace THMS.UI.WinForms.Controls
 
             _loading = false;
             LockCopiedFields();
-            ReloadAppraisals(_existing?.ValuationId is Guid valuationId && valuationId != Guid.Empty
-                ? valuationId
-                : _existing?.Id);
+            ReloadAppraisals(PreferredValuationId());
             RecalculateAppraisal();
             RefreshTotal();
             ApplyInitialSize(facts, values, buttons, layout);
@@ -595,6 +596,15 @@ namespace THMS.UI.WinForms.Controls
             }
 
             RecalculateLines();
+        }
+
+        private Guid? PreferredValuationId()
+        {
+            if (_existing?.ValuationId is Guid valuationId && valuationId != Guid.Empty)
+                return valuationId;
+            if (_selectedValuation?.Id is Guid selected && selected != Guid.Empty)
+                return selected;
+            return _existing?.Id;
         }
 
         private void ReloadAppraisals(Guid? preferredId)

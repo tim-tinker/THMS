@@ -25,7 +25,7 @@ namespace THMS.Logic.ViewModels.Finance
     public sealed class NetWorthSnapshot
     {
         public const string MethodNote =
-            "Net worth is cash, investment market value, and other asset valuations, minus debt. Debt is negative. A leased asset is what you keep: its value, minus the remaining payments, minus the residual. When that is negative, the vehicle is debt. The current month uses today's bank, credit, and loan balances. Earlier months use the latest statement on or before month-end, plus activity posted after that statement. Accounts with no earlier statement are left out of those months. Investment values use the latest price on or before month-end. An asset keeps the latest total market value on or before that day, then assessed value, then market value.";
+            "Net worth is cash, investment market value, and other asset valuations, minus debt. Debt is negative. A leased asset is what you keep: its value, minus the remaining payments, minus the residual. When that is negative, the vehicle is debt. The current month uses today's bank, credit, and loan balances. Earlier months use the latest statement on or before month-end, plus activity posted after that statement. Accounts with no earlier statement are left out of those months. Investment values use the latest price on or before month-end. Property keeps the latest total market value on or before that day, then assessed value, then market value. A vehicle uses private-party value, then market, then trade-in, then retail. Each source contributes its latest figure of that kind, and those figures are combined as the median.";
 
         public decimal NetWorth { get; init; }
         public decimal Cash { get; init; }

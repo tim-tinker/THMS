@@ -135,10 +135,10 @@ namespace THMS.Logic.Finance.Aggregation
                 }
             }
 
-            Sort(totals.Banks);
-            Sort(totals.Credits);
-            Sort(totals.LoansAccounts);
-            Sort(totals.Investments);
+            Sort(totals.Banks, debt: false);
+            Sort(totals.Credits, debt: true);
+            Sort(totals.LoansAccounts, debt: true);
+            Sort(totals.Investments, debt: false);
             return totals;
         }
 
@@ -150,9 +150,16 @@ namespace THMS.Logic.Finance.Aggregation
                 Balance = balance
             };
 
-        private static void Sort(List<FinanceDashboardAccountLine> lines) =>
+        private static void Sort(List<FinanceDashboardAccountLine> lines, bool debt) =>
             lines.Sort((left, right) =>
-                string.Compare(left.Name, right.Name, StringComparison.CurrentCultureIgnoreCase));
+            {
+                var byBalance = debt
+                    ? left.Balance.CompareTo(right.Balance)
+                    : right.Balance.CompareTo(left.Balance);
+                return byBalance != 0
+                    ? byBalance
+                    : string.Compare(left.Name, right.Name, StringComparison.CurrentCultureIgnoreCase);
+            });
 
         private sealed class AccountTotals
         {

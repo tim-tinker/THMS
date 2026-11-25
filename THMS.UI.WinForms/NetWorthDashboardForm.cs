@@ -29,6 +29,11 @@ namespace THMS.UI.WinForms
         private readonly DataGridView _lines = Grid();
         private readonly BindingSource _monthsSource = new();
         private readonly BindingSource _linesSource = new();
+        private NetWorthSnapshot _snapshot = new();
+        private ToolStripDropDown? _openDrop;
+        private Control? _openAnchor;
+        private Control? _closedByClickAnchor;
+        private int _closedByClickTick;
 
         public NetWorthDashboardForm()
         {
@@ -88,8 +93,9 @@ namespace THMS.UI.WinForms
             });
         }
 
-        private void Bind(NetWorthSnapshot snapshot)
+        internal void Bind(NetWorthSnapshot snapshot)
         {
+            _snapshot = snapshot;
             _netWorth.Text = snapshot.NetWorth.ToString("c2");
             _cash.Text = snapshot.Cash.ToString("c2");
             _investments.Text = snapshot.Investments.ToString("c2");
@@ -182,14 +188,14 @@ namespace THMS.UI.WinForms
                 table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
 
             table.Controls.Add(Card("Net worth", _netWorth), 0, 0);
-            table.Controls.Add(Card("Cash", _cash), 1, 0);
-            table.Controls.Add(Card("Investments", _investments), 2, 0);
-            table.Controls.Add(Card("Other assets", _otherAssets), 3, 0);
-            table.Controls.Add(Card("Debt", _debt), 4, 0);
+            table.Controls.Add(Card("Cash", _cash, "Cash"), 1, 0);
+            table.Controls.Add(Card("Investments", _investments, "Investments"), 2, 0);
+            table.Controls.Add(Card("Other assets", _otherAssets, "Property", "Vehicles", "Personal"), 3, 0);
+            table.Controls.Add(Card("Debt", _debt, "Debt"), 4, 0);
             return table;
         }
 
-        private static Control Card(string caption, Label value)
+        private Control Card(string caption, Label value, params string[] groups)
         {
             var cell = new TableLayoutPanel
             {
@@ -200,17 +206,216 @@ namespace THMS.UI.WinForms
             };
             cell.RowStyles.Add(new RowStyle(SizeType.Percent, 40));
             cell.RowStyles.Add(new RowStyle(SizeType.Percent, 60));
-            cell.Controls.Add(new Label
+            var captionLabel = new Label
             {
-                Text = caption,
+                Text = groups.Length == 0 ? caption : caption + "  ▾",
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.BottomLeft,
                 ForeColor = Color.DimGray
-            }, 0, 0);
+            };
+            cell.Controls.Add(captionLabel, 0, 0);
             value.Dock = DockStyle.Fill;
             value.TextAlign = ContentAlignment.TopLeft;
             cell.Controls.Add(value, 0, 1);
+            if (groups.Length > 0)
+            {
+                captionLabel.Cursor = Cursors.Hand;
+                value.Cursor = Cursors.Hand;
+                cell.Cursor = Cursors.Hand;
+                captionLabel.Click += (_, _) => ShowBreakdown(cell, groups);
+                value.Click += (_, _) => ShowBreakdown(cell, groups);
+                cell.Click += (_, _) => ShowBreakdown(cell, groups);
+            }
+
             return cell;
+        }
+
+        private void ShowBreakdown(Control anchor, string[] groups)
+        {
+            // The opening click is also seen as a click outside the menu, so the menu
+            // closes before this handler runs. Skip the reopen when that click was on
+            // the same total.
+            if (ReferenceEquals(_closedByClickAnchor, anchor)
+                && (uint)(Environment.TickCount - _closedByClickTick) < 500)
+            {
+                _closedByClickAnchor = null;
+                return;
+            }
+
+            if (_openDrop is { Visible: true, IsDisposed: false } open && ReferenceEquals(_openAnchor, anchor))
+            {
+                open.Close(ToolStripDropDownCloseReason.CloseCalled);
+                return;
+            }
+
+            var debt = groups.Length == 1 && groups[0] == "Debt";
+            var matching = _snapshot.Lines
+                .Where(line => line.Amount is not null && groups.Contains(line.Group));
+            var lines = (debt
+                    ? matching.OrderBy(line => line.Amount)
+                    : matching.OrderByDescending(line => line.Amount))
+                .ThenBy(line => line.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var showGroup = groups.Length > 1;
+            var list = new ListView
+            {
+                View = View.Details,
+                FullRowSelect = true,
+                HeaderStyle = ColumnHeaderStyle.None,
+                BorderStyle = BorderStyle.None,
+                MultiSelect = false,
+                HideSelection = false,
+                ShowItemToolTips = true,
+                Font = Font
+            };
+            if (showGroup)
+                list.Columns.Add("Group", 90);
+            list.Columns.Add("Name", 160);
+            list.Columns.Add("Amount", 100, HorizontalAlignment.Right);
+
+            if (lines.Count == 0)
+            {
+                list.Items.Add("None");
+            }
+            else
+            {
+                foreach (var line in lines)
+                {
+                    var amount = line.Amount!.Value.ToString("c2");
+                    var item = showGroup ? list.Items.Add(line.Group) : list.Items.Add(line.Name);
+                    if (showGroup)
+                        item.SubItems.Add(line.Name);
+                    item.SubItems.Add(amount);
+                    if (line.Source.Length > 0)
+                        item.ToolTipText = line.Source;
+                }
+            }
+
+            var groupWidth = showGroup ? 70 : 0;
+            var nameWidth = 140;
+            var amountWidth = 90;
+            foreach (ListViewItem item in list.Items)
+            {
+                if (showGroup)
+                    groupWidth = Math.Max(groupWidth, TextRenderer.MeasureText(item.Text, list.Font).Width + 16);
+                var name = showGroup && item.SubItems.Count > 1 ? item.SubItems[1].Text : item.Text;
+                nameWidth = Math.Max(nameWidth, TextRenderer.MeasureText(name, list.Font).Width + 16);
+                var amountIndex = showGroup ? 2 : 1;
+                if (item.SubItems.Count > amountIndex)
+                    amountWidth = Math.Max(amountWidth, TextRenderer.MeasureText(item.SubItems[amountIndex].Text, list.Font).Width + 16);
+            }
+
+            nameWidth = Math.Min(nameWidth, 360);
+            groupWidth = Math.Min(groupWidth, 140);
+            var rowHeight = list.Font.Height + 10;
+            var height = Math.Clamp((Math.Max(1, list.Items.Count) * rowHeight) + 6, rowHeight + 8, 320);
+            var scroll = list.Items.Count * rowHeight + 6 > 320;
+            var chrome = (scroll ? SystemInformation.VerticalScrollBarWidth : 0) + 4;
+            var width = Math.Max(anchor.Width, groupWidth + nameWidth + amountWidth + chrome);
+            var used = 0;
+            if (showGroup)
+            {
+                list.Columns[0].Width = groupWidth;
+                used = groupWidth;
+            }
+
+            var nameColumn = showGroup ? 1 : 0;
+            var amountColumn = showGroup ? 2 : 1;
+            list.Columns[amountColumn].Width = amountWidth;
+            list.Columns[nameColumn].Width = Math.Max(80, width - used - amountWidth - chrome);
+            list.Size = new Size(width, height);
+
+            var panel = new Panel { Size = list.Size };
+            list.Dock = DockStyle.Fill;
+            panel.Controls.Add(list);
+
+            var drop = new ToolStripDropDown
+            {
+                Padding = Padding.Empty,
+                AutoClose = true
+            };
+            var host = new ToolStripControlHost(panel)
+            {
+                AutoSize = false,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+                Size = panel.Size
+            };
+            drop.Items.Add(host);
+
+            var owner = FindForm() as Control ?? anchor;
+            drop.Closed += (_, e) =>
+            {
+                if (ReferenceEquals(_openDrop, drop))
+                {
+                    _openDrop = null;
+                    _openAnchor = null;
+                }
+
+                if (e.CloseReason == ToolStripDropDownCloseReason.AppClicked
+                    && !anchor.IsDisposed
+                    && anchor.ClientRectangle.Contains(anchor.PointToClient(System.Windows.Forms.Cursor.Position)))
+                {
+                    _closedByClickAnchor = anchor;
+                    _closedByClickTick = Environment.TickCount;
+                }
+
+                DeferDispose(owner, drop);
+            };
+            if (owner.IsHandleCreated && !owner.IsDisposed)
+            {
+                owner.BeginInvoke(() =>
+                {
+                    if (drop.IsDisposed || anchor.IsDisposed)
+                        return;
+
+                    _openDrop = drop;
+                    _openAnchor = anchor;
+                    drop.Show(anchor, new Point(0, anchor.Height));
+                });
+            }
+        }
+
+        internal string[][] OpenBreakdownRows()
+        {
+            if (_openDrop is not { IsDisposed: false, Visible: true })
+                return [];
+
+            foreach (ToolStripItem item in _openDrop.Items)
+            {
+                if (item is not ToolStripControlHost host)
+                    continue;
+                var list = host.Control as ListView ?? host.Control?.Controls.OfType<ListView>().FirstOrDefault();
+                if (list is null)
+                    continue;
+                return list.Items.Cast<ListViewItem>()
+                    .Select(row =>
+                    {
+                        var texts = new string[row.SubItems.Count];
+                        for (var i = 0; i < texts.Length; i++)
+                            texts[i] = row.SubItems[i].Text;
+                        return texts;
+                    })
+                    .ToArray();
+            }
+
+            return [];
+        }
+
+        private static void DeferDispose(Control owner, ToolStripDropDown drop)
+        {
+            if (owner.IsDisposed || !owner.IsHandleCreated)
+            {
+                if (!drop.IsDisposed)
+                    drop.Dispose();
+                return;
+            }
+
+            owner.BeginInvoke(() =>
+            {
+                if (!drop.IsDisposed)
+                    drop.Dispose();
+            });
         }
 
         private Label SectionHeader(string text)

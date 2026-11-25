@@ -70,6 +70,14 @@ namespace THMS.UI.WinForms.Controls
         private NumericUpDown numLeaseAmount;
         private Label lblLeaseResidual;
         private NumericUpDown numLeaseResidual;
+        private Label lblLeaseGross;
+        private NumericUpDown numLeaseGross;
+        private Label lblLeaseReduction;
+        private NumericUpDown numLeaseReduction;
+        private Label lblLeaseAdjusted;
+        private NumericUpDown numLeaseAdjusted;
+        private Label lblLeaseRent;
+        private NumericUpDown numLeaseRent;
         private Label lblLeaseHint;
 
         private Label lblMortPrincipal;
@@ -258,6 +266,7 @@ namespace THMS.UI.WinForms.Controls
             numLoanRate = MoneyBox(panelFieldLeft, 44);
             numLoanRate.Minimum = 0;
             numLoanRate.Maximum = 100;
+            numLoanRate.ValueChanged += (_, _) => RefreshLeaseApr();
 
             lblLoanTerm = FieldLabel("Term (months):", 10, 80, 150);
             numLoanTerm = new NumericUpDown
@@ -268,30 +277,52 @@ namespace THMS.UI.WinForms.Controls
                 Maximum = 480
             };
 
-            lblLeaseAmount = FieldLabel("Lease amount:", 10, 116, 150);
-            numLeaseAmount = MoneyBox(panelFieldLeft, 116);
-            numLeaseAmount.Minimum = 0;
-            numLeaseAmount.Maximum = 1000000;
+            const int leaseFieldLeft = 175;
+            lblLeaseGross = FieldLabel("Gross cap cost:", 10, 116, 165);
+            numLeaseGross = LeaseMoneyBox(leaseFieldLeft, 116);
 
-            lblLeaseResidual = FieldLabel("Residual:", 10, 152, 150);
-            numLeaseResidual = MoneyBox(panelFieldLeft, 152);
-            numLeaseResidual.Minimum = 0;
-            numLeaseResidual.Maximum = 1000000;
+            lblLeaseReduction = FieldLabel("Cap reduction:", 10, 152, 165);
+            numLeaseReduction = LeaseMoneyBox(leaseFieldLeft, 152);
+
+            lblLeaseAdjusted = FieldLabel("Adjusted cap cost:", 10, 188, 165);
+            numLeaseAdjusted = LeaseMoneyBox(leaseFieldLeft, 188);
+
+            lblLeaseResidual = FieldLabel("Residual:", 10, 224, 165);
+            numLeaseResidual = LeaseMoneyBox(leaseFieldLeft, 224);
+
+            lblLeaseRent = FieldLabel("Rent charge:", 10, 260, 165);
+            numLeaseRent = LeaseMoneyBox(leaseFieldLeft, 260);
+
+            lblLeaseAmount = FieldLabel("Lease amount:", 10, 296, 165);
+            numLeaseAmount = LeaseMoneyBox(leaseFieldLeft, 296);
 
             lblLeaseHint = HintLabel(
-                "Balance is the remaining payments. Lease amount is the total of the payments over the term and is not part of net worth. " +
-                "Residual is the buyout. Net worth assumes you keep the vehicle: its value, minus the balance, minus the residual. " +
-                "A negative result is a liability.",
-                188,
+                "Balance is the remaining payments. Adjusted cap cost is gross cap cost minus cap reduction. " +
+                "Money factor = rent charge ÷ (term × (adjusted cap cost + residual)). " +
+                "Lease amount is the total of the payments and is not part of net worth. " +
+                "Residual is the buyout. Keeping the vehicle is its value, minus the balance, minus the residual.",
+                332,
                 380,
-                100);
+                168);
 
+            numLeaseGross.ValueChanged += OnLeaseContractChanged;
+            numLeaseReduction.ValueChanged += OnLeaseContractChanged;
+            numLeaseAdjusted.ValueChanged += OnLeaseContractChanged;
+            numLeaseResidual.ValueChanged += OnLeaseContractChanged;
+            numLeaseRent.ValueChanged += OnLeaseContractChanged;
+            numLoanTerm.ValueChanged += OnLeaseContractChanged;
+
+            pnlLoan.AutoScroll = true;
             pnlLoan.Controls.AddRange(new Control[] {
                 lblLoanPrincipal, numLoanPrincipal,
                 lblLoanRate, numLoanRate,
                 lblLoanTerm, numLoanTerm,
-                lblLeaseAmount, numLeaseAmount,
+                lblLeaseGross, numLeaseGross,
+                lblLeaseReduction, numLeaseReduction,
+                lblLeaseAdjusted, numLeaseAdjusted,
                 lblLeaseResidual, numLeaseResidual,
+                lblLeaseRent, numLeaseRent,
+                lblLeaseAmount, numLeaseAmount,
                 lblLeaseHint
             });
 
@@ -410,6 +441,14 @@ namespace THMS.UI.WinForms.Controls
             Height = height,
             AutoSize = false
         };
+
+        private static NumericUpDown LeaseMoneyBox(int left, int top)
+        {
+            var box = MoneyBox(left, top);
+            box.Minimum = 0;
+            box.Maximum = 10000000;
+            return box;
+        }
 
         private static NumericUpDown MoneyBox(int left, int top) => new()
         {

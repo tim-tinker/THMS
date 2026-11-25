@@ -708,6 +708,8 @@ namespace THMS.Tests.Logic
             Assert.That(loanRow.Paid, Is.EqualTo(AccountRegisterRow.AutoPaid));
             Assert.That(loanRow.Apr, Is.EqualTo("6.99%"));
             Assert.That(AccountRegisterRow.FormatApr(new MortgageAccount { InterestRate = 2.875m }), Is.EqualTo("2.875%"));
+            Assert.That(AccountRegisterRow.FormatApr(new LeaseAccount { MoneyFactor = 0.00125m }), Is.EqualTo("3%"));
+            Assert.That(AccountRegisterRow.FormatApr(new LeaseAccount { InterestRate = 3.9m }), Is.EqualTo(""));
         }
 
         [Test]

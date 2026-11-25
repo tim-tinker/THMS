@@ -9,6 +9,7 @@ namespace THMS.Data.Stores.SQLite
         private readonly string _connectionString;
         private readonly AssetsTable _assets = new();
         private readonly AssetValuationsTable _valuations = new();
+        private readonly ValuationSourcesTable _sources = new();
 
         public SQLiteAssetDataStore(string databasePath)
         {
@@ -16,6 +17,7 @@ namespace THMS.Data.Stores.SQLite
             using var conn = Open();
             _assets.InitializeSchema(conn);
             _valuations.InitializeSchema(conn);
+            _sources.InitializeSchema(conn);
         }
 
         public void Save(Asset asset)
@@ -50,6 +52,30 @@ namespace THMS.Data.Stores.SQLite
             _valuations.DeleteForAsset(conn, id);
             _assets.Delete(conn, id);
             tx.Commit();
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public void SaveSource(ValuationSource source)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source.Id == Guid.Empty)
+                source.Id = Guid.NewGuid();
+            source.ModifiedOn = DateTime.UtcNow;
+            using var conn = Open();
+            _sources.Upsert(conn, source);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public IReadOnlyList<ValuationSource> GetSources()
+        {
+            using var conn = Open();
+            return _sources.GetAll(conn);
+        }
+
+        public void DeleteSource(Guid id)
+        {
+            using var conn = Open();
+            _sources.Delete(conn, id);
             FinanceDataRevision.NoteChanged();
         }
 

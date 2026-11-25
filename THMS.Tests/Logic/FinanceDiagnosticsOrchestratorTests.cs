@@ -137,6 +137,33 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void LoanDiagnostics_AsksALeaseForMoneyFactorAndSkipsAmortization()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var transactions = new InMemoryTransactionDataStore();
+            accounts.UpsertAccount(new LeaseAccount
+            {
+                Name = "Car lease",
+                Institution = "X",
+                AccountNumber = "4",
+                WebsiteUrl = "",
+                Type = AccountType.Lease,
+                Principal = -5000,
+                InterestRate = 3.9m,
+                MoneyFactor = 0.00125m,
+                TermMonths = 36,
+                StartDate = DateTime.Today
+            });
+
+            var findings = new LoanDiagnosticsOrchestrator(accounts, transactions).Run();
+
+            Assert.That(findings, Has.None.Contains("interest rate"));
+            Assert.That(findings, Has.None.Contains("Amortization"));
+            Assert.That(findings, Has.None.Contains("Payment does not cover"));
+            Assert.That(findings, Has.Some.Contains("Lease with no payments: Car lease"));
+        }
+
+        [Test]
         public void ForecastDiagnostics_ReportsStaleEndedAndMissingAccounts()
         {
             var accounts = new InMemoryAccountDataStore();

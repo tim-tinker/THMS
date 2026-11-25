@@ -92,6 +92,70 @@ namespace THMS.Tests.UI
             }
         }
 
+        [Test]
+        [Apartment(ApartmentState.STA)]
+        public void ValuationDialog_OffersSourcesForThatAssetAndCanOpenTheWebsite()
+        {
+            var vehicles = new InMemoryVehicleDataStore();
+            var details = new VehicleIce { Year = 2023, Make = "Ford", Model = "Mustang Mach-E", Vin = "1FMCU0G6XPUA12345", Name = "Mach-E" };
+            vehicles.UpsertVehicle(details);
+            var orchestrator = Orchestrator(vehicles);
+            orchestrator.SaveValuationSource(new ValuationSource
+            {
+                Name = "Fort Bend CAD",
+                WebsiteUrl = "https://www.fbcad.org",
+                Kinds = AppraisedAssetKind.Property
+            });
+            orchestrator.SaveValuationSource(new ValuationSource
+            {
+                Name = "Kelley Blue Book",
+                WebsiteUrl = "https://www.kbb.com",
+                Kinds = AppraisedAssetKind.Vehicle
+            });
+            var car = new VehicleAsset { Name = "Mach-E", Category = "Vehicle" };
+            orchestrator.SaveAsset(car, null, details);
+            var house = new PropertyAsset { Name = "Casa Tinker", Category = "Real estate" };
+            orchestrator.SaveAsset(house, null, null);
+
+            using var vehicle = new VehicleValuationDialog(orchestrator, car, null);
+            vehicle.Show();
+            try
+            {
+                var source = Source(vehicle);
+                Assert.That(source.Items.Cast<object>().Select(item => item.ToString()).ToArray(),
+                    Is.EqualTo(new[] { "Kelley Blue Book" }));
+                source.SelectedItem = "Kelley Blue Book";
+                vehicle.Refresh();
+                var link = All(vehicle).OfType<LinkLabel>().Single();
+                Assert.That(link.Text, Is.EqualTo("Kelley Blue Book"));
+                Assert.That(link.Visible, Is.True);
+                Assert.That(link.Width, Is.GreaterThan(40));
+                Assert.That(link.Right, Is.LessThanOrEqualTo(source.Right - SystemInformation.VerticalScrollBarWidth + 4));
+                source.Text = "County tax notice";
+                Assert.That(link.Visible, Is.False);
+            }
+            finally
+            {
+                vehicle.Close();
+            }
+
+            using var property = new PropertyValuationDialog(orchestrator, house, null);
+            property.Show();
+            try
+            {
+                var source = Source(property);
+                Assert.That(source.Items.Cast<object>().Select(item => item.ToString()).ToArray(),
+                    Is.EqualTo(new[] { "Fort Bend CAD" }));
+                source.SelectedItem = "Fort Bend CAD";
+                property.Refresh();
+                Assert.That(All(property).OfType<LinkLabel>().Single().Text, Is.EqualTo("Fort Bend CAD"));
+            }
+            finally
+            {
+                property.Close();
+            }
+        }
+
         private static void AssertLayout(Form dialog)
         {
             var problems = new List<string>();
@@ -130,13 +194,13 @@ namespace THMS.Tests.UI
         }
 
         private static ComboBox ValueList(Form dialog) =>
-            All(dialog).OfType<ComboBox>().Single();
+            All(dialog).OfType<ComboBox>().Single(combo => combo.DropDownStyle == ComboBoxStyle.DropDownList);
 
         private static NumericUpDown Amount(Form dialog) =>
             All(dialog).OfType<NumericUpDown>().Single();
 
-        private static TextBox Source(Form dialog) =>
-            All(dialog).OfType<TextBox>().Single(box => !box.ReadOnly && string.IsNullOrEmpty(box.Text));
+        private static ComboBox Source(Form dialog) =>
+            All(dialog).OfType<ComboBox>().Single(combo => combo.DropDownStyle == ComboBoxStyle.DropDown);
 
         private static string Describe(Control control) =>
             string.IsNullOrWhiteSpace(control.Text) ? control.GetType().Name : control.Text;

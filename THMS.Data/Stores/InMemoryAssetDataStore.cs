@@ -6,6 +6,7 @@ namespace THMS.Data.Stores
     {
         private readonly List<Asset> _assets = [];
         private readonly List<AssetValuation> _valuations = [];
+        private readonly List<ValuationSource> _sources = [];
 
         public void Save(Asset asset)
         {
@@ -31,6 +32,29 @@ namespace THMS.Data.Stores
         {
             _assets.RemoveAll(item => item.Id == id);
             _valuations.RemoveAll(item => item.AssetId == id);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public void SaveSource(ValuationSource source)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source.Id == Guid.Empty)
+                source.Id = Guid.NewGuid();
+            source.ModifiedOn = DateTime.UtcNow;
+            var index = _sources.FindIndex(item => item.Id == source.Id);
+            if (index >= 0)
+                _sources[index] = source;
+            else
+                _sources.Add(source);
+            FinanceDataRevision.NoteChanged();
+        }
+
+        public IReadOnlyList<ValuationSource> GetSources() =>
+            _sources.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+        public void DeleteSource(Guid id)
+        {
+            _sources.RemoveAll(item => item.Id == id);
             FinanceDataRevision.NoteChanged();
         }
 

@@ -261,6 +261,92 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void Compose_UsesThePrivatePartyMedianAndKeepsTheLease()
+        {
+            var accounts = new InMemoryAccountDataStore();
+            var assets = new InMemoryAssetDataStore();
+            var bluey = new VehicleAsset { Name = "Bluey" };
+            assets.Save(bluey);
+            SaveValue(assets, bluey.Id, ValuationTypes.PrivateParty, 10000, new DateTime(2026, 10, 1), "Kelley Blue Book");
+            SaveValue(assets, bluey.Id, ValuationTypes.PrivateParty, 28000, new DateTime(2026, 11, 20), "Kelley Blue Book");
+            SaveValue(assets, bluey.Id, ValuationTypes.PrivateParty, 30000, new DateTime(2026, 11, 20), "Edmunds");
+            SaveValue(assets, bluey.Id, ValuationTypes.PrivateParty, 32000, new DateTime(2026, 11, 20), "NADA");
+            SaveValue(assets, bluey.Id, ValuationTypes.PrivateParty, 34000, new DateTime(2026, 11, 18), "CarGurus");
+            SaveValue(assets, bluey.Id, ValuationTypes.TradeIn, 20000, new DateTime(2026, 11, 24), "Kelley Blue Book");
+            SaveValue(assets, bluey.Id, ValuationTypes.TradeIn, 22000, new DateTime(2026, 11, 24), "Edmunds");
+            SaveValue(assets, bluey.Id, ValuationTypes.TradeIn, 24000, new DateTime(2026, 11, 24), "NADA");
+            SaveValue(assets, bluey.Id, ValuationTypes.TradeIn, 26000, new DateTime(2026, 11, 24), "CarGurus");
+            accounts.UpsertAccount(new LeaseAccount
+            {
+                Name = "Bluey lease",
+                Type = AccountType.Lease,
+                Principal = -8000,
+                Residual = 20000,
+                SecuredAssetId = bluey.Id
+            });
+
+            var snapshot = Compose(accounts, assets, new DateTime(2026, 11, 24));
+
+            var line = snapshot.Lines.Single(item => item.Name == "Bluey");
+            Assert.That(line.Group, Is.EqualTo("Vehicles"));
+            Assert.That(line.Amount, Is.EqualTo(3000m));
+            Assert.That(line.Source, Does.Contain("Private party median of 4"));
+            Assert.That(line.Source, Does.Contain("Kelley Blue Book"));
+            Assert.That(line.Source, Does.Contain("Edmunds"));
+            Assert.That(line.Source, Does.Contain("NADA"));
+            Assert.That(line.Source, Does.Contain("CarGurus"));
+            Assert.That(line.Source, Does.Contain("Keeping it"));
+            Assert.That(line.Source, Does.Not.Contain("Trade-in"));
+            Assert.That(line.Source, Does.Not.Contain("No valuation"));
+            Assert.That(snapshot.Lines.Any(item => item.Name == "Bluey lease"), Is.False);
+            Assert.That(snapshot.OtherAssets, Is.EqualTo(3000m));
+            Assert.That(snapshot.Debt, Is.EqualTo(0m));
+            Assert.That(snapshot.NetWorth, Is.EqualTo(3000m));
+            Assert.That(snapshot.Months.Select(month => month.Vehicles), Is.EqualTo(new[] { 0m, 3000m }));
+            AssertAddsUp(snapshot);
+        }
+
+        [Test]
+        public void Compose_UsesTradeInWhenNoPrivatePartyIsRecorded()
+        {
+            var assets = new InMemoryAssetDataStore();
+            var bluey = new VehicleAsset { Name = "Bluey" };
+            assets.Save(bluey);
+            SaveValue(assets, bluey.Id, ValuationTypes.TradeIn, 21000, new DateTime(2026, 11, 2), "Kelley Blue Book");
+            SaveValue(assets, bluey.Id, ValuationTypes.Retail, 40000, new DateTime(2026, 11, 20), "Edmunds");
+
+            var snapshot = Compose(new InMemoryAccountDataStore(), assets, new DateTime(2026, 11, 24));
+
+            var line = snapshot.Lines.Single();
+            Assert.That(line.Group, Is.EqualTo("Vehicles"));
+            Assert.That(line.Amount, Is.EqualTo(21000m));
+            Assert.That(line.Source, Does.StartWith("Trade-in"));
+            AssertAddsUp(snapshot);
+        }
+
+        [Test]
+        public void Compose_CarriesPrivatePartyAheadOfANewerTradeIn()
+        {
+            var assets = new InMemoryAssetDataStore();
+            var bluey = new VehicleAsset { Name = "Bluey" };
+            assets.Save(bluey);
+            SaveValue(assets, bluey.Id, ValuationTypes.PrivateParty, 25000, new DateTime(2026, 9, 15), "Kelley Blue Book");
+            SaveValue(assets, bluey.Id, ValuationTypes.TradeIn, 40000, new DateTime(2026, 11, 10), "Edmunds");
+
+            var snapshot = Compose(new InMemoryAccountDataStore(), assets, new DateTime(2026, 11, 15));
+
+            Assert.That(snapshot.Lines.Single().Amount, Is.EqualTo(25000m));
+            Assert.That(snapshot.Lines.Single().Source, Does.StartWith("Private party"));
+            Assert.That(snapshot.Lines.Single().Source, Does.Contain("carried forward"));
+            Assert.That(snapshot.Months.Select(month => month.Label), Is.EqualTo(new[]
+            {
+                "Sep 2026", "Oct 2026", "Nov 2026"
+            }));
+            Assert.That(snapshot.Months.Select(month => month.Vehicles), Is.EqualTo(new[] { 25000m, 25000m, 25000m }));
+            AssertAddsUp(snapshot);
+        }
+
+        [Test]
         public void Compose_WithNoData_ReturnsTheCurrentMonthAtZero()
         {
             var snapshot = Compose(new InMemoryAccountDataStore(), new InMemoryAssetDataStore(), new DateTime(2026, 11, 15));
@@ -307,13 +393,15 @@ namespace THMS.Tests.Logic
             Guid assetId,
             string type,
             decimal amount,
-            DateTime asOf) =>
+            DateTime asOf,
+            string source = "") =>
             assets.SaveValuation(new AssetValuation
             {
                 AssetId = assetId,
                 ValueType = type,
                 Amount = amount,
-                AsOf = asOf
+                AsOf = asOf,
+                Source = source
             });
 
         private static PostedTransaction Posted(Guid accountId, DateTime date, decimal amount) =>

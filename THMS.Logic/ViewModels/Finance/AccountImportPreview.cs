@@ -68,6 +68,14 @@ namespace THMS.Logic.ViewModels.Finance
                     if (Apr.HasValue)
                         credit.APR = Apr.Value;
                     break;
+                case LeaseAccount lease:
+                    if (Apr.HasValue)
+                        lease.MoneyFactor = LeaseAccount.MoneyFactorFromAprPercent(Apr.Value);
+                    if (Principal.HasValue)
+                        lease.Principal = LiabilityLedgerMigration.ImportedDebtPrincipal(Principal.Value);
+                    if (TermMonths.HasValue)
+                        lease.TermMonths = TermMonths.Value;
+                    break;
                 case LoanAccount loan:
                     if (Apr.HasValue)
                         loan.InterestRate = Apr.Value;
@@ -94,6 +102,7 @@ namespace THMS.Logic.ViewModels.Finance
         private static decimal? AprOf(Account account) => account switch
         {
             CreditAccount credit => credit.APR,
+            LeaseAccount lease when lease.MoneyFactor > 0 => lease.ApproximateAprPercent,
             LoanAccount loan => loan.InterestRate,
             MortgageAccount mortgage => mortgage.InterestRate,
             _ => null

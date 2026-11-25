@@ -1,5 +1,4 @@
 using THMS.Domain.Assets;
-using THMS.Domain.Finance.Planning;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.ViewModels.Assets;
 using THMS.UI.WinForms.Controls;
@@ -11,10 +10,10 @@ namespace THMS.UI.WinForms
         private readonly AssetOrchestrator _orchestrator;
         private readonly DataGridView _assets = Grid();
         private readonly DataGridView _valuations = Grid();
-        private readonly DataGridView _taxes = Grid();
+        private readonly DataGridView _sources = Grid();
         private readonly BindingSource _assetSource = new();
         private readonly BindingSource _valuationSource = new();
-        private readonly BindingSource _taxSource = new();
+        private readonly BindingSource _sourceCatalog = new();
         private bool _binding;
         private bool _valuationBreakdown;
 
@@ -32,7 +31,22 @@ namespace THMS.UI.WinForms
 
             _assets.DataSource = _assetSource;
             _valuations.DataSource = _valuationSource;
-            _taxes.DataSource = _taxSource;
+            _sources.DataSource = _sourceCatalog;
+            _sources.Columns.AddRange(
+                LinkFill(nameof(ValuationSource.Name), "Source"),
+                Fill(nameof(ValuationSource.AppraisesLabel), "Appraises"),
+                Fill(nameof(ValuationSource.WebsiteUrl), "Website"));
+            _sources.CellContentClick += (_, e) => OpenSourceName(e);
+            _sources.CellFormatting += (_, e) => FormatSourceName(e);
+            _sources.CellDoubleClick += (_, e) =>
+            {
+                if (e.RowIndex < 0 || SourceHasWebsite(e))
+                    return;
+                EditSource(SelectedSource());
+            };
+            UseMenu(_sources,
+                ("Edit", () => EditSource(SelectedSource())),
+                ("Delete", () => DeleteSource()));
             _assets.Columns.AddRange(
                 Fill(nameof(AssetListRow.Name), "Name"),
                 Column(nameof(AssetListRow.Kind), "Kind"),
@@ -46,48 +60,50 @@ namespace THMS.UI.WinForms
                 Money(nameof(AssetValuation.Amount), "Amount"),
                 Date(nameof(AssetValuation.AsOf), "As of"),
                 Fill(nameof(AssetValuation.Source), "Source"));
-            _taxes.Columns.AddRange(
-                Column(nameof(PropertyTaxListRow.TaxYear), "Tax year"),
-                Date(nameof(PropertyTaxListRow.ProcessDate), "Process date"),
-                Date(nameof(PropertyTaxListRow.DueDate), "Due date"),
-                Money(nameof(PropertyTaxListRow.AmountDue), "Taxes due"),
-                Fill(nameof(PropertyTaxListRow.Collector), "Collector"));
 
             _assets.SelectionChanged += (_, _) => LoadChildren();
             _assets.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) EditAsset(SelectedAsset()); };
             _valuations.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) EditValuation(SelectedValuation()); };
-            _taxes.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) EditTaxStatement(SelectedTax()); };
             UseMenu(_assets,
                 ("Edit", () => EditAsset(SelectedAsset())),
                 ("Delete", () => DeleteAsset()));
-            UseMenu(_valuations, ("Edit", () => EditValuation(SelectedValuation())));
-            UseMenu(_taxes,
-                ("Edit", () => EditTaxStatement(SelectedTax())),
-                ("Delete", () => DeleteTaxStatement()));
+            UseMenu(_valuations,
+                ("Edit", () => EditValuation(SelectedValuation())),
+                ("Add property tax statement", () => AddTaxStatementFromValuation()));
+            _valuations.ContextMenuStrip!.Opening += (_, _) =>
+            {
+                var property = SelectedAsset() is PropertyAsset;
+                foreach (ToolStripItem item in _valuations.ContextMenuStrip.Items)
+                {
+                    if (item.Text != "Add property tax statement")
+                        continue;
+                    item.Visible = property;
+                    item.Enabled = property && SelectedValuation() is PropertyAppraisal;
+                }
+            };
 
             var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal };
-            var lower = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical };
             split.Panel1.Controls.Add(Section("Assets", _assets, () => EditAsset(null)));
-            lower.Panel1.Controls.Add(Section("Valuations", _valuations, () => EditValuation(null)));
-            lower.Panel2.Controls.Add(Section("Property tax statements", _taxes, () => EditTaxStatement(null)));
-            split.Panel2.Controls.Add(lower);
+            split.Panel2.Controls.Add(Section("Valuations", _valuations, () => EditValuation(null)));
 
-            Controls.Add(split);
+            var tabs = new ThmsTabControl { Dock = DockStyle.Fill };
+            var assetsPage = new TabPage("Assets");
+            var sourcesPage = new TabPage("Sources");
+            assetsPage.Controls.Add(split);
+            sourcesPage.Controls.Add(Section("Valuation sources", _sources, () => EditSource(null)));
+            tabs.TabPages.Add(assetsPage);
+            tabs.TabPages.Add(sourcesPage);
+            Controls.Add(tabs);
             void LayoutSplits()
             {
                 if (split.Height > 240)
                     split.SplitterDistance = split.Height / 2;
-                var limit = lower.Panel1MinSize + lower.Panel2MinSize + lower.SplitterWidth;
-                if (lower.Width <= limit)
-                    return;
-                var distance = (int)Math.Round(ClientSize.Width * 0.6);
-                var max = lower.Width - lower.Panel2MinSize - lower.SplitterWidth;
-                lower.SplitterDistance = Math.Clamp(distance, lower.Panel1MinSize, max);
             }
             Load += (_, _) =>
             {
                 LayoutSplits();
                 Reload();
+                ReloadSources();
             };
             Resize += (_, _) => LayoutSplits();
         }
@@ -122,10 +138,93 @@ namespace THMS.UI.WinForms
                 _valuationSource.DataSource = _orchestrator.GetPropertyAppraisals(asset.Id).ToList();
             else
                 _valuationSource.DataSource = _orchestrator.GetValuations(asset.Id).ToList();
-            _taxSource.DataSource = asset is PropertyAsset
-                ? _orchestrator.GetPropertyTaxRows(asset.Id).ToList()
-                : [];
         }
+
+        private void ReloadSources(Guid? keepId = null)
+        {
+            keepId ??= SelectedSource()?.Id;
+            _sourceCatalog.DataSource = _orchestrator.GetValuationSources().ToList();
+            if (keepId is null)
+                return;
+            foreach (DataGridViewRow row in _sources.Rows)
+            {
+                if (row.DataBoundItem is ValuationSource source && source.Id == keepId)
+                {
+                    row.Selected = true;
+                    _sources.CurrentCell = row.Cells[0];
+                    return;
+                }
+            }
+        }
+
+        private void EditSource(ValuationSource? source)
+        {
+            using var dialog = new ValuationSourceDialog(_orchestrator, source);
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+                ReloadSources(source?.Id);
+        }
+
+        private void DeleteSource()
+        {
+            var source = SelectedSource();
+            if (source is null)
+                return;
+            if (MessageBox.Show(this, $"Delete {source.Name}?", "Delete Source",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+            _orchestrator.DeleteValuationSource(source.Id);
+            ReloadSources();
+        }
+
+        private void OpenSourceName(DataGridViewCellEventArgs e)
+        {
+            if (!SourceHasWebsite(e))
+                return;
+            OpenSourceWebsite(_sources.Rows[e.RowIndex].DataBoundItem as ValuationSource);
+        }
+
+        private void FormatSourceName(DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                return;
+            if (_sources.Columns[e.ColumnIndex].Name != nameof(ValuationSource.Name))
+                return;
+            if (_sources.Rows[e.RowIndex].Cells[e.ColumnIndex] is not DataGridViewLinkCell cell)
+                return;
+            if (e.CellStyle is null)
+                return;
+            if (_sources.Rows[e.RowIndex].DataBoundItem is not ValuationSource source)
+                return;
+
+            var plain = e.CellStyle.ForeColor;
+            if (plain.IsEmpty)
+                plain = _sources.ForeColor;
+            DataGridViewUtil.ApplyLinkAppearance(cell, e.CellStyle, source.Website is not null, plain);
+        }
+
+        private bool SourceHasWebsite(DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                return false;
+            if (_sources.Columns[e.ColumnIndex].Name != nameof(ValuationSource.Name))
+                return false;
+            return (_sources.Rows[e.RowIndex].DataBoundItem as ValuationSource)?.Website is not null;
+        }
+
+        private static void OpenSourceWebsite(ValuationSource? source)
+        {
+            var website = source?.Website;
+            if (website is null)
+                return;
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = website.ToString(),
+                UseShellExecute = true
+            });
+        }
+
+        private ValuationSource? SelectedSource() =>
+            _sources.CurrentRow?.DataBoundItem as ValuationSource;
 
         private void EditAsset(Asset? asset)
         {
@@ -173,34 +272,14 @@ namespace THMS.UI.WinForms
                 Reload(asset.Id);
         }
 
-        private void EditTaxStatement(PropertyTaxStatement? existing)
+        private void AddTaxStatementFromValuation()
         {
-            var asset = SelectedAsset() as PropertyAsset;
-            if (asset is null && existing is null)
-            {
-                MessageBox.Show(this, "Select a property first.", "Property Tax",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (SelectedAsset() is not PropertyAsset property || SelectedValuation() is not PropertyAppraisal appraisal)
                 return;
-            }
 
-            if (existing is not null && _orchestrator.GetAsset(existing.AssetId) is PropertyAsset billed)
-                asset = billed;
-
-            using var dialog = new PropertyTaxStatementDialog(_orchestrator, existing, collector: null, asset);
+            using var dialog = new PropertyTaxStatementDialog(_orchestrator, null, collector: null, property, appraisal);
             if (dialog.ShowDialog(this) == DialogResult.OK)
-                Reload(asset?.Id);
-        }
-
-        private void DeleteTaxStatement()
-        {
-            var row = _taxes.CurrentRow?.DataBoundItem as PropertyTaxListRow;
-            if (row is null)
-                return;
-            if (MessageBox.Show(this, $"Delete the {row.TaxYear} property tax statement?", "Delete Statement",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
-                return;
-            _orchestrator.DeletePropertyTaxStatement(row.Id);
-            Reload();
+                Reload(property.Id);
         }
 
         private Asset? SelectedAsset()
@@ -211,13 +290,6 @@ namespace THMS.UI.WinForms
         }
 
         private object? SelectedValuation() => _valuations.CurrentRow?.DataBoundItem;
-
-        private PropertyTaxStatement? SelectedTax()
-        {
-            if (_taxes.CurrentRow?.DataBoundItem is not PropertyTaxListRow row)
-                return null;
-            return _orchestrator.GetPropertyTaxStatement(row.Id);
-        }
 
         private void SelectAsset(Guid? id)
         {
@@ -342,6 +414,18 @@ namespace THMS.UI.WinForms
 
         private static DataGridViewTextBoxColumn Column(string property, string header) =>
             new() { DataPropertyName = property, HeaderText = header, Name = property, ReadOnly = true };
+
+        private static DataGridViewLinkColumn LinkFill(string property, string header) =>
+            new()
+            {
+                DataPropertyName = property,
+                HeaderText = header,
+                Name = property,
+                ReadOnly = true,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                LinkBehavior = LinkBehavior.HoverUnderline,
+                TrackVisitedState = false
+            };
 
         private static DataGridViewTextBoxColumn Fill(string property, string header)
         {

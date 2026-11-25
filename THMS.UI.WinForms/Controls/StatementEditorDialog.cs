@@ -719,7 +719,22 @@ namespace THMS.UI.WinForms.Controls
                     break;
                 case StatementType.Loan:
                     rows.Add(StatementRow("New Balance", numStatementBalance!, bold: true));
-                    if ((SelectedAccount() ?? _lockedAccount) is LoanAccount loan)
+                    if ((SelectedAccount() ?? _lockedAccount) is LeaseAccount lease)
+                    {
+                        if (lease.GrossCapitalizedCost > 0)
+                            rows.Add(StatementRow("Gross cap cost", ValueLabel(lease.GrossCapitalizedCost.ToString("C2"))));
+                        if (lease.CapitalizedCostReduction > 0)
+                            rows.Add(StatementRow("Cap reduction", ValueLabel(lease.CapitalizedCostReduction.ToString("C2"))));
+                        if (lease.AdjustedCapitalizedCost > 0)
+                            rows.Add(StatementRow("Adjusted cap cost", ValueLabel(lease.AdjustedCapitalizedCost.ToString("C2"))));
+                        if (lease.RentCharge > 0)
+                            rows.Add(StatementRow("Rent charge", ValueLabel(lease.RentCharge.ToString("C2"))));
+                        rows.Add(StatementRow("Money factor", ValueLabel(lease.MoneyFactor.ToString("0.########"))));
+                        rows.Add(StatementRow(
+                            "Approx. APR",
+                            ValueLabel(lease.MoneyFactor > 0 ? lease.ApproximateAprPercent.ToString("0.###") + "%" : "—")));
+                    }
+                    else if ((SelectedAccount() ?? _lockedAccount) is LoanAccount loan)
                         rows.Add(StatementRow("Interest Rate", ValueLabel(Percent(loan.InterestRate))));
                     break;
                 case StatementType.Mortgage:

@@ -51,14 +51,24 @@ namespace THMS.Logic.Orchestrators.Finance
                 var missing = new List<string>();
                 if (AmountOwed(loan, loan.Principal) == 0)
                     missing.Add("principal");
-                if (loan.InterestRate <= 0)
+                if (loan is LeaseAccount lease)
+                {
+                    if (lease.MoneyFactor <= 0)
+                        missing.Add("money factor");
+                }
+                else if (loan.InterestRate <= 0)
+                {
                     missing.Add("interest rate");
+                }
                 if (loan.TermMonths <= 0)
                     missing.Add("term");
                 if (loan.StartDate == default)
                     missing.Add("start date");
                 if (missing.Count > 0)
-                    findings.Add($"Missing loan metadata ({string.Join(", ", missing)}): {loan.Name}");
+                {
+                    var kind = loan is LeaseAccount ? "lease" : "loan";
+                    findings.Add($"Missing {kind} metadata ({string.Join(", ", missing)}): {loan.Name}");
+                }
             }
         }
 
@@ -91,7 +101,10 @@ namespace THMS.Logic.Orchestrators.Finance
             {
                 if (!posted.Any(t => t.AccountId == loan.Id) &&
                     !recurring.Any(r => r.IsActive && r.AccountId == loan.Id))
-                    findings.Add($"Loan with no payments: {loan.Name}");
+                {
+                    var kind = loan is LeaseAccount ? "Lease" : "Loan";
+                    findings.Add($"{kind} with no payments: {loan.Name}");
+                }
             }
 
             foreach (var mortgage in mortgages)
@@ -152,7 +165,11 @@ namespace THMS.Logic.Orchestrators.Finance
         {
             var engine = new LoanAmortizationEngine();
             foreach (var loan in loans)
+            {
+                if (loan is LeaseAccount)
+                    continue;
                 InspectSchedule(loan.Name, AmountOwed(loan, loan.Principal), loan.InterestRate, loan.TermMonths, engine, findings);
+            }
             foreach (var mortgage in mortgages)
                 InspectSchedule(mortgage.Name, AmountOwed(mortgage, mortgage.Principal), mortgage.InterestRate, mortgage.TermMonths, engine, findings);
         }

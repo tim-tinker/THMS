@@ -146,6 +146,18 @@ namespace THMS.Ingestion.Importers.Finance
                         credit.APR = apr;
                     break;
 
+                case LeaseAccount lease:
+                    var factorColumn = Column(headers, "MoneyFactor", "Money Factor", "LeaseFactor", "Lease Factor");
+                    if (TryReadDecimal(reader, factorColumn, out var factor))
+                        lease.MoneyFactor = factor;
+                    else if (TryReadDecimal(reader, aprColumn, out var leaseApr) && leaseApr > 0)
+                        lease.MoneyFactor = LeaseAccount.MoneyFactorFromAprPercent(leaseApr);
+                    if (TryReadDecimal(reader, principalColumn, out var leasePrincipal))
+                        lease.Principal = -leasePrincipal;
+                    if (TryReadInt(reader, termColumn, out var leaseTerm))
+                        lease.TermMonths = leaseTerm;
+                    break;
+
                 case LoanAccount loan:
                     if (TryReadDecimal(reader, aprColumn, out var loanApr))
                         loan.InterestRate = loanApr;

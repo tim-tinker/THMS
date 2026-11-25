@@ -103,15 +103,35 @@ namespace THMS.UI.WinForms.Controls
                     numCreditStarting.Value = Clamp(numCreditStarting, PostedBalanceCalculator.ToDisplayBalance(credit, credit.StartingBalance));
                     break;
 
-                case LoanAccount loan:
-                    numLoanPrincipal.Value = Clamp(numLoanPrincipal, PostedBalanceCalculator.ToDisplayBalance(loan, loan.Principal));
-                    numLoanRate.Value = loan.InterestRate;
-                    numLoanTerm.Value = loan.TermMonths;
-                    if (loan is LeaseAccount lease)
+                case LeaseAccount lease:
+                    _leaseMath = true;
+                    try
                     {
-                        numLeaseAmount.Value = Clamp(numLeaseAmount, lease.LeaseAmount);
+                        ApplyRateEditor(moneyFactor: true);
+                        numLoanPrincipal.Value = Clamp(numLoanPrincipal, PostedBalanceCalculator.ToDisplayBalance(lease, lease.Principal));
+                        numLoanTerm.Value = lease.TermMonths;
+                        numLeaseGross.Value = Clamp(numLeaseGross, lease.GrossCapitalizedCost);
+                        numLeaseReduction.Value = Clamp(numLeaseReduction, lease.CapitalizedCostReduction);
+                        numLeaseAdjusted.Value = Clamp(numLeaseAdjusted, lease.AdjustedCapitalizedCost);
                         numLeaseResidual.Value = Clamp(numLeaseResidual, lease.Residual);
+                        numLeaseRent.Value = Clamp(numLeaseRent, lease.RentCharge);
+                        numLeaseAmount.Value = Clamp(numLeaseAmount, lease.LeaseAmount);
+                        numLoanRate.Value = Clamp(numLoanRate, lease.MoneyFactor);
+                        if (numLeaseAdjusted.Value <= 0)
+                            FillAdjustedCapCost();
                     }
+                    finally
+                    {
+                        _leaseMath = false;
+                    }
+                    ApplyRentChargeFactor();
+                    break;
+
+                case LoanAccount loan:
+                    ApplyRateEditor(moneyFactor: false);
+                    numLoanPrincipal.Value = Clamp(numLoanPrincipal, PostedBalanceCalculator.ToDisplayBalance(loan, loan.Principal));
+                    numLoanRate.Value = Clamp(numLoanRate, loan.InterestRate);
+                    numLoanTerm.Value = loan.TermMonths;
                     break;
 
                 case MortgageAccount mortgage:
@@ -163,10 +183,19 @@ namespace THMS.UI.WinForms.Controls
 
                 case LeaseAccount lease:
                     lease.Principal = PostedBalanceCalculator.ToLedgerBalance(lease, numLoanPrincipal.Value);
-                    lease.InterestRate = numLoanRate.Value;
                     lease.TermMonths = (int)numLoanTerm.Value;
-                    lease.LeaseAmount = numLeaseAmount.Value;
+                    lease.GrossCapitalizedCost = numLeaseGross.Value;
+                    lease.CapitalizedCostReduction = numLeaseReduction.Value;
+                    lease.AdjustedCapitalizedCost = numLeaseAdjusted.Value;
                     lease.Residual = numLeaseResidual.Value;
+                    lease.RentCharge = numLeaseRent.Value;
+                    lease.LeaseAmount = numLeaseAmount.Value;
+                    lease.MoneyFactor = LeaseAccount.MoneyFactorFromRentCharge(
+                        lease.RentCharge,
+                        lease.AdjustedCapitalizedCost,
+                        lease.Residual,
+                        lease.TermMonths) ?? numLoanRate.Value;
+                    lease.InterestRate = 0;
                     break;
 
                 case LoanAccount loan:
@@ -238,12 +267,118 @@ namespace THMS.UI.WinForms.Controls
         {
             var lease = Account is LeaseAccount;
             lblLoanPrincipal.Text = lease ? "Balance:" : "Principal:";
-            lblLeaseAmount.Visible = lease;
-            numLeaseAmount.Visible = lease;
+            ApplyRateEditor(lease);
+            lblLeaseGross.Visible = lease;
+            numLeaseGross.Visible = lease;
+            lblLeaseReduction.Visible = lease;
+            numLeaseReduction.Visible = lease;
+            lblLeaseAdjusted.Visible = lease;
+            numLeaseAdjusted.Visible = lease;
             lblLeaseResidual.Visible = lease;
             numLeaseResidual.Visible = lease;
+            lblLeaseRent.Visible = lease;
+            numLeaseRent.Visible = lease;
+            lblLeaseAmount.Visible = lease;
+            numLeaseAmount.Visible = lease;
             lblLeaseHint.Visible = lease;
-            pnlLoan.Height = lease ? 296 : 120;
+            RefreshLeaseApr();
+            pnlLoan.Height = lease ? 516 : 120;
+        }
+
+        private void ApplyRateEditor(bool moneyFactor)
+        {
+            if (moneyFactor)
+            {
+                if (numLoanRate.Value > 1m)
+                    numLoanRate.Value = 1m;
+                numLoanRate.Maximum = 1m;
+                numLoanRate.DecimalPlaces = 8;
+                numLoanRate.Increment = 0.00000001m;
+                lblLoanRate.Text = "Money factor:";
+                return;
+            }
+
+            numLoanRate.Maximum = 100m;
+            numLoanRate.DecimalPlaces = 2;
+            numLoanRate.Increment = 0.01m;
+            lblLoanRate.Text = "Interest Rate (%):";
+        }
+
+        private bool _leaseMath;
+
+        private void OnLeaseContractChanged(object? sender, EventArgs e)
+        {
+            if (_leaseMath || Account is not LeaseAccount)
+                return;
+
+            _leaseMath = true;
+            try
+            {
+                if (sender == numLeaseGross || sender == numLeaseReduction)
+                    FillAdjustedCapCost();
+                ApplyRentChargeFactor();
+            }
+            finally
+            {
+                _leaseMath = false;
+            }
+
+            RefreshLeaseApr();
+        }
+
+        private void FillAdjustedCapCost()
+        {
+            if (numLeaseGross.Value <= 0)
+                return;
+
+            var adjusted = numLeaseGross.Value - numLeaseReduction.Value;
+            if (adjusted < numLeaseAdjusted.Minimum)
+                adjusted = numLeaseAdjusted.Minimum;
+            if (adjusted > numLeaseAdjusted.Maximum)
+                adjusted = numLeaseAdjusted.Maximum;
+            if (numLeaseAdjusted.Value != adjusted)
+                numLeaseAdjusted.Value = adjusted;
+        }
+
+        private void ApplyRentChargeFactor()
+        {
+            var factor = LeaseAccount.MoneyFactorFromRentCharge(
+                numLeaseRent.Value,
+                numLeaseAdjusted.Value,
+                numLeaseResidual.Value,
+                (int)numLoanTerm.Value);
+            if (factor is not decimal value)
+                return;
+
+            if (value > numLoanRate.Maximum)
+                value = numLoanRate.Maximum;
+            var shown = Math.Round(value, numLoanRate.DecimalPlaces, MidpointRounding.AwayFromZero);
+            if (numLoanRate.Value != shown)
+                numLoanRate.Value = shown;
+        }
+
+        private void RefreshLeaseApr()
+        {
+            if (lblLeaseHint is null || Account is not LeaseAccount)
+                return;
+
+            var rate = numLoanRate.Value > 0
+                ? $" About {numLoanRate.Value * LeaseAccount.AprMultiplier:0.###}% APR."
+                : "";
+            var check = "";
+            if (numLeaseAdjusted.Value > numLeaseResidual.Value && numLeaseRent.Value > 0)
+            {
+                var depreciation = numLeaseAdjusted.Value - numLeaseResidual.Value;
+                var basePayments = depreciation + numLeaseRent.Value;
+                check = $" Depreciation {depreciation:c2} plus the rent charge is {basePayments:c2}.";
+            }
+
+            lblLeaseHint.Text =
+                "Balance is the remaining payments. Adjusted cap cost is gross cap cost minus cap reduction. " +
+                "Money factor = rent charge ÷ (term × (adjusted cap cost + residual))." +
+                rate + check +
+                " Lease amount is the total of the payments and is not part of net worth. " +
+                "Residual is the buyout. Keeping the vehicle is its value, minus the balance, minus the residual.";
         }
 
         private void LayoutAutoPay(Panel subtypePanel)
@@ -296,9 +431,23 @@ namespace THMS.UI.WinForms.Controls
 
             int contentBottom = 0;
             foreach (Control child in panel.Controls)
+            {
+                if (!child.Visible)
+                    continue;
                 contentBottom = Math.Max(contentBottom, child.Bottom);
+            }
 
             panel.Height = contentBottom + panelPadding;
+            var maxPanelHeight = LogicalToDeviceUnits(420);
+            if (panel.Height > maxPanelHeight)
+            {
+                panel.AutoScroll = true;
+                panel.Height = maxPanelHeight;
+            }
+            else
+            {
+                panel.AutoScroll = false;
+            }
 
             ClientSize = new Size(
                 ClientSize.Width,
@@ -319,6 +468,8 @@ namespace THMS.UI.WinForms.Controls
                 ? choice.Id
                 : (Guid?)null;
 
+            var fromLease = Account is LeaseAccount;
+            var rateBox = numLoanRate.Value;
             var carriedLoan = Account is LoanAccount currentLoan
                 && selected is "Loan" or "Lease"
                 ? currentLoan
@@ -362,15 +513,27 @@ namespace THMS.UI.WinForms.Controls
                 if (carriedLoan is not null && Account is LoanAccount loan)
                 {
                     loan.Principal = PostedBalanceCalculator.ToLedgerBalance(loan, numLoanPrincipal.Value);
-                    loan.InterestRate = numLoanRate.Value;
                     loan.TermMonths = (int)numLoanTerm.Value;
                     loan.SecuredAssetId = carriedLoan.SecuredAssetId;
                     loan.StartDate = carriedLoan.StartDate;
                     loan.ScheduleType = carriedLoan.ScheduleType;
                     if (loan is LeaseAccount nextLease)
                     {
+                        nextLease.MoneyFactor = fromLease
+                            ? rateBox
+                            : LeaseAccount.MoneyFactorFromAprPercent(rateBox);
+                        nextLease.GrossCapitalizedCost = numLeaseGross.Value;
+                        nextLease.CapitalizedCostReduction = numLeaseReduction.Value;
+                        nextLease.AdjustedCapitalizedCost = numLeaseAdjusted.Value;
+                        nextLease.RentCharge = numLeaseRent.Value;
                         nextLease.LeaseAmount = numLeaseAmount.Value;
                         nextLease.Residual = numLeaseResidual.Value;
+                    }
+                    else
+                    {
+                        loan.InterestRate = fromLease
+                            ? rateBox * LeaseAccount.AprMultiplier
+                            : rateBox;
                     }
                 }
             }

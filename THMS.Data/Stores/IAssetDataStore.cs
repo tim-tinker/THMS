@@ -9,6 +9,10 @@ namespace THMS.Data.Stores
         IReadOnlyList<Asset> GetAll();
         void Delete(Guid id);
 
+        void SaveSource(ValuationSource source);
+        IReadOnlyList<ValuationSource> GetSources();
+        void DeleteSource(Guid id);
+
         void SaveValuation(AssetValuation valuation);
         IReadOnlyList<AssetValuation> GetValuations(Guid assetId);
         void DeleteValuation(Guid id);

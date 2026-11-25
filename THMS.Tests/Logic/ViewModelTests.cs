@@ -670,6 +670,37 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void Compose_SortsAccountListsByValueWithZerosLast()
+        {
+            var snapshot = new FinanceDashboardComposer().Compose(
+                new DateTime(2026, 11, 25),
+                [
+                    new BankAccount { Name = "Alpha", PostedBalance = 10 },
+                    new BankAccount { Name = "Zulu", PostedBalance = 500 },
+                    new BankAccount { Name = "Middle", PostedBalance = 0 },
+                    new CreditAccount { Name = "Amex", PostedBalance = -20 },
+                    new CreditAccount { Name = "Visa", PostedBalance = -800 },
+                    new CreditAccount { Name = "Store", PostedBalance = 0 },
+                    new LoanAccount { Name = "Auto", Principal = -100 },
+                    new MortgageAccount { Name = "Cabin", Principal = -2000 },
+                    new InvestmentAccount { Name = "Brokerage", CashBalance = 5, PositionValue = 0 },
+                    new InvestmentAccount { Name = "HSA", CashBalance = 0, PositionValue = 900 }
+                ],
+                [],
+                [],
+                [],
+                new Dictionary<Guid, ExpenseBudgetHistory?>(),
+                [],
+                [],
+                []);
+
+            Assert.That(snapshot.BankAccounts.Select(account => account.Name), Is.EqualTo(new[] { "Zulu", "Alpha", "Middle" }));
+            Assert.That(snapshot.CreditAccounts.Select(account => account.Name), Is.EqualTo(new[] { "Visa", "Amex", "Store" }));
+            Assert.That(snapshot.LoanAccounts.Select(account => account.Name), Is.EqualTo(new[] { "Cabin", "Auto" }));
+            Assert.That(snapshot.InvestmentAccounts.Select(account => account.Name), Is.EqualTo(new[] { "HSA", "Brokerage" }));
+        }
+
+        [Test]
         public void BudgetStatus_UsesFrequencySpecificSoonWindow()
         {
             var weekly = StatusPeriod(new DateTime(2026, 9, 13));

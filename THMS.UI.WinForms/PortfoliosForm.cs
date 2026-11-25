@@ -8,8 +8,8 @@ namespace THMS.UI.WinForms
 {
     public class PortfoliosForm : BaseEmbeddedForm
     {
-        private readonly InvestmentPortfolioCatalog _catalog = new();
-        private readonly InvestmentImportOrchestrator _import = new();
+        private readonly InvestmentPortfolioCatalog _catalog;
+        private readonly InvestmentImportOrchestrator _import;
         private readonly BindingSource _portfolioSource = new();
         private readonly BindingSource _securitySource = new();
         private readonly BindingSource _actionSource = new();
@@ -24,7 +24,14 @@ namespace THMS.UI.WinForms
         private int _loadedRevision = int.MinValue;
 
         public PortfoliosForm()
+            : this(new InvestmentPortfolioCatalog(), new InvestmentImportOrchestrator())
         {
+        }
+
+        internal PortfoliosForm(InvestmentPortfolioCatalog catalog, InvestmentImportOrchestrator import)
+        {
+            _catalog = catalog;
+            _import = import;
             Text = "Portfolios";
             AutoScaleMode = AutoScaleMode.Dpi;
             BackColor = Color.White;
@@ -42,6 +49,7 @@ namespace THMS.UI.WinForms
                 TextColumn(nameof(InvestmentPortfolioRow.PricesAsOfText), "Prices as of"),
                 TextColumn(nameof(InvestmentPortfolioRow.PriceSource), "Prices"),
                 MoneyColumn(nameof(InvestmentPortfolioRow.EstimatedAnnualIncome), "Est. annual income"));
+            FitAllValues(_portfolios);
             _securities.Columns.AddRange(
                 TextColumn(nameof(InvestmentPositionRow.Symbol), "Symbol"),
                 FillColumn(nameof(InvestmentPositionRow.Name), "Name"),
@@ -136,6 +144,29 @@ namespace THMS.UI.WinForms
             }
 
             _loadedRevision = FinanceDataRevision.Current;
+            FitAllValues(_portfolios);
+        }
+
+        private static void FitAllValues(DataGridView grid)
+        {
+            if (grid.IsDisposed)
+                return;
+
+            grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+            foreach (DataGridViewColumn column in grid.Columns)
+            {
+                if (column.AutoSizeMode == DataGridViewAutoSizeColumnMode.Fill || column.Index < 0)
+                    continue;
+
+                column.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                if (!grid.IsHandleCreated)
+                    continue;
+
+                grid.AutoResizeColumn(column.Index, DataGridViewAutoSizeColumnMode.AllCells);
+                var width = column.GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, fixedHeight: true);
+                if (width > 0)
+                    column.MinimumWidth = width;
+            }
         }
 
         private void OnPortfolioSelected()

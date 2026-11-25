@@ -222,7 +222,9 @@ namespace THMS.Tests.UI
                 var expected = anniversary < DateTime.Today ? anniversary : DateTime.Today;
                 Assert.That(dialog.Text, Is.EqualTo("Add Real Estate Valuation"));
                 Assert.That(All(dialog).OfType<DateTimePicker>().Single().Value.Date, Is.EqualTo(expected));
-                Assert.That(TextBox(dialog, "Fort Bend CAD").Text, Is.EqualTo("Fort Bend CAD"));
+                Assert.That(
+                    All(dialog).OfType<ComboBox>().Single(combo => combo.DropDownStyle == ComboBoxStyle.DropDown).Text,
+                    Is.EqualTo("Fort Bend CAD"));
                 Assert.That(Editor(dialog, "Land market").Value, Is.EqualTo(84500m));
                 Assert.That(Editor(dialog, "Improvement market").Value, Is.EqualTo(542600m));
                 Assert.That(Editor(dialog, "Less homestead").Value, Is.EqualTo(27000m));
@@ -395,6 +397,67 @@ namespace THMS.Tests.UI
                 Assert.That(collectors.SelectedItem, Is.InstanceOf<Account>());
                 Assert.That(((Account)collectors.SelectedItem!).Name, Is.EqualTo("Fort Bend Tax Office"));
                 Assert.That(grid.Rows.Count, Is.EqualTo(2));
+            }
+            finally
+            {
+                dialog.Close();
+            }
+        }
+
+        [Test]
+        [Apartment(ApartmentState.STA)]
+        public void StatementFromAValuation_FillsThatAppraisalAndWaitsForTheCollector()
+        {
+            var orchestrator = Orchestrator();
+            var collector = orchestrator.EnsureTaxCollector("Fort Bend Tax Office");
+            var property = new PropertyAsset { Name = "Casa Tinker", Category = "Real estate" };
+            orchestrator.SaveAsset(property, null, null);
+            var latest = new PropertyAppraisal
+            {
+                AsOf = new DateTime(2026, 5, 1),
+                Source = "Fort Bend CAD",
+                LandMarketValue = 84500m,
+                ImprovementMarketValue = 542600m
+            };
+            var selected = new PropertyAppraisal
+            {
+                AsOf = new DateTime(2025, 5, 1),
+                Source = "County notice",
+                LandMarketValue = 70000m,
+                ImprovementMarketValue = 500000m,
+                HomesteadCap = 12000m
+            };
+            orchestrator.SavePropertyAppraisal(property, latest);
+            orchestrator.SavePropertyAppraisal(property, selected);
+            var previous = Statement(collector.Id, property.Id, DateTime.Today.Year - 1, "Lamar CISD", 145000m, 1.139m);
+            orchestrator.SavePropertyTaxStatement(property, previous);
+
+            using var dialog = new PropertyTaxStatementDialog(orchestrator, null, null, property, selected);
+            dialog.Show();
+            try
+            {
+                var valuation = All(dialog).OfType<ComboBox>().Single(combo =>
+                    combo.Items.Cast<object>().Any(item => item is string text && text == "(choose a valuation)"));
+                Assert.That(((PropertyAppraisal)valuation.SelectedItem!).Id, Is.EqualTo(selected.Id));
+                Assert.That(valuation.GetItemText(valuation.SelectedItem), Does.Contain("County notice"));
+                Assert.That(Editor(dialog, "Land market").Value, Is.EqualTo(70000m));
+                Assert.That(Editor(dialog, "Improvement market").Value, Is.EqualTo(500000m));
+                Assert.That(Editor(dialog, "Less homestead").Value, Is.EqualTo(12000m));
+                Assert.That(Editor(dialog, "Total market").Value, Is.EqualTo(570000m));
+                Assert.That(Editor(dialog, "Assessed").Value, Is.EqualTo(558000m));
+
+                var collectorLabel = All(dialog).OfType<Label>().Single(label => label.Text == "Collector");
+                var collectors = All(collectorLabel.Parent!).OfType<ComboBox>().Single();
+                Assert.That(collectors.Text, Is.Empty);
+                Assert.That(collectors.SelectedIndex, Is.EqualTo(-1));
+                var grid = All(dialog).OfType<DataGridView>().Single();
+                Assert.That(grid.Rows.Count, Is.EqualTo(0));
+
+                collectors.SelectedItem = collectors.Items.Cast<object>().OfType<Account>()
+                    .Single(account => account.Name == "Fort Bend Tax Office");
+                Assert.That(grid.Rows.Count, Is.EqualTo(1));
+                Assert.That(grid.Rows[0].Cells["Name"].Value, Is.EqualTo("Lamar CISD"));
+                Assert.That(Line(grid, "ExemptionAmount"), Is.EqualTo(145000m));
             }
             finally
             {

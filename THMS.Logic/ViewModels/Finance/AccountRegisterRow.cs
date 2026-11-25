@@ -134,6 +134,9 @@ namespace THMS.Logic.ViewModels.Finance
 
         private static decimal? AprNumber(Account account)
         {
+            if (account is LeaseAccount lease)
+                return lease.MoneyFactor > 0 ? lease.ApproximateAprPercent : null;
+
             decimal? rate = account switch
             {
                 CreditAccount credit => credit.APR,

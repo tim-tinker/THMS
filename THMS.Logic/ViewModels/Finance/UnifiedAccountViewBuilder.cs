@@ -56,6 +56,13 @@ namespace THMS.Logic.ViewModels.Finance
                         view.Balance = inv.CashBalance + inv.PositionValue;
                         break;
 
+                    case LeaseAccount lease:
+                        if (live is null && useStoredPosted)
+                            view.Balance = PostedBalanceCalculator.ToDisplayBalance(lease, lease.Principal);
+                        view.APR = lease.MoneyFactor > 0 ? lease.ApproximateAprPercent : null;
+                        view.DueDate = LookupNextPayment(acct.Id, nextPaymentByAccount) ?? live?.DueDate;
+                        break;
+
                     case LoanAccount loan:
                         if (live is null && useStoredPosted)
                             view.Balance = PostedBalanceCalculator.ToDisplayBalance(loan, loan.Principal);

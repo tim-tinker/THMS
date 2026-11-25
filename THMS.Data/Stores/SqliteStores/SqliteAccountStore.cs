@@ -227,7 +227,12 @@ namespace THMS.Data.Stores.SqliteStores
                 TermMonths = details.Value.TermMonths,
                 SecuredAssetId = details.Value.SecuredAssetId,
                 LeaseAmount = details.Value.LeaseAmount,
-                Residual = details.Value.Residual
+                Residual = details.Value.Residual,
+                MoneyFactor = details.Value.MoneyFactor,
+                GrossCapitalizedCost = details.Value.GrossCapitalizedCost,
+                CapitalizedCostReduction = details.Value.CapitalizedCostReduction,
+                AdjustedCapitalizedCost = details.Value.AdjustedCapitalizedCost,
+                RentCharge = details.Value.RentCharge
             };
         }
 

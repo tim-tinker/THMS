@@ -58,8 +58,8 @@ namespace THMS.UI
         public void LoadModules()
         {
             AddSectionLabel("Dashboards");
-            AddDashboard("Finance", new FinanceDashboardForm());
             AddDashboard("Net Worth", new NetWorthDashboardForm());
+            AddDashboard("Finance", new FinanceDashboardForm());
             AddDashboard("Investments", new InvestmentsDashboardForm());
             AddDashboard("Vehicles", new VehicleListDashboardForm());
             AddDashboard("Energy", new EnergyDashboardForm());
@@ -74,7 +74,7 @@ namespace THMS.UI
         private void OnLoad(object sender, EventArgs e)
         {
             new AssetOrchestrator().EnsureVehicleAssets();
-            ShowDashboard("Finance");
+            ShowDashboard("Net Worth");
         }
 
         private async void OnShown(object? sender, EventArgs e)
@@ -128,8 +128,11 @@ namespace THMS.UI
                 form.RefreshAfterExternalData();
             if (_embeddedForms.TryGetValue("Portfolios", out var portfolios) && portfolios is PortfoliosForm portfolioForm)
                 portfolioForm.RefreshView();
-            if (_dashboards.TryGetValue("Finance", out var dashboard))
-                dashboard.RefreshDashboard();
+            foreach (var dashboard in _dashboards.Values)
+            {
+                if (dashboard.Visible)
+                    dashboard.RefreshDashboard();
+            }
         }
 
         private void SetAppStatus(string message, bool busy = false, int? completed = null, int? total = null)

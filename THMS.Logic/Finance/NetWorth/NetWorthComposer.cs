@@ -11,13 +11,6 @@ namespace THMS.Logic.Finance.NetWorth
 {
     public sealed class NetWorthComposer
     {
-        private static readonly string[] ValuePreference =
-        [
-            ValuationTypes.TotalMarket,
-            ValuationTypes.Assessed,
-            ValuationTypes.Market
-        ];
-
         private readonly IAccountDataStore _accounts;
         private readonly ITransactionDataStore _transactions;
         private readonly IAccountStatementDataStore _statements;
@@ -68,7 +61,7 @@ namespace THMS.Logic.Finance.NetWorth
             }
 
             var investments = BuildInvestments(accounts.OfType<InvestmentAccount>(), asOf);
-            var start = EarliestMonth(current, investments, valuations, statements, cashAccounts.Concat(debtAccounts));
+            var start = EarliestMonth(current, investments, assets, valuations, statements, cashAccounts.Concat(debtAccounts));
             var months = new List<NetWorthMonthRow>();
             decimal? previous = null;
 
@@ -86,7 +79,7 @@ namespace THMS.Logic.Finance.NetWorth
                 foreach (var asset in assets)
                 {
                     var lease = LeaseOn(asset, debtAccounts);
-                    var chosen = ValueAsOf(valuations[asset.Id], through);
+                    var chosen = ValuationPolicy.Choose(asset, valuations[asset.Id], through);
                     if (lease is null)
                     {
                         if (chosen is not null)
@@ -195,7 +188,7 @@ namespace THMS.Logic.Finance.NetWorth
 
             foreach (var asset in assets)
             {
-                var chosen = ValueAsOf(valuations[asset.Id], asOf);
+                var chosen = ValuationPolicy.Choose(asset, valuations[asset.Id], asOf);
                 if (!linked.TryGetValue(asset.Id, out var lease))
                 {
                     lines.Add(new NetWorthLine
@@ -203,7 +196,7 @@ namespace THMS.Logic.Finance.NetWorth
                         Group = GroupOf(asset),
                         Name = asset.Name,
                         Amount = chosen?.Amount,
-                        Source = chosen is null ? "No valuation" : Describe(chosen, asOf)
+                        Source = chosen is null ? "No valuation" : chosen.Describe(asOf)
                     });
                     continue;
                 }
@@ -255,18 +248,10 @@ namespace THMS.Logic.Finance.NetWorth
                 .ToList();
         }
 
-        private static string Describe(AssetValuation valuation, DateTime asOf)
-        {
-            var text = $"{valuation.ValueType} as of {valuation.AsOf:d}";
-            if (valuation.AsOf.Date < new DateTime(asOf.Year, asOf.Month, 1))
-                text += ", carried forward";
-            return text;
-        }
-
-        private static string KeptSource(AssetValuation valuation, LeaseAccount lease, DateTime asOf)
+        private static string KeptSource(ChosenValuation valuation, LeaseAccount lease, DateTime asOf)
         {
             var owed = lease.Principal < 0 ? -lease.Principal : lease.Principal;
-            return $"{Describe(valuation, asOf)}. Keeping it is that value, minus {owed:c2} still due, minus {lease.Residual:c2} residual.";
+            return $"{valuation.Describe(asOf)}. Keeping it is that value, minus {owed:c2} still due, minus {lease.Residual:c2} residual.";
         }
 
         private static HashSet<Guid> LinkedLeaseIds(IReadOnlyList<Account> debtAccounts, IReadOnlyList<Asset> assets)
@@ -492,6 +477,7 @@ namespace THMS.Logic.Finance.NetWorth
         private static DateTime EarliestMonth(
             DateTime current,
             InvestmentSeries investments,
+            IReadOnlyList<Asset> assets,
             IReadOnlyDictionary<Guid, IReadOnlyList<AssetValuation>> valuations,
             IReadOnlyDictionary<Guid, List<AccountStatement>> statements,
             IEnumerable<Account> balanceAccounts)
@@ -503,11 +489,13 @@ namespace THMS.Logic.Finance.NetWorth
                     start = month;
             }
 
-            foreach (var values in valuations.Values)
+            foreach (var asset in assets)
             {
+                if (!valuations.TryGetValue(asset.Id, out var values))
+                    continue;
                 foreach (var valuation in values)
                 {
-                    if (!IsPreferredValue(valuation.ValueType))
+                    if (!ValuationPolicy.Counts(asset, valuation.ValueType))
                         continue;
                     var month = new DateTime(valuation.AsOf.Year, valuation.AsOf.Month, 1);
                     if (month < start)
@@ -530,32 +518,6 @@ namespace THMS.Logic.Finance.NetWorth
             }
 
             return start;
-        }
-
-        private static AssetValuation? ValueAsOf(IReadOnlyList<AssetValuation> valuations, DateTime through)
-        {
-            foreach (var type in ValuePreference)
-            {
-                var chosen = valuations
-                    .Where(valuation => valuation.ValueType == type && valuation.AsOf.Date <= through.Date)
-                    .OrderByDescending(valuation => valuation.AsOf)
-                    .FirstOrDefault();
-                if (chosen is not null)
-                    return chosen;
-            }
-
-            return null;
-        }
-
-        private static bool IsPreferredValue(string valueType)
-        {
-            foreach (var type in ValuePreference)
-            {
-                if (type == valueType)
-                    return true;
-            }
-
-            return false;
         }
 
         private readonly record struct DatedAmount(DateTime Date, decimal Amount);

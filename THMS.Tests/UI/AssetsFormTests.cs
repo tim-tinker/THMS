@@ -1,5 +1,8 @@
+using System.ComponentModel;
+using System.Reflection;
 using THMS.Data.Stores;
 using THMS.Domain.Assets;
+using THMS.Domain.Transportation;
 using THMS.Logic.Orchestrators;
 using THMS.Logic.ViewModels.Assets;
 using THMS.UI.WinForms;
@@ -22,7 +25,7 @@ namespace THMS.Tests.UI
                 form.Refresh();
                 var problems = new List<string>();
                 var labels = All(form).OfType<Label>().Where(label => label.Visible).ToList();
-                foreach (var title in new[] { "Assets", "Valuations", "Property tax statements" })
+                foreach (var title in new[] { "Assets", "Valuations" })
                 {
                     var label = labels.Single(item => item.Text == title);
                     var needed = TextRenderer.MeasureText(label.Text, label.Font);
@@ -33,9 +36,9 @@ namespace THMS.Tests.UI
                         problems.Add($"'{title}' overlaps its grid.");
                 }
 
-                var adds = All(form).OfType<ThmsButton>().Where(button => button.Text == "Add").ToList();
-                if (adds.Count != 3)
-                    problems.Add($"Expected 3 Add buttons, found {adds.Count}.");
+                var adds = All(form).OfType<ThmsButton>().Where(button => button.Visible && button.Text == "Add").ToList();
+                if (adds.Count != 2)
+                    problems.Add($"Expected 2 Add buttons, found {adds.Count}.");
 
                 foreach (var button in adds)
                 {
@@ -56,11 +59,11 @@ namespace THMS.Tests.UI
                 }
 
                 AssertMenu(GridWithColumn(form, "Name"), "Edit", "Delete");
-                AssertMenu(GridUnder(form, "Valuations"), "Edit");
-                AssertMenu(GridWithColumn(form, "Tax year"), "Edit", "Delete");
-                var valuationsWidth = GridUnder(form, "Valuations").Parent!.Width;
-                var expected = (int)Math.Round(form.ClientSize.Width * 0.6);
-                Assert.That(valuationsWidth, Is.EqualTo(expected).Within(8));
+                AssertMenu(GridUnder(form, "Valuations"), "Edit", "Add property tax statement");
+                var valuations = GridUnder(form, "Valuations").Parent!;
+                var split = (SplitContainer)valuations.Parent!.Parent!;
+                Assert.That(split.Orientation, Is.EqualTo(Orientation.Horizontal));
+                Assert.That(split.SplitterDistance, Is.EqualTo(split.Height / 2).Within(8));
                 Assert.That(problems, Is.Empty);
             }
             finally
@@ -128,6 +131,123 @@ namespace THMS.Tests.UI
                 var prior = (PropertyAppraisal)grid.Rows[1].DataBoundItem!;
                 Assert.That(prior.AsOf, Is.EqualTo(new DateTime(2025, 5, 1)));
                 Assert.That(prior.TotalMarketValue, Is.EqualTo(631400m));
+
+                var taxItem = MenuItem(grid, "Add property tax statement");
+                OpenMenu(grid);
+                Assert.That(taxItem.Available, Is.True);
+                Assert.That(taxItem.Enabled, Is.True);
+                Assert.That(All(form).OfType<DataGridView>().Any(item =>
+                    item.Columns.Cast<DataGridViewColumn>().Any(column => column.HeaderText == "Tax year")), Is.False);
+            }
+            finally
+            {
+                form.Close();
+            }
+        }
+
+        [Test]
+        [Apartment(ApartmentState.STA)]
+        public void VehicleValuations_DoNotOfferAPropertyTaxStatement()
+        {
+            var vehicles = new InMemoryVehicleDataStore();
+            var details = new VehicleIce
+            {
+                Year = 2024,
+                Make = "Ford",
+                Model = "Mustang Mach-E",
+                Vin = "1FMCU0G6XPUA12345",
+                Name = "Bluey"
+            };
+            vehicles.UpsertVehicle(details);
+            var orchestrator = new AssetOrchestrator(
+                new InMemoryAssetDataStore(),
+                new InMemoryAccountDataStore(),
+                new InMemoryAccountStatementDataStore(),
+                new InMemoryTransactionDataStore(),
+                vehicles);
+            var car = new VehicleAsset { Name = "Bluey", Category = "Vehicle" };
+            orchestrator.SaveAsset(car, null, details);
+            orchestrator.SaveValuation(new AssetValuation
+            {
+                AssetId = car.Id,
+                ValueType = ValuationTypes.PrivateParty,
+                Amount = 24710m,
+                AsOf = new DateTime(2026, 11, 24),
+                Source = "Edmunds"
+            });
+
+            using var form = new AssetsForm(orchestrator);
+            form.ClientSize = new Size(1100, 760);
+            form.Show();
+            try
+            {
+                var grid = GridUnder(form, "Valuations");
+                Assert.That(grid.Rows.Count, Is.EqualTo(1));
+                var taxItem = MenuItem(grid, "Add property tax statement");
+                OpenMenu(grid);
+                Assert.That(taxItem.Available, Is.False);
+            }
+            finally
+            {
+                form.Close();
+            }
+        }
+
+        [Test]
+        [Apartment(ApartmentState.STA)]
+        public void SourcesTab_ListsValuationSourcesWithTheAssetsTheyAppraise()
+        {
+            var orchestrator = new AssetOrchestrator(
+                new InMemoryAssetDataStore(),
+                new InMemoryAccountDataStore(),
+                new InMemoryAccountStatementDataStore(),
+                new InMemoryTransactionDataStore(),
+                new InMemoryVehicleDataStore());
+            orchestrator.SaveValuationSource(new ValuationSource
+            {
+                Name = "Fort Bend CAD",
+                WebsiteUrl = "www.fbcad.org",
+                Kinds = AppraisedAssetKind.Property
+            });
+            orchestrator.SaveValuationSource(new ValuationSource
+            {
+                Name = "Kelley Blue Book",
+                WebsiteUrl = "https://www.kbb.com",
+                Kinds = AppraisedAssetKind.Vehicle
+            });
+            orchestrator.SaveValuationSource(new ValuationSource
+            {
+                Name = "Tax notice",
+                WebsiteUrl = "",
+                Kinds = AppraisedAssetKind.Property
+            });
+
+            using var form = new AssetsForm(orchestrator);
+            form.ClientSize = new Size(1100, 760);
+            form.Show();
+            try
+            {
+                var tabs = All(form).OfType<TabControl>().Single();
+                tabs.SelectedTab = tabs.TabPages.Cast<TabPage>().Single(page => page.Text == "Sources");
+                form.Refresh();
+
+                var grid = All(form).OfType<DataGridView>().Single(item =>
+                    item.Columns.Cast<DataGridViewColumn>().Any(column => column.HeaderText == "Appraises"));
+                Assert.That(grid.Columns.Cast<DataGridViewColumn>().Select(column => column.HeaderText).ToArray(),
+                    Is.EqualTo(new[] { "Source", "Appraises", "Website" }));
+                Assert.That(grid.Columns[nameof(ValuationSource.Name)], Is.InstanceOf<DataGridViewLinkColumn>());
+                Assert.That(grid.Rows.Cast<DataGridViewRow>().Select(row => ((ValuationSource)row.DataBoundItem!).Name).ToArray(),
+                    Is.EqualTo(new[] { "Fort Bend CAD", "Kelley Blue Book", "Tax notice" }));
+                var cad = (ValuationSource)grid.Rows[0].DataBoundItem!;
+                Assert.That(cad.AppraisesLabel, Is.EqualTo("Property"));
+                Assert.That(cad.Website, Is.Not.Null);
+                Assert.That(cad.Website!.Host, Is.EqualTo("www.fbcad.org"));
+                var name = grid.Columns[nameof(ValuationSource.Name)].Index;
+                Assert.That(((DataGridViewLinkCell)grid.Rows[0].Cells[name]).LinkColor, Is.EqualTo(DataGridViewUtil.LinkFore));
+                Assert.That(((DataGridViewLinkCell)grid.Rows[2].Cells[name]).LinkColor, Is.Not.EqualTo(DataGridViewUtil.LinkFore));
+
+                var menu = grid.ContextMenuStrip!.Items.Cast<ToolStripItem>().Select(item => item.Text).ToArray();
+                Assert.That(menu, Is.EqualTo(new[] { "Edit", "Delete" }));
             }
             finally
             {
@@ -139,6 +259,17 @@ namespace THMS.Tests.UI
         {
             var label = All(form).OfType<Label>().Single(item => item.Text == title);
             return label.Parent!.Controls.OfType<DataGridView>().Single();
+        }
+
+        private static ToolStripMenuItem MenuItem(DataGridView grid, string text) =>
+            grid.ContextMenuStrip!.Items.Cast<ToolStripMenuItem>().Single(item => item.Text == text);
+
+        private static void OpenMenu(DataGridView grid)
+        {
+            var opening = typeof(ToolStripDropDown).GetMethod(
+                "OnOpening",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            opening!.Invoke(grid.ContextMenuStrip, [new CancelEventArgs()]);
         }
 
         private static void AssertMenu(DataGridView grid, params string[] items)

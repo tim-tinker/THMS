@@ -67,7 +67,7 @@ namespace THMS.UI.WinForms.Controls
         private readonly ComboBox _type = new() { DropDownStyle = ComboBoxStyle.DropDownList };
         private readonly NumericUpDown _amount = Money();
         private readonly DateTimePicker _asOf = new() { Format = DateTimePickerFormat.Short };
-        private readonly TextBox _source = new();
+        private readonly ValuationSourceField _source;
         private Control _identity = null!;
         private TableLayoutPanel _values = null!;
         private FlowLayoutPanel _buttons = null!;
@@ -104,6 +104,9 @@ namespace THMS.UI.WinForms.Controls
             _type.SelectedItem = existing?.ValueType ?? ValuationTypes.Market;
             if (_type.SelectedIndex < 0)
                 _type.SelectedIndex = 0;
+            _source = new ValuationSourceField(
+                orchestrator.GetValuationSources(ValuationSource.KindOf(asset)),
+                existing?.Source ?? "");
             var dropWidth = types.Count == 0
                 ? 160
                 : types.Max(text => TextRenderer.MeasureText(text, Font).Width) + SystemInformation.VerticalScrollBarWidth + 16;
@@ -113,7 +116,6 @@ namespace THMS.UI.WinForms.Controls
             {
                 _amount.Value = Clamp(_amount, existing.Amount);
                 _asOf.Value = existing.AsOf == default ? DateTime.Today : existing.AsOf;
-                _source.Text = existing.Source;
             }
 
             var valueRows = new Control[]
@@ -216,7 +218,7 @@ namespace THMS.UI.WinForms.Controls
                 valuation.ValueType = _type.SelectedItem as string ?? "";
                 valuation.Amount = _amount.Value;
                 valuation.AsOf = _asOf.Value.Date;
-                valuation.Source = _source.Text.Trim();
+                valuation.Source = _source.SourceName;
                 _orchestrator.SaveValuation(valuation);
                 DialogResult = DialogResult.OK;
             }
