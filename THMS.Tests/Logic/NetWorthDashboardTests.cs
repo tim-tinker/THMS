@@ -217,6 +217,12 @@ namespace THMS.Tests.Logic
             Assert.That(november.Debt, Is.EqualTo(-200250m));
             Assert.That(november.Property, Is.EqualTo(400000m));
             Assert.That(november.NetWorth, Is.EqualTo(201350m));
+            Assert.That(september.Lines.Single(line => line.Name == "Checking").Amount, Is.EqualTo(1000m));
+            Assert.That(september.Lines.Single(line => line.Name == "Checking").Source, Does.StartWith("Balance as of"));
+            Assert.That(september.Lines.Single(line => line.Name == "Visa").Amount, Is.EqualTo(-300m));
+            Assert.That(september.Lines.Any(line => line.Name == "Mortgage"), Is.False);
+            Assert.That(november.Lines.Single(line => line.Name == "Checking").Source, Is.EqualTo("Current balance"));
+            Assert.That(november.Lines.Single(line => line.Name == "Mortgage").Source, Is.EqualTo("Current balance, secured by House"));
             Assert.That(snapshot.NetWorth, Is.EqualTo(201350m));
             Assert.That(snapshot.Note, Is.EqualTo(NetWorthSnapshot.MethodNote));
             AssertAddsUp(snapshot);
@@ -251,6 +257,8 @@ namespace THMS.Tests.Logic
 
             Assert.That(Month(snapshot, new DateTime(2026, 10, 1)).Investments, Is.EqualTo(80m));
             Assert.That(Month(snapshot, new DateTime(2026, 10, 1)).Cash, Is.EqualTo(0m));
+            Assert.That(Month(snapshot, new DateTime(2026, 10, 1)).Lines.Select(line => line.Name), Is.EqualTo(new[] { "Brokerage" }));
+            Assert.That(Month(snapshot, new DateTime(2026, 10, 1)).Lines.Single().Amount, Is.EqualTo(80m));
             Assert.That(Month(snapshot, new DateTime(2026, 11, 1)).Investments, Is.EqualTo(200m));
             Assert.That(Month(snapshot, new DateTime(2026, 11, 1)).Cash, Is.EqualTo(500m));
             Assert.That(snapshot.Lines.Single(line => line.Name == "Brokerage").Amount, Is.EqualTo(100m));
@@ -386,7 +394,20 @@ namespace THMS.Tests.Logic
             Assert.That(snapshot.Investments, Is.EqualTo(latest.Investments));
             Assert.That(snapshot.OtherAssets, Is.EqualTo(latest.Property + latest.Vehicles + latest.Personal));
             Assert.That(snapshot.Debt, Is.EqualTo(latest.Debt));
+            Assert.That(snapshot.Lines, Is.SameAs(latest.Lines));
+            foreach (var month in snapshot.Months)
+            {
+                Assert.That(Sum(month, "Cash"), Is.EqualTo(month.Cash));
+                Assert.That(Sum(month, "Investments"), Is.EqualTo(month.Investments));
+                Assert.That(Sum(month, "Property"), Is.EqualTo(month.Property));
+                Assert.That(Sum(month, "Vehicles"), Is.EqualTo(month.Vehicles));
+                Assert.That(Sum(month, "Personal"), Is.EqualTo(month.Personal));
+                Assert.That(Sum(month, "Debt"), Is.EqualTo(month.Debt));
+            }
         }
+
+        private static decimal Sum(NetWorthMonthRow month, string group) =>
+            month.Lines.Where(line => line.Group == group).Sum(line => line.Amount ?? 0m);
 
         private static void SaveValue(
             InMemoryAssetDataStore assets,

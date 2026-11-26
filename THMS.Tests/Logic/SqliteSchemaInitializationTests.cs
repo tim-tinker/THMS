@@ -162,6 +162,41 @@ namespace THMS.Tests.Logic
             }
         }
 
+        [Test]
+        public void DeleteBuiltInInterest_StaysDeletedWhenCategoriesReload()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"thms-retire-interest-{Guid.NewGuid():N}.db");
+            try
+            {
+                var store = new SQLiteTransactionDataStore(path);
+                var orchestrator = new CategoryOrchestrator(store, store);
+                Assert.That(store.GetCategory(DefaultExpenseCategories.InterestId), Is.Not.Null);
+
+                orchestrator.DeleteCategory(DefaultExpenseCategories.InterestId);
+
+                Assert.That(store.GetCategory(DefaultExpenseCategories.InterestId), Is.Null);
+                store.EnsureDefaultCategories();
+                store.EnsureDefaultCategories();
+                Assert.That(orchestrator.GetAllCategories().Select(category => category.Id),
+                    Does.Not.Contain(DefaultExpenseCategories.InterestId));
+
+                var reopened = new SQLiteTransactionDataStore(path);
+                reopened.EnsureDefaultCategories();
+                Assert.That(reopened.GetCategory(DefaultExpenseCategories.InterestId), Is.Null);
+                Assert.That(reopened.GetCategory(DefaultExpenseCategories.UncategorizedId), Is.Not.Null);
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                foreach (var suffix in new[] { "", "-wal", "-shm" })
+                {
+                    var file = path + suffix;
+                    if (File.Exists(file))
+                        File.Delete(file);
+                }
+            }
+        }
+
         private static void CreateAll(string path)
         {
             _ = new SQLiteTransactionDataStore(path);

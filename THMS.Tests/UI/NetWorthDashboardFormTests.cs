@@ -99,6 +99,94 @@ namespace THMS.Tests.UI
             }
         }
 
+        [Test]
+        [Apartment(ApartmentState.STA)]
+        public void HistoryCell_ShowsThatMonthAndColumn()
+        {
+            var julyCash = new NetWorthLine { Group = "Cash", Name = "Checking", Amount = 10m, Source = "Balance as of 7/31/2026" };
+            var julyBrokerage = new NetWorthLine { Group = "Investments", Name = "Brokerage", Amount = 20m, Source = "Market value" };
+            var julyHsa = new NetWorthLine { Group = "Investments", Name = "HSA", Amount = 200m, Source = "Market value" };
+            var julyAuto = new NetWorthLine { Group = "Debt", Name = "Auto", Amount = -50m, Source = "Balance as of 7/31/2026" };
+            var julyMortgage = new NetWorthLine { Group = "Debt", Name = "Mortgage", Amount = -600m, Source = "Balance as of 7/31/2026" };
+            var today = new[]
+            {
+                new NetWorthLine { Group = "Cash", Name = "Checking", Amount = 300m, Source = "Current balance" },
+                new NetWorthLine { Group = "Cash", Name = "Savings", Amount = 1200m, Source = "Current balance" },
+                new NetWorthLine { Group = "Investments", Name = "HSA", Amount = 100m, Source = "No position history" }
+            };
+            var snapshot = new NetWorthSnapshot
+            {
+                Lines = today,
+                Months =
+                [
+                    new NetWorthMonthRow
+                    {
+                        Month = new DateTime(2026, 7, 1),
+                        Label = "Jul 2026",
+                        Cash = 10m,
+                        Investments = 100m,
+                        NetWorth = 110m,
+                        Lines = [julyCash, julyBrokerage, julyHsa, julyAuto, julyMortgage]
+                    },
+                    new NetWorthMonthRow
+                    {
+                        Month = new DateTime(2026, 11, 1),
+                        Label = "Nov 2026",
+                        Cash = 1500m,
+                        Investments = 100m,
+                        NetWorth = 1600m,
+                        Lines = today
+                    }
+                ]
+            };
+
+            using var form = new NetWorthDashboardForm();
+            form.ClientSize = new Size(1200, 800);
+            form.InitializeDashboard();
+            form.Show();
+            try
+            {
+                form.Bind(snapshot);
+                form.Refresh();
+
+                form.SelectHistory("Nov 2026", nameof(NetWorthMonthRow.Label));
+                Assert.That(form.DetailHeading, Is.EqualTo("Nov 2026"));
+                Assert.That(form.DetailNames(), Is.EqualTo(new[] { "Savings", "Checking", "HSA" }));
+
+                form.SelectHistory("Jul 2026", nameof(NetWorthMonthRow.Investments));
+                Assert.That(form.DetailHeading, Is.EqualTo("Jul 2026 · Investments"));
+                Assert.That(form.DetailNames(), Is.EqualTo(new[] { "HSA", "Brokerage" }));
+
+                form.SelectHistory("Jul 2026", nameof(NetWorthMonthRow.Debt));
+                Assert.That(form.DetailHeading, Is.EqualTo("Jul 2026 · Debt"));
+                Assert.That(form.DetailNames(), Is.EqualTo(new[] { "Mortgage", "Auto" }));
+
+                form.SelectHistory("Jul 2026", nameof(NetWorthMonthRow.Cash));
+                Assert.That(form.DetailHeading, Is.EqualTo("Jul 2026 · Cash"));
+                Assert.That(form.DetailNames(), Is.EqualTo(new[] { "Checking" }));
+
+                form.SelectHistory("Jul 2026", nameof(NetWorthMonthRow.NetWorth));
+                Assert.That(form.DetailHeading, Is.EqualTo("Jul 2026"));
+                Assert.That(form.DetailNames(), Is.EqualTo(new[] { "Checking", "HSA", "Brokerage", "Mortgage", "Auto" }));
+
+                form.SelectHistory("Jul 2026", nameof(NetWorthMonthRow.Change));
+                Assert.That(form.DetailHeading, Is.EqualTo("Jul 2026"));
+                Assert.That(form.DetailNames(), Is.EqualTo(new[] { "Checking", "HSA", "Brokerage", "Mortgage", "Auto" }));
+
+                Click(Caption(form, "Cash"));
+                Application.DoEvents();
+                Assert.That(form.OpenBreakdownRows(), Is.EqualTo(new[]
+                {
+                    new[] { "Savings", 1200m.ToString("c2") },
+                    new[] { "Checking", 300m.ToString("c2") }
+                }));
+            }
+            finally
+            {
+                form.Close();
+            }
+        }
+
         private static Label Caption(Form form, string title) =>
             All(form).OfType<Label>().Single(label => label.Text == title || label.Text == title + "  ▾");
 

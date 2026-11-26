@@ -815,6 +815,7 @@ namespace THMS.Data.Stores.SQLite
 
             _store.Assignments.DeleteForCategory(conn, category.Id);
             _store.Categories.Delete(conn, category.Id);
+            _store.Categories.RetireBuiltIn(conn, category.Id);
             tx.Commit();
         }
 

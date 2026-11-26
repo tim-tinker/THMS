@@ -29,7 +29,9 @@ namespace THMS.UI.WinForms
         private readonly DataGridView _lines = Grid();
         private readonly BindingSource _monthsSource = new();
         private readonly BindingSource _linesSource = new();
+        private Label _detailHeader = null!;
         private NetWorthSnapshot _snapshot = new();
+        private bool _bindingMonths;
         private ToolStripDropDown? _openDrop;
         private Control? _openAnchor;
         private Control? _closedByClickAnchor;
@@ -102,8 +104,10 @@ namespace THMS.UI.WinForms
             _otherAssets.Text = snapshot.OtherAssets.ToString("c2");
             _debt.Text = snapshot.Debt.ToString("c2");
             _note.Text = snapshot.Note;
+            _bindingMonths = true;
             _monthsSource.DataSource = snapshot.Months.Reverse().ToList();
-            _linesSource.DataSource = snapshot.Lines.ToList();
+            _bindingMonths = false;
+            ShowSelectedLines();
             ReplaceChart(_netWorthChart, NetWorthChartFactory.CreateNetWorthChart(snapshot.Months));
             ReplaceChart(_compositionChart, NetWorthChartFactory.CreateCompositionChart(snapshot.Months));
         }
@@ -129,6 +133,7 @@ namespace THMS.UI.WinForms
                 TextColumn(nameof(NetWorthLine.Source), "Source", DataGridViewAutoSizeColumnMode.Fill));
             DataGridViewUtil.EnableDoubleBuffering(_months);
             DataGridViewUtil.EnableDoubleBuffering(_lines);
+            _months.CurrentCellChanged += (_, _) => ShowSelectedLines();
 
             var root = new TableLayoutPanel
             {
@@ -167,10 +172,11 @@ namespace THMS.UI.WinForms
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Horizontal
             };
+            _detailHeader = SectionHeader("Today");
             split.Panel1.Controls.Add(_months);
             split.Panel1.Controls.Add(SectionHeader("History"));
             split.Panel2.Controls.Add(_lines);
-            split.Panel2.Controls.Add(SectionHeader("Today"));
+            split.Panel2.Controls.Add(_detailHeader);
             SplitContainerUtil.MakeSplitterVisible(split);
             Shown += (_, _) => SplitContainerUtil.TrySetLeadingRatio(split, 55, 45);
             return split;
@@ -375,6 +381,89 @@ namespace THMS.UI.WinForms
                 });
             }
         }
+
+        internal void SelectHistory(string monthLabel, string columnProperty)
+        {
+            var column = _months.Columns[columnProperty];
+            if (column is null)
+                return;
+
+            for (var i = 0; i < _months.Rows.Count; i++)
+            {
+                if (_months.Rows[i].DataBoundItem is not NetWorthMonthRow row || row.Label != monthLabel)
+                    continue;
+
+                if (_months.IsHandleCreated && !_months.IsDisposed)
+                    DataGridViewUtil.SelectOnlyCell(_months, i, column.Index);
+                ShowSelectedLines(row, column.DataPropertyName, column.HeaderText);
+                return;
+            }
+        }
+
+        internal string DetailHeading => _detailHeader.Text;
+
+        internal string[] DetailNames() =>
+            _lines.Rows.Cast<DataGridViewRow>()
+                .Where(row => !row.IsNewRow)
+                .Select(row => row.Cells[nameof(NetWorthLine.Name)].Value?.ToString() ?? "")
+                .ToArray();
+
+        private void ShowSelectedLines()
+        {
+            if (_bindingMonths || _detailHeader is null)
+                return;
+
+            var row = _months.CurrentRow?.DataBoundItem as NetWorthMonthRow;
+            if (row is null && _monthsSource.Count > 0)
+                row = _monthsSource[0] as NetWorthMonthRow;
+            var column = _months.CurrentCell?.OwningColumn;
+            ShowSelectedLines(row, column?.DataPropertyName, column?.HeaderText);
+        }
+
+        private void ShowSelectedLines(NetWorthMonthRow? row, string? property, string? header)
+        {
+            var lines = row is null ? _snapshot.Lines : row.Lines;
+            var group = GroupFor(property);
+            if (group is not null)
+                lines = lines.Where(line => line.Group == group).ToList();
+
+            _detailHeader.Text = row is null
+                ? "Today"
+                : group is null ? row.Label : $"{row.Label} · {header}";
+            _linesSource.DataSource = SortDetail(lines, group is null);
+        }
+
+        private static List<NetWorthLine> SortDetail(IReadOnlyList<NetWorthLine> lines, bool mixed)
+        {
+            var ordered = mixed
+                ? lines.OrderBy(line => GroupOrder(line.Group)).ThenByDescending(AmountMagnitude)
+                : lines.OrderByDescending(AmountMagnitude);
+            return ordered.ThenBy(line => line.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        private static decimal AmountMagnitude(NetWorthLine line) => Math.Abs(line.Amount ?? 0m);
+
+        private static int GroupOrder(string group) => group switch
+        {
+            "Cash" => 0,
+            "Investments" => 1,
+            "Property" => 2,
+            "Vehicles" => 3,
+            "Personal" => 4,
+            "Debt" => 5,
+            _ => 6
+        };
+
+        private static string? GroupFor(string? property) => property switch
+        {
+            nameof(NetWorthMonthRow.Cash) => "Cash",
+            nameof(NetWorthMonthRow.Investments) => "Investments",
+            nameof(NetWorthMonthRow.Property) => "Property",
+            nameof(NetWorthMonthRow.Vehicles) => "Vehicles",
+            nameof(NetWorthMonthRow.Personal) => "Personal",
+            nameof(NetWorthMonthRow.Debt) => "Debt",
+            _ => null
+        };
 
         internal string[][] OpenBreakdownRows()
         {

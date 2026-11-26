@@ -2781,6 +2781,22 @@ namespace THMS.Tests.Logic
         }
 
         [Test]
+        public void DeleteCategory_BuiltInInterestStaysDeleted()
+        {
+            var store = new InMemoryTransactionDataStore();
+            var orchestrator = new CategoryOrchestrator(store, store);
+
+            orchestrator.DeleteCategory(DefaultExpenseCategories.InterestId);
+
+            Assert.That(store.GetCategory(DefaultExpenseCategories.InterestId), Is.Null);
+            Assert.That(
+                orchestrator.GetAllCategories().Select(category => category.Id),
+                Does.Not.Contain(DefaultExpenseCategories.InterestId));
+            store.EnsureDefaultCategories();
+            Assert.That(store.GetCategory(DefaultExpenseCategories.GroceriesId), Is.Not.Null);
+        }
+
+        [Test]
         public void DeleteCategory_MovesUsersToUncategorizedAndReparentsChildren()
         {
             var store = new InMemoryTransactionDataStore();

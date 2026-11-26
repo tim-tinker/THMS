@@ -14,6 +14,7 @@ namespace THMS.Data.Stores.InMemoryStores
         private readonly List<ExpenseBudgetRule> _expenseBudgetRules = new();
         private readonly List<ExpenseBudgetHistory> _expenseBudgetHistory = new();
         private readonly List<ExpenseCategory> _categories = new();
+        private readonly HashSet<Guid> _retiredDefaults = new();
         private readonly List<CategoryAssignment> _assignments = new();
         private readonly List<SplitTransactionRow> _splits = new();
         private readonly List<PaymentIntent> _paymentIntents = new();
@@ -589,6 +590,8 @@ namespace THMS.Data.Stores.InMemoryStores
 
             _assignments.RemoveAll(a => a.CategoryId == category.Id);
             _categories.RemoveAll(c => c.Id == category.Id);
+            if (DefaultExpenseCategories.IsBuiltIn(category.Id))
+                _retiredDefaults.Add(category.Id);
         }
 
         public ExpenseCategory? GetCategory(Guid id) => _categories.FirstOrDefault(c => c.Id == id);
@@ -633,6 +636,8 @@ namespace THMS.Data.Stores.InMemoryStores
         {
             foreach (var category in DefaultExpenseCategories.All)
             {
+                if (_retiredDefaults.Contains(category.Id))
+                    continue;
                 if (_categories.Any(c => c.Id == category.Id))
                     continue;
                 _categories.Add(new ExpenseCategory

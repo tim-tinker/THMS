@@ -22,6 +22,7 @@ namespace THMS.Data.Stores.SqlTables
 
             SqliteSchema.EnsureColumn(conn, "ExpenseCategories", "Role", "TEXT");
             MigrateFromTransactionCategories(conn);
+            EnsureRetiredDefaults(conn);
             EnsureDefaults(conn);
         }
 
@@ -96,15 +97,64 @@ namespace THMS.Data.Stores.SqlTables
             return ReadAll(cmd);
         }
 
+        public void RetireBuiltIn(SqliteConnection conn, Guid id)
+        {
+            if (!DefaultExpenseCategories.IsBuiltIn(id))
+                return;
+
+            EnsureRetiredDefaults(conn);
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "INSERT OR IGNORE INTO RetiredDefaultCategories (Id) VALUES (@Id);";
+            cmd.Parameters.AddWithValue("@Id", id.ToString());
+            cmd.ExecuteNonQuery();
+        }
+
         public void EnsureDefaults(SqliteConnection conn)
         {
+            EnsureRetiredDefaults(conn);
+            var retired = RetiredDefaultIds(conn);
             foreach (var category in DefaultExpenseCategories.All)
             {
-                if (GetById(conn, category.Id) is not null)
+                if (retired.Contains(category.Id) || GetById(conn, category.Id) is not null)
                     continue;
 
-                Add(conn, category);
+                AddIfMissing(conn, category);
             }
+        }
+
+        private static void EnsureRetiredDefaults(SqliteConnection conn)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                CREATE TABLE IF NOT EXISTS RetiredDefaultCategories (
+                    Id TEXT PRIMARY KEY
+                );";
+            cmd.ExecuteNonQuery();
+        }
+
+        private static HashSet<Guid> RetiredDefaultIds(SqliteConnection conn)
+        {
+            var ids = new HashSet<Guid>();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT Id FROM RetiredDefaultCategories;";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (Guid.TryParse(reader.GetString(0), out var id))
+                    ids.Add(id);
+            }
+
+            return ids;
+        }
+
+        private static void AddIfMissing(SqliteConnection conn, ExpenseCategory category)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                INSERT OR IGNORE INTO ExpenseCategories (Id, Name, ParentCategoryId, IsActive, DisplayOrder, Role)
+                VALUES (@Id, @Name, @ParentCategoryId, @IsActive, @DisplayOrder, @Role);";
+            Bind(cmd, category);
+            cmd.ExecuteNonQuery();
         }
 
         public void MigrateLegacyCategoryStrings(SqliteConnection conn)

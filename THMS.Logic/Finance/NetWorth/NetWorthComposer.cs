@@ -104,6 +104,18 @@ namespace THMS.Logic.Finance.NetWorth
                 }
 
                 var net = cash + invested + property + vehicles + personal + debt;
+                var lines = BuildLines(
+                    month,
+                    through,
+                    live,
+                    cashAccounts,
+                    debtAccounts,
+                    names,
+                    investments,
+                    assets,
+                    valuations,
+                    statements,
+                    activity);
                 months.Add(new NetWorthMonthRow
                 {
                     Month = month,
@@ -115,13 +127,13 @@ namespace THMS.Logic.Finance.NetWorth
                     Property = property,
                     Vehicles = vehicles,
                     Personal = personal,
-                    Debt = debt
+                    Debt = debt,
+                    Lines = lines
                 });
                 previous = net;
             }
 
             var latest = months[^1];
-            var lines = BuildLines(asOf, cashAccounts, debtAccounts, names, investments, assets, valuations);
             return new NetWorthSnapshot
             {
                 NetWorth = latest.NetWorth,
@@ -129,9 +141,9 @@ namespace THMS.Logic.Finance.NetWorth
                 Investments = latest.Investments,
                 OtherAssets = latest.Property + latest.Vehicles + latest.Personal,
                 Debt = latest.Debt,
-                Note = Note(investments, lines),
+                Note = Note(investments, latest.Lines),
                 Months = months,
-                Lines = lines
+                Lines = latest.Lines
             };
         }
 
@@ -151,27 +163,34 @@ namespace THMS.Logic.Finance.NetWorth
         }
 
         private List<NetWorthLine> BuildLines(
-            DateTime asOf,
+            DateTime month,
+            DateTime through,
+            bool live,
             IReadOnlyList<Account> cashAccounts,
             IReadOnlyList<Account> debtAccounts,
             IReadOnlyDictionary<Guid, string> assetNames,
             InvestmentSeries investments,
             IReadOnlyList<Asset> assets,
-            IReadOnlyDictionary<Guid, IReadOnlyList<AssetValuation>> valuations)
+            IReadOnlyDictionary<Guid, IReadOnlyList<AssetValuation>> valuations,
+            IReadOnlyDictionary<Guid, List<AccountStatement>> statements,
+            IReadOnlyDictionary<Guid, List<DatedAmount>> activity)
         {
             var lines = new List<NetWorthLine>();
             foreach (var account in cashAccounts)
             {
+                if (!TryBalance(account, statements, activity, through, live, out var amount))
+                    continue;
+
                 lines.Add(new NetWorthLine
                 {
                     Group = "Cash",
                     Name = account.Name ?? "",
-                    Amount = StoredBalance(account),
-                    Source = "Current balance"
+                    Amount = amount,
+                    Source = live ? "Current balance" : $"Balance as of {through:d}"
                 });
             }
 
-            foreach (var line in investments.Lines)
+            foreach (var line in investments.LinesOn(month, live))
             {
                 lines.Add(new NetWorthLine
                 {
@@ -188,7 +207,7 @@ namespace THMS.Logic.Finance.NetWorth
 
             foreach (var asset in assets)
             {
-                var chosen = ValuationPolicy.Choose(asset, valuations[asset.Id], asOf);
+                var chosen = ValuationPolicy.Choose(asset, valuations[asset.Id], through);
                 if (!linked.TryGetValue(asset.Id, out var lease))
                 {
                     lines.Add(new NetWorthLine
@@ -196,10 +215,13 @@ namespace THMS.Logic.Finance.NetWorth
                         Group = GroupOf(asset),
                         Name = asset.Name,
                         Amount = chosen?.Amount,
-                        Source = chosen is null ? "No valuation" : chosen.Describe(asOf)
+                        Source = chosen is null ? "No valuation" : chosen.Describe(through)
                     });
                     continue;
                 }
+
+                if (LeaseBalance(lease, statements, activity, through, live) is not decimal leaseBalance)
+                    continue;
 
                 if (chosen is null)
                 {
@@ -207,19 +229,19 @@ namespace THMS.Logic.Finance.NetWorth
                     {
                         Group = "Debt",
                         Name = asset.Name,
-                        Amount = CostToKeep(lease.Principal, lease.Residual),
+                        Amount = CostToKeep(leaseBalance, lease.Residual),
                         Source = "No valuation. Keeping it costs the remaining payments and the residual."
                     });
                     continue;
                 }
 
-                var equity = LeaseEquity.IfKept(chosen.Amount, lease.Principal, lease.Residual);
+                var equity = LeaseEquity.IfKept(chosen.Amount, leaseBalance, lease.Residual);
                 lines.Add(new NetWorthLine
                 {
                     Group = equity >= 0 ? GroupOf(asset) : "Debt",
                     Name = asset.Name,
                     Amount = equity,
-                    Source = KeptSource(chosen, lease, asOf)
+                    Source = KeptSource(chosen, leaseBalance, lease.Residual, through)
                 });
             }
 
@@ -227,18 +249,20 @@ namespace THMS.Logic.Finance.NetWorth
             {
                 if (account is LeaseAccount linkedLease && linked.ContainsKey(linkedLease.SecuredAssetId ?? Guid.Empty))
                     continue;
+                if (!TryBalance(account, statements, activity, through, live, out var amount))
+                    continue;
 
-                var amount = account is LeaseAccount lease
-                    ? CostToKeep(lease.Principal, lease.Residual)
-                    : StoredBalance(account);
+                var shown = account is LeaseAccount lease
+                    ? CostToKeep(amount, lease.Residual)
+                    : amount;
                 lines.Add(new NetWorthLine
                 {
                     Group = "Debt",
                     Name = account.Name ?? "",
-                    Amount = amount,
+                    Amount = shown,
                     Source = account is LeaseAccount
-                        ? "Remaining payments and residual"
-                        : DebtSource(account, assetNames)
+                        ? live ? "Remaining payments and residual" : $"Remaining payments and residual as of {through:d}"
+                        : DebtSource(account, assetNames, through, live)
                 });
             }
 
@@ -248,10 +272,34 @@ namespace THMS.Logic.Finance.NetWorth
                 .ToList();
         }
 
-        private static string KeptSource(ChosenValuation valuation, LeaseAccount lease, DateTime asOf)
+        private static bool TryBalance(
+            Account account,
+            IReadOnlyDictionary<Guid, List<AccountStatement>> statements,
+            IReadOnlyDictionary<Guid, List<DatedAmount>> activity,
+            DateTime through,
+            bool live,
+            out decimal amount)
         {
-            var owed = lease.Principal < 0 ? -lease.Principal : lease.Principal;
-            return $"{valuation.Describe(asOf)}. Keeping it is that value, minus {owed:c2} still due, minus {lease.Residual:c2} residual.";
+            if (live)
+            {
+                amount = StoredBalance(account);
+                return true;
+            }
+
+            if (BalanceAsOf(account, statements[account.Id], activity[account.Id], through) is decimal balance)
+            {
+                amount = balance;
+                return true;
+            }
+
+            amount = 0;
+            return false;
+        }
+
+        private static string KeptSource(ChosenValuation valuation, decimal leaseBalance, decimal residual, DateTime asOf)
+        {
+            var owed = leaseBalance < 0 ? -leaseBalance : leaseBalance;
+            return $"{valuation.Describe(asOf)}. Keeping it is that value, minus {owed:c2} still due, minus {residual:c2} residual.";
         }
 
         private static HashSet<Guid> LinkedLeaseIds(IReadOnlyList<Account> debtAccounts, IReadOnlyList<Asset> assets)
@@ -331,7 +379,11 @@ namespace THMS.Logic.Finance.NetWorth
             }
         }
 
-        private static string DebtSource(Account account, IReadOnlyDictionary<Guid, string> assetNames)
+        private static string DebtSource(
+            Account account,
+            IReadOnlyDictionary<Guid, string> assetNames,
+            DateTime through,
+            bool live)
         {
             Guid? secured = account switch
             {
@@ -339,9 +391,10 @@ namespace THMS.Logic.Finance.NetWorth
                 MortgageAccount mortgage => mortgage.SecuredAssetId,
                 _ => null
             };
+            var balance = live ? "Current balance" : $"Balance as of {through:d}";
             return secured is Guid assetId && assetNames.TryGetValue(assetId, out var name) && name.Length > 0
-                ? $"Current balance, secured by {name}"
-                : "Current balance";
+                ? $"{balance}, secured by {name}"
+                : balance;
         }
 
         private static string GroupOf(Asset asset) => AssetKinds.Of(asset) switch
@@ -446,7 +499,7 @@ namespace THMS.Logic.Finance.NetWorth
                 {
                     var stored = account.CashBalance + account.PositionValue;
                     series.Untracked += stored;
-                    series.Lines.Add(new InvestmentLine(account.Name ?? "", stored, false));
+                    series.Remember(account.Name ?? "", stored, false, []);
                     continue;
                 }
 
@@ -454,7 +507,7 @@ namespace THMS.Logic.Finance.NetWorth
                     series.Add(month.Month, month.Value);
                 if (history[^1].Unpriced > 0)
                     series.PricesIncomplete = true;
-                series.Lines.Add(new InvestmentLine(account.Name ?? "", history[^1].Value, true));
+                series.Remember(account.Name ?? "", history[^1].Value, true, history);
             }
 
             return series;
@@ -525,17 +578,51 @@ namespace THMS.Logic.Finance.NetWorth
         private sealed class InvestmentSeries
         {
             private readonly Dictionary<DateTime, decimal> _months = [];
+            private readonly List<HeldInvestment> _accounts = [];
 
             public decimal Untracked { get; set; }
             public bool PricesIncomplete { get; set; }
-            public List<InvestmentLine> Lines { get; } = [];
             public IEnumerable<DateTime> Months => _months.Keys;
 
             public void Add(DateTime month, decimal value) =>
                 _months[month] = _months.GetValueOrDefault(month) + value;
 
             public decimal ValueOn(DateTime month) => _months.GetValueOrDefault(month);
+
+            public void Remember(string name, decimal stored, bool tracked, IReadOnlyList<InvestmentMonth> history)
+            {
+                var values = new Dictionary<DateTime, decimal>();
+                if (tracked)
+                {
+                    foreach (var month in history)
+                        values[month.Month] = month.Value;
+                }
+
+                _accounts.Add(new HeldInvestment(name, stored, tracked, values));
+            }
+
+            public IEnumerable<InvestmentLine> LinesOn(DateTime month, bool live)
+            {
+                foreach (var account in _accounts)
+                {
+                    if (!account.Tracked)
+                    {
+                        if (live)
+                            yield return new InvestmentLine(account.Name, account.Stored, false);
+                        continue;
+                    }
+
+                    if (account.Months.TryGetValue(month, out var value))
+                        yield return new InvestmentLine(account.Name, value, true);
+                }
+            }
         }
+
+        private sealed record HeldInvestment(
+            string Name,
+            decimal Stored,
+            bool Tracked,
+            Dictionary<DateTime, decimal> Months);
 
         private readonly record struct InvestmentLine(string Name, decimal Amount, bool Tracked);
     }

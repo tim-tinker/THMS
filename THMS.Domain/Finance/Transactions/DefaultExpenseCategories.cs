@@ -24,6 +24,17 @@ namespace THMS.Domain.Finance.Transactions
 
         public static readonly Guid[] UtilityMemberIds = [UtilityId, ElectricId, WaterId, GasId];
 
+        public static bool IsBuiltIn(Guid id) =>
+            id == UtilityId
+            || id == ElectricId
+            || id == WaterId
+            || id == GasId
+            || id == GroceriesId
+            || id == RestaurantsId
+            || id == PaymentId
+            || id == InterestId
+            || id == UncategorizedId;
+
         public static IReadOnlyList<ExpenseCategory> All { get; } =
         [
             new() { Id = UtilityId, Name = Utility, DisplayOrder = 10 },

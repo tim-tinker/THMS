@@ -12,6 +12,7 @@ namespace THMS.Logic.ViewModels.Finance
         public decimal Vehicles { get; init; }
         public decimal Personal { get; init; }
         public decimal Debt { get; init; }
+        public IReadOnlyList<NetWorthLine> Lines { get; init; } = [];
     }
 
     public sealed class NetWorthLine
