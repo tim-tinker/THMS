@@ -18,9 +18,20 @@ namespace THMS.UI.WinForms.Controls
 
         public bool DiscardActivity { get; private set; }
 
+        private readonly ToolTip _leaseTips;
+
+        private const string ChargeTip = "Enter a negative number. This value is a charge to you.";
+
         public AccountEditForm(Account? existing, IEnumerable<Account>? accounts = null, bool persisted = false)
         {
             InitializeComponent();
+            _leaseTips = new ToolTip(components)
+            {
+                AutoPopDelay = 12000,
+                InitialDelay = 400,
+                ReshowDelay = 200,
+                ShowAlways = true
+            };
 
             _accounts = accounts?.ToList() ?? [];
             _persisted = persisted;
@@ -110,12 +121,12 @@ namespace THMS.UI.WinForms.Controls
                         ApplyRateEditor(moneyFactor: true);
                         numLoanPrincipal.Value = Clamp(numLoanPrincipal, PostedBalanceCalculator.ToDisplayBalance(lease, lease.Principal));
                         numLoanTerm.Value = lease.TermMonths;
-                        numLeaseGross.Value = Clamp(numLeaseGross, lease.GrossCapitalizedCost);
+                        numLeaseGross.Value = Clamp(numLeaseGross, Charge(lease.GrossCapitalizedCost));
                         numLeaseReduction.Value = Clamp(numLeaseReduction, lease.CapitalizedCostReduction);
-                        numLeaseAdjusted.Value = Clamp(numLeaseAdjusted, lease.AdjustedCapitalizedCost);
-                        numLeaseResidual.Value = Clamp(numLeaseResidual, lease.Residual);
-                        numLeaseRent.Value = Clamp(numLeaseRent, lease.RentCharge);
-                        numLeaseAmount.Value = Clamp(numLeaseAmount, lease.LeaseAmount);
+                        numLeaseAdjusted.Value = Clamp(numLeaseAdjusted, Charge(lease.AdjustedCapitalizedCost));
+                        numLeaseResidual.Value = Clamp(numLeaseResidual, Charge(lease.Residual));
+                        numLeaseRent.Value = Clamp(numLeaseRent, Charge(lease.RentCharge));
+                        numLeaseAmount.Value = Clamp(numLeaseAmount, Charge(lease.LeaseAmount));
                         numLoanRate.Value = Clamp(numLoanRate, lease.MoneyFactor);
                         if (numLeaseAdjusted.Value <= 0)
                             FillAdjustedCapCost();
@@ -184,12 +195,12 @@ namespace THMS.UI.WinForms.Controls
                 case LeaseAccount lease:
                     lease.Principal = PostedBalanceCalculator.ToLedgerBalance(lease, numLoanPrincipal.Value);
                     lease.TermMonths = (int)numLoanTerm.Value;
-                    lease.GrossCapitalizedCost = numLeaseGross.Value;
+                    lease.GrossCapitalizedCost = Magnitude(numLeaseGross.Value);
                     lease.CapitalizedCostReduction = numLeaseReduction.Value;
-                    lease.AdjustedCapitalizedCost = numLeaseAdjusted.Value;
-                    lease.Residual = numLeaseResidual.Value;
-                    lease.RentCharge = numLeaseRent.Value;
-                    lease.LeaseAmount = numLeaseAmount.Value;
+                    lease.AdjustedCapitalizedCost = Magnitude(numLeaseAdjusted.Value);
+                    lease.Residual = Magnitude(numLeaseResidual.Value);
+                    lease.RentCharge = Magnitude(numLeaseRent.Value);
+                    lease.LeaseAmount = Magnitude(numLeaseAmount.Value);
                     lease.MoneyFactor = LeaseAccount.MoneyFactorFromRentCharge(
                         lease.RentCharge,
                         lease.AdjustedCapitalizedCost,
@@ -267,7 +278,6 @@ namespace THMS.UI.WinForms.Controls
         {
             var lease = Account is LeaseAccount;
             lblLoanPrincipal.Text = lease ? "Balance:" : "Principal:";
-            ApplyRateEditor(lease);
             lblLeaseGross.Visible = lease;
             numLeaseGross.Visible = lease;
             lblLeaseReduction.Visible = lease;
@@ -280,9 +290,176 @@ namespace THMS.UI.WinForms.Controls
             numLeaseRent.Visible = lease;
             lblLeaseAmount.Visible = lease;
             numLeaseAmount.Visible = lease;
-            lblLeaseHint.Visible = lease;
-            RefreshLeaseApr();
-            pnlLoan.Height = lease ? 516 : 120;
+            if (lease)
+                ArrangeLeaseFields();
+            else
+                ArrangeLoanFields();
+            ApplyRateEditor(lease);
+            if (lease)
+                LockCalculated(numLoanRate);
+            LockCalculated(numLeaseAdjusted);
+            var bottom = 0;
+            foreach (Control child in pnlLoan.Controls)
+            {
+                if (child.Visible)
+                    bottom = Math.Max(bottom, child.Bottom);
+            }
+            pnlLoan.Height = bottom + LogicalToDeviceUnits(8);
+        }
+
+        private void ArrangeLoanFields()
+        {
+            btnLeaseHelp.Visible = false;
+            ArrangeColumn(
+            [
+                (lblLoanPrincipal, numLoanPrincipal),
+                (lblLoanRate, numLoanRate),
+                (lblLoanTerm, numLoanTerm)
+            ]);
+            UnlockEntry(numLoanRate);
+            SetChargeTip(lblLoanPrincipal, numLoanPrincipal, false);
+        }
+
+        private void ArrangeLeaseFields()
+        {
+            ArrangeColumn(
+            [
+                (lblLoanTerm, numLoanTerm),
+                (lblLeaseGross, numLeaseGross),
+                (lblLeaseReduction, numLeaseReduction),
+                (lblLeaseAdjusted, numLeaseAdjusted),
+                (lblLeaseResidual, numLeaseResidual),
+                (lblLeaseRent, numLeaseRent),
+                (lblLoanRate, numLoanRate),
+                (lblLeaseAmount, numLeaseAmount),
+                (lblLoanPrincipal, numLoanPrincipal)
+            ]);
+            var size = LogicalToDeviceUnits(28);
+            btnLeaseHelp.SetBounds(
+                numLoanPrincipal.Right - size,
+                numLoanPrincipal.Bottom + LogicalToDeviceUnits(8),
+                size,
+                size);
+            btnLeaseHelp.Visible = true;
+            _leaseTips.SetToolTip(btnLeaseHelp, "How these lease amounts work");
+            SetChargeTip(lblLeaseGross, numLeaseGross, true);
+            SetChargeTip(lblLeaseResidual, numLeaseResidual, true);
+            SetChargeTip(lblLeaseRent, numLeaseRent, true);
+            SetChargeTip(lblLeaseAmount, numLeaseAmount, true);
+            SetChargeTip(lblLoanPrincipal, numLoanPrincipal, true);
+        }
+
+        private void ArrangeColumn((Label Label, Control Field)[] rows)
+        {
+            var gap = LogicalToDeviceUnits(12);
+            var textWidth = 0;
+            foreach (var (label, _) in rows)
+            {
+                label.Left = 0;
+                textWidth = Math.Max(textWidth, TextRenderer.MeasureText(label.Text, label.Font).Width);
+            }
+
+            var boxLeft = Math.Max(txtName.Left - pnlLoan.Left, textWidth + gap);
+            var boxRight = txtName.Right - pnlLoan.Left;
+            if (boxRight < boxLeft + LogicalToDeviceUnits(140))
+                boxRight = boxLeft + txtName.Width;
+            var boxWidth = boxRight - boxLeft;
+            if (pnlLoan.Width < boxRight + LogicalToDeviceUnits(4))
+                pnlLoan.Width = boxRight + LogicalToDeviceUnits(4);
+
+            var top = LogicalToDeviceUnits(8);
+            var step = LogicalToDeviceUnits(36);
+            for (var i = 0; i < rows.Length; i++)
+            {
+                var (label, field) = rows[i];
+                label.Top = top;
+                label.Width = Math.Max(textWidth, boxLeft - gap);
+                field.SetBounds(boxLeft, top, boxWidth, field.Height);
+                field.TabIndex = i;
+                if (field is NumericUpDown number)
+                    number.TextAlign = HorizontalAlignment.Right;
+                top += step;
+            }
+        }
+
+        private void OnLeaseHelp(object? sender, EventArgs e)
+        {
+            MessageBox.Show(
+                this,
+                LeaseHelpText(),
+                "Lease amounts",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+
+        internal string LeaseHelpText()
+        {
+            var rate = numLoanRate.Value > 0
+                ? $" About {numLoanRate.Value * LeaseAccount.AprMultiplier:0.###}% APR."
+                : "";
+            var check = "";
+            var adjusted = Magnitude(numLeaseAdjusted.Value);
+            var residual = Magnitude(numLeaseResidual.Value);
+            var rent = Magnitude(numLeaseRent.Value);
+            if (adjusted > residual && rent > 0)
+            {
+                var depreciation = adjusted - residual;
+                var basePayments = depreciation + rent;
+                check = $" Depreciation {depreciation:c2} plus the rent charge is {basePayments:c2}.";
+            }
+
+            return
+                "Gross cap cost, residual, rent charge, lease amount, and balance are charges, so enter them as negative numbers. Cap reduction stays positive." +
+                Environment.NewLine + Environment.NewLine +
+                "Adjusted cap cost is calculated from the gross cap cost and the cap reduction." +
+                Environment.NewLine + Environment.NewLine +
+                "Money factor = rent charge ÷ (term × (adjusted cap cost + residual)), using the positive amounts." +
+                rate + check +
+                Environment.NewLine + Environment.NewLine +
+                "Lease amount is the total of the payments and is not part of net worth. Residual is the buyout. Keeping the vehicle is its value, minus the remaining payments, minus the residual.";
+        }
+
+        private void SetChargeTip(Control label, Control field, bool charge)
+        {
+            var text = charge ? ChargeTip : "";
+            _leaseTips.SetToolTip(label, text);
+            _leaseTips.SetToolTip(field, text);
+        }
+
+        private static void LockCalculated(NumericUpDown box)
+        {
+            box.ReadOnly = true;
+            box.TabStop = false;
+            box.InterceptArrowKeys = false;
+            box.Increment = 0;
+            box.BackColor = SystemColors.Control;
+            box.TextAlign = HorizontalAlignment.Right;
+            foreach (Control child in box.Controls)
+            {
+                if (child is TextBox text)
+                {
+                    text.BackColor = SystemColors.Control;
+                    text.TextAlign = HorizontalAlignment.Right;
+                    text.SetBounds(0, text.Top, Math.Max(0, box.ClientSize.Width - 2), text.Height);
+                }
+                else
+                    child.Visible = false;
+            }
+        }
+
+        private static void UnlockEntry(NumericUpDown box)
+        {
+            box.ReadOnly = false;
+            box.TabStop = true;
+            box.InterceptArrowKeys = true;
+            box.BackColor = SystemColors.Window;
+            foreach (Control child in box.Controls)
+            {
+                if (child is TextBox text)
+                    text.BackColor = SystemColors.Window;
+                else
+                    child.Visible = true;
+            }
         }
 
         private void ApplyRateEditor(bool moneyFactor)
@@ -314,6 +491,9 @@ namespace THMS.UI.WinForms.Controls
             _leaseMath = true;
             try
             {
+                if (sender == numLeaseGross || sender == numLeaseResidual || sender == numLeaseRent
+                    || sender == numLeaseAmount || sender == numLoanPrincipal)
+                    ShowAsCharge((NumericUpDown)sender);
                 if (sender == numLeaseGross || sender == numLeaseReduction)
                     FillAdjustedCapCost();
                 ApplyRentChargeFactor();
@@ -322,16 +502,17 @@ namespace THMS.UI.WinForms.Controls
             {
                 _leaseMath = false;
             }
-
-            RefreshLeaseApr();
         }
 
         private void FillAdjustedCapCost()
         {
-            if (numLeaseGross.Value <= 0)
+            var gross = Magnitude(numLeaseGross.Value);
+            if (gross == 0)
                 return;
 
-            var adjusted = numLeaseGross.Value - numLeaseReduction.Value;
+            var adjusted = -(gross - numLeaseReduction.Value);
+            if (adjusted > 0)
+                adjusted = 0;
             if (adjusted < numLeaseAdjusted.Minimum)
                 adjusted = numLeaseAdjusted.Minimum;
             if (adjusted > numLeaseAdjusted.Maximum)
@@ -343,9 +524,9 @@ namespace THMS.UI.WinForms.Controls
         private void ApplyRentChargeFactor()
         {
             var factor = LeaseAccount.MoneyFactorFromRentCharge(
-                numLeaseRent.Value,
-                numLeaseAdjusted.Value,
-                numLeaseResidual.Value,
+                Magnitude(numLeaseRent.Value),
+                Magnitude(numLeaseAdjusted.Value),
+                Magnitude(numLeaseResidual.Value),
                 (int)numLoanTerm.Value);
             if (factor is not decimal value)
                 return;
@@ -355,30 +536,6 @@ namespace THMS.UI.WinForms.Controls
             var shown = Math.Round(value, numLoanRate.DecimalPlaces, MidpointRounding.AwayFromZero);
             if (numLoanRate.Value != shown)
                 numLoanRate.Value = shown;
-        }
-
-        private void RefreshLeaseApr()
-        {
-            if (lblLeaseHint is null || Account is not LeaseAccount)
-                return;
-
-            var rate = numLoanRate.Value > 0
-                ? $" About {numLoanRate.Value * LeaseAccount.AprMultiplier:0.###}% APR."
-                : "";
-            var check = "";
-            if (numLeaseAdjusted.Value > numLeaseResidual.Value && numLeaseRent.Value > 0)
-            {
-                var depreciation = numLeaseAdjusted.Value - numLeaseResidual.Value;
-                var basePayments = depreciation + numLeaseRent.Value;
-                check = $" Depreciation {depreciation:c2} plus the rent charge is {basePayments:c2}.";
-            }
-
-            lblLeaseHint.Text =
-                "Balance is the remaining payments. Adjusted cap cost is gross cap cost minus cap reduction. " +
-                "Money factor = rent charge ÷ (term × (adjusted cap cost + residual))." +
-                rate + check +
-                " Lease amount is the total of the payments and is not part of net worth. " +
-                "Residual is the buyout. Keeping the vehicle is its value, minus the balance, minus the residual.";
         }
 
         private void LayoutAutoPay(Panel subtypePanel)
@@ -522,12 +679,12 @@ namespace THMS.UI.WinForms.Controls
                         nextLease.MoneyFactor = fromLease
                             ? rateBox
                             : LeaseAccount.MoneyFactorFromAprPercent(rateBox);
-                        nextLease.GrossCapitalizedCost = numLeaseGross.Value;
+                        nextLease.GrossCapitalizedCost = Magnitude(numLeaseGross.Value);
                         nextLease.CapitalizedCostReduction = numLeaseReduction.Value;
-                        nextLease.AdjustedCapitalizedCost = numLeaseAdjusted.Value;
-                        nextLease.RentCharge = numLeaseRent.Value;
-                        nextLease.LeaseAmount = numLeaseAmount.Value;
-                        nextLease.Residual = numLeaseResidual.Value;
+                        nextLease.AdjustedCapitalizedCost = Magnitude(numLeaseAdjusted.Value);
+                        nextLease.RentCharge = Magnitude(numLeaseRent.Value);
+                        nextLease.LeaseAmount = Magnitude(numLeaseAmount.Value);
+                        nextLease.Residual = Magnitude(numLeaseResidual.Value);
                     }
                     else
                     {
@@ -613,6 +770,20 @@ namespace THMS.UI.WinForms.Controls
             if (value > box.Maximum)
                 return box.Maximum;
             return value;
+        }
+
+        /// <summary>
+        /// Contract amounts are stored as positive figures. The editor shows an amount owed as a negative charge.
+        /// Balance keeps the ledger sign and is not passed through here.
+        /// </summary>
+        private static decimal Charge(decimal amount) => amount > 0 ? -amount : amount;
+
+        private static decimal Magnitude(decimal amount) => decimal.Abs(amount);
+
+        private static void ShowAsCharge(NumericUpDown box)
+        {
+            if (box.Value > 0)
+                box.Value = -box.Value;
         }
 
         private static DateTime PickerDate(DateTimePicker picker, DateTime? value)
