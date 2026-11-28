@@ -205,6 +205,11 @@ namespace THMS.Tests.Logic
             _ = new SQLiteFinanceDataStore(path);
             _ = new SQLiteEnergyDataStore(path);
             _ = new SQLiteVehicleDataStore(path);
+            _ = new SQLiteIncomeDataStore(path);
+            _ = new SQLiteRetirement401kLimitStore(path);
+            _ = new SQLiteRetirement401kMatchStore(path);
+            _ = new SQLiteRetirement401kBirthYearStore(path);
+            _ = new SQLiteHouseholdPersonStore(path);
         }
     }
 }

@@ -17,6 +17,7 @@ namespace THMS.UI
         private readonly Dictionary<string, BaseEmbeddedForm> _embeddedForms = [];
         private readonly PlaidTransactionOrchestrator _plaidSync = new();
         private CancellationTokenSource? _plaidSyncCts;
+        private Retirement401kDialog? _retirement401k;
 
         /// <summary>Designer only.</summary>
         public MainForm()
@@ -69,6 +70,10 @@ namespace THMS.UI
             AddEmbeddedForm("Portfolios", new PortfoliosForm());
             AddEmbeddedForm("Energy", new DataCenterForm());
             AddEmbeddedForm("Assets", new AssetsForm());
+            AddEmbeddedForm("Income", new IncomeForm());
+
+            AddSectionLabel("Planning");
+            AddPlanningCalculator("401(k)", ShowRetirement401k);
         }
 
         private void OnLoad(object sender, EventArgs e)
@@ -86,6 +91,7 @@ namespace THMS.UI
         private void OnFormClosing(object? sender, FormClosingEventArgs e)
         {
             _plaidSyncCts?.Cancel();
+            _retirement401k?.Dispose();
         }
 
         private async Task RunStartupPlaidSyncAsync()
@@ -241,6 +247,23 @@ namespace THMS.UI
             var button = CreateNavButton(label);
             button.Click += OnClickNavigateToDashboard;
             ConfigureChildForm(dashboardForm);
+        }
+
+        /// <summary>
+        /// A planning tool opens a dialog and leaves the current dashboard selected.
+        /// The dialog is not a destination in the main panel.
+        /// </summary>
+        private void AddPlanningCalculator(string label, EventHandler open)
+        {
+            var button = CreateNavButton(label);
+            button.Click += open;
+        }
+
+        private void ShowRetirement401k(object? sender, EventArgs e)
+        {
+            if (_retirement401k is null || _retirement401k.IsDisposed)
+                _retirement401k = new Retirement401kDialog();
+            _retirement401k.ShowDialog(this);
         }
 
         private void AddEmbeddedForm(string label, BaseEmbeddedForm embeddedForm)

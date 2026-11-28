@@ -1,13 +1,26 @@
+using System.Runtime.CompilerServices;
+
 namespace THMS.UI.WinForms.Controls
 {
     internal static class SplitContainerUtil
     {
         public const int WidthDip = 5;
         public static readonly Color Bar = Color.FromArgb(168, 168, 168);
+        private static readonly ConditionalWeakTable<SplitContainer, WidthDipBox> Widths = new();
 
-        public static void MakeSplitterVisible(SplitContainer split)
+        public static void MakeSplitterVisible(SplitContainer split) => MakeSplitterVisible(split, WidthDip);
+
+        public static void MakeSplitterVisible(SplitContainer split, int widthDip)
         {
             ArgumentNullException.ThrowIfNull(split);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(widthDip);
+            if (!Widths.TryGetValue(split, out var box))
+            {
+                box = new WidthDipBox();
+                Widths.Add(split, box);
+            }
+
+            box.Dip = widthDip;
             ApplyBarColor(split);
             ApplyWidth(split);
             split.HandleCreated -= OnLaidOut;
@@ -52,13 +65,19 @@ namespace THMS.UI.WinForms.Controls
 
         private static void ApplyWidth(SplitContainer split)
         {
-            var width = Math.Max(4, split.LogicalToDeviceUnits(WidthDip));
+            var dip = Widths.TryGetValue(split, out var box) ? box.Dip : WidthDip;
+            var width = Math.Max(4, split.LogicalToDeviceUnits(dip));
             var span = split.Orientation == Orientation.Horizontal ? split.Height : split.Width;
             if (span - split.Panel1MinSize - split.Panel2MinSize < width)
                 return;
             if (split.SplitterWidth == width)
                 return;
             split.SplitterWidth = width;
+        }
+
+        private sealed class WidthDipBox
+        {
+            public int Dip = WidthDip;
         }
     }
 }

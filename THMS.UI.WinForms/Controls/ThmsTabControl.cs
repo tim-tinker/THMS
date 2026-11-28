@@ -61,15 +61,16 @@ namespace THMS.UI.WinForms.Controls
 
         public void RecalculateItemSize()
         {
-            var width = _minTabWidth;
+            var pad = LogicalToDeviceUnits(12);
+            var width = LogicalToDeviceUnits(_minTabWidth);
             foreach (TabPage page in TabPages)
             {
-                var measured = TextRenderer.MeasureText(page.Text, HeaderFont).Width + 24;
+                var measured = TextRenderer.MeasureText(page.Text, HeaderFont).Width + pad;
                 width = Math.Max(width, measured);
             }
 
-            width = Math.Min(width, _maxTabWidth);
-            ItemSize = new Size(LogicalToDeviceUnits(width), LogicalToDeviceUnits(_tabHeight));
+            width = Math.Min(width, LogicalToDeviceUnits(_maxTabWidth));
+            ItemSize = new Size(width, LogicalToDeviceUnits(_tabHeight));
         }
 
         protected override void OnHandleCreated(EventArgs e)
